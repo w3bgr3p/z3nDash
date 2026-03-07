@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>z3n8 | HTTP</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: var(--bg1);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: var(--accent);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            font-size: 11px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stat-label {
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 10px;
+        }
+
+        .stat-value {
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .controls {
+            background: var(--bg1);
+            padding: 8px 12px;
+            margin: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .controls select,
+        .controls input,
+        .controls button {
+            padding: 4px 12px;
+            font-size: 12px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: inherit;
+        }
+
+        .controls button {
+            background: var(--green-bg);
+            border-color: rgba(240, 246, 252, 0.1);
+            color: #ffffff;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .controls button:hover {
+            background: var(--green-bg2);
+        }
+
+        .controls button.danger {
+            background: var(--red-bg);
+            border-color: rgba(248, 81, 73, 0.4);
+        }
+
+        .controls button.danger:hover {
+            background: var(--red-bg);
+            filter: brightness(1.15);
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            margin: 0 8px 8px 8px;
+            gap: 8px;
+        }
+
+        .requests-list {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow-y: auto;
+        }
+
+        .details-panel {
+            width: 500px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: none;
+            flex-direction: column;
+        }
+
+        .details-panel.visible {
+            display: flex;
+        }
+
+        .request-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--bg2);
+            cursor: pointer;
+            transition: background 0.15s;
+            display: grid;
+            grid-template-columns: 80px 60px auto 60px 80px 100px;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .request-item:hover {
+            background: var(--bg1);
+        }
+
+        .request-item.selected {
+            background: var(--bg2);
+            border-left: 3px solid var(--accent);
+        }
+
+        .method {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        .method.GET    { background: rgba(88, 166, 255, 0.15); color: var(--accent-lo); }
+        .method.POST   { background: rgba(63, 185, 80, 0.15);  color: var(--green-lo); }
+        .method.PUT    { background: rgba(210, 153, 34, 0.15); color: var(--yellow-lo); }
+        .method.DELETE { background: rgba(248, 81, 73, 0.15);  color: var(--red-lo); }
+
+        .status {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        .status.s2xx { background: rgba(63, 185, 80, 0.15);  color: var(--green-lo); }
+        .status.s3xx { background: rgba(88, 166, 255, 0.15); color: var(--accent-lo); }
+        .status.s4xx { background: rgba(210, 153, 34, 0.15); color: var(--yellow-lo); }
+        .status.s5xx { background: rgba(248, 81, 73, 0.15);  color: var(--red-lo); }
+
+        .url {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text);
+        }
+
+        .duration {
+            color: var(--text2);
+            font-family: monospace;
+            font-size: 11px;
+            text-align: right;
+        }
+
+        .timestamp {
+            color: var(--text3);
+            font-family: monospace;
+            font-size: 10px;
+        }
+
+        .account {
+            color: var(--green-hi);
+            font-size: 11px;
+        }
+
+        .details-header {
+            padding: 12px;
+            background: var(--bg1);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .details-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text2);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0 8px;
+        }
+
+        .close-btn:hover {
+            color: var(--text);
+        }
+
+        .tabs {
+            display: flex;
+            background: var(--bg1);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+
+        .tab:hover {
+            background: var(--bg2);
+        }
+
+        .tab.active {
+            border-bottom-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        #play.tab-panel.active {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .info-grid {
+            display: grid;
+            gap: 8px;
+        }
+
+        .info-row {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 8px;
+        }
+
+        .info-label {
+            color: var(--text2);
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        .code-block {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 8px;
+            font-family: monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .header-list {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+
+        .header-item {
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--bg2);
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 8px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+
+        .header-item:last-child {
+            border-bottom: none;
+        }
+
+        .header-key {
+            color: var(--green-hi);
+        }
+
+        .header-value {
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
+        .copy-btn:hover {
+            background: var(--border);
+        }
+
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 6px;
+            border: 2px solid var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--muted);
+        }
+
+        /* ── PLAY TAB ── */
+        .play-layout { display: flex; flex-direction: column; height: 100%; gap: 0; }
+        .play-url-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+        .play-method-select {
+            background: var(--bg2); border: 1px solid var(--border); color: var(--text);
+            font-family: inherit; font-size: 11px; padding: 4px 6px; border-radius: 4px; outline: none;
+        }
+        .play-url-input {
+            flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+            font-family: monospace; font-size: 11px; padding: 4px 8px; border-radius: 4px; outline: none;
+        }
+        .play-url-input:focus { border-color: var(--accent); }
+        .play-send-btn {
+            background: var(--green-bg); border: 1px solid rgba(240,246,252,0.1); color: #fff;
+            padding: 4px 14px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 11px;
+            font-weight: 600; transition: background 0.2s; white-space: nowrap;
+        }
+        .play-send-btn:hover { background: var(--green-bg2); }
+        .play-section-label {
+            font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em;
+            padding: 4px 0 3px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+        }
+        .play-textarea {
+            width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+            font-family: monospace; font-size: 10.5px; padding: 6px 8px; border-radius: 4px;
+            outline: none; resize: vertical; line-height: 1.5; min-height: 60px;
+        }
+        .play-textarea:focus { border-color: var(--accent); }
+        .play-response-wrap {
+            flex: 1; display: flex; flex-direction: column; margin-top: 8px; min-height: 0;
+        }
+        .play-response-area {
+            flex: 1; width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+            font-family: monospace; font-size: 10.5px; padding: 6px 8px; border-radius: 4px;
+            outline: none; resize: none; line-height: 1.5; min-height: 80px;
+        }
+        .play-status { font-size: 10px; color: var(--text2); margin-left: auto; }
+        .play-status.ok  { color: var(--green-lo); }
+        .play-status.err { color: var(--red-lo); }
+        .play-footer { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+        .status-2xx { color: var(--green-lo); }
+        .status-3xx { color: var(--accent-lo); }
+        .status-4xx { color: var(--yellow-lo); }
+        .status-5xx { color: var(--red-lo); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🌐 HTTP Traffic Monitor</h1>
+    <div class="stats-bar">
+        <div class="stat-item">
+            <span class="stat-label">Total</span>
+            <span class="stat-value" id="totalRequests">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Success</span>
+            <span class="stat-value" style="color: var(--green-lo);" id="successRate">0%</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Avg Time</span>
+            <span class="stat-value" id="avgTime">0ms</span>
+        </div>
+    </div>
+</div>
+
+<div class="controls">
+    <select id="methodFilter" onchange="refresh()">
+        <option value="">All Methods</option>
+        <option value="GET">GET</option>
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+        <option value="DELETE">DELETE</option>
+    </select>
+
+    <select id="statusFilter" onchange="refresh()">
+        <option value="">All Statuses</option>
+        <option value="2">2xx Success</option>
+        <option value="3">3xx Redirect</option>
+        <option value="4">4xx Client Error</option>
+        <option value="5">5xx Server Error</option>
+    </select>
+
+    <input type="text" id="urlFilter" placeholder="Filter by URL..." onkeyup="refresh()">
+
+    <select id="machineFilter" onchange="refresh()">
+        <option value="">All Machines</option>
+    </select>
+
+    <select id="projectFilter" onchange="refresh()">
+        <option value="">All Projects</option>
+    </select>
+
+    <input type="number" id="limitInput" value="200" min="10" max="1000" step="10" onchange="refresh()">
+
+    <button onclick="refresh()">🔄 Refresh</button>
+    <button onclick="toggleAutoRefresh()">⏸️ Auto: <span id="autoStatus">ON</span></button>
+    <button onclick="clearFilters()">✖️ Reset</button>
+    <button onclick="clearLogs()" class="danger">🗑️ Clear Logs</button>
+</div>
+
+<div class="container">
+    <div class="requests-list" id="requestsList"></div>
+
+    <div class="details-panel" id="detailsPanel">
+        <div class="details-header">
+            <span class="details-title">Request Details</span>
+            <button class="close-btn" onclick="closeDetails()">×</button>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('overview')">Overview</div>
+            <div class="tab" onclick="switchTab('request')">Request</div>
+            <div class="tab" onclick="switchTab('response')">Response</div>
+            <div class="tab" onclick="switchTab('play')">⚡ Play</div>
+        </div>
+
+        <div class="tab-content">
+            <div class="tab-panel active" id="overview"></div>
+            <div class="tab-panel" id="request"></div>
+            <div class="tab-panel" id="response"></div>
+            <div class="tab-panel" id="play"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SERVER = window.location.origin;
+    let autoRefresh = true;
+    let autoRefreshInterval = null;
+    let selectedRequest = null;
+    let currentLogs = [];
+
+    async function refresh() {
+        const method = document.getElementById('methodFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        const url = document.getElementById('urlFilter').value;
+        const machine = document.getElementById('machineFilter').value;
+        const project = document.getElementById('projectFilter').value;
+        const limit = document.getElementById('limitInput').value;
+
+        let apiUrl = `${SERVER}/traffic-logs?limit=${limit}`;
+        if (method) apiUrl += `&method=${method}`;
+        if (status) apiUrl += `&status=${status}`;
+        if (url) apiUrl += `&url=${encodeURIComponent(url)}`;
+        if (machine) apiUrl += `&machine=${encodeURIComponent(machine)}`;
+        if (project) apiUrl += `&project=${encodeURIComponent(project)}`;
+
+        try {
+            const response = await fetch(apiUrl);
+            let logs = await response.json();
+
+            // client-side filtering (server may not support all params)
+            if (method)  logs = logs.filter(l => l.method === method);
+            if (status)  logs = logs.filter(l => String(l.statusCode || '').startsWith(status));
+            if (url)     logs = logs.filter(l => (l.url || '').toLowerCase().includes(url.toLowerCase()));
+            if (machine) logs = logs.filter(l => (l.machine || '') === machine);
+            if (project) logs = logs.filter(l => (l.project || '') === project);
+
+            currentLogs = logs;
+            renderRequests(currentLogs);
+            await updateStats();
+        } catch (e) {
+            console.error('Refresh failed:', e);
+        }
+    }
+
+    function renderRequests(logs) {
+        const container = document.getElementById('requestsList');
+        container.innerHTML = logs.map((log, idx) => {
+            const statusClass = log.statusCode >= 200 && log.statusCode < 300 ? 's2xx' :
+                log.statusCode >= 300 && log.statusCode < 400 ? 's3xx' :
+                    log.statusCode >= 400 && log.statusCode < 500 ? 's4xx' : 's5xx';
+
+            const time = new Date(log.timestamp).toLocaleTimeString();
+            const duration = log.durationMs ? `${log.durationMs}ms` : '-';
+
+            return `
+            <div class="request-item" onclick="showDetails(${idx})">
+                <span class="timestamp">${time}</span>
+                <span class="method ${log.method}">${log.method}</span>
+                <span class="url" title="${escapeHtml(log.url)}">${escapeHtml(truncate(log.url, 60))}</span>
+                <span class="status ${statusClass}">${log.statusCode}</span>
+                <span class="duration">${duration}</span>
+                <span class="account">${log.account || '-'}</span>
+            </div>
+        `;
+        }).join('');
+    }
+
+    function showDetails(idx) {
+        selectedRequest = currentLogs[idx];
+        const panel = document.getElementById('detailsPanel');
+        panel.classList.add('visible');
+
+        document.querySelectorAll('.request-item').forEach((el, i) => {
+            el.classList.toggle('selected', i === idx);
+        });
+
+        renderOverview();
+        renderRequest();
+        renderResponse();
+        renderPlay();
+    }
+
+    function closeDetails() {
+        document.getElementById('detailsPanel').classList.remove('visible');
+        document.querySelectorAll('.request-item').forEach(el => el.classList.remove('selected'));
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+        event.target.classList.add('active');
+        document.getElementById(tab).classList.add('active');
+    }
+
+    function renderOverview() {
+        if (!selectedRequest) return;
+
+        const overview = document.getElementById('overview');
+        overview.innerHTML = `
+        <div class="info-grid">
+            <div class="info-row">
+                <span class="info-label">URL:</span>
+                <span class="info-value">${escapeHtml(selectedRequest.url)}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Method:</span>
+                <span class="info-value">${selectedRequest.method}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="info-value">${selectedRequest.statusCode}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Duration:</span>
+                <span class="info-value">${selectedRequest.durationMs}ms</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Timestamp:</span>
+                <span class="info-value">${selectedRequest.timestamp}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Machine:</span>
+                <span class="info-value">${selectedRequest.machine}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Project:</span>
+                <span class="info-value">${selectedRequest.project}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Account:</span>
+                <span class="info-value">${selectedRequest.account || '-'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Session:</span>
+                <span class="info-value">${selectedRequest.session || '-'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Proxy:</span>
+                <span class="info-value">${selectedRequest.request.proxy || '-'}</span>
+            </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+            <button class="copy-btn" onclick="copyCodeHttpClient(this)" style="border-color:rgba(88,166,255,0.4);color:var(--accent);">&#x2398; HttpClient</button>
+            <button class="copy-btn" onclick="copyCodeZP7(this)"        style="border-color:rgba(63,185,80,0.4);color:var(--green-lo);">&#x2398; ZP7</button>
+            <button class="copy-btn" onclick="copyCodeHybrid(this)"     style="border-color:rgba(210,153,34,0.4);color:var(--yellow-lo);">&#x2398; Hybrid</button>
+            <button class="copy-btn" onclick="copyCodePython(this)"     style="border-color:rgba(255,166,88,0.4);color:#f0883e;">&#x2398; Python</button>
+            <button class="copy-btn" onclick="copyCodeTS(this)"         style="border-color:rgba(41,182,246,0.4);color:#29b6f6;">&#x2398; TypeScript</button>
+            <button class="copy-btn" onclick="copyCodeCurl(this)"       style="border-color:rgba(163,113,247,0.4);color:#a371f7;">&#x2398; cURL</button>
+            <select id="apiStructureMode" style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);font-family:inherit;font-size:11px;padding:3px 6px;border-radius:4px;cursor:pointer;"><option value="skeleton">skeleton</option><option value="first">first</option><option value="last">last</option></select><button class="copy-btn" onclick="copyApiStructure(this)" style="border-color:rgba(255,123,114,0.4);color:#ff7b72;">&#x2398; API Structure</button>
+        </div>
+    `;
+    }
+
+    function parseHeaderLines(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw.filter(h => h && h.trim());
+        if (typeof raw === 'string') return raw.split('\r\n').filter(h => h.trim());
+        return [];
+    }
+
+    function buildHeadersHtml(lines) {
+        return lines.map(h => {
+            const colonIdx = h.indexOf(':');
+            if (colonIdx === -1) return '';
+            const key   = h.substring(0, colonIdx).trim();
+            const value = h.substring(colonIdx + 1).trim();
+            return `<div class="header-item"><span class="header-key">${escapeHtml(key)}</span><span class="header-value">${escapeHtml(value)}</span></div>`;
+        }).join('');
+    }
+
+    function prettyJson(str) {
+        try { return JSON.stringify(JSON.parse(str), null, 2); } catch(e) { return str; }
+    }
+
+    function renderRequest() {
+        if (!selectedRequest) return;
+        const r = selectedRequest.request;
+        const headerLines = parseHeaderLines(r.headers);
+        let cookies = r.cookies || r.Cookies || '';
+        if (!cookies) {
+            const cl = headerLines.find(h => h.toLowerCase().startsWith('cookie:'));
+            if (cl) cookies = cl.substring(cl.indexOf(':') + 1).trim();
+        }
+        const body = r.body || '';
+        const headersHtml = buildHeadersHtml(headerLines);
+        const el = document.getElementById('request');
+        el.innerHTML = `
+        <h4>Headers:</h4>
+        <div class="header-list">${headersHtml || '<i style="color:var(--text3);padding:8px 12px;display:block;">No headers</i>'}</div>
+        <h4 style="margin-top:16px;">Cookies:</h4>
+        <div id="req-cookies-block" class="code-block" style="color:var(--yellow-lo);min-height:20px;word-break:break-all;white-space:pre-wrap;">${cookies ? escapeHtml(cookies) : '<i style="color:var(--text3);">No cookies</i>'}</div>
+        <h4 style="margin-top:16px;">Body:</h4>
+        <div id="req-body-content" class="code-block" style="min-height:20px;white-space:pre-wrap;">${body ? escapeHtml(prettyJson(body)) : '<i style="color:var(--text3);">Empty body</i>'}</div>
+        `;
+        if (cookies) {
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = '\u{1F4CB} Copy Cookies';
+            btn.onclick = () => navigator.clipboard.writeText(cookies).then(() => {
+                const o = btn.textContent; btn.textContent = '\u2713 Copied!'; btn.style.background = 'rgba(63,185,80,0.2)';
+                setTimeout(() => { btn.textContent = o; btn.style.background = ''; }, 1500);
+            });
+            document.getElementById('req-cookies-block').after(btn);
+        }
+        if (body) {
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = '\u{1F4CB} Copy Body';
+            btn.onclick = () => copyBodyById('req-body-content', btn);
+            document.getElementById('req-body-content').after(btn);
+        }
+    }
+
+    function renderResponse() {
+        if (!selectedRequest) return;
+        const res = selectedRequest.response;
+        const body = res.body || '';
+        const headerLines = parseHeaderLines(res.headers);
+        const headersHtml = buildHeadersHtml(headerLines);
+        const el = document.getElementById('response');
+        el.innerHTML = `
+        <h4>Headers:</h4>
+        <div class="header-list">${headersHtml || '<i style="color:var(--text3);padding:8px 12px;display:block;">No headers</i>'}</div>
+        <h4 style="margin-top:16px;">Body:</h4>
+        <div id="res-body-content" class="code-block" style="min-height:20px;white-space:pre-wrap;">${body ? escapeHtml(prettyJson(body)) : '<i style="color:var(--text3);">Empty body</i>'}</div>
+        `;
+        if (body) {
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = '\u{1F4CB} Copy Body';
+            btn.onclick = () => copyBodyById('res-body-content', btn);
+            document.getElementById('res-body-content').after(btn);
+        }
+    }
+
+
+    function copyBodyById(elementId, btn) {
+        const text = document.getElementById(elementId)?.innerText?.trim();
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = '\u2713 Copied!';
+            btn.style.background = 'rgba(63, 185, 80, 0.2)';
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+        });
+    }
+
+    async function updateStats() {
+        try {
+            const response = await fetch(`${SERVER}/traffic-stats`);
+            const stats = await response.json();
+
+            document.getElementById('totalRequests').textContent = stats.totalRequests;
+
+            const success = stats.byStatus['2xx'] || 0;
+            const successRate = stats.totalRequests > 0 ? Math.round((success / stats.totalRequests) * 100) : 0;
+            document.getElementById('successRate').textContent = successRate + '%';
+
+            document.getElementById('avgTime').textContent = stats.avgDurationMs + 'ms';
+
+            const machineFilter = document.getElementById('machineFilter');
+            const projectFilter = document.getElementById('projectFilter');
+
+            const curMachine = machineFilter.value;
+            const curProject = projectFilter.value;
+
+            if (stats.byMachine) {
+                machineFilter.innerHTML = '<option value="">All Machines</option>' +
+                    Object.keys(stats.byMachine).map(m =>
+                        `<option value="${m}" ${m === curMachine ? 'selected' : ''}>${m}</option>`
+                    ).join('');
+            }
+
+            if (stats.byProject) {
+                projectFilter.innerHTML = '<option value="">All Projects</option>' +
+                    Object.keys(stats.byProject).map(p =>
+                        `<option value="${p}" ${p === curProject ? 'selected' : ''}>${p}</option>`
+                    ).join('');
+            }
+        } catch (e) {
+            console.error('Stats update failed:', e);
+        }
+    }
+
+    function toggleAutoRefresh() {
+        autoRefresh = !autoRefresh;
+        document.getElementById('autoStatus').textContent = autoRefresh ? 'ON' : 'OFF';
+        if (autoRefresh) {
+            autoRefreshInterval = setInterval(refresh, 3000);
+        } else {
+            clearInterval(autoRefreshInterval);
+        }
+    }
+
+    function clearFilters() {
+        document.getElementById('methodFilter').value = '';
+        document.getElementById('statusFilter').value = '';
+        document.getElementById('urlFilter').value = '';
+        document.getElementById('machineFilter').value = '';
+        document.getElementById('projectFilter').value = '';
+        refresh();
+    }
+
+    async function clearLogs() {
+        if (!confirm('Delete all HTTP logs?')) return;
+        try {
+            await fetch(`${SERVER}/clear-http`, { method: 'POST' });
+            refresh();
+        } catch (e) {
+            console.error('Clear failed:', e);
+        }
+    }
+
+    function buildCurlString(req) {
+        let curl = `curl -X ${req.method} '${req.url}'`;
+        const headerLines = parseHeaderLines(req.request.headers);
+        headerLines.forEach(h => {
+            if (!h.includes('***MASKED***')) curl += ` \\\n  -H '${h.replace(/'/g, "\\'")}'`;
+        });
+        if (req.request.body) curl += ` \\\n  -d '${req.request.body.replace(/'/g, "\\'")}'`;
+        return curl;
+    }
+
+    function copyCurlBtn(btn) {
+        if (!selectedRequest) return;
+        const text = buildCurlString(selectedRequest);
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = '\u2713 Copied!';
+            btn.style.background = 'rgba(63, 185, 80, 0.2)';
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+        });
+    }
+
+    function buildCSharpCode(req) {
+        const method  = req.method;
+        const url     = req.url;
+        const headerLines = parseHeaderLines(req.request.headers)
+            .filter(h => !h.startsWith(':') && !h.includes('***MASKED***'));
+        const body = req.request.body || '';
+
+        let contentType = 'application/json';
+        let cookieHeader = '';
+        const requestHeaders = [];
+
+        headerLines.forEach(h => {
+            const ci = h.indexOf(':');
+            if (ci === -1) return;
+            const key = h.substring(0, ci).trim();
+            const val = h.substring(ci + 1).trim();
+            const kl  = key.toLowerCase();
+            if (kl === 'content-type') { contentType = val; return; }
+            if (kl === 'cookie')       { cookieHeader = val; return; }
+            requestHeaders.push([key, val]);
+        });
+
+        const esc = s => { let r = ''; for (let i = 0; i < s.length; i++) { const ch = s[i]; r += ch === '"' ? '\\"' : ch === '\\' ? '\\\\' : ch; } return r; };
+
+        const lines = [];
+        lines.push('using System.Net;');
+        lines.push('using System.Net.Http;');
+        lines.push('using System.Text;');
+        lines.push('');
+        lines.push('var handler = new HttpClientHandler');
+        lines.push('{');
+        lines.push('    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,');
+        lines.push('    UseCookies = false');
+        lines.push('};');
+        lines.push('');
+        lines.push('using var client = new HttpClient(handler);');
+        lines.push('');
+        const methodPascal = method.charAt(0).toUpperCase() + method.slice(1).toLowerCase();
+        lines.push(`var request = new HttpRequestMessage(HttpMethod.${methodPascal}, "${esc(url)}");`);
+        lines.push('');
+
+        if (requestHeaders.length > 0) {
+            lines.push('// Request headers');
+            requestHeaders.forEach(([k, v]) => {
+                lines.push(`request.Headers.TryAddWithoutValidation("${k}", "${esc(v)}");`);
+            });
+            lines.push('');
+        }
+
+        if (cookieHeader) {
+            lines.push('// Cookies');
+            lines.push(`request.Headers.TryAddWithoutValidation("Cookie", "${esc(cookieHeader)}");`);
+            lines.push('');
+        }
+
+        if (body && method !== 'GET' && method !== 'HEAD') {
+            const bodyEsc = esc(body).replace(/\n/g, '\\n').replace(/\r/g, '');
+            lines.push('// Body');
+            lines.push(`request.Content = new StringContent("${bodyEsc}", Encoding.UTF8, "${contentType}");`);
+            lines.push('');
+        }
+
+        lines.push('var response = await client.SendAsync(request);');
+        lines.push('var responseBody = await response.Content.ReadAsStringAsync();');
+        lines.push('');
+        lines.push('Console.WriteLine($"Status: {(int)response.StatusCode}");');
+        lines.push('Console.WriteLine(responseBody);');
+
+        return lines.join('\n');
+    }
+
+    function copyCSharpCode(btn) {
+        if (!selectedRequest) return;
+        const code = buildCSharpCode(selectedRequest);
+        navigator.clipboard.writeText(code).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = '\u2713 Copied!';
+            btn.style.background = 'rgba(163, 113, 247, 0.2)';
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1800);
+        });
+    }
+    // ── HttpClient (async, with usings) ──
+    function copyCodeHttpClient(btn) {
+        if (!selectedRequest) return;
+        copyCodeWithFeedback(btn, buildCSharpCode(selectedRequest), 'rgba(88,166,255,0.2)');
+    }
+
+    // ── ZP7 ──
+    function buildZP7Code(req) {
+        const method  = req.method;
+        const url     = req.url;
+        const headerLines = parseHeaderLines(req.request.headers)
+            .filter(h => !h.startsWith(':') && !h.includes('***MASKED***'));
+        const body = req.request.body || '';
+
+        let contentType = 'application/x-www-form-urlencoded';
+        let cookieHeader = '';
+        let userAgent = '';
+        const additionalHeaders = [];
+
+        headerLines.forEach(h => {
+            const ci = h.indexOf(':');
+            if (ci === -1) return;
+            const key = h.substring(0, ci).trim();
+            const val = h.substring(ci + 1).trim();
+            const kl  = key.toLowerCase();
+            if (kl === 'content-type') { contentType = val; return; }
+            if (kl === 'cookie')       { cookieHeader = val; return; }
+            if (kl === 'user-agent')   { userAgent = val; return; }
+            additionalHeaders.push(`${key}: ${val}`);
+        });
+
+        const esc = s => { let r = ''; for (let i = 0; i < s.length; i++) { const ch = s[i]; r += ch === '"' ? '\\"' : ch === '\\' ? '\\\\' : ch; } return r; };
+        const vEsc = s => String(s).split('"').join('""');
+        const zpMethod = `ZennoLab.InterfacesLibrary.Enums.Http.HttpMethod.${method}`;
+
+        const lines = [];
+        lines.push('var response = ZennoPoster.HTTP.Request(');
+        lines.push(`    ${zpMethod},`);
+        lines.push(`    @"${vEsc(url)}",`);
+        lines.push(`    content: @"${vEsc(body)}",`);
+        lines.push(`    contentPostingType: @"${vEsc(contentType)}",`);
+        lines.push(`    proxy: "",`);
+        lines.push(`    Encoding: "UTF-8",`);
+        lines.push(`    respType: ZennoLab.InterfacesLibrary.Enums.Http.ResponceType.HeaderAndBody,`);
+        lines.push(`    Timeout: 30000,`);
+        lines.push(`    Cookies: @"${vEsc(cookieHeader)}",`);
+        lines.push(`    UserAgent: @"${vEsc(userAgent)}",`);
+        lines.push(`    UseRedirect: true,`);
+        lines.push(`    MaxRedirectCount: 5,`);
+        if (additionalHeaders.length > 0) {
+            const hdrs = additionalHeaders.map(h => `@"${vEsc(h)}"`).join(', ');
+            lines.push(`    AdditionalHeaders: new string[] { ${hdrs} },`);
+        } else {
+            lines.push(`    AdditionalHeaders: null,`);
+        }
+        lines.push(`    DownloadPath: null,`);
+        lines.push(`    UseOriginalUrl: false,`);
+        lines.push(`    throwExceptionOnError: true,`);
+        lines.push(`    cookieContainer: null,`);
+        lines.push(`    removeDefaultHeaders: true`);
+        lines.push(');');
+        return lines.join('\n');
+    }
+
+    function copyCodeZP7(btn) {
+        if (!selectedRequest) return;
+        copyCodeWithFeedback(btn, buildZP7Code(selectedRequest), 'rgba(63,185,80,0.2)');
+    }
+
+    // ── Hybrid: HttpClient, no usings, sync (.Result) ──
+    function buildHybridCode(req) {
+        const method  = req.method;
+        const url     = req.url;
+        const headerLines = parseHeaderLines(req.request.headers)
+            .filter(h => !h.startsWith(':') && !h.includes('***MASKED***'));
+        const body = req.request.body || '';
+
+        let contentType = 'application/json';
+        let cookieHeader = '';
+        const requestHeaders = [];
+
+        headerLines.forEach(h => {
+            const ci = h.indexOf(':');
+            if (ci === -1) return;
+            const key = h.substring(0, ci).trim();
+            const val = h.substring(ci + 1).trim();
+            const kl  = key.toLowerCase();
+            if (kl === 'content-type') { contentType = val; return; }
+            if (kl === 'cookie')       { cookieHeader = val; return; }
+            requestHeaders.push([key, val]);
+        });
+
+        const esc = s => { let r = ''; for (let i = 0; i < s.length; i++) { const ch = s[i]; r += ch === '"' ? '\\"' : ch === '\\' ? '\\\\' : ch; } return r; };
+        const methodPascal = method.charAt(0).toUpperCase() + method.slice(1).toLowerCase();
+
+        const lines = [];
+        lines.push('var handler = new HttpClientHandler');
+        lines.push('{');
+        lines.push('    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,');
+        lines.push('    UseCookies = false');
+        lines.push('};');
+        lines.push('var client = new HttpClient(handler);');
+        lines.push('');
+        lines.push(`var request = new HttpRequestMessage(HttpMethod.${methodPascal}, "${esc(url)}");`);
+        lines.push('');
+
+        if (requestHeaders.length > 0) {
+            lines.push('// Headers');
+            requestHeaders.forEach(([k, v]) => {
+                lines.push(`request.Headers.TryAddWithoutValidation("${k}", "${esc(v)}");`);
+            });
+            lines.push('');
+        }
+
+        if (cookieHeader) {
+            lines.push('// Cookies');
+            lines.push(`request.Headers.TryAddWithoutValidation("Cookie", "${esc(cookieHeader)}");`);
+            lines.push('');
+        }
+
+        if (body && method !== 'GET' && method !== 'HEAD') {
+            const bodyEsc = esc(body).replace(/\n/g, '\\n').replace(/\r/g, '');
+            lines.push('// Body');
+            lines.push(`request.Content = new StringContent("${bodyEsc}", Encoding.UTF8, "${contentType}");`);
+            lines.push('');
+        }
+
+        lines.push('var response = client.SendAsync(request).Result;');
+        lines.push('var responseBody = response.Content.ReadAsStringAsync().Result;');
+        lines.push('');
+        lines.push('// response.StatusCode, responseBody');
+
+        return lines.join('\n');
+    }
+
+    function copyCodeHybrid(btn) {
+        if (!selectedRequest) return;
+        copyCodeWithFeedback(btn, buildHybridCode(selectedRequest), 'rgba(210,153,34,0.2)');
+    }
+
+    // ── Python (requests) ──
+    function buildPythonCode(req) {
+        const method  = req.method;
+        const url     = req.url;
+        const headerLines = parseHeaderLines(req.request.headers)
+            .filter(h => !h.startsWith(':') && !h.includes('***MASKED***'));
+        const body = req.request.body || '';
+
+        let contentType = '';
+        let cookieHeader = '';
+        const headersObj = {};
+
+        headerLines.forEach(h => {
+            const ci = h.indexOf(':');
+            if (ci === -1) return;
+            const key = h.substring(0, ci).trim();
+            const val = h.substring(ci + 1).trim();
+            const kl  = key.toLowerCase();
+            if (kl === 'cookie') { cookieHeader = val; return; }
+            if (kl === 'content-type') contentType = val;
+            headersObj[key] = val;
+        });
+
+        // escape for python single-quoted string
+        const pyEsc = s => String(s).split('\\').join('\\\\').split("'").join("\\'");
+        const pyStr = s => "'" + pyEsc(s) + "'";
+        const pyDict = obj => {
+            const entries = Object.entries(obj);
+            if (!entries.length) return '{}';
+            return '{\n' + entries.map(([k, v]) => '    ' + pyStr(k) + ': ' + pyStr(v)).join(',\n') + '\n}';
+        };
+
+        const lines = [];
+        lines.push('import requests');
+        lines.push('');
+        lines.push('headers = ' + pyDict(headersObj));
+        lines.push('');
+
+        if (cookieHeader) {
+            const cookieDict = {};
+            cookieHeader.split(';').forEach(pair => {
+                const eq = pair.indexOf('=');
+                if (eq > 0) cookieDict[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
+            });
+            lines.push('cookies = ' + pyDict(cookieDict));
+            lines.push('');
+        }
+
+        const meth = method.toLowerCase();
+        const cookiesArg = cookieHeader ? ', cookies=cookies' : '';
+
+        if (body && method !== 'GET' && method !== 'HEAD') {
+            if (contentType.includes('json')) {
+                lines.push('import json');
+                lines.push('');
+                lines.push('payload = json.loads(' + pyStr(body) + ')');
+                lines.push('');
+                lines.push('response = requests.' + meth + '(' + pyStr(url) + ', headers=headers, json=payload' + cookiesArg + ')');
+            } else {
+                lines.push('payload = ' + pyStr(body));
+                lines.push('');
+                lines.push('response = requests.' + meth + '(' + pyStr(url) + ', headers=headers, data=payload' + cookiesArg + ')');
+            }
+        } else {
+            lines.push('response = requests.' + meth + '(' + pyStr(url) + ', headers=headers' + cookiesArg + ')');
+        }
+
+        lines.push('');
+        lines.push('print(response.status_code)');
+        lines.push('print(response.text)');
+        return lines.join('\n');
+    }
+
+    function copyCodePython(btn) {
+        if (!selectedRequest) return;
+        copyCodeWithFeedback(btn, buildPythonCode(selectedRequest), 'rgba(255,166,88,0.2)');
+    }
+
+    // ── TypeScript (fetch) ──
+    function buildTSCode(req) {
+        const method  = req.method;
+        const url     = req.url;
+        const headerLines = parseHeaderLines(req.request.headers)
+            .filter(h => !h.startsWith(':') && !h.includes('***MASKED***'));
+        const body = req.request.body || '';
+
+        let contentType = 'application/json';
+        let cookieHeader = '';
+        const headersObj = {};
+
+        headerLines.forEach(h => {
+            const ci = h.indexOf(':');
+            if (ci === -1) return;
+            const key = h.substring(0, ci).trim();
+            const val = h.substring(ci + 1).trim();
+            const kl  = key.toLowerCase();
+            if (kl === 'cookie') { cookieHeader = val; }
+            if (kl === 'content-type') contentType = val;
+            headersObj[key] = val;
+        });
+        if (cookieHeader) headersObj['Cookie'] = cookieHeader;
+
+        const escDQ = s => { let r = ''; for (let i = 0; i < s.length; i++) { const ch = s[i]; r += ch === '"' ? '\\"' : ch === '\\' ? '\\\\' : ch === '\n' ? '\\n' : ch === '\r' ? '' : ch; } return r; };
+
+        const headersLines = Object.entries(headersObj)
+            .map(([k, v]) => '    "' + escDQ(k) + '": "' + escDQ(v) + '"')
+            .join(',\n');
+
+        const lines = [];
+        lines.push('const response = await fetch(');
+        lines.push('  "' + escDQ(url) + '",');
+        lines.push('  {');
+        lines.push('    method: "' + method + '",');
+        lines.push('    headers: {');
+        if (headersLines) lines.push(headersLines);
+        lines.push('    },');
+        if (body && method !== 'GET' && method !== 'HEAD') {
+            lines.push('    body: "' + escDQ(body) + '",');
+        }
+        lines.push('  }');
+        lines.push(');');
+        lines.push('');
+        lines.push('const data = await response.text();');
+        lines.push('console.log(response.status, data);');
+        return lines.join('\n');
+    }
+
+    function copyCodeTS(btn) {
+        if (!selectedRequest) return;
+        copyCodeWithFeedback(btn, buildTSCode(selectedRequest), 'rgba(41,182,246,0.2)');
+    }
+
+    // ── cURL ──
+    function buildCurlCode(req) {
+        const headerLines = parseHeaderLines(req.request.headers)
+            .filter(h => !h.startsWith(':') && !h.includes('***MASKED***'));
+        const body = req.request.body || '';
+        const sqEsc = s => s.split("'").join("'\\''");
+
+        let curl = 'curl -X ' + req.method + " \\\n  '" + sqEsc(req.url) + "'";
+        headerLines.forEach(h => {
+            if (!h.includes('***MASKED***'))
+                curl += " \\\n  -H '" + sqEsc(h) + "'";
+        });
+        if (body && req.method !== 'GET' && req.method !== 'HEAD')
+            curl += " \\\n  --data-raw '" + sqEsc(body) + "'";
+        return curl;
+    }
+
+    function copyCodeCurl(btn) {
+        if (!selectedRequest) return;
+        copyCodeWithFeedback(btn, buildCurlCode(selectedRequest), 'rgba(163,113,247,0.2)');
+    }
+
+    // ── API Structure (from all currentLogs) ──
+    function bodyToSkeleton(val) {
+        if (val === null || val === undefined) return null;
+        if (Array.isArray(val)) return val.length > 0 ? [bodyToSkeleton(val[0])] : [];
+        if (typeof val === 'object') {
+            const out = {};
+            for (const k of Object.keys(val)) out[k] = bodyToSkeleton(val[k]);
+            return out;
+        }
+        return typeof val;
+    }
+
+    function skeletonKey(skeleton) {
+        try { return JSON.stringify(skeleton); } catch(e) { return String(skeleton); }
+    }
+
+    function tryParseJson(s) {
+        if (!s) return null;
+        try { return JSON.parse(s); } catch(e) { return null; }
+    }
+
+    function buildApiStructure(mode) {
+        // mode: "skeleton" | "first" | "last"
+        mode = mode || 'skeleton';
+        const logs = currentLogs;
+        if (!logs || !logs.length) return '[]';
+
+        // endpointMap: key -> { meta, requestBodies: [{skelKey, skeleton, raw}], responseBody, lastRespRaw }
+        const endpointMap = {};
+
+        logs.forEach(log => {
+            const urlPath = (log.url || '').split('?')[0];
+            const lastSeg = urlPath.substring(urlPath.lastIndexOf('/') + 1);
+            if (!urlPath.endsWith('/') && lastSeg.includes('.')) return;
+
+            const method = log.method || '';
+            const url    = log.url || '';
+            const key    = method + ':' + url;
+
+            const reqBody  = (log.request  && log.request.body)  || '';
+            const respBody = (log.response && log.response.body) || '';
+            const reqHdrs  = parseHeaderLines((log.request  && log.request.headers)  || '');
+            const respHdrs = parseHeaderLines((log.response && log.response.headers) || '');
+
+            const cookieLine    = reqHdrs.find(h => h.toLowerCase().startsWith('cookie:'));
+            const reqCookies    = cookieLine ? cookieLine.substring(cookieLine.indexOf(':') + 1).trim() : '';
+            const setCookieLines = respHdrs.filter(h => h.toLowerCase().startsWith('set-cookie:'));
+            const respCookies   = setCookieLines.map(h => h.substring(h.indexOf(':') + 1).trim()).join('\n');
+
+            const reqHeaderObj = {}, respHeaderObj = {};
+            reqHdrs.forEach(h => {
+                if (h.startsWith(':')) return;
+                const ci = h.indexOf(':'); if (ci < 0) return;
+                const k = h.substring(0, ci).trim().toLowerCase();
+                if (k === 'cookie') return;
+                reqHeaderObj[k] = h.substring(ci + 1).trim();
+            });
+            respHdrs.forEach(h => {
+                const ci = h.indexOf(':'); if (ci < 0) return;
+                const k = h.substring(0, ci).trim().toLowerCase();
+                if (k === 'set-cookie') return;
+                respHeaderObj[k] = h.substring(ci + 1).trim();
+            });
+
+            const reqParsed   = tryParseJson(reqBody);
+            const reqSkeleton = reqParsed !== null ? bodyToSkeleton(reqParsed) : (reqBody ? 'string' : null);
+            const skelKey     = skeletonKey(reqSkeleton);
+
+            if (!endpointMap[key]) {
+                endpointMap[key] = {
+                    method, url,
+                    statusCode: log.statusCode,
+                    requestHeaders:  reqHeaderObj,
+                    responseHeaders: respHeaderObj,
+                    requestCookies:  reqCookies,
+                    responseCookies: respCookies,
+                    // each entry: { skelKey, skeleton, firstRaw, lastRaw }
+                    requestBodies: {},
+                    firstRespRaw: null, lastRespRaw: null,
+                    firstRespParsed: null, lastRespParsed: null
+                };
+            }
+
+            const ep = endpointMap[key];
+
+            // request bodies — track first/last raw per unique skeleton
+            if (reqSkeleton !== null) {
+                if (!ep.requestBodies[skelKey]) {
+                    ep.requestBodies[skelKey] = {
+                        skeleton: reqSkeleton,
+                        firstRaw: reqParsed !== null ? reqParsed : reqBody,
+                        lastRaw:  reqParsed !== null ? reqParsed : reqBody
+                    };
+                } else {
+                    ep.requestBodies[skelKey].lastRaw = reqParsed !== null ? reqParsed : reqBody;
+                }
+            }
+
+            // response body — track first and last
+            if (respBody) {
+                const rp = tryParseJson(respBody);
+                if (!ep.firstRespRaw) {
+                    ep.firstRespRaw    = rp !== null ? rp : respBody;
+                    ep.firstRespParsed = rp !== null ? bodyToSkeleton(rp) : 'string';
+                }
+                ep.lastRespRaw    = rp !== null ? rp : respBody;
+                ep.lastRespParsed = rp !== null ? bodyToSkeleton(rp) : 'string';
+            }
+        });
+
+        const result = Object.values(endpointMap).map(ep => {
+            const bodyEntries = Object.values(ep.requestBodies);
+
+            let reqBody;
+            if (bodyEntries.length === 0) {
+                reqBody = null;
+            } else {
+                const pick = entries => entries.map(e => {
+                    if (mode === 'skeleton') return e.skeleton;
+                    if (mode === 'first')    return e.firstRaw;
+                    if (mode === 'last')     return e.lastRaw;
+                });
+                const picked = pick(bodyEntries);
+                reqBody = picked.length === 1 ? picked[0] : picked;
+            }
+
+            let respBody;
+            if (mode === 'skeleton') respBody = ep.firstRespParsed;
+            else if (mode === 'first') respBody = ep.firstRespRaw;
+            else if (mode === 'last')  respBody = ep.lastRespRaw;
+
+            return {
+                method:          ep.method,
+                url:             ep.url,
+                statusCode:      ep.statusCode,
+                requestHeaders:  ep.requestHeaders,
+                responseHeaders: ep.responseHeaders,
+                requestCookies:  ep.requestCookies  || null,
+                responseCookies: ep.responseCookies || null,
+                requestBody:     reqBody,
+                responseBody:    respBody || null
+            };
+        });
+
+        return JSON.stringify(result, null, 2);
+    }
+
+    function copyApiStructure(btn) {
+        const mode = (document.getElementById('apiStructureMode') || {}).value || 'skeleton';
+        const json = buildApiStructure(mode);
+        copyCodeWithFeedback(btn, json, 'rgba(255,123,114,0.2)');
+    }
+
+
+
+    function copyCodeWithFeedback(btn, text, bgColor) {
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = '\u2713 Copied!';
+            btn.style.background = bgColor;
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1800);
+        });
+    }
+
+    function parseHeadersTextToObj(text) {
+        const h = {};
+        if (!text.trim()) return h;
+        text.split('\n').forEach(line => {
+            const idx = line.indexOf(':');
+            if (idx > 0) { h[line.slice(0, idx).trim()] = line.slice(idx + 1).trim(); }
+        });
+        return h;
+    }
+
+    function renderPlay() {
+        if (!selectedRequest) return;
+        const r = selectedRequest.request;
+        const headerLines = parseHeaderLines(r.headers);
+        // Filter out pseudo-headers (:authority etc) for replay
+        const replayHeaders = headerLines.filter(h => !h.startsWith(':')).join('\n');
+        const body = r.body || '';
+
+        const el = document.getElementById('play');
+        el.innerHTML = `
+        <div class="play-url-row">
+            <select class="play-method-select" id="playMethod">
+                <option${selectedRequest.method==='GET'?' selected':''}>GET</option>
+                <option${selectedRequest.method==='POST'?' selected':''}>POST</option>
+                <option${selectedRequest.method==='PUT'?' selected':''}>PUT</option>
+                <option${selectedRequest.method==='DELETE'?' selected':''}>DELETE</option>
+                <option${selectedRequest.method==='PATCH'?' selected':''}>PATCH</option>
+                <option${selectedRequest.method==='HEAD'?' selected':''}>HEAD</option>
+            </select>
+            <input class="play-url-input" id="playUrl" value="${escapeHtml(selectedRequest.url)}" />
+            <button class="play-send-btn" onclick="sendPlay()">▶ Send</button>
+            <span class="play-status" id="playStatus"></span>
+        </div>
+        <div class="play-section-label">Headers (one per line, Key: Value)</div>
+        <textarea class="play-textarea" id="playHeaders" style="min-height:90px;max-height:150px;">${escapeHtml(replayHeaders)}</textarea>
+        <div class="play-section-label" style="margin-top:6px;">Body</div>
+        <textarea class="play-textarea" id="playBody" style="min-height:50px;max-height:100px;">${escapeHtml(prettyJson(body))}</textarea>
+        <div class="play-response-wrap">
+            <div class="play-section-label" style="display:flex;align-items:center;gap:8px;">
+                Response
+                <button class="copy-btn" style="margin-top:0;padding:2px 8px;font-size:10px;" onclick="copyPlayResponse(this)">📋 Copy</button>
+                <button class="copy-btn" style="margin-top:0;padding:2px 8px;font-size:10px;" onclick="copyCurlBtn2(this)">📋 cURL</button>
+            </div>
+            <textarea class="play-response-area" id="playResponse" readonly placeholder="Response will appear here..."></textarea>
+        </div>
+        `;
+    }
+
+    function copyCurlBtn2(btn) {
+        if (!selectedRequest) return;
+        // Build curl from current play tab inputs
+        const method = document.getElementById('playMethod')?.value || selectedRequest.method;
+        const url    = document.getElementById('playUrl')?.value    || selectedRequest.url;
+        const hText  = document.getElementById('playHeaders')?.value || '';
+        const body   = document.getElementById('playBody')?.value   || '';
+        let curl = `curl -X ${method} '${url}'`;
+        hText.split('\n').forEach(h => {
+            if (h.trim() && !h.includes('***MASKED***')) curl += ` \\\n  -H '${h.trim().replace(/'/g, "\\'")}'`;
+        });
+        if (body.trim()) curl += ` \\\n  -d '${body.replace(/'/g, "\\'")}'`;
+        navigator.clipboard.writeText(curl).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = '\u2713 Copied!';
+            btn.style.background = 'rgba(63, 185, 80, 0.2)';
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+        });
+    }
+
+    async function sendPlay() {
+        const url    = document.getElementById('playUrl').value.trim();
+        const method = document.getElementById('playMethod').value;
+        const hText  = document.getElementById('playHeaders').value;
+        const body   = document.getElementById('playBody').value.trim();
+        const statusEl = document.getElementById('playStatus');
+        const respEl   = document.getElementById('playResponse');
+
+        if (!url) { respEl.value = 'URL is empty'; return; }
+
+        statusEl.className = 'play-status';
+        statusEl.textContent = '⏳ Sending...';
+        respEl.value = '';
+
+        const headers = parseHeadersTextToObj(hText);
+        // Remove accept-encoding — decompression must be handled by the C# server (AutomaticDecompression)
+        delete headers['accept-encoding'];
+        delete headers['Accept-Encoding'];
+        let res;
+        try {
+            res = await fetch(`${SERVER}/http-replay`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, method, headers, body: body || null })
+            });
+        } catch (e) {
+            statusEl.className = 'play-status err';
+            statusEl.textContent = '✕ Unreachable';
+            respEl.value = 'Cannot connect to ' + SERVER + '\n\nError: ' + e.message;
+            return;
+        }
+
+        let rawText = '';
+        try { rawText = await res.text(); } catch {}
+        let json = null;
+        try { json = JSON.parse(rawText); } catch {}
+
+        if (!json || json.error) {
+            statusEl.className = 'play-status err';
+            statusEl.textContent = json?.error ? ('✕ ' + json.error) : ('✕ HTTP ' + res.status);
+            respEl.value = json?.error || ('HTTP ' + res.status + '\n\n' + rawText);
+            return;
+        }
+
+        const status = json.statusCode || res.status;
+        const cls = status >= 200 && status < 300 ? 'status-2xx'
+            : status >= 300 && status < 400 ? 'status-3xx'
+                : status >= 400 && status < 500 ? 'status-4xx' : 'status-5xx';
+        statusEl.className = 'play-status ok';
+        statusEl.innerHTML = `<span class="${cls}">${status}</span> · ${json.durationMs ?? '?'}ms`;
+
+        let respBody = json.responseBody || '';
+        try { respBody = JSON.stringify(JSON.parse(respBody), null, 2); } catch {}
+        const respHeaders = Object.entries(json.responseHeaders || {}).map(([k,v]) => `${k}: ${v}`).join('\n');
+        respEl.value = `── Headers ──\n${respHeaders}\n\n── Body ──\n${respBody}`;
+    }
+
+    function copyPlayResponse(btn) {
+        const text = document.getElementById('playResponse')?.value;
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = '\u2713 Copied!';
+            btn.style.background = 'rgba(63, 185, 80, 0.2)';
+            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+        });
+    }
+
+    function copyText(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            btn.style.background = 'rgba(63, 185, 80, 0.2)';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1500);
+        });
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function escapeForJs(text) {
+        return text.replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+    }
+
+    function truncate(str, len) {
+        if (str.length <= len) return str;
+        return str.substring(0, len) + '...';
+    }
+
+    refresh();
+    autoRefreshInterval = setInterval(refresh, 3000);
+</script>
+
+</body>
+</html>

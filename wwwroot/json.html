@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z3n Json</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;800&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11.5px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        .header { display: flex; align-items: center; gap: 12px; padding: 7px 16px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; flex-wrap: wrap; }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 14px; color: var(--accent); letter-spacing: -0.5px; white-space: nowrap; }
+        .logo span { color: var(--text-dim); font-weight: 400; }
+        .toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); padding: 3px 9px; border-radius: 5px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 10px; transition: all 0.15s; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+        .btn:hover { border-color: var(--border2); color: var(--text); background: var(--border); }
+        .btn.accent { border-color: var(--accent-dim); color: var(--accent); }
+        .btn.accent:hover { background: var(--accent-dim); }
+        .btn.danger { border-color: #3a1a1a; color: var(--red); }
+        .btn.danger:hover { background: #2a1010; }
+        .btn.replay-btn { border-color: #1e3a2a; color: var(--green); }
+        .btn.replay-btn:hover { background: #0d2018; }
+        .stats { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+        .stat-badge { background: var(--surface2); border: 1px solid var(--border); padding: 3px 8px; border-radius: 4px; color: var(--text-dim); font-size: 10px; }
+        .stat-badge span { color: var(--text); }
+        .depth-btns { display: flex; gap: 2px; }
+        .depth-btn { width: 22px; height: 22px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-muted); border-radius: 4px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 10px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+        .depth-btn:hover { border-color: var(--border2); color: var(--text); background: var(--border); }
+        .depth-btn.active { border-color: var(--accent-dim); color: var(--accent); background: var(--accent-dim); }
+
+        .main { display: flex; flex: 1; overflow: hidden; }
+        .input-panel { width: 340px; min-width: 180px; max-width: 50%; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; resize: horizontal; overflow: auto; }
+        .panel-header { padding: 5px 12px; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; background: var(--surface); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        textarea { flex: 1; background: var(--bg); border: none; outline: none; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 10px 12px; resize: none; line-height: 1.45; }
+        textarea::placeholder { color: var(--text-muted); }
+
+        .tree-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .tree-search { padding: 5px 12px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .search-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 8px; outline: none; transition: border-color 0.15s; }
+        .search-input:focus { border-color: var(--accent-dim); }
+        .search-input::placeholder { color: var(--text-muted); }
+
+        .info-banner { background: #0d160d; border-bottom: 1px solid #1a3a14; padding: 5px 12px; font-size: 10px; color: var(--green); display: none; align-items: center; gap: 8px; flex-shrink: 0; }
+        .info-banner.show { display: flex; }
+
+        /* FIELD FILTER */
+        .field-filter { border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; display: none; }
+        .field-filter.show { display: block; }
+        .ff-header { padding: 5px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; min-height: 26px; }
+        .ff-header:hover { background: var(--surface2); }
+        .ff-title { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; flex: 1; }
+        .ff-badge { background: var(--accent-dim); color: var(--accent); border-radius: 3px; font-size: 9px; padding: 0 5px; display: none; }
+        .ff-arrow { color: var(--text-muted); font-size: 9px; }
+        .ff-body { display: none; padding: 6px 12px 8px; border-top: 1px solid var(--border); }
+        .ff-body.open { display: block; }
+        .preset-row { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+        .preset-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+        .preset-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); padding: 2px 8px; border-radius: 4px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 10px; transition: all 0.15s; white-space: nowrap; }
+        .preset-btn:hover { border-color: var(--border2); color: var(--text); background: var(--border); }
+        .preset-btn.active { border-color: var(--accent-dim); color: var(--accent); background: var(--accent-dim); }
+        .ff-levels { display: flex; flex-direction: column; gap: 0; margin-top: 4px; max-height: 160px; overflow-y: auto; }
+        .ff-level-row { display: flex; align-items: center; gap: 4px; padding: 3px 0; flex-wrap: wrap; }
+        .ff-level-row + .ff-level-row { border-top: 1px solid var(--border); }
+        .ff-level-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; min-width: 36px; flex-shrink: 0; }
+        .field-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+        .chip { display: flex; align-items: center; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 10px; color: var(--text-dim); transition: all 0.15s; user-select: none; }
+        .chip:hover { border-color: var(--border2); color: var(--text); }
+        .chip.on { border-color: var(--green); color: var(--green); background: #0a2018; }
+        .chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; transition: background 0.15s; }
+        .chip.on .chip-dot { background: var(--green); }
+
+        /* VIRTUAL SCROLL */
+        .vscroll-wrap { flex: 1; overflow: auto; position: relative; }
+        #vscroll-spacer { width: 1px; display: block; }
+        #vscroll-rows { position: absolute; top: 0; left: 0; right: 0; }
+
+        /* ROW */
+        .vrow { height: var(--ROW); display: flex; align-items: center; padding-right: 4px; border-radius: 4px; white-space: nowrap; position: relative; }
+        .vrow:hover { background: var(--surface2); }
+        .vrow:hover .node-actions { opacity: 1; }
+        .vrow.is-hidden { opacity: 0.3; }
+        .vrow.is-hidden .node-key { text-decoration: line-through; text-decoration-color: var(--red); }
+
+        .indent-lines { display: flex; align-items: stretch; flex-shrink: 0; }
+        .indent-line { width: 14px; position: relative; flex-shrink: 0; }
+        .indent-line::before { content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 1px; background: var(--border); }
+
+        .toggle-btn { width: 14px; height: var(--ROW); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); flex-shrink: 0; font-size: 8px; border-radius: 3px; transition: color 0.1s, background 0.1s; user-select: none; }
+        .toggle-btn:hover { color: var(--text); background: var(--border2); }
+        .toggle-btn.leaf { cursor: default; }
+
+        .node-key { color: var(--key-color); font-weight: 500; cursor: pointer; }
+        .node-key:hover { color: #7ab8ff; }
+        .node-colon { color: var(--text-muted); margin: 0 4px; }
+        .node-value-str  { color: var(--string-color); }
+        .node-value-num  { color: var(--number-color); }
+        .node-value-bool { color: var(--bool-color); }
+        .node-value-null { color: var(--null-color); font-style: italic; }
+        .node-bracket { color: var(--text-dim); cursor: pointer; }
+        .node-summary { color: var(--text-muted); font-size: 10px; margin-left: 3px; font-style: italic; }
+
+        .node-actions { opacity: 0; display: flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; transition: opacity 0.1s; flex-shrink: 0; }
+        .act-btn { width: 17px; height: 17px; border-radius: 3px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: all 0.1s; font-size: 10px; padding: 0; }
+        .act-btn:hover { background: var(--border2); color: var(--text); }
+        .act-btn.copy-btn:hover { color: var(--accent); }
+        .act-btn.csharp-btn:hover { color: #b5a0ff; }
+        .act-btn.hide-btn:hover { color: var(--red); }
+        .act-btn.replay-act:hover { color: var(--green); }
+
+        /* ── AUTH / CAPTCHA BADGES ── */
+        .security-badges { display: flex; gap: 3px; margin-left: 6px; flex-shrink: 0; }
+        .sec-badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap; }
+        .sec-badge.auth-bearer  { background: #1a2a4a; color: #79b8ff; border: 1px solid #2a3a5a; }
+        .sec-badge.auth-basic   { background: #1a2040; color: #9090ff; border: 1px solid #2a2a60; }
+        .sec-badge.auth-apikey  { background: #1a3020; color: #56d364; border: 1px solid #2a4030; }
+        .sec-badge.cf           { background: #3a2000; color: #f0883e; border: 1px solid #5a3a00; }
+        .sec-badge.captcha      { background: #3a1a2a; color: #ff79c6; border: 1px solid #5a2a3a; }
+        .sec-badge.turnstile    { background: #2a2000; color: #ffd700; border: 1px solid #4a3800; }
+
+        .hl { background: #3a2a00; border-radius: 2px; color: var(--yellow); }
+        .parse-error { padding: 16px; color: var(--red); font-size: 12px; line-height: 1.6; background: #1a0a0a; border: 1px solid #3a1515; border-radius: 6px; margin: 12px; }
+
+        .toast { position: fixed; bottom: 20px; right: 20px; background: var(--surface2); border: 1px solid var(--border2); color: var(--text); padding: 8px 16px; border-radius: 8px; font-size: 12px; opacity: 0; transform: translateY(8px); transition: all 0.2s; pointer-events: none; z-index: 999; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+
+        .path-bar { padding: 3px 12px; border-top: 1px solid var(--border); background: var(--surface); font-size: 9px; color: var(--text-muted); min-height: 20px; display: flex; align-items: center; gap: 4px; flex-shrink: 0; overflow: hidden; }
+        .path-bar span { color: var(--accent); }
+
+        .hidden-panel { border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; max-height: 90px; overflow-y: auto; }
+        .hidden-panel-header { padding: 5px 14px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        .hidden-tags { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 14px; }
+        .hidden-tag { background: #2a1010; border: 1px solid #3a1515; color: var(--red); padding: 2px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .hidden-tag:hover { background: #3a1515; }
+
+        /* ── REPLAY MODAL ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; width: 900px; max-width: 96vw; height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .modal-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: var(--text); }
+        .modal-close { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+        .modal-close:hover { color: var(--text); }
+        .modal-body { display: flex; gap: 0; flex: 1; overflow: hidden; }
+        .replay-left { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+        .replay-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .replay-section { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+        .replay-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px 4px; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .replay-url-row { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center; }
+        .method-select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 6px; border-radius: 4px; outline: none; }
+        .url-input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 8px; border-radius: 4px; outline: none; }
+        .url-input:focus { border-color: var(--accent-dim); }
+        textarea.replay-area { flex: 1; background: var(--bg); border: none; outline: none; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 8px 12px; resize: none; line-height: 1.5; }
+        .modal-footer { padding: 8px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+        .replay-status { font-size: 10px; color: var(--text-muted); margin-left: auto; }
+        .replay-status.ok  { color: var(--green); }
+        .replay-status.err { color: var(--red); }
+        .status-2xx { color: var(--green); }
+        .status-3xx { color: var(--accent); }
+        .status-4xx { color: var(--yellow); }
+        .status-5xx { color: var(--red); }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">JSON<span>ZEN</span></div>
+    <div class="toolbar">
+        <button class="btn accent" onclick="parseJSON()">▶ Parse</button>
+        <button class="btn" onclick="expandAll()">⊞ Expand all</button>
+        <button class="btn" onclick="collapseAll()">⊟ Collapse all</button>
+        <button class="btn" onclick="showAll()">👁 Show all</button>
+        <span style="color:var(--text-muted);font-size:10px;white-space:nowrap">Level:</span>
+        <div class="depth-btns" id="depth-btns"></div>
+        <button class="btn" onclick="copyRoot()">⎘ Copy all</button>
+        <button class="btn" onclick="formatInput()">✦ Format</button>
+        <button class="btn replay-btn" onclick="openReplayFromRoot()">⚡ Replay</button>
+        <button class="btn danger" onclick="clearAll()">✕ Clear</button>
+    </div>
+    <div class="stats" id="stats"></div>
+</div>
+
+<div class="main">
+    <div class="input-panel">
+        <div class="panel-header">
+            Input JSON
+            <span id="char-count" style="color:var(--text-muted)"></span>
+        </div>
+        <textarea id="input"
+                  placeholder="Paste JSON here...&#10;&#10;For files >500 KB&#10;click ▶ Parse after pasting"
+                  oninput="onInputChange()"
+                  onkeydown="handleInputKey(event)"></textarea>
+    </div>
+
+    <div class="tree-panel">
+        <div class="tree-search">
+            <input class="search-input" id="search" placeholder="🔍  Filter keys or values..." oninput="onSearchDebounced()" />
+            <div id="search-count" style="color:var(--text-muted);font-size:11px;white-space:nowrap"></div>
+        </div>
+        <div class="info-banner" id="info-banner">⚡ Virtual rendering active</div>
+        <div class="field-filter" id="field-filter">
+            <div class="ff-header" onclick="toggleFFPanel()">
+                <span class="ff-title">Field Filter</span>
+                <span class="ff-badge" id="ff-badge"></span>
+                <span class="ff-arrow" id="ff-arrow">▶</span>
+            </div>
+            <div class="ff-body" id="ff-body">
+                <div class="preset-row">
+                    <span class="preset-label">Presets:</span>
+                    <button class="preset-btn" data-preset="api" onclick="applyPreset('api')" title="url + requestBody + responseBody">API view</button>
+                    <button class="preset-btn" data-preset="headers" onclick="applyPreset('headers')" title="url + requestHeaders + responseHeaders">Headers</button>
+                    <button class="preset-btn" data-preset="status" onclick="applyPreset('status')" title="url + method + statusCode">Status</button>
+                    <button class="preset-btn" data-preset="all" onclick="applyPreset('all')">Show all</button>
+                </div>
+                <div class="ff-levels" id="ff-chips"></div>
+            </div>
+        </div>
+        <div class="vscroll-wrap" id="vscroll-wrap">
+            <div id="vscroll-spacer"></div>
+            <div id="vscroll-rows"></div>
+        </div>
+        <div class="path-bar" id="path-bar">hover a node to see path</div>
+        <div class="hidden-panel" id="hidden-panel" style="display:none">
+            <div class="hidden-panel-header">
+                Hidden keys
+                <button class="btn" style="padding:2px 8px;font-size:10px" onclick="showAll()">restore all</button>
+            </div>
+            <div class="hidden-tags" id="hidden-tags"></div>
+        </div>
+    </div>
+</div>
+
+<!-- REPLAY MODAL -->
+<div class="modal-overlay" id="replayOverlay" onclick="closeReplayOnBg(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">⚡ Request Replay</span>
+            <button class="modal-close" onclick="closeReplay()">✕</button>
+        </div>
+        <div class="replay-url-row">
+            <select class="method-select" id="replayMethod">
+                <option>GET</option><option>POST</option><option>PUT</option>
+                <option>DELETE</option><option>PATCH</option><option>HEAD</option>
+            </select>
+            <input class="url-input" id="replayUrl" placeholder="https://..." />
+        </div>
+        <div class="modal-body">
+            <div class="replay-left">
+                <div class="replay-label">Request Headers (one per line, Key: Value)</div>
+                <textarea class="replay-area" id="replayHeaders" placeholder="Content-Type: application/json&#10;Authorization: Bearer token..."></textarea>
+                <div class="replay-label" style="border-top:1px solid var(--border)">Request Body (JSON)</div>
+                <textarea class="replay-area" id="replayBody" style="flex:0 0 140px" placeholder='{"key": "value"}'></textarea>
+            </div>
+            <div class="replay-right">
+                <div class="replay-label">Response</div>
+                <textarea class="replay-area" id="replayResponse" readonly placeholder="Response will appear here..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn accent" onclick="sendReplay()">▶ Send</button>
+            <button class="btn" onclick="formatReplayBody()">✦ Format body</button>
+            <button class="btn" onclick="copyReplayResponse()">⎘ Copy response</button>
+            <span class="replay-status" id="replayStatus"></span>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+    // ════════════════════════════════════════════════════════
+    // CONSTANTS
+    // ════════════════════════════════════════════════════════
+    const ROW_H           = 19;
+    const OVERSCAN        = 20;
+    const AUTO_PARSE_MAX  = 500_000;
+    const LARGE_THRESHOLD = 500_000;
+
+    // ── Security detection patterns ──────────────────────────
+    const AUTH_PATTERNS = [
+        { re: /authorization:\s*bearer\s+\S/i,   cls: 'auth-bearer',  label: '🔑 Bearer'    },
+        { re: /authorization:\s*basic\s+\S/i,    cls: 'auth-basic',   label: '🔑 Basic'     },
+        { re: /x-api-key:/i,                     cls: 'auth-apikey',  label: '🔑 API Key'   },
+        { re: /x-auth-token:/i,                  cls: 'auth-apikey',  label: '🔑 Auth Token'},
+        { re: /cookie:.*cf-clearance/i,          cls: 'cf',           label: '🛡 CF Clear'  },
+        { re: /__cf_bm/i,                        cls: 'cf',           label: '🛡 CF Bot'    },
+        { re: /cf-ray:/i,                        cls: 'cf',           label: '🛡 CF Ray'    },
+        { re: /x-turnstile-token:/i,             cls: 'turnstile',    label: '🛡 Turnstile' },
+        { re: /x-recaptcha-token:/i,             cls: 'captcha',      label: '🤖 reCaptcha' },
+        { re: /x-captcha-token:/i,               cls: 'captcha',      label: '🤖 Captcha'   },
+    ];
+
+    const CAPTCHA_PATTERNS = [
+        { re: /data-sitekey=["']([^"']+)/,          cls: 'captcha',   label: '🤖 reCaptcha' },
+        { re: /hcaptcha\.com/,                       cls: 'captcha',   label: '🤖 hCaptcha'  },
+        { re: /grecaptcha\.render|grecaptcha\.execute/, cls: 'captcha', label: '🤖 reCaptcha'},
+        { re: /challenges\.cloudflare\.com/,         cls: 'cf',        label: '🛡 CF Challenge'},
+        { re: /turnstile\.sitekey|turnstile.*render/, cls: 'turnstile', label: '🛡 Turnstile'},
+        { re: /arkoselabs\.com|FunCaptcha/,          cls: 'captcha',   label: '🤖 FunCaptcha'},
+        { re: /"sitekey"\s*:\s*"([^"]+)"/,           cls: 'captcha',   label: '🤖 SiteKey'  },
+    ];
+
+    // ════════════════════════════════════════════════════════
+    // STATE
+    // ════════════════════════════════════════════════════════
+    let parsedData       = null;
+    let flatRows         = [];
+    let visibleRows      = [];
+    let collapseStates   = {};
+    let manualHideStates = {};
+    let searchQuery      = '';
+
+    // ════════════════════════════════════════════════════════
+    // SECURITY DETECTION
+    // ════════════════════════════════════════════════════════
+
+    // Detects security-relevant patterns in a string value
+    // Returns array of { cls, label }
+    function detectSecurityBadges(key, value) {
+        if (typeof value !== 'string' || value.length < 2) return [];
+        const found = [];
+        const seen  = new Set();
+
+        const keyLower = String(key).toLowerCase();
+        const valLower = value.toLowerCase();
+        const combined = `${keyLower}: ${value}`;
+
+        // Check auth patterns (in headers-like strings or individual values)
+        for (const p of AUTH_PATTERNS) {
+            if ((p.re.test(combined) || p.re.test(value)) && !seen.has(p.label)) {
+                found.push({ cls: p.cls, label: p.label });
+                seen.add(p.label);
+            }
+        }
+
+        // Check captcha in response bodies / long strings
+        if (value.length > 20) {
+            for (const p of CAPTCHA_PATTERNS) {
+                if (p.re.test(value) && !seen.has(p.label)) {
+                    found.push({ cls: p.cls, label: p.label });
+                    seen.add(p.label);
+                }
+            }
+        }
+
+        // Key-based quick checks
+        const KEY_HINTS = {
+            'authorization': { cls: 'auth-bearer', label: '🔑 Auth' },
+            'x-api-key':     { cls: 'auth-apikey', label: '🔑 API Key' },
+            'cf-clearance':  { cls: 'cf',          label: '🛡 CF Clear' },
+            'sitekey':       { cls: 'captcha',     label: '🤖 SiteKey' },
+            'captcha':       { cls: 'captcha',     label: '🤖 Captcha' },
+            'recaptcha':     { cls: 'captcha',     label: '🤖 reCaptcha' },
+            'hcaptcha':      { cls: 'captcha',     label: '🤖 hCaptcha' },
+            'turnstile':     { cls: 'turnstile',   label: '🛡 Turnstile' },
+        };
+        for (const [k, v] of Object.entries(KEY_HINTS)) {
+            if (keyLower.includes(k) && !seen.has(v.label)) {
+                found.push(v);
+                seen.add(v.label);
+            }
+        }
+
+        return found;
+    }
+
+    // ════════════════════════════════════════════════════════
+    // BUILD FLAT ROWS
+    // ════════════════════════════════════════════════════════
+    function buildFlatRows(data) {
+        const rows  = [];
+        const stack = [];
+        stack.push({ type: 'node', val: data, key: null, path: '', depth: 0 });
+
+        while (stack.length > 0) {
+            const item = stack.pop();
+
+            if (item.type === 'close') {
+                rows.push({ path: item.path + '__close', key: item.key, value: item.val, depth: item.depth, isComplex: true, isArray: item.isArray, isClose: true, parentPath: item.path, collapsed: false, hidden: false });
+                continue;
+            }
+
+            const { val, key, path, depth } = item;
+            const isComplex = (val !== null && typeof val === 'object');
+            const isArray   = isComplex && Array.isArray(val);
+            const collapsed = !!collapseStates[path];
+            const hidden    = !!manualHideStates[path] || (filterHideKeys !== null && key !== null && filterHideKeys.has(String(key)));
+
+            rows.push({ path, key, value: val, depth, isComplex, isArray, isClose: false, parentPath: null, collapsed, hidden });
+
+            if (isComplex && !collapsed && !hidden) {
+                stack.push({ type: 'close', val, key, path, depth, isArray });
+                const entries = isArray ? val.map((v, i) => [i, v]) : Object.entries(val);
+                for (let i = entries.length - 1; i >= 0; i--) {
+                    const [k, v] = entries[i];
+                    const childPath = path !== '' ? path + '.' + k : String(k);
+                    stack.push({ type: 'node', val: v, key: k, path: childPath, depth: depth + 1 });
+                }
+            }
+        }
+        return rows;
+    }
+
+    // ════════════════════════════════════════════════════════
+    // VIRTUAL SCROLL
+    // ════════════════════════════════════════════════════════
+    let rafPending = false;
+    function scheduleRender() {
+        if (!rafPending) { rafPending = true; requestAnimationFrame(() => { rafPending = false; renderVisible(); }); }
+    }
+
+    function renderVisible() {
+        const wrap   = document.getElementById('vscroll-wrap');
+        const spacer = document.getElementById('vscroll-spacer');
+        const rowsEl = document.getElementById('vscroll-rows');
+        const total  = visibleRows.length;
+
+        spacer.style.height = (total * ROW_H) + 'px';
+        if (total === 0) { rowsEl.innerHTML = ''; rowsEl.style.transform = ''; return; }
+
+        const scrollTop = wrap.scrollTop;
+        const viewH     = wrap.clientHeight;
+        const startIdx  = Math.max(0,       Math.floor(scrollTop / ROW_H) - OVERSCAN);
+        const endIdx    = Math.min(total-1, Math.ceil((scrollTop + viewH) / ROW_H) + OVERSCAN);
+
+        rowsEl.style.transform = 'translateY(' + (startIdx * ROW_H) + 'px)';
+        const frag = document.createDocumentFragment();
+        for (let i = startIdx; i <= endIdx; i++) frag.appendChild(makeRowEl(visibleRows[i]));
+        rowsEl.innerHTML = '';
+        rowsEl.appendChild(frag);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // MAKE ROW ELEMENT
+    // ════════════════════════════════════════════════════════
+    function makeRowEl(row) {
+        const div = document.createElement('div');
+        div.className = 'vrow' + (row.hidden ? ' is-hidden' : '');
+
+        if (row.isClose) {
+            div.appendChild(makeIndent(row.depth));
+            const sp = document.createElement('span');
+            sp.style.display = 'inline-block'; sp.style.width = '14px';
+            div.appendChild(sp);
+            appendText(div, 'node-bracket', row.isArray ? ']' : '}');
+            return div;
+        }
+
+        div.appendChild(makeIndent(row.depth));
+
+        const tog = document.createElement('div');
+        tog.className = 'toggle-btn' + (row.isComplex ? '' : ' leaf');
+        tog.textContent = row.isComplex ? (row.collapsed ? '▶' : '▼') : '·';
+        if (row.isComplex) tog.onclick = (e) => { e.stopPropagation(); toggleCollapse(row.path); };
+        div.appendChild(tog);
+
+        if (row.key !== null) {
+            const k = document.createElement('span');
+            k.className = 'node-key';
+            const keyText = typeof row.key === 'number' ? String(row.key) : '"' + row.key + '"';
+            setTextHL(k, keyText);
+            if (row.isComplex) k.onclick = () => toggleCollapse(row.path);
+            div.appendChild(k);
+            appendText(div, 'node-colon', ': ');
+        }
+
+        // Security badges — detect on string values, render BEFORE value
+        let secBadges = [];
+        if (!row.isComplex && typeof row.value === 'string') {
+            secBadges = detectSecurityBadges(row.key, row.value);
+        }
+
+        if (secBadges.length > 0) {
+            const badgesEl = document.createElement('div');
+            badgesEl.className = 'security-badges';
+            secBadges.forEach(b => {
+                const badge = document.createElement('span');
+                badge.className = 'sec-badge ' + b.cls;
+                badge.textContent = b.label;
+                badgesEl.appendChild(badge);
+            });
+            div.appendChild(badgesEl);
+        }
+
+        if (!row.isComplex) {
+            const v = document.createElement('span');
+            v.className = valueClass(row.value);
+            setTextHL(v, formatValue(row.value));
+            div.appendChild(v);
+        } else {
+            const open = document.createElement('span');
+            open.className = 'node-bracket';
+            open.textContent = row.isArray ? '[' : '{';
+            open.onclick = () => toggleCollapse(row.path);
+            div.appendChild(open);
+
+            if (row.collapsed || row.hidden) {
+                const sm = document.createElement('span');
+                sm.className = 'node-summary';
+                const count = row.isArray ? row.value.length : Object.keys(row.value).length;
+                sm.textContent = row.isArray ? ' ' + count + ' items ' : ' ' + count + ' keys ';
+                div.appendChild(sm);
+                appendText(div, 'node-bracket', row.isArray ? ']' : '}');
+            }
+        }
+
+        // Actions
+        const acts = document.createElement('div');
+        acts.className = 'node-actions';
+
+        const cpBtn = document.createElement('button');
+        cpBtn.className = 'act-btn copy-btn'; cpBtn.title = 'Copy'; cpBtn.textContent = '⎘';
+        cpBtn.onclick = (e) => { e.stopPropagation(); copyNode(row.value, row.path); };
+        acts.appendChild(cpBtn);
+
+        // C# selector button — only for leaf (non-complex) nodes with a path
+        if (!row.isComplex && row.path) {
+            const csBtn = document.createElement('button');
+            csBtn.className = 'act-btn csharp-btn'; csBtn.title = 'Copy C# selector'; csBtn.textContent = 'C#';
+            csBtn.style.fontSize = '8px'; csBtn.style.fontWeight = '700'; csBtn.style.letterSpacing = '-0.5px';
+            csBtn.onclick = (e) => { e.stopPropagation(); copyCSharpSelector(row.path); };
+            acts.appendChild(csBtn);
+        }
+
+        // Replay button — show if value looks like a URL or parent key is "url"/"requestUrl"
+        const isUrlLike = typeof row.value === 'string' && /^https?:\/\//i.test(row.value);
+        const isUrlKey  = row.key && /^(url|requestUrl|endpoint|href)$/i.test(String(row.key));
+        if (isUrlLike || isUrlKey) {
+            const rpBtn = document.createElement('button');
+            rpBtn.className = 'act-btn replay-act'; rpBtn.title = 'Replay this request'; rpBtn.textContent = '⚡';
+            rpBtn.onclick = (e) => { e.stopPropagation(); openReplayFromNode(row); };
+            acts.appendChild(rpBtn);
+        }
+
+        const hdBtn = document.createElement('button');
+        hdBtn.className = 'act-btn hide-btn';
+        hdBtn.title = row.hidden ? 'Show' : 'Hide';
+        hdBtn.textContent = row.hidden ? '👁' : '🚫';
+        hdBtn.onclick = (e) => { e.stopPropagation(); toggleManualHide(row.path); };
+        acts.appendChild(hdBtn);
+
+        div.appendChild(acts);
+
+        div.addEventListener('mouseenter', () => {
+            document.getElementById('path-bar').innerHTML = '<span>' + (row.path || '(root)') + '</span>';
+        });
+
+        return div;
+    }
+
+    function makeIndent(depth) {
+        const d = document.createElement('div');
+        d.className = 'indent-lines';
+        for (let i = 0; i < depth; i++) {
+            const l = document.createElement('div'); l.className = 'indent-line'; d.appendChild(l);
+        }
+        return d;
+    }
+
+    function appendText(parent, cls, text) {
+        const el = document.createElement('span'); el.className = cls; el.textContent = text;
+        parent.appendChild(el); return el;
+    }
+
+    function setTextHL(el, text) {
+        if (!searchQuery) { el.textContent = text; return; }
+        const lc = text.toLowerCase();
+        const idx = lc.indexOf(searchQuery);
+        if (idx === -1) { el.textContent = text; return; }
+        el.appendChild(document.createTextNode(text.slice(0, idx)));
+        const hl = document.createElement('span'); hl.className = 'hl';
+        hl.textContent = text.slice(idx, idx + searchQuery.length);
+        el.appendChild(hl);
+        el.appendChild(document.createTextNode(text.slice(idx + searchQuery.length)));
+    }
+
+    // ════════════════════════════════════════════════════════
+    // REPLAY
+    // ════════════════════════════════════════════════════════
+    // Same origin — файл открыт через EmbeddedServer, порт берётся оттуда же
+    const REPLAY_SERVER = window.location.origin;
+
+    function openReplay(url, method, headers, body) {
+        document.getElementById('replayUrl').value     = url     || '';
+        document.getElementById('replayMethod').value  = method  || 'GET';
+        document.getElementById('replayHeaders').value = headers || '';
+        document.getElementById('replayBody').value    = body    || '';
+        document.getElementById('replayResponse').value = '';
+        document.getElementById('replayStatus').textContent = '';
+        document.getElementById('replayOverlay').classList.add('show');
+    }
+
+    function openReplayFromRoot() {
+        if (!parsedData) { toast('Nothing parsed'); return; }
+        // Try to extract url/method/headers/body from root object
+        const d = parsedData;
+        const url     = d.url     || d.requestUrl || d.endpoint || '';
+        const method  = d.method  || 'GET';
+        const headers = headersObjToText(d.requestHeaders || d.headers || {});
+        const body    = typeof d.requestBody === 'object'
+            ? JSON.stringify(d.requestBody, null, 2)
+            : (d.requestBody || '');
+        openReplay(url, method, headers, body);
+    }
+
+    function openReplayFromNode(row) {
+        // Find sibling/parent fields: url, method, headers, body
+        const parts  = row.path.split('.');
+        const parent = parts.slice(0, -1).join('.');
+        let obj = parsedData;
+        if (parent) {
+            for (const p of parent.split('.')) {
+                obj = obj?.[isNaN(p) ? p : +p];
+            }
+        }
+        const isObj = obj && typeof obj === 'object' && !Array.isArray(obj);
+        const url     = isObj ? (obj.url || obj.requestUrl || row.value || '') : row.value || '';
+        const method  = isObj ? (obj.method || 'GET') : 'GET';
+        const headers = isObj ? headersObjToText(obj.requestHeaders || obj.headers || {}) : '';
+        const body    = isObj ? (typeof obj.requestBody === 'object'
+            ? JSON.stringify(obj.requestBody, null, 2)
+            : (obj.requestBody || '')) : '';
+        openReplay(url, method, headers, body);
+    }
+
+    function headersObjToText(obj) {
+        if (!obj || typeof obj !== 'object') return '';
+        return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join('\n');
+    }
+
+    function parseHeadersText(text) {
+        const headers = {};
+        if (!text.trim()) return headers;
+        text.split('\n').forEach(line => {
+            const idx = line.indexOf(':');
+            if (idx > 0) {
+                const k = line.slice(0, idx).trim();
+                const v = line.slice(idx + 1).trim();
+                if (k) headers[k] = v;
+            }
+        });
+        return headers;
+    }
+
+    async function sendReplay() {
+        const url     = document.getElementById('replayUrl').value.trim();
+        const method  = document.getElementById('replayMethod').value;
+        const headers = parseHeadersText(document.getElementById('replayHeaders').value);
+        const bodyTxt = document.getElementById('replayBody').value.trim();
+        const statusEl = document.getElementById('replayStatus');
+
+        if (!url) { toast('URL is empty'); return; }
+
+        statusEl.className = 'replay-status';
+        statusEl.textContent = '⏳ Sending...';
+        document.getElementById('replayResponse').value = '';
+
+        let res;
+        try {
+            res = await fetch(`${REPLAY_SERVER}/http-replay`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, method, headers, body: bodyTxt || null })
+            });
+        } catch (e) {
+            statusEl.className = 'replay-status err';
+            statusEl.textContent = '✕ Server unreachable';
+            document.getElementById('replayResponse').value =
+                `Cannot connect to ${REPLAY_SERVER}\n\nMake sure EmbeddedServer is running and has /http-replay route.\n\nOriginal error: ${e.message}`;
+            return;
+        }
+
+        let rawText = '';
+        try { rawText = await res.text(); } catch {}
+
+        let json = null;
+        try { json = JSON.parse(rawText); } catch {}
+
+        if (!json) {
+            statusEl.className = 'replay-status err';
+            statusEl.textContent = `✕ HTTP ${res.status} — bad response`;
+            document.getElementById('replayResponse').value =
+                `Server returned HTTP ${res.status}\n\nRaw response:\n${rawText || '(empty)'}`;
+            return;
+        }
+
+        if (json.error) {
+            statusEl.className = 'replay-status err';
+            statusEl.textContent = '✕ ' + json.error;
+            document.getElementById('replayResponse').value = 'Server error: ' + json.error;
+            return;
+        }
+
+        const status = json.statusCode || res.status;
+        const cls = status >= 200 && status < 300 ? 'status-2xx'
+            : status >= 300 && status < 400 ? 'status-3xx'
+                : status >= 400 && status < 500 ? 'status-4xx' : 'status-5xx';
+
+        statusEl.className = 'replay-status ok';
+        statusEl.innerHTML = `<span class="${cls}">${status}</span> · ${json.durationMs ?? '?'}ms`;
+
+        let body = json.responseBody || '';
+        try { body = JSON.stringify(JSON.parse(body), null, 2); } catch {}
+        const respHeaders = Object.entries(json.responseHeaders || {}).map(([k,v]) => `${k}: ${v}`).join('\n');
+        document.getElementById('replayResponse').value =
+            `── Headers ──\n${respHeaders}\n\n── Body ──\n${body}`;
+    }
+
+    function closeReplay() { document.getElementById('replayOverlay').classList.remove('show'); }
+    function closeReplayOnBg(e) { if (e.target === document.getElementById('replayOverlay')) closeReplay(); }
+
+    function formatReplayBody() {
+        const ta = document.getElementById('replayBody');
+        try { ta.value = JSON.stringify(JSON.parse(ta.value), null, 2); } catch { toast('Invalid JSON in body'); }
+    }
+
+    function copyReplayResponse() {
+        const text = document.getElementById('replayResponse').value;
+        if (!text) { toast('No response yet'); return; }
+        navigator.clipboard.writeText(text).then(() => toast('Copied response'));
+    }
+
+    // ════════════════════════════════════════════════════════
+    // MUTATIONS
+    // ════════════════════════════════════════════════════════
+    function toggleCollapse(path) { collapseStates[path] = !collapseStates[path]; rebuildAndRender(); }
+    function toggleManualHide(path) {
+        if (manualHideStates[path]) delete manualHideStates[path]; else manualHideStates[path] = true;
+        rebuildAndRender(); updateHiddenPanel();
+    }
+    function rebuildAndRender(resetScroll) {
+        if (!parsedData) return;
+        flatRows = buildFlatRows(parsedData);
+        applySearch();
+        if (resetScroll) document.getElementById('vscroll-wrap').scrollTop = 0;
+        scheduleRender();
+    }
+
+    // ════════════════════════════════════════════════════════
+    // SEARCH
+    // ════════════════════════════════════════════════════════
+    function applySearch() {
+        if (!searchQuery) { visibleRows = flatRows; document.getElementById('search-count').textContent = ''; return; }
+        const matchPaths = new Set(); const ancestorPaths = new Set();
+        for (let i = 0; i < flatRows.length; i++) {
+            const row = flatRows[i];
+            if (row.isClose) continue;
+            const keyStr = row.key !== null ? String(row.key).toLowerCase() : '';
+            const valStr = !row.isComplex ? String(row.value === null ? 'null' : row.value).toLowerCase() : '';
+            if (keyStr.includes(searchQuery) || valStr.includes(searchQuery)) {
+                matchPaths.add(row.path);
+                const parts = row.path.split('.');
+                let cur = '';
+                for (let j = 0; j < parts.length; j++) {
+                    cur = j === 0 ? parts[0] : cur + '.' + parts[j];
+                    ancestorPaths.add(cur);
+                }
+            }
+        }
+        visibleRows = flatRows.filter(row => {
+            const ref = row.isClose ? row.parentPath : row.path;
+            return matchPaths.has(ref) || ancestorPaths.has(ref);
+        });
+        const cnt = matchPaths.size;
+        document.getElementById('search-count').textContent = cnt ? cnt + ' match' : 'no matches';
+    }
+
+    let searchTimer;
+    function onSearchDebounced() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            searchQuery = document.getElementById('search').value.toLowerCase().trim();
+            if (!parsedData) return;
+            applySearch(); scheduleRender();
+        }, 200);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // PARSE
+    // ════════════════════════════════════════════════════════
+    function parseJSON() {
+        const raw = document.getElementById('input').value.trim();
+        if (!raw) { toast('Nothing to parse'); return; }
+        let data;
+        try { data = JSON.parse(raw); }
+        catch (e) {
+            document.getElementById('vscroll-rows').innerHTML =
+                '<div class="parse-error" style="margin:12px">⚠ Parse error: ' + escHtml(e.message) + '</div>';
+            document.getElementById('vscroll-spacer').style.height = '120px';
+            document.getElementById('stats').innerHTML = '';
+            return;
+        }
+        parsedData = data; collapseStates = {}; manualHideStates = {};
+        searchQuery = ''; filterHideKeys = null;
+        document.getElementById('search').value = '';
+        document.getElementById('search-count').textContent = '';
+
+        if (raw.length >= LARGE_THRESHOLD) {
+            document.getElementById('info-banner').classList.add('show');
+            document.getElementById('info-banner').textContent =
+                '⚡ Large JSON (' + (raw.length / 1e6).toFixed(2) + ' MB) — virtual rendering, deep nodes auto-collapsed';
+            autoCollapseDeep(parsedData, 2);
+        } else {
+            document.getElementById('info-banner').classList.remove('show');
+        }
+        rebuildAndRender(true); updateStats(); initDepthButtons(); initFieldFilter(); updateHiddenPanel();
+    }
+
+    function autoCollapseDeep(data, maxDepth) {
+        const stack = [{ val: data, path: '', depth: 0 }];
+        while (stack.length) {
+            const { val, path, depth } = stack.pop();
+            if (val === null || typeof val !== 'object') continue;
+            if (depth >= maxDepth) { collapseStates[path] = true; continue; }
+            const entries = Array.isArray(val) ? val.map((v,i) => [i,v]) : Object.entries(val);
+            for (let i = entries.length - 1; i >= 0; i--) {
+                const [k, v] = entries[i];
+                const cp = path !== '' ? path + '.' + k : String(k);
+                stack.push({ val: v, path: cp, depth: depth + 1 });
+            }
+        }
+    }
+
+    let inputTimer;
+    function onInputChange() {
+        const val = document.getElementById('input').value;
+        const len = val.length;
+        document.getElementById('char-count').textContent = len ? len.toLocaleString() + ' chars' : '';
+        if (!val.trim()) return;
+        if (len > AUTO_PARSE_MAX) {
+            document.getElementById('info-banner').classList.add('show');
+            document.getElementById('info-banner').textContent =
+                '⚡ ' + (len / 1e6).toFixed(2) + ' MB — click ▶ Parse (Ctrl+Enter)';
+            return;
+        }
+        clearTimeout(inputTimer);
+        inputTimer = setTimeout(() => {
+            try {
+                parsedData = JSON.parse(val);
+                collapseStates = {}; manualHideStates = {};
+                document.getElementById('info-banner').classList.remove('show');
+                rebuildAndRender(true); updateStats(); initDepthButtons();
+            } catch {}
+        }, 300);
+    }
+
+    function handleInputKey(e) { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); parseJSON(); } }
+    function formatInput() {
+        try { const p = JSON.parse(document.getElementById('input').value); document.getElementById('input').value = JSON.stringify(p, null, 2); onInputChange(); }
+        catch { toast('Invalid JSON'); }
+    }
+    function clearAll() {
+        document.getElementById('input').value = '';
+        document.getElementById('char-count').textContent = '';
+        document.getElementById('stats').innerHTML = '';
+        document.getElementById('path-bar').textContent = 'hover a node to see path';
+        document.getElementById('info-banner').classList.remove('show');
+        document.getElementById('depth-btns').innerHTML = '';
+        parsedData = null; flatRows = []; visibleRows = [];
+        collapseStates = {}; manualHideStates = {}; searchQuery = ''; filterHideKeys = null;
+        document.getElementById('vscroll-rows').innerHTML = '';
+        document.getElementById('vscroll-spacer').style.height = '0';
+        updateHiddenPanel();
+    }
+
+    // ════════════════════════════════════════════════════════
+    // BULK OPS
+    // ════════════════════════════════════════════════════════
+    function expandAll() { collapseStates = {}; document.querySelectorAll('.depth-btn').forEach(b => b.classList.remove('active')); rebuildAndRender(); }
+    function collapseAll() {
+        if (!parsedData) return;
+        collapseStates = {};
+        iWalkPaths(parsedData, (p, v) => { if (v !== null && typeof v === 'object') collapseStates[p] = true; });
+        rebuildAndRender();
+    }
+    function collapseToDepth(maxDepth) {
+        if (!parsedData) return;
+        collapseStates = {};
+        iWalkPaths(parsedData, (p, v, d) => { if (v !== null && typeof v === 'object') collapseStates[p] = (d >= maxDepth); });
+        rebuildAndRender();
+        document.querySelectorAll('.depth-btn').forEach(b => { b.classList.toggle('active', parseInt(b.dataset.depth) === maxDepth); });
+    }
+    function showAll() { manualHideStates = {}; updateHiddenPanel(); rebuildAndRender(); }
+
+    function iWalkPaths(obj, fn) {
+        const stack = [{ val: obj, path: '', depth: 0 }];
+        while (stack.length) {
+            const { val, path, depth } = stack.pop();
+            fn(path, val, depth);
+            if (val !== null && typeof val === 'object') {
+                const entries = Array.isArray(val) ? val.map((v,i) => [i,v]) : Object.entries(val);
+                for (let i = entries.length - 1; i >= 0; i--) {
+                    const [k, v] = entries[i];
+                    const cp = path !== '' ? path + '.' + k : String(k);
+                    stack.push({ val: v, path: cp, depth: depth + 1 });
+                }
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    // DEPTH BUTTONS
+    // ════════════════════════════════════════════════════════
+    function initDepthButtons() {
+        const container = document.getElementById('depth-btns');
+        container.innerHTML = '';
+        if (!parsedData) return;
+        let maxD = 0;
+        iWalkPaths(parsedData, (p, v, d) => { maxD = Math.max(maxD, d); });
+        const levels = Math.min(maxD, 8);
+        for (let i = 1; i <= levels; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'depth-btn'; btn.dataset.depth = i; btn.textContent = i;
+            btn.title = 'Collapse to depth ' + i; btn.onclick = () => collapseToDepth(i);
+            container.appendChild(btn);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    // COPY C# SELECTOR
+    // ════════════════════════════════════════════════════════
+    function copyCSharpSelector(path) {
+        const parts = path.split('.');
+
+        // Build JObject selector chain
+        let selector = 'JObject.Parse(json)';
+        for (const part of parts) {
+            if (/^\d+$/.test(part)) {
+                selector += '[' + part + ']';
+            } else {
+                selector += '["' + part + '"]';
+            }
+        }
+
+        // Build camelCase variable name from last non-numeric segment
+        // e.g. "user-agent" -> "userAgent", "x_api_key" -> "xApiKey"
+        const lastKey = [...parts].reverse().find(p => !/^\d+$/.test(p)) || 'value';
+        const varName = lastKey
+            .replace(/[^a-zA-Z0-9_]/g, '_')
+            .replace(/_+([a-zA-Z0-9])/g, (_, c) => c.toUpperCase())
+            .replace(/^_+/, '')
+            .replace(/^([A-Z])/, c => c.toLowerCase());
+
+        const reserved = new Set(['base','bool','break','byte','case','catch','char','checked',
+            'class','const','continue','decimal','default','delegate','do','double','else',
+            'enum','event','explicit','extern','false','finally','fixed','float','for',
+            'foreach','goto','if','implicit','in','int','interface','internal','is','lock',
+            'long','namespace','new','null','object','operator','out','override','params',
+            'private','protected','public','readonly','ref','return','sbyte','sealed',
+            'short','sizeof','stackalloc','static','string','struct','switch','this',
+            'throw','true','try','typeof','uint','ulong','unchecked','unsafe','ushort',
+            'using','virtual','void','volatile','while']);
+        const safeName = reserved.has(varName) ? varName + 'Value' : (varName || 'value');
+
+        const code = 'var ' + safeName + ' = ' + selector + ';';
+        navigator.clipboard.writeText(code).then(() => toast('C# copied: ' + safeName));
+    }
+
+    // ════════════════════════════════════════════════════════
+    // COPY
+    // ════════════════════════════════════════════════════════
+    function copyNode(value, path) {
+        const text = (value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : String(value);
+        navigator.clipboard.writeText(text).then(() => toast('Copied ' + (path || 'root')));
+    }
+    function copyRoot() {
+        if (!parsedData) return;
+        navigator.clipboard.writeText(JSON.stringify(parsedData, null, 2)).then(() => toast('Copied'));
+    }
+
+    // ════════════════════════════════════════════════════════
+    // HIDDEN PANEL
+    // ════════════════════════════════════════════════════════
+    function updateHiddenPanel() {
+        const panel = document.getElementById('hidden-panel');
+        const tags  = document.getElementById('hidden-tags');
+        const paths = Object.keys(manualHideStates);
+        if (!paths.length) { panel.style.display = 'none'; return; }
+        panel.style.display = '';
+        tags.innerHTML = '';
+        paths.forEach(p => {
+            const tag = document.createElement('div');
+            tag.className = 'hidden-tag';
+            tag.innerHTML = '🚫 ' + escHtml(p) + ' <span style="color:var(--text-muted)">↩</span>';
+            tag.onclick = () => { delete manualHideStates[p]; updateHiddenPanel(); rebuildAndRender(); };
+            tags.appendChild(tag);
+        });
+    }
+
+    // ════════════════════════════════════════════════════════
+    // STATS
+    // ════════════════════════════════════════════════════════
+    function updateStats() {
+        if (!parsedData) return;
+        let keys = 0, maxDepth = 0;
+        const stack = [{ v: parsedData, d: 0 }];
+        while (stack.length) {
+            const { v, d } = stack.pop();
+            maxDepth = Math.max(maxDepth, d);
+            if (v !== null && typeof v === 'object') {
+                if (Array.isArray(v)) { keys += v.length; for (let i = 0; i < v.length; i++) stack.push({ v: v[i], d: d+1 }); }
+                else { const ks = Object.keys(v); keys += ks.length; for (let i = 0; i < ks.length; i++) stack.push({ v: v[ks[i]], d: d+1 }); }
+            }
+        }
+        document.getElementById('stats').innerHTML =
+            '<div class="stat-badge">keys <span>' + keys.toLocaleString() + '</span></div>' +
+            '<div class="stat-badge">depth <span>' + maxDepth + '</span></div>' +
+            '<div class="stat-badge">rows <span>' + flatRows.length.toLocaleString() + '</span></div>';
+    }
+
+    // ════════════════════════════════════════════════════════
+    // UTILS
+    // ════════════════════════════════════════════════════════
+    function valueClass(v) {
+        if (v === null) return 'node-value-null';
+        if (typeof v === 'string') return 'node-value-str';
+        if (typeof v === 'number') return 'node-value-num';
+        if (typeof v === 'boolean') return 'node-value-bool';
+        return 'node-value-str';
+    }
+    function formatValue(v) {
+        if (v === null) return 'null';
+        if (typeof v === 'string') return '"' + (v.length > 300 ? v.slice(0, 300) + '…' : v) + '"';
+        return String(v);
+    }
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    let toastTimer;
+    function toast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg; el.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // FIELD FILTER
+    // ════════════════════════════════════════════════════════
+    let filterHideKeys = null;
+    const FF_PRESETS = {
+        api:     ['url', 'method', 'statusCode', 'requestBody', 'responseBody'],
+        headers: ['url', 'method', 'statusCode', 'requestHeaders', 'responseHeaders'],
+        status:  ['url', 'method', 'statusCode'],
+    };
+
+    function detectArrayItemKeys(data) {
+        const depthMap = new Map();
+        const stack = [{ val: data, depth: 0 }];
+        while (stack.length) {
+            const { val, depth } = stack.pop();
+            if (val === null || typeof val !== 'object') continue;
+            if (Array.isArray(val)) {
+                val.forEach(item => {
+                    if (item && typeof item === 'object' && !Array.isArray(item)) {
+                        if (!depthMap.has(depth)) depthMap.set(depth, new Set());
+                        Object.keys(item).forEach(k => depthMap.get(depth).add(k));
+                        Object.values(item).forEach(c => stack.push({ val: c, depth: depth + 1 }));
+                    } else { stack.push({ val: item, depth: depth + 1 }); }
+                });
+            } else { Object.values(val).forEach(c => stack.push({ val: c, depth: depth + 1 })); }
+        }
+        return depthMap;
+    }
+
+    function initFieldFilter() {
+        const depthMap = detectArrayItemKeys(parsedData);
+        const ff = document.getElementById('field-filter');
+        if (!depthMap.size) { ff.classList.remove('show'); return; }
+        ff.classList.add('show');
+        filterHideKeys = null; updateFFBadge(); setPresetActive(null);
+        const container = document.getElementById('ff-chips');
+        container.innerHTML = '';
+        const sortedDepths = [...depthMap.keys()].sort((a, b) => a - b);
+        sortedDepths.forEach(depth => {
+            const keys = [...depthMap.get(depth)].sort();
+            const row = document.createElement('div'); row.className = 'ff-level-row';
+            const label = document.createElement('span'); label.className = 'ff-level-label';
+            label.textContent = 'L' + (depth + 1); label.title = 'Depth level ' + (depth + 1);
+            row.appendChild(label);
+            const chipsWrap = document.createElement('div'); chipsWrap.className = 'field-chips';
+            keys.forEach(key => {
+                const chip = document.createElement('div');
+                chip.className = 'chip on'; chip.dataset.field = key;
+                chip.innerHTML = '<div class="chip-dot"></div>' + key;
+                chip.onclick = () => { chip.classList.toggle('on'); rebuildFilterFromChips(); };
+                chipsWrap.appendChild(chip);
+            });
+            row.appendChild(chipsWrap); container.appendChild(row);
+        });
+    }
+
+    function rebuildFilterFromChips() {
+        const all = [...document.querySelectorAll('.chip')];
+        const off = all.filter(c => !c.classList.contains('on')).map(c => c.dataset.field);
+        filterHideKeys = off.length ? new Set(off) : null;
+        setPresetActive(null); updateFFBadge(); rebuildAndRender();
+    }
+
+    function toggleFFPanel() {
+        const body = document.getElementById('ff-body'); const arrow = document.getElementById('ff-arrow');
+        body.classList.toggle('open'); arrow.textContent = body.classList.contains('open') ? '▼' : '▶';
+    }
+
+    function applyPreset(name) {
+        const all = [...document.querySelectorAll('.chip')];
+        if (name === 'all') { all.forEach(c => c.classList.add('on')); filterHideKeys = null; }
+        else {
+            const show = new Set(FF_PRESETS[name] || []);
+            const off = [];
+            all.forEach(c => { if (show.has(c.dataset.field)) c.classList.add('on'); else { c.classList.remove('on'); off.push(c.dataset.field); } });
+            filterHideKeys = off.length ? new Set(off) : null;
+            const body = document.getElementById('ff-body');
+            if (!body.classList.contains('open')) toggleFFPanel();
+        }
+        setPresetActive(name); updateFFBadge(); rebuildAndRender();
+    }
+
+    function setPresetActive(name) { document.querySelectorAll('.preset-btn').forEach(b => { b.classList.toggle('active', b.dataset.preset === name); }); }
+
+    function updateFFBadge() {
+        const badge = document.getElementById('ff-badge');
+        if (!filterHideKeys || !filterHideKeys.size) { badge.style.display = 'none'; return; }
+        const total = document.querySelectorAll('.chip').length;
+        badge.style.display = ''; badge.textContent = (total - filterHideKeys.size) + '/' + total;
+    }
+
+    // ════════════════════════════════════════════════════════
+    // INIT
+    // ════════════════════════════════════════════════════════
+    document.getElementById('vscroll-wrap').addEventListener('scroll', scheduleRender, { passive: true });
+    new ResizeObserver(scheduleRender).observe(document.getElementById('vscroll-wrap'));
+
+    document.getElementById('input').addEventListener('paste', () => {
+        setTimeout(() => {
+            const val = document.getElementById('input').value;
+            const len = val.length;
+            document.getElementById('char-count').textContent = len ? len.toLocaleString() + ' chars' : '';
+            if (len > AUTO_PARSE_MAX) {
+                document.getElementById('info-banner').classList.add('show');
+                document.getElementById('info-banner').textContent = '⚡ ' + (len / 1e6).toFixed(2) + ' MB pasted — click ▶ Parse (or Ctrl+Enter)';
+            } else { onInputChange(); }
+        }, 30);
+    });
+
+    // Keyboard: Escape closes replay
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReplay(); });
+
+    window.addEventListener('load', () => {
+        // Demo: реальные запросы к httpbin.org — публичный echo-сервис
+        // ⚡ Replay работает сразу: нажми ⚡ на любом url или кнопку Replay в тулбаре
+        const demo = JSON.stringify({
+            "totalEndpoints": 3,
+            "getEndpoints": [
+                {
+                    "method": "GET",
+                    "url": "https://httpbin.org/bearer",
+                    "statusCode": "200",
+                    "requestHeaders": {
+                        "accept": "application/json",
+                        "authorization": "Bearer demo-token-jsonzen-test",
+                        "content-type": "application/json",
+                        "user-agent": "JsonZEN/1.0"
+                    },
+                    "requestCookies": "",
+                    "responseHeaders": {
+                        "content-type": "application/json",
+                        "server": "gunicorn/19.9.0",
+                        "access-control-allow-origin": "*"
+                    },
+                    "responseCookies": "",
+                    "responseBody": {
+                        "authenticated": true,
+                        "token": "demo-token-jsonzen-test"
+                    }
+                },
+                {
+                    "method": "GET",
+                    "url": "https://httpbin.org/get",
+                    "statusCode": "200",
+                    "requestHeaders": {
+                        "accept": "*/*",
+                        "authorization": "Bearer demo-token-jsonzen-test",
+                        "content-type": "application/json",
+                        "x-api-key": "test-api-key-12345",
+                        "user-agent": "JsonZEN/1.0"
+                    },
+                    "requestCookies": "",
+                    "responseHeaders": {
+                        "content-type": "application/json",
+                        "server": "gunicorn/19.9.0",
+                        "access-control-allow-origin": "*"
+                    },
+                    "responseCookies": "",
+                    "responseBody": {
+                        "args": {},
+                        "headers": {
+                            "Accept": "*/*",
+                            "Authorization": "Bearer demo-token-jsonzen-test",
+                            "Host": "httpbin.org"
+                        },
+                        "url": "https://httpbin.org/get"
+                    }
+                },
+                {
+                    "method": "GET",
+                    "url": "https://httpbin.org/headers",
+                    "statusCode": "200",
+                    "requestHeaders": {
+                        "accept": "application/json",
+                        "authorization": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW1vLXVzZXIiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6OTk5OTk5OTk5OX0.demo-signature",
+                        "x-api-key": "sk-test-0000000000000000",
+                        "user-agent": "JsonZEN/1.0",
+                        "cf-clearance": "demo_clearance_value_for_testing"
+                    },
+                    "requestCookies": "__cf_bm=demo_cf_bm_cookie; cf_clearance=demo_clearance",
+                    "responseHeaders": {
+                        "content-type": "application/json",
+                        "server": "gunicorn/19.9.0",
+                        "cf-ray": "demo-cf-ray-id",
+                        "access-control-allow-origin": "*"
+                    },
+                    "responseCookies": "",
+                    "responseBody": {
+                        "headers": {
+                            "Accept": "application/json",
+                            "Authorization": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...",
+                            "Host": "httpbin.org"
+                        }
+                    }
+                }
+            ],
+            "postEndpoints": [
+                {
+                    "method": "POST",
+                    "url": "https://httpbin.org/post",
+                    "statusCode": "200",
+                    "requestHeaders": {
+                        "accept": "application/json",
+                        "authorization": "Bearer demo-token-jsonzen-test",
+                        "content-type": "application/json",
+                        "user-agent": "JsonZEN/1.0"
+                    },
+                    "requestCookies": "",
+                    "responseHeaders": {
+                        "content-type": "application/json",
+                        "server": "gunicorn/19.9.0",
+                        "access-control-allow-origin": "*"
+                    },
+                    "responseCookies": "",
+                    "requestBody": {
+                        "action": "test",
+                        "payload": { "key": "value", "count": 42 }
+                    },
+                    "responseBody": {
+                        "json": { "action": "test", "payload": { "key": "value", "count": 42 } },
+                        "url": "https://httpbin.org/post"
+                    }
+                }
+            ]
+        }, null, 2);
+
+        document.getElementById('input').value = demo;
+        try {
+            parsedData = JSON.parse(demo);
+            flatRows = buildFlatRows(parsedData);
+            visibleRows = flatRows;
+            scheduleRender(); updateStats(); initDepthButtons();
+        } catch(e) { console.error(e); }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>z3n8 | Logs</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-header {
+            background: var(--bg1);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .main-header h1 {
+            font-size: 18px;
+            color: var(--accent);
+        }
+
+        .dashboard-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            gap: 8px;
+            padding: 8px;
+        }
+
+
+
+        .panel {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .panel-header {
+            background: var(--bg1);
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            font-size: 11px;
+        }
+
+        .stat-item {
+            display: flex;
+            gap: 2px;
+        }
+
+        .stat-label {
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 14px;
+        }
+
+        .stat-value {
+            color: var(--accent);
+            font-size: 14px;
+        }
+
+        .controls {
+            background: var(--bg1);
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .controls select,
+        .controls input,
+        .controls button {
+            padding: 4px 10px;
+            font-size: 11px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: inherit;
+        }
+
+        .controls button {
+
+            border-color: rgba(240, 246, 252, 0.1);
+            color: #fff;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .controls button:hover {
+            background: var(--green-bg2);
+        }
+
+        .controls button.danger {
+            background: var(--red-bg);
+            border-color: rgba(248, 81, 73, 0.4);
+        }
+
+        .controls button.danger:hover {
+            background: var(--red-bg);
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .request-item {
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--bg2);
+            cursor: pointer;
+            transition: background 0.15s;
+            display: grid;
+            grid-template-columns: 70px 55px 1fr 55px 70px 65px 90px;
+            gap: 6px;
+            align-items: center;
+            font-size: 11px;
+        }
+
+        .request-item:hover {
+            background: var(--bg1);
+        }
+
+        .method {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        .method.GET { background: rgba(88, 166, 255, 0.15); color: var(--accent-lo); }
+        .method.POST { background: rgba(63, 185, 80, 0.15); color: var(--green-lo); }
+        .method.PUT { background: rgba(210, 153, 34, 0.15); color: var(--yellow-lo); }
+        .method.DELETE { background: rgba(248, 81, 73, 0.15); color: var(--red-lo); }
+
+        .status {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        .status.s2xx { background: rgba(63, 185, 80, 0.15); color: var(--green-lo); }
+        .status.s3xx { background: rgba(88, 166, 255, 0.15); color: var(--accent-lo); }
+        .status.s4xx { background: rgba(210, 153, 34, 0.15); color: var(--yellow-lo); }
+        .status.s5xx { background: rgba(248, 81, 73, 0.15); color: var(--red-lo); }
+
+        .url {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text);
+        }
+
+        .duration {
+            color: var(--text2);
+            font-family: monospace;
+            font-size: 10px;
+            text-align: right;
+        }
+
+        .timestamp {
+            color: var(--text3);
+            font-family: monospace;
+            font-size: 10px;
+        }
+
+        .account {
+            color: var(--green-hi);
+            font-size: 10px;
+        }
+
+        .cookie-source {
+            font-size: 9px;
+            padding: 2px 4px;
+            background: var(--bg2);
+            border-radius: 3px;
+            color: var(--text2);
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .log-entry {
+            padding: 6px 12px;
+            border-left: 3px solid transparent;
+            background: var(--bg);
+            border-bottom: 1px solid var(--bg2);
+            transition: background 0.15s;
+        }
+
+        .log-header {
+            display: grid;
+            grid-template-columns: 70px 100px 80px 50px 70px 70px 90px 250px 15px ;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .log-entry:hover {
+            background: var(--bg1);
+        }
+
+        .log-entry.ERROR {
+            border-left-color: var(--red);
+            background: var(--red-tint2);
+        }
+
+        .log-entry.ERROR:hover {
+            background: var(--red-tint);
+        }
+
+        .log-entry.WARNING {
+            border-left-color: var(--yellow);
+        }
+
+
+        .machine {
+            color: var(--accent);
+            background: rgba(56, 139, 253, 0.15);
+            padding: 1px 4px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .project {
+            color: var(--purple);
+            background: rgba(163, 113, 247, 0.15);
+            padding: 1px 4px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .level {
+            padding: 1px 4px;
+            border-radius: 6px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-family: ui-monospace, monospace;
+            cursor: pointer;
+        }
+
+        .level.ERROR {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--red-lo);
+        }
+
+        .level.WARNING {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--yellow-lo);
+        }
+
+        .level.INFO {
+            background: rgba(56, 139, 253, 0.15);
+            color: var(--accent-lo);
+        }
+
+        .level.SUCCESS {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--green-lo);
+        }
+
+        .message {
+            cursor: copy;
+            padding: 4px 0;
+            margin-top: 4px;
+            border-radius: 3px;
+            transition: background 0.15s;
+            word-break: break-word;
+            color: var(--text);
+            line-height: 1.5;
+            font-size: 11px;
+            display: -webkit-box;
+            -webkit-line-clamp: 5;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .message:hover {
+            background: rgba(110, 118, 129, 0.1);
+            padding: 4px 6px;
+            -webkit-line-clamp: unset;
+        }
+
+        .session, .port, .pid {
+            color: var(--text3);
+            font-size: 10px;
+            font-family: ui-monospace, monospace;
+            cursor: pointer;
+        }
+        .copy-btn {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
+        .copy-btn:hover {
+            background: var(--border);
+        }
+
+
+        /* Стили для панели деталей (аналогично первому дашборду) */
+        .details-panel {
+            position: absolute;
+            right: 8px;
+            top: 50px;
+            bottom: 8px;
+            width: 500px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: none; /* По умолчанию скрыта */
+            flex-direction: column;
+            z-index: 100;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+        }
+
+        .details-panel.visible { display: flex; }
+
+        .details-header {
+            padding: 12px;
+            background: var(--bg1);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tabs {
+            display: flex;
+            background: var(--bg1);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 12px;
+        }
+
+        .tab.active {
+            border-bottom-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .tab-content { flex: 1; overflow-y: auto; padding: 12px; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .code-block {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 5px;
+        }
+
+        .info-grid { display: grid; gap: 8px; }
+        .info-row { display: grid; grid-template-columns: 100px 1fr; gap: 8px; }
+        .info-label { color: var(--text2); }
+        .header-item { display: grid; grid-template-columns: 140px 1fr; border-bottom: 1px solid var(--bg2); padding: 4px 0; }
+        .header-key { color: var(--green-hi); font-family: monospace; }
+
+
+        .header-list {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+
+        .header-item {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            border-bottom: 1px solid var(--bg2);
+            padding: 6px 12px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+
+        .header-item:last-child {
+            border-bottom: none;
+        }
+
+        .header-key {
+            color: var(--green-hi);
+            font-family: monospace;
+        }
+
+        .header-value {
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        .dashboard-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            gap: 0; /* Убираем gap, будут разделители */
+            padding: 0;
+        }
+
+        .panel {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .resizer {
+            width: 8px;
+            background: var(--border);
+            cursor: col-resize;
+            margin: 0 -4px; /* Чтобы не занимал лишнее место */
+            z-index: 10;
+            transition: background 0.2s;
+            position: relative; /* Чтобы ::after работал корректно */
+            flex-shrink: 0;
+        }
+        .resizer:hover {
+            background: var(--bg);
+        }
+
+        .resizer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -4px;   /* Расширяем зону клика влево */
+            right: -4px;  /* Расширяем зону клика вправо */
+            bottom: 0;
+        }
+
+
+
+
+
+
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 6px;
+            border: 2px solid var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--muted);
+        }
+    </style>
+</head>
+<body>
+
+
+
+<div class="dashboard-container">
+
+    <!-- LIVE LOGS PANEL (RIGHT) -->
+    <div class="panel" id="logsPanel">
+
+
+        <div class="controls" >
+            <span class="panel-title">📋 </span>
+            <div class="control-row">
+                <button onclick="refreshLogs()">🔄</button>
+                <button onclick="toggleLogsAutoRefresh()">⏸️ <span id="logsAutoStatus">ON</span></button>
+                <button onclick="clearLogsFilters()">✖️</button>
+                <button onclick="clearLogsServer()" class="danger">🗑️</button>
+            </div>
+
+            <div class="control-row">
+                <select id="logsLevelFilter" onchange="refreshLogs()">
+                    <option value="">All Levels</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="INFO">INFO</option>
+                    <option value="SUCCESS">SUCCESS</option>
+                </select>
+                <select id="logsMachineFilter" onchange="refreshLogs()"><option value="">All Machines</option></select>
+                <select id="logsProjectFilter" onchange="refreshLogs()"><option value="">All Projects</option></select>
+                <select id="logsSessionFilter" onchange="refreshLogs()"><option value="">Sessions</option></select>
+                <select id="logsPortFilter" onchange="refreshLogs()"><option value="">Ports</option></select>
+                <select id="logsPidFilter" onchange="refreshLogs()"><option value="">PIDs</option></select>
+                <select id="logsAccountFilter" onchange="refreshLogs()"><option value="">All Accounts</option></select>
+
+                <input type="number" id="logsLimitInput" value="100" min="10" max="500" step="10" style="width: 60px;" onchange="refreshLogs()">
+            </div>
+        </div>
+        <div class="content-area" id="logsContainer"></div>
+    </div>
+
+    <div class="resizer" id="drag-handle"></div>
+
+    <!-- HTTP TRAFFIC PANEL (LEFT) -->
+    <div class="panel" id="httpPanel">
+
+        <div class="controls">
+            <span class="panel-title">🌐 </span>
+
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-label">Total: </span>
+                    <span class="stat-value" id="httpTotalRequests">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Success: </span>
+                    <span class="stat-value" style="color: #56d364;" id="httpSuccessRate">0%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg:  </span>
+                    <span class="stat-value" id="httpAvgTime">0ms</span>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <button onclick="refreshHttp()">🔄</button>
+                <button onclick="toggleHttpAutoRefresh()">⏸️ <span id="httpAutoStatus">ON</span></button>
+                <button onclick="clearHttpFilters()">✖️</button>
+                <button onclick="clearHttpLogs()" class="danger">🗑️</button>
+            </div>
+
+            <div class="control-row">
+                <select id="httpMethodFilter" onchange="refreshHttp()">
+                    <option value="">All Methods</option>
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+                <select id="httpStatusFilter" onchange="refreshHttp()">
+                    <option value="">All Status</option>
+                    <option value="2">2xx</option>
+                    <option value="3">3xx</option>
+                    <option value="4">4xx</option>
+                    <option value="5">5xx</option>
+                </select>
+
+                <input type="text" id="httpUrlFilter" placeholder="URL filter..." onkeyup="refreshHttp()" style="min-width: 120px;">
+                <select id="httpMachineFilter" onchange="refreshHttp()"><option value="">All Machines</option></select>
+                <select id="httpProjectFilter" onchange="refreshHttp()"><option value="">All Projects</option></select>
+                <select id="httpCookieSourceFilter" onchange="refreshHttp()">
+
+                    <option value="">Cookie Src</option><option value="db">DB</option>
+                    <option value="var">Var</option>
+                    <option value="container">Container</option>
+                    <option value="not-set">Not Set</option>
+                </select>
+                <select id="httpAccountFilter" onchange="refreshHttp()">
+                    <option value="">All Accounts</option>
+                </select>
+
+                <input type="number" id="httpLimitInput" value="100" min="10" max="500" step="10" style="width: 60px;" onchange="refreshHttp()">
+            </div>
+        </div>
+
+
+
+        <div class="content-area" id="httpRequestsList"></div>
+    </div>
+
+</div>
+
+<div class="details-panel" id="detailsPanel">
+    <div class="details-header">
+        <span class="details-title">Request Details</span>
+        <button class="close-btn" onclick="closeDetails()" style="background:none; border:none; color:#8b949e; cursor:pointer; font-size:20px;">×</button>
+    </div>
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('overview')">Overview</div>
+        <div class="tab" onclick="switchTab('request')">Request</div>
+        <div class="tab" onclick="switchTab('response')">Response</div>
+    </div>
+    <div class="tab-content">
+        <div id="overview" class="tab-panel active"></div>
+        <div id="request" class="tab-panel"></div>
+        <div id="response" class="tab-panel"></div>
+    </div>
+</div>
+
+
+
+
+<script>
+    const SERVER = window.location.origin;
+
+    // HTTP Traffic variables
+    let httpAutoRefresh = true;
+    let httpAutoRefreshInterval = null;
+    let currentHttpLogs = [];
+
+    // Logs variables
+    let logsAutoRefresh = true;
+    let logsAutoRefreshInterval = null;
+
+
+    document.addEventListener('click', e => {
+        if (!e.target.matches('.copy-btn[data-copy-target]')) return;
+
+        const targetId = e.target.getAttribute('data-copy-target');
+        const el = document.getElementById(targetId);
+        if (!el) return;
+
+        const text = el.innerText.trim();
+        if (!text) return;
+
+        navigator.clipboard.writeText(text).then(() => {
+            const original = e.target.innerHTML;
+            e.target.innerHTML = '✓ Copied!';
+            e.target.style.background = 'rgba(63, 185, 80, 0.25)';
+            setTimeout(() => {
+                e.target.innerHTML = original;
+                e.target.style.background = '';
+            }, 1400);
+        }).catch(err => {
+            console.error('Clipboard error:', err);
+            e.target.innerHTML = 'Failed 😕';
+            setTimeout(() => e.target.innerHTML = original, 2000);
+        });
+    });
+
+
+    // ===== HTTP TRAFFIC FUNCTIONS =====
+    async function refreshHttp() {
+        const method = document.getElementById('httpMethodFilter').value;
+        const status = document.getElementById('httpStatusFilter').value;
+        const url = document.getElementById('httpUrlFilter').value;
+        const machine = document.getElementById('httpMachineFilter').value;
+        const project = document.getElementById('httpProjectFilter').value;
+        const cookieSource = document.getElementById('httpCookieSourceFilter').value;
+        const account = document.getElementById('httpAccountFilter')?.value || '';
+        const limit = document.getElementById('httpLimitInput').value;
+
+        let apiUrl = `${SERVER}/http-logs?limit=${limit}`;
+        if (method) apiUrl += `&method=${method}`;
+        if (status) apiUrl += `&status=${status}`;
+        if (url) apiUrl += `&url=${encodeURIComponent(url)}`;
+        if (machine) apiUrl += `&machine=${encodeURIComponent(machine)}`;
+        if (project) apiUrl += `&project=${encodeURIComponent(project)}`;
+        if (cookieSource) apiUrl += `&cookiesSource=${encodeURIComponent(cookieSource)}`;
+        if (account) apiUrl += `&account=${encodeURIComponent(account)}`;
+
+        try {
+            const response = await fetch(apiUrl);
+            currentHttpLogs = await response.json();
+            renderHttpRequests(currentHttpLogs);
+            await updateHttpStats();
+        } catch (e) {
+            console.error('HTTP refresh failed:', e);
+        }
+    }
+
+    function renderHttpRequests(logs) {
+        const container = document.getElementById('httpRequestsList');
+        container.innerHTML = logs.map((log, idx) => {
+            const method = log.method || 'GET';
+            const url = log.url || '';
+            const statusCode = log.statusCode || 0;
+            const duration = log.durationMs ? `${log.durationMs}ms` : '-';
+            const cSrc = (log.request && log.request.cookiesSource) ? log.request.cookiesSource : '-';
+
+            const statusClass = statusCode >= 200 && statusCode < 300 ? 's2xx' :
+                statusCode >= 300 && statusCode < 400 ? 's3xx' :
+                    statusCode >= 400 && statusCode < 500 ? 's4xx' : 's5xx';
+
+            const time = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '--:--:--';
+
+            return `
+                <div class="request-item"onclick="showDetails(${idx})">
+                    <span class="timestamp">${time}</span>
+                    <span class="method ${method}">${method}</span>
+                    <span class="url" title="${escapeHtml(url)}">${escapeHtml(url)}</span>
+                    <span class="status ${statusClass}">${statusCode}</span>
+                    <span class="duration">${duration}</span>
+                    <span class="cookie-source">${cSrc}</span>
+                    <span class="account">${log.account || '-'}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function updateHttpStats() {
+        try {
+            const response = await fetch(`${SERVER}/http-stats`);
+            const stats = await response.json();
+
+            document.getElementById('httpTotalRequests').textContent = stats.totalRequests;
+
+            const success = stats.byStatus['2xx'] || 0;
+            const successRate = stats.totalRequests > 0 ? Math.round((success / stats.totalRequests) * 100) : 0;
+            document.getElementById('httpSuccessRate').textContent = successRate + '%';
+            document.getElementById('httpAvgTime').textContent = stats.avgDurationMs + 'ms';
+
+            const machineFilter = document.getElementById('httpMachineFilter');
+            const projectFilter = document.getElementById('httpProjectFilter');
+            const accountFilter = document.getElementById('httpAccountFilter');
+
+            const curMachine = machineFilter.value;
+            const curProject = projectFilter.value;
+            const curAccount = accountFilter?.value || '';
+
+            if (stats.byMachine) {
+                machineFilter.innerHTML = '<option value="">All Machines</option>' +
+                    Object.keys(stats.byMachine).map(m =>
+                        `<option value="${m}" ${m === curMachine ? 'selected' : ''}>${m}</option>`
+                    ).join('');
+            }
+
+            if (stats.byProject) {
+                projectFilter.innerHTML = '<option value="">All Projects</option>' +
+                    Object.keys(stats.byProject).map(p =>
+                        `<option value="${p}" ${p === curProject ? 'selected' : ''}>${p}</option>`
+                    ).join('');
+            }
+
+            if (stats.byAccount && accountFilter) {
+                accountFilter.innerHTML = '<option value="">All Accounts</option>' +
+                    Object.keys(stats.byAccount).map(a =>
+                        `<option value="${a}" ${a === curAccount ? 'selected' : ''}>${a}</option>`
+                    ).join('');
+            }
+        } catch (e) {
+            console.error('HTTP stats update failed:', e);
+        }
+    }
+
+    function toggleHttpAutoRefresh() {
+        httpAutoRefresh = !httpAutoRefresh;
+        document.getElementById('httpAutoStatus').textContent = httpAutoRefresh ? 'ON' : 'OFF';
+        if (httpAutoRefresh) {
+            httpAutoRefreshInterval = setInterval(refreshHttp, 3000);
+        } else {
+            clearInterval(httpAutoRefreshInterval);
+        }
+    }
+
+    function clearHttpFilters() {
+        document.getElementById('httpMethodFilter').value = '';
+        document.getElementById('httpStatusFilter').value = '';
+        document.getElementById('httpUrlFilter').value = '';
+        document.getElementById('httpMachineFilter').value = '';
+        document.getElementById('httpProjectFilter').value = '';
+        document.getElementById('httpCookieSourceFilter').value = '';
+        const accountFilter = document.getElementById('httpAccountFilter');
+        if (accountFilter) accountFilter.value = '';
+        refreshHttp();
+    }
+
+    async function clearHttpLogs() {
+        if (!confirm('Delete all HTTP logs?')) return;
+        try {
+            await fetch(`${SERVER}/clear-http`, { method: 'POST' });
+            refreshHttp();
+        } catch (e) {
+            console.error('Clear failed:', e);
+        }
+    }
+
+    // ===== LIVE LOGS FUNCTIONS =====
+    async function refreshLogs() {
+        const level = document.getElementById('logsLevelFilter').value;
+        const machine = document.getElementById('logsMachineFilter').value;
+        const project = document.getElementById('logsProjectFilter').value;
+        const session = document.getElementById('logsSessionFilter').value;
+        const port = document.getElementById('logsPortFilter').value;
+        const pid = document.getElementById('logsPidFilter').value;
+        const limit = document.getElementById('logsLimitInput').value;
+        const account = document.getElementById('logsAccountFilter').value;
+
+        let url = `${SERVER}/logs?limit=${limit}`;
+        if (level) url += `&level=${level}`;
+        if (machine) url += `&machine=${encodeURIComponent(machine)}`;
+        if (project) url += `&project=${encodeURIComponent(project)}`;
+        if (session) url += `&session=${encodeURIComponent(session)}`;
+        if (port) url += `&port=${encodeURIComponent(port)}`;
+        if (pid) url += `&pid=${encodeURIComponent(pid)}`;
+        if (account) url += `&account=${encodeURIComponent(account)}`;
+
+        try {
+            const response = await fetch(url);
+            const logs = await response.json();
+            renderLogs(logs);
+            await updateLogsFilters();
+        } catch (e) {
+            console.error('Logs refresh failed:', e);
+        }
+    }
+
+    function formatSession(session) {
+        const sessionNum = parseInt(session);
+        if (isNaN(sessionNum) || sessionNum < 1000000000) return `${session}`;
+
+        const timestamp = sessionNum > 9999999999 ? sessionNum : sessionNum * 1000;
+        const date = new Date(timestamp);
+        if (isNaN(date.getTime())) return `${session}`;
+
+        const now = new Date();
+        const diff = now - date;
+
+        if (diff < 86400000 && diff > 0) {
+            return `${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+        }
+        return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+
+    function renderLogs(logs) {
+        const container = document.getElementById('logsContainer');
+        container.innerHTML = logs.map(log => {const extraStr = log.extra ? JSON.stringify(log.extra) : '';
+            return `
+                <div class="log-entry ${log.level}">
+                    <div class="log-header">
+                        <span class="timestamp">${new Date(log.timestamp).toLocaleTimeString()}</span>
+                        <span class="machine" onclick="setLogsFilter('logsMachineFilter', '${log.machine}')">${log.machine}</span>
+                        <span class="project" onclick="setLogsFilter('logsProjectFilter', '${log.project}')">${log.project}</span>
+                        <span class="level ${log.level}" onclick="setLogsFilter('logsLevelFilter', '${log.level}')">${log.level}</span>
+        
+                        
+                        <span class="session" onclick="setLogsFilter('logsSessionFilter', '${log.session}')" title="${log.session}">${formatSession(log.session)}</span>
+                        <span class="pid" onclick="setLogsFilter('logsPidFilter', '${log.pid}')">pid:${log.pid}</span>
+                        <span class="port" onclick="setLogsFilter('logsPortFilter', '${log.port}')">port:${log.port}</span>
+
+                        <span style="color: #6e7681; font-size: 10px;">${extraStr}</span>
+                        <span class="account" onclick="setLogsFilter('logsAccountFilter', '${log.account}')">${log.account}</span>
+
+                    </div>
+                    <div class="message" onclick="copyToClipboard(this.innerText, this)" title="Click to copy">${escapeHtml(log.message)}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function updateLogsFilters() {
+        try {
+            const response = await fetch(`${SERVER}/stats`);
+            const stats = await response.json();
+
+            const mFilter = document.getElementById('logsMachineFilter');
+            const pFilter = document.getElementById('logsProjectFilter');
+            const sFilter = document.getElementById('logsSessionFilter');
+            const portFilter = document.getElementById('logsPortFilter');
+            const pidFilter = document.getElementById('logsPidFilter');
+            const accountFilter = document.getElementById('logsAccountFilter');
+
+            const curM = mFilter.value;
+            const curP = pFilter.value;
+            const curS = sFilter.value;
+            const curPort = portFilter.value;
+            const curPid = pidFilter.value;
+            const curAccount = accountFilter.value;
+
+            if (stats.byMachine) {
+                mFilter.innerHTML = '<option value="">All Machines</option>' +
+                    Object.keys(stats.byMachine).map(m => `<option value="${m}" ${m === curM ? 'selected' : ''}>${m}</option>`).join('');
+            }
+            if (stats.byProject) {
+                pFilter.innerHTML = '<option value="">All Projects</option>' +
+                    Object.keys(stats.byProject).map(p => `<option value="${p}" ${p === curP ? 'selected' : ''}>${p}</option>`).join('');
+            }
+            if (stats.bySession) {
+                const sessionKeys = Object.keys(stats.bySession).sort((a, b) => b - a);
+                sFilter.innerHTML = '<option value="">Sessions</option>' +
+                    sessionKeys.map(s => `<option value="${s}" ${s === curS ? 'selected' : ''}>${s}</option>`).join('');
+            }
+            if (stats.byPort) {
+                const portKeys = Object.keys(stats.byPort).filter(p => p !== '').sort();
+                portFilter.innerHTML = '<option value="">Ports</option>' +
+                    portKeys.map(p => `<option value="${p}" ${p === curPort ? 'selected' : ''}>${p}</option>`).join('');
+            }
+            if (stats.byPid) {
+                const pidKeys = Object.keys(stats.byPid).filter(p => p !== '').sort((a, b) => b - a);
+                pidFilter.innerHTML = '<option value="">PIDs</option>' +
+                    pidKeys.map(p => `<option value="${p}" ${p === curPid ? 'selected' : ''}>${p}</option>`).join('');
+            }
+            if (stats.byAccount) {
+                accountFilter.innerHTML = '<option value="">All Accounts</option>' +
+                    Object.keys(stats.byAccount).map(a => `<option value="${a}" ${a === curAccount ? 'selected' : ''}>${a}</option>`).join('');
+            }
+        } catch (e) {
+            console.error('Stats failed:', e);
+        }
+    }
+
+    function toggleLogsAutoRefresh() {
+        logsAutoRefresh = !logsAutoRefresh;
+        document.getElementById('logsAutoStatus').textContent = logsAutoRefresh ? 'ON' : 'OFF';
+        if (logsAutoRefresh) {
+            logsAutoRefreshInterval = setInterval(refreshLogs, 3000);
+        } else {
+            clearInterval(logsAutoRefreshInterval);
+        }
+    }
+
+    function clearLogsFilters() {
+        document.getElementById('logsLevelFilter').value = '';
+        document.getElementById('logsMachineFilter').value = '';
+        document.getElementById('logsProjectFilter').value = '';
+        document.getElementById('logsSessionFilter').value = '';
+        document.getElementById('logsPortFilter').value = '';
+        document.getElementById('logsPidFilter').value = '';
+        document.getElementById('logsAccountFilter').value = '';
+        refreshLogs();
+    }
+
+    async function clearLogsServer() {
+        if (!confirm('Delete all logs?')) return;
+        try {
+            await fetch(`${SERVER}/clear`, { method: 'POST' });
+            refreshLogs();
+        } catch (e) {
+            console.error('Clear failed:', e);
+        }
+    }
+
+    function setLogsFilter(filterId, value) {
+        const filterElement = document.getElementById(filterId);
+        if (filterElement) {
+            filterElement.value = value;
+            if (filterElement.value !== value) {
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.innerHTML = value;
+                filterElement.appendChild(opt);
+                filterElement.value = value;
+            }
+            refreshLogs();
+        }
+    }
+
+    function copyToClipboard(text, element) {
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const originalBg = element.style.background;
+            element.style.background = "rgba(63, 185, 80, 0.2)";
+            setTimeout(() => { element.style.background = originalBg; }, 200);
+        });
+    }
+
+    // ===== UTILITY FUNCTIONS =====
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function truncate(str, len) {
+        if (str.length <= len) return str;
+        return str.substring(0, len) + '...';
+    }
+
+
+    let selectedRequest = null;
+
+    function showDetails(idx) {
+        selectedRequest = currentHttpLogs[idx];
+        document.getElementById('detailsPanel').classList.add('visible');
+        renderOverview();
+        renderRequest();
+        renderResponse();
+    }
+
+    function closeDetails() {
+        document.getElementById('detailsPanel').classList.remove('visible');
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    function renderOverview() {
+        if (!selectedRequest) return;
+        const div = document.getElementById('overview');
+        div.innerHTML = `
+        <div class="info-grid">
+            <div class="info-row"><span class="info-label">URL:</span><span class="info-value">${escapeHtml(selectedRequest.url)}</span></div>
+            <div class="info-row"><span class="info-label">Method:</span><span>${selectedRequest.method}</span></div>
+            <div class="info-row"><span class="info-label">Status:</span><span>${selectedRequest.statusCode}</span></div>
+            <div class="info-row"><span class="info-label">Machine:</span><span>${selectedRequest.machine}</span></div>
+            <div class="info-row"><span class="info-label">Project:</span><span>${selectedRequest.project}</span></div>
+            <div class="info-row"><span class="info-label">Account:</span><span>${selectedRequest.account}</span></div>
+            <div class="info-row"><span class="info-label">Cookie Src:</span><span style="color:#d29922">${selectedRequest.request?.cookiesSource || '-'}</span></div>
+
+        </div>
+        <button class="copy-btn" onclick="copyCurl(this)">📋 Copy as cURL</button>
+    `;
+    }
+
+    function renderRequest() {
+        if (!selectedRequest) return;
+        const r = selectedRequest.request;
+        const headers = r.headers || [];
+        const cookies = r.cookies || r.Cookies || "";
+        const body = r.body || "";
+
+        let formattedBody = body;
+        try {
+            const parsed = JSON.parse(body);
+            formattedBody = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+            // Not JSON, use as-is
+        }
+
+        // Парсим headers в таблицу
+        const headersHtml = headers.map(h => {
+            const colonIdx = h.indexOf(':');
+            const key = colonIdx > -1 ? h.substring(0, colonIdx) : h;
+            const value = colonIdx > -1 ? h.substring(colonIdx + 1).trim() : "";
+            return `
+            <div class="header-item">
+                <span class="header-key">${escapeHtml(key)}</span>
+                <span class="header-value">${escapeHtml(value)}</span>
+            </div>
+        `;
+        }).join('');
+
+        document.getElementById('request').innerHTML = `
+        <h4>Headers:</h4>
+        <div class="header-list">
+            ${headersHtml}
+        </div>
+
+        <h4 style="margin-top: 16px;">Cookies:</h4>
+        <div class="code-block" style="color: #dbab79; min-height: 20px;">
+            ${cookies ? escapeHtml(cookies) : '<i style="color: #6e7681;">No cookies sent or captured</i>'}
+        </div>
+        ${cookies ? `<button class="copy-btn" onclick="copyText('${escapeForJs(cookies)}', this)">📋 Copy Cookies</button>` : ''}
+        
+         <h4 style="margin-top: 16px;">Body:</h4>
+        
+     
+        
+        <div id="request-body-content" class="code-block" style="min-height: 20px; white-space: pre-wrap;">${formattedBody ? escapeHtml(formattedBody) : ''}</div>
+        ${body ? `<button class="copy-btn" onclick="copyBody('request-body-content', this)">📋 Copy Body</button>` : ''}
+    `;
+    }
+
+
+
+
+    function copyBody(elementId, btnElement) {
+        const text = document.getElementById(elementId).innerText;
+        if (!text) return;
+
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = btnElement;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            btn.style.background = 'rgba(63, 185, 80, 0.2)';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1500);
+        }).catch(err => {
+            console.error('Ошибка копирования:', err);
+        });
+    }
+
+
+    function renderResponse() {
+        if (!selectedRequest) return;
+        const res = selectedRequest.response;
+        //const headers = res.headers || '';
+        const body = res.body || '';
+
+        let headerLines = [];
+        if (Array.isArray(res.headers)) {
+            headerLines = res.headers.filter(h => h && h.trim());
+        } else if (typeof res.headers === 'string') {
+            headerLines = res.headers.split('\r\n').filter(h => h.trim());
+        }
+
+        const headersHtml = headerLines.map(h => {
+            const colonIdx = h.indexOf(':');
+            if (colonIdx === -1) return '';
+            const key = h.substring(0, colonIdx);
+            const value = h.substring(colonIdx + 1).trim();
+            return `
+            <div class="header-item">
+                <span class="header-key">${escapeHtml(key)}</span>
+                <span class="header-value">${escapeHtml(value)}</span>
+            </div>
+        `;
+        }).join('');
+
+        let formattedBody = body;
+        try {
+            const parsed = JSON.parse(body);
+            formattedBody = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+            // Not JSON, use as-is
+        }
+
+        document.getElementById('response').innerHTML = `
+        <h4>Headers:</h4>
+        <div class="header-list">
+            ${headersHtml || '<i style="color: #6e7681;">No headers</i>'}
+        </div>
+        
+        <h4 style="margin-top: 16px;">Body:</h4>
+        <div id="response-body-content" class="code-block" style="min-height: 20px; white-space: pre-wrap;">${formattedBody ? escapeHtml(formattedBody) : '<i style="color: #6e7681;">Empty body</i>'}</div>
+        ${body ? `<button class="copy-btn" onclick="copyBody('response-body-content', this)">📋 Copy Body</button>` : ''}
+    `;
+
+    }
+
+    function copyCurl(btnElement) {
+        if (!selectedRequest) return;
+
+        const req = selectedRequest;
+        let curl = `curl -X ${req.method} '${req.url}'`;
+
+        if (req.request.headers) {
+            req.request.headers.forEach(h => {
+                if (!h.includes('***MASKED***')) {
+                    curl += ` \\\n  -H '${h}'`;
+                }
+            });
+        }
+
+        if (req.request.body) {
+            curl += ` \\\n  -d '${req.request.body.replace(/'/g, "\\'")}'`;
+        }
+
+        copyText(curl, btnElement);
+    }
+
+    function copyText(text, btnElement) {
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = btnElement;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            btn.style.background = 'rgba(63, 185, 80, 0.2)';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1500);
+        });
+    }
+
+    function escapeForJs(text) {
+        return text.replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+    }
+
+    function initResizablePanels() {
+        const resizer = document.getElementById('drag-handle');
+        const leftPanel = document.getElementById('logsPanel');
+        const rightPanel = document.getElementById('httpPanel');
+        const container = document.querySelector('.dashboard-container');
+
+        if (!resizer || !leftPanel || !rightPanel) return;
+
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            // Визуальная индикация активного ресайза
+            resizer.style.background = '#58a6ff';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            // Вычисляем положение курсора относительно контейнера
+            const containerRect = container.getBoundingClientRect();
+            const pointerOffset = e.clientX - containerRect.left;
+
+            const leftWidthPercentage = (pointerOffset / containerRect.width) * 100;
+            leftPanel.style.flex = `0 0 ${leftWidthPercentage}%`;
+            rightPanel.style.flex = `1 1 0`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                resizer.style.background = ''; // Возвращаем исходный цвет
+            }
+        });
+
+
+
+    }
+
+    // Запуск
+    initResizablePanels();
+
+    // Initialize both panels (это уже есть в коде)
+    refreshHttp();
+    refreshLogs();
+    httpAutoRefreshInterval = setInterval(refreshHttp, 3000);
+    logsAutoRefreshInterval = setInterval(refreshLogs, 3000);
+</script>
+
+</body>
+</html>

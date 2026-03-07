@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z3n8 | Config</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            background: var(--bg);
+            color: var(--text);
+            padding: 32px 24px 48px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .page-sub {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-bottom: 28px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            max-width: 1100px;
+        }
+        @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+
+        /* ── Card ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg, 8px);
+            padding: 18px 20px;
+        }
+        .card-hdr {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .card-hdr .icon { font-size: 16px; line-height: 1; }
+        .card-hdr h2 {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-hi, #e6edf3);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .card-hdr .badge {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--text-dim);
+            background: var(--surface2, #21262d);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2px 7px;
+        }
+
+        /* ── Status grid ── */
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .stat-item {
+            background: var(--surface2, #0d1117);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .stat-value {
+            font-size: 13px;
+            color: var(--text-hi, #e6edf3);
+            font-weight: 600;
+            word-break: break-all;
+        }
+        .stat-value.mono { font-family: 'JetBrains Mono', monospace; }
+        .stat-value .pill {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .pill.ok  { background: #1a3a1e; color: #3fb950; border: 1px solid #238636; }
+        .pill.warn { background: #2d1f00; color: #d29922; border: 1px solid #9e6a03; }
+        .pill.err  { background: #3a1a1a; color: #f85149; border: 1px solid #da3633; }
+
+        /* ── Ports list ── */
+        .ports-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 2px;
+        }
+        .port-chip {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #0c2340;
+            border: 1px solid #1f6feb;
+            color: #58a6ff;
+            font-weight: 600;
+        }
+
+        /* ── Logs storage ── */
+        .storage-bar-wrap {
+            background: var(--surface2, #21262d);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        .storage-bar-fill {
+            height: 100%;
+            background: #388bfd;
+            border-radius: 4px;
+            transition: width 0.4s ease;
+        }
+        .storage-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+        .storage-size {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-hi, #e6edf3);
+            margin: 4px 0 2px;
+        }
+        .storage-detail {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        /* ── Form fields ── */
+        .field-group { display: flex; flex-direction: column; gap: 10px; }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .field label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .field input, .field select {
+            background: var(--surface2, #0d1117);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: var(--text-hi, #e6edf3);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 6px 9px;
+            outline: none;
+            transition: border-color 0.15s;
+            width: 100%;
+        }
+        .field input:focus, .field select:focus { border-color: #388bfd; }
+        .field input::placeholder { color: #484f58; }
+
+        .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+        .section-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #388bfd;
+            padding: 8px 0 4px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2px;
+        }
+
+        /* ── Buttons ── */
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 6px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            background: var(--surface2, #21262d);
+            color: var(--text);
+            transition: background 0.15s, border-color 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn:hover { background: var(--surface, #30363d); }
+        .btn:disabled { opacity: 0.4; cursor: default; }
+        .btn.primary { background: #1f6feb; border-color: #388bfd; color: #fff; }
+        .btn.primary:hover { background: #388bfd; }
+        .btn.danger  { background: #3a1a1a; border-color: #da3633; color: #f85149; }
+        .btn.danger:hover  { background: #da3633; color: #fff; }
+
+        /* ── Toast ── */
+        #toast {
+            position: fixed;
+            bottom: 24px; right: 24px;
+            padding: 10px 16px;
+            border-radius: 7px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid var(--border);
+            background: var(--surface, #161b22);
+            color: var(--text-hi, #e6edf3);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.2s, transform 0.2s;
+            pointer-events: none;
+        }
+        #toast.show { opacity: 1; transform: translateY(0); }
+        #toast.ok   { border-color: #238636; color: #3fb950; }
+        #toast.err  { border-color: #da3633; color: #f85149; }
+
+        /* ── File list ── */
+        .file-list {
+            max-height: 160px;
+            overflow-y: auto;
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-dim);
+            padding: 3px 6px;
+            border-radius: 3px;
+            background: var(--surface2, #0d1117);
+        }
+        .file-item .fname { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-item .fsize { flex-shrink: 0; margin-left: 8px; color: #8b949e; }
+
+        /* ── Uptime chip ── */
+        .uptime-chip {
+            font-size: 11px;
+            font-weight: 600;
+            color: #3fb950;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border: 1px solid #30363d;
+            border-top-color: #388bfd;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .full-col { grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+
+<h1>⚙️ Config</h1>
+<p class="page-sub">Runtime status · Configuration · Log storage &nbsp;·&nbsp; <kbd style="font-size:9px;background:var(--surface2,#21262d);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--text-dim)">Ctrl+Shift+6</kbd></p>
+
+<div class="layout" id="layout">
+
+    <!-- ── STATUS ── -->
+    <div class="card">
+        <div class="card-hdr">
+            <span class="icon">🟢</span>
+            <h2>Server Status</h2>
+            <span class="badge" id="uptimeBadge">loading…</span>
+        </div>
+        <div class="status-grid" id="statusGrid">
+            <div class="stat-item"><span class="stat-label">Status</span><span class="stat-value"><span class="pill ok">RUNNING</span></span></div>
+            <div class="stat-item"><span class="stat-label">Uptime</span><span class="stat-value uptime-chip" id="uptimeVal">—</span></div>
+            <div class="stat-item"><span class="stat-label">Dashboard Port</span><span class="stat-value mono" id="sPort">—</span></div>
+            <div class="stat-item"><span class="stat-label">All Ports</span><span class="stat-value" id="sPorts"><span class="pill warn">—</span></span></div>
+            <div class="stat-item"><span class="stat-label">DB Mode</span><span class="stat-value mono" id="sDbMode">—</span></div>
+            <div class="stat-item"><span class="stat-label">DB Host</span><span class="stat-value mono" id="sDbHost">—</span></div>
+            <div class="stat-item"><span class="stat-label">Log Host</span><span class="stat-value mono" id="sLogHost">—</span></div>
+            <div class="stat-item"><span class="stat-label">Traffic Host</span><span class="stat-value mono" id="sTrafficHost">—</span></div>
+            <div class="stat-item"><span class="stat-label">Logs Folder</span><span class="stat-value mono" id="sLogsFolder" style="font-size:10px">—</span></div>
+            <div class="stat-item"><span class="stat-label">Reports Folder</span><span class="stat-value mono" id="sReportsFolder" style="font-size:10px">—</span></div>
+            <div class="stat-item"><span class="stat-label">Temp Folder</span><span class="stat-value mono" id="sTempFolder" style="font-size:10px">—</span></div>
+            <div class="stat-item"><span class="stat-label">Max File Size</span><span class="stat-value mono" id="sMaxFile">—</span></div>
+        </div>
+    </div>
+
+    <!-- ── LOG STORAGE ── -->
+    <div class="card">
+        <div class="card-hdr">
+            <span class="icon">💾</span>
+            <h2>Log Storage</h2>
+            <button class="btn" onclick="loadStorage()" id="refreshStorageBtn" style="margin-left:auto; padding:3px 10px; font-size:10px;">↻ Refresh</button>
+        </div>
+
+        <div class="storage-size" id="storageTotalSize">—</div>
+        <div class="storage-detail" id="storageDetail">calculating…</div>
+        <div class="storage-bar-wrap">
+            <div class="storage-bar-fill" id="storageBar" style="width:0%"></div>
+        </div>
+        <div class="storage-row">
+            <span id="storageFileCount">— files</span>
+            <span id="storageMaxHint"></span>
+        </div>
+
+        <div class="file-list" id="fileList"></div>
+
+        <div class="btn-row" style="margin-top:16px; justify-content:flex-start; flex-wrap:wrap; gap:8px;">
+            <button class="btn danger" id="clearLogsBtn" onclick="clearLogs('logs')">🗑 Clear App Logs</button>
+            <button class="btn danger" id="clearHttpBtn" onclick="clearLogs('http')">🗑 Clear HTTP Logs</button>
+            <button class="btn danger" id="clearTrafficBtn" onclick="clearLogs('traffic')">🗑 Clear Traffic Logs</button>
+            <button class="btn danger" id="clearAllBtn" onclick="clearLogs('all')">☠ Clear ALL Logs</button>
+        </div>
+    </div>
+
+    <!-- ── CONFIG EDITOR ── -->
+    <div class="card full-col">
+        <div class="card-hdr">
+            <span class="icon">📝</span>
+            <h2>Edit Configuration</h2>
+            <span class="badge">appsettings.secrets.json</span>
+        </div>
+
+        <div class="field-group" id="configForm">
+            <div class="section-label">Database</div>
+            <div class="field-row">
+                <div class="field">
+                    <label>DB Type</label>
+                    <select id="cfgDbType">
+                        <option value="sqlite">SQLite</option>
+                        <option value="postgres">PostgreSQL</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>SQLite Path</label>
+                    <input id="cfgSqlitePath" type="text" placeholder="path/to/db.sqlite">
+                </div>
+            </div>
+            <div class="field-row-3" id="pgFields">
+                <div class="field">
+                    <label>PG Host</label>
+                    <input id="cfgPgHost" type="text" placeholder="localhost">
+                </div>
+                <div class="field">
+                    <label>PG Port</label>
+                    <input id="cfgPgPort" type="text" placeholder="5432">
+                </div>
+                <div class="field">
+                    <label>PG Database</label>
+                    <input id="cfgPgDatabase" type="text" placeholder="postgres">
+                </div>
+                <div class="field">
+                    <label>PG User</label>
+                    <input id="cfgPgUser" type="text" placeholder="postgres">
+                </div>
+                <div class="field">
+                    <label>PG Password</label>
+                    <input id="cfgPgPassword" type="password" placeholder="••••••••">
+                </div>
+            </div>
+
+            <div class="section-label">Logs & Server</div>
+            <div class="field-row-3">
+                <div class="field">
+                    <label>Dashboard Port</label>
+                    <input id="cfgDashboardPort" type="text" placeholder="10993">
+                </div>
+                <div class="field">
+                    <label>Log Host</label>
+                    <input id="cfgLogHost" type="text" placeholder="http://localhost:10994">
+                </div>
+                <div class="field">
+                    <label>Traffic Host</label>
+                    <input id="cfgTrafficHost" type="text" placeholder="http://localhost:10995">
+                </div>
+            </div>
+            <div class="field-row-3">
+                <div class="field">
+                    <label>Logs Folder</label>
+                    <input id="cfgLogsFolder" type="text" placeholder="./logs">
+                </div>
+                <div class="field">
+                    <label>Temp Folder</label>
+                    <input id="cfgTempFolder" type="text" placeholder="./temp">
+                </div>
+                <div class="field">
+                    <label>Reports Folder</label>
+                    <input id="cfgReportsFolder" type="text" placeholder="./reports">
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Max File Size (MB)</label>
+                    <input id="cfgMaxFileSizeMb" type="number" placeholder="50">
+                </div>
+            </div>
+
+            <div class="section-label">API Keys</div>
+            <div class="field-row">
+                <div class="field">
+                    <label>ZB API Key</label>
+                    <input id="cfgZbKey" type="password" placeholder="••••••••">
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn" onclick="loadConfig()">↺ Reset</button>
+                <button class="btn primary" onclick="saveConfig()">💾 Save Config</button>
+            </div>
+            <p style="font-size:10px; color:var(--text-dim); text-align:right; margin-top:-6px;">
+                ⚠ Restart required for port / path changes to take effect
+            </p>
+        </div>
+    </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+    // ── Toast ─────────────────────────────────────────────────────────
+    let _toastTimer;
+    function toast(msg, type = 'ok') {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'show ' + type;
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(() => { el.className = ''; }, 2800);
+    }
+
+    // ── Uptime counter ────────────────────────────────────────────────
+    let _startTime = null;
+    function fmtUptime(secs) {
+        const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+        if (h > 0) return `${h}h ${m}m`;
+        if (m > 0) return `${m}m ${s}s`;
+        return `${s}s`;
+    }
+    function tickUptime() {
+        if (!_startTime) return;
+        const elapsed = Math.floor((Date.now() - _startTime) / 1000);
+        document.getElementById('uptimeVal').textContent = fmtUptime(elapsed);
+        document.getElementById('uptimeBadge').textContent = fmtUptime(elapsed);
+    }
+
+    // ── Format bytes ──────────────────────────────────────────────────
+    function fmtBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024, sizes = ['B','KB','MB','GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (bytes / Math.pow(k, i)).toFixed(i > 1 ? 1 : 0) + ' ' + sizes[i];
+    }
+
+    // ── Load Status ───────────────────────────────────────────────────
+    async function loadStatus() {
+        try {
+            const r = await fetch('/config/status');
+            if (!r.ok) return;
+            const d = await r.json();
+
+            // uptime
+            if (d.startedAt) {
+                _startTime = new Date(d.startedAt).getTime();
+                tickUptime();
+                setInterval(tickUptime, 1000);
+            }
+
+            setText('sPort', d.dashboardPort ?? '—');
+            setText('sDbMode', d.dbMode ?? '—');
+
+            const host = d.dbMode === 'SQLite'
+                ? (d.sqlitePath ?? '—')
+                : `${d.pgHost ?? ''}:${d.pgPort ?? ''}`;
+            setText('sDbHost', host);
+
+            setText('sLogHost', d.logHost || '—');
+            setText('sTrafficHost', d.trafficHost || '—');
+            setText('sLogsFolder', d.logsFolder || '—');
+            setText('sReportsFolder', d.reportsFolder || '—');
+            setText('sTempFolder', d.tempFolder || '—');
+            setText('sMaxFile', d.maxFileSizeMb ? d.maxFileSizeMb + ' MB' : '—');
+
+            // Ports chips
+            const portsEl = document.getElementById('sPorts');
+            if (d.listeningPorts && d.listeningPorts.length) {
+                portsEl.innerHTML = d.listeningPorts.map(p =>
+                    `<span class="port-chip">${p}</span>`
+                ).join(' ');
+            }
+
+        } catch (e) {
+            console.error('Status load failed', e);
+        }
+    }
+
+    function setText(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    }
+
+    // ── Load Storage ──────────────────────────────────────────────────
+    async function loadStorage() {
+        const btn = document.getElementById('refreshStorageBtn');
+        btn.innerHTML = '<span class="spinner"></span>…';
+        btn.disabled = true;
+        try {
+            const r = await fetch('/config/storage');
+            if (!r.ok) { toast('Storage fetch failed', 'err'); return; }
+            const d = await r.json();
+
+            document.getElementById('storageTotalSize').textContent = fmtBytes(d.totalBytes ?? 0);
+            document.getElementById('storageDetail').textContent =
+                `${d.fileCount ?? 0} files · ${fmtBytes(d.totalBytes ?? 0)} total`;
+            document.getElementById('storageFileCount').textContent = `${d.fileCount ?? 0} files`;
+
+            const maxBytes = (d.maxFileSizeMbHint ?? 500) * 1024 * 1024;
+            const pct = Math.min(100, Math.round((d.totalBytes ?? 0) / maxBytes * 100));
+            const bar = document.getElementById('storageBar');
+            bar.style.width = pct + '%';
+            bar.style.background = pct > 80 ? '#f85149' : pct > 50 ? '#d29922' : '#388bfd';
+            document.getElementById('storageMaxHint').textContent = pct + '% of soft limit';
+
+            const list = document.getElementById('fileList');
+            if (d.files && d.files.length) {
+                list.innerHTML = d.files.map(f => `
+                <div class="file-item">
+                    <span class="fname">${f.name}</span>
+                    <span class="fsize">${fmtBytes(f.size)}</span>
+                </div>
+            `).join('');
+            } else {
+                list.innerHTML = '<div class="file-item"><span class="fname" style="color:var(--text-dim)">No log files</span></div>';
+            }
+        } catch (e) {
+            toast('Storage error: ' + e.message, 'err');
+        } finally {
+            btn.innerHTML = '↻ Refresh';
+            btn.disabled = false;
+        }
+    }
+
+    // ── Clear Logs ────────────────────────────────────────────────────
+    const CLEAR_MAP = {
+        logs:    { url: '/clear',         label: 'App logs' },
+        http:    { url: '/clear-http',    label: 'HTTP logs' },
+        traffic: { url: '/clear-traffic', label: 'Traffic logs' },
+        all:     { url: '/clear-all-logs', label: 'ALL logs' },
+    };
+
+    async function clearLogs(type) {
+        const { url, label } = CLEAR_MAP[type];
+        if (!confirm(`Clear ${label}? This cannot be undone.`)) return;
+
+        const btnId = { logs:'clearLogsBtn', http:'clearHttpBtn', traffic:'clearTrafficBtn', all:'clearAllBtn' }[type];
+        const btn = document.getElementById(btnId);
+        btn.disabled = true;
+        btn.textContent = '…';
+
+        try {
+            const r = await fetch(url, { method: 'POST' });
+            if (r.ok) {
+                toast(`✓ ${label} cleared`, 'ok');
+                await loadStorage();
+            } else {
+                toast(`Failed to clear ${label}`, 'err');
+            }
+        } catch (e) {
+            toast('Error: ' + e.message, 'err');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = btn.id === 'clearAllBtn' ? '☠ Clear ALL Logs'
+                : btn.id === 'clearLogsBtn'    ? '🗑 Clear App Logs'
+                    : btn.id === 'clearHttpBtn'    ? '🗑 Clear HTTP Logs'
+                        : '🗑 Clear Traffic Logs';
+        }
+    }
+
+    // ── Load Config ───────────────────────────────────────────────────
+    async function loadConfig() {
+        try {
+            const r = await fetch('/config');
+            if (!r.ok) { toast('Config load failed', 'err'); return; }
+            const d = await r.json();
+
+            setVal('cfgDbType',        (d.dbConfig?.type ?? 'sqlite').toLowerCase());
+            setVal('cfgSqlitePath',    d.dbConfig?.sqlitePath ?? '');
+            setVal('cfgPgHost',        d.dbConfig?.postgresHost ?? '');
+            setVal('cfgPgPort',        d.dbConfig?.postgresPort ?? '');
+            setVal('cfgPgDatabase',    d.dbConfig?.postgresDatabase ?? '');
+            setVal('cfgPgUser',        d.dbConfig?.postgresUser ?? '');
+            setVal('cfgPgPassword',    d.dbConfig?.postgresPassword ?? '');
+            setVal('cfgDashboardPort', d.logsConfig?.dashboardPort ?? '');
+            setVal('cfgLogHost',       d.logsConfig?.logHost ?? '');
+            setVal('cfgTrafficHost',   d.logsConfig?.trafficHost ?? '');
+            setVal('cfgLogsFolder',    d.logsConfig?.logsFolder ?? '');
+            setVal('cfgTempFolder',    d.logsConfig?.tempFolder ?? '');
+            setVal('cfgReportsFolder', d.logsConfig?.reportsFolder ?? '');
+            setVal('cfgMaxFileSizeMb', d.logsConfig?.maxFileSizeMb ?? '');
+            setVal('cfgZbKey',         d.apiConfig?.zb ?? '');
+
+            togglePgFields();
+        } catch(e) {
+            toast('Config error: ' + e.message, 'err');
+        }
+    }
+
+    function setVal(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.value = val ?? '';
+    }
+
+    function togglePgFields() {
+        const isPg = document.getElementById('cfgDbType').value === 'postgres';
+        document.getElementById('pgFields').style.opacity = isPg ? '1' : '0.35';
+        document.querySelectorAll('#pgFields input').forEach(i => i.disabled = !isPg);
+    }
+    document.getElementById('cfgDbType').addEventListener('change', togglePgFields);
+
+    // ── Save Config ───────────────────────────────────────────────────
+    async function saveConfig() {
+        const payload = {
+            dbConfig: {
+                type:             document.getElementById('cfgDbType').value,
+                sqlitePath:       document.getElementById('cfgSqlitePath').value,
+                postgresHost:     document.getElementById('cfgPgHost').value,
+                postgresPort:     document.getElementById('cfgPgPort').value,
+                postgresDatabase: document.getElementById('cfgPgDatabase').value,
+                postgresUser:     document.getElementById('cfgPgUser').value,
+                postgresPassword: document.getElementById('cfgPgPassword').value,
+            },
+            logsConfig: {
+                dashboardPort:  document.getElementById('cfgDashboardPort').value,
+                logHost:        document.getElementById('cfgLogHost').value,
+                trafficHost:    document.getElementById('cfgTrafficHost').value,
+                logsFolder:     document.getElementById('cfgLogsFolder').value,
+                tempFolder:     document.getElementById('cfgTempFolder').value,
+                reportsFolder:  document.getElementById('cfgReportsFolder').value,
+                maxFileSizeMb:  parseInt(document.getElementById('cfgMaxFileSizeMb').value) || 0,
+            },
+            apiConfig: {
+                zb: document.getElementById('cfgZbKey').value,
+            }
+        };
+
+        try {
+            const r = await fetch('/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (r.ok) {
+                toast('✓ Config saved', 'ok');
+                await loadStatus();
+            } else {
+                const t = await r.text();
+                toast('Save failed: ' + t, 'err');
+            }
+        } catch(e) {
+            toast('Error: ' + e.message, 'err');
+        }
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────
+    (async () => {
+        await Promise.all([loadStatus(), loadStorage(), loadConfig()]);
+    })();
+</script>
+</body>
+</html>

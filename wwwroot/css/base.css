@@ -1,0 +1,141 @@
+/* ═══════════════════════════════════════════════════════
+   base.css — design tokens, reset, typography
+   Все страницы подключают этот файл первым
+   ═══════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;800&display=swap');
+
+/* ── Tokens (dark theme default) ── */
+:root {
+    /* Backgrounds */
+    --bg:        #0d0f14;
+    --surface:   #13161e;
+    --surface2:  #1a1e28;
+    --surface3:  #21262d;
+
+    /* Borders */
+    --border:    #252a38;
+    --border2:   #2e3447;
+
+    /* Text */
+    --text:      #c8d0e8;
+    --text-dim:  #5a6480;
+    --text-muted:#3a4060;
+    --text-hi:   #e6edf3;
+
+    /* Accent */
+    --accent:     #4e9eff;
+    --accent-dim: #1e3a5f;
+
+    /* Semantic colors */
+    --green:     #4ecca3;
+    --green-dim: #0d2a1a;
+    --yellow:    #ffd566;
+    --yellow-dim:#2a1e00;
+    --red:       #ff5566;
+    --red-dim:   #2a0d0d;
+    --purple:    #a78bfa;
+    --purple-dim:#1e1040;
+
+    /* JSON syntax */
+    --key-color:    #4e9eff;
+    --string-color: #4ecca3;
+    --number-color: #ffd566;
+    --bool-color:   #ff6b9d;
+    --null-color:   #a78bfa;
+
+    /* Layout */
+    --row-h: 19px;
+    --radius: 5px;
+    --radius-lg: 10px;
+}
+
+/* ── Light theme ── */
+[data-theme="light"] {
+    --bg:        #ffffff;
+    --surface:   #f6f8fa;
+    --surface2:  #ebeef2;
+    --surface3:  #dde1e7;
+    --border:    #d0d7de;
+    --border2:   #b6bec8;
+    --text:      #1f2328;
+    --text-dim:  #656d76;
+    --text-muted:#8c959f;
+    --text-hi:   #0d1117;
+    --accent:    #0969da;
+    --accent-dim:#dbeafe;
+    --green:     #1a7f37;
+    --green-dim: #dafbe1;
+    --yellow:    #9a6700;
+    --yellow-dim:#fff8c5;
+    --red:       #cf222e;
+    --red-dim:   #ffebe9;
+    --purple:    #8250df;
+    --purple-dim:#fbefff;
+    --key-color:    #0969da;
+    --string-color: #1a7f37;
+    --number-color: #9a6700;
+    --bool-color:   #cf222e;
+    --null-color:   #8250df;
+}
+
+/* ── Hyper theme ── */
+[data-theme="hyper"] {
+    --bg:        #010409;
+    --surface:   #0d1117;
+    --surface2:  #161b22;
+    --surface3:  #1f2937;
+    --border:    #1a2030;
+    --border2:   #243048;
+    --text:      #a0b4d0;
+    --text-dim:  #3a4a60;
+    --text-muted:#253040;
+    --text-hi:   #c8d8f0;
+    --accent:    #00d4ff;
+    --accent-dim:#003a50;
+    --green:     #00ff88;
+    --green-dim: #002a18;
+    --yellow:    #ffcc00;
+    --yellow-dim:#2a1e00;
+    --red:       #ff2244;
+    --red-dim:   #2a0010;
+    --purple:    #cc88ff;
+    --purple-dim:#1a0030;
+    --key-color:    #00d4ff;
+    --string-color: #00ff88;
+    --number-color: #ffcc00;
+    --bool-color:   #ff6b9d;
+    --null-color:   #cc88ff;
+}
+
+/* ── Reset ── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ── Base ── */
+html { height: 100%; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Selection ── */
+::selection { background: var(--accent-dim); color: var(--text); }
+
+/* ── Focus ── */
+:focus-visible { outline: 1px solid var(--accent-dim); outline-offset: 2px; }

@@ -1,0 +1,101 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net8.0-windows</TargetFramework>
+        <UseWindowsForms>true</UseWindowsForms>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        
+        <!-- Иконка приложения -->
+        <ApplicationIcon>icon.ico</ApplicationIcon>
+
+        <RootNamespace>z3n8</RootNamespace>
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>true</SelfContained>
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+        <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    </PropertyGroup>
+    
+    
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Playwright" Version="1.58.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+        <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3800.47" />
+        
+        <PackageReference Include="Npgsql" Version="10.0.1" />
+        <PackageReference Include="System.Data.Odbc" Version="10.0.2" />
+        <PackageReference Include="System.Management" Version="10.0.0-rc.2.25502.107" />
+
+        <PackageReference Include="Nethereum.ABI" Version="4.29.0.0" />
+        <PackageReference Include="Nethereum.HdWallet" Version="4.29.0.0" />
+        <PackageReference Include="Nethereum.Web3" Version="4.29.0.0" />
+
+        <PackageReference Include="Otp.NET" Version="1.4.0" />
+
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.*" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.*" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.*" />   <!-- для Bind -->
+        <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.*" />
+
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="appsettings.secrets.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\home.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\json.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\pm.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\config.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\logs.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\http.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\report.html">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+
+        <None Update="wwwroot\css\base.css">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\css\components.css">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\css\themes.css">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\js\theme.js">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\js\nav.js">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+
+
+        <None Update="icon.ico">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+
+       
+    </ItemGroup>
+
+
+    
+    
+</Project>

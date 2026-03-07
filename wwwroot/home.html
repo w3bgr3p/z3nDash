@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z3n8 | Home</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 48px;
+            padding: 40px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 13px;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        header { text-align: center; }
+        header h1 {
+            font-size: 28px;
+            color: var(--accent);
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            margin-bottom: 6px;
+            font-family: 'Syne', sans-serif;
+        }
+        header p { color: var(--text-dim); font-size: 13px; }
+
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            width: 100%;
+            max-width: 860px;
+        }
+
+        .nav-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 20px 22px;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: border-color 0.15s, background 0.15s, transform 0.1s;
+            position: relative;
+            overflow: hidden;
+        }
+        .nav-card:hover {
+            border-color: var(--card-color, var(--accent));
+            background: var(--surface2);
+            transform: translateY(-1px);
+        }
+        .nav-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: var(--card-color, var(--accent));
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .nav-card:hover::before { opacity: 1; }
+
+        .card-icon  { font-size: 24px; line-height: 1; }
+        .card-title { font-size: 14px; font-weight: 600; color: var(--text-hi); }
+        .card-desc  { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+        .card-badge {
+            margin-top: auto;
+            padding-top: 10px;
+            font-size: 10px;
+            color: var(--card-color, var(--accent));
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        footer { color: var(--text-muted); font-size: 11px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>ZP8</h1>
+    <p>ZennoPoster Orchestrator</p>
+</header>
+
+<nav class="nav-grid" id="navGrid"></nav>
+
+<footer id="footer">—</footer>
+
+<script>
+    // ── ADD NEW PAGES HERE ──────────────────────────────────
+    const PAGES = [
+        { icon: '⚙️', title: 'PM Dashboard', desc: 'Task management, start/stop commands, execution settings, scheduler.', url: '/?page=pm',   color: '#58a6ff' },
+        { icon: '📋', title: 'Logs',          desc: 'Application logs with filtering by level, machine, project, account.',  url: '/?page=logs', color: '#3fb950' },
+        { icon: '🌐', title: 'HTTP Traffic',  desc: 'Intercepted HTTP requests and responses from ZP tasks.',                url: '/?page=http', color: '#d29922' },
+        { icon: '📊', title: 'Report',        desc: 'Union analytics report across projects, machines and accounts.',         url: '/report',     color: '#a371f7' },
+        { icon: '🔍', title: 'JSON Viewer',   desc: 'Interactive JSON tree with auth/captcha detection and request replay.',  url: '/json',       color: '#4e9eff' },
+        { icon: '⚙️', title: 'Config', desc: 'Server status, configuration editor, log storage management.', url: '/?page=config', color: '#f78166' },
+    ];
+    // ────────────────────────────────────────────────────────
+
+    function render() {
+        document.getElementById('navGrid').innerHTML = PAGES.map(p => `
+        <a class="nav-card" href="${p.url}" style="--card-color:${p.color}">
+            <div class="card-icon">${p.icon}</div>
+            <div class="card-title">${p.title}</div>
+            <div class="card-desc">${p.desc}</div>
+            <div class="card-badge">Open →</div>
+        </a>
+    `).join('');
+        document.getElementById('footer').textContent = `${PAGES.length} pages · ${new Date().getFullYear()}`;
+    }
+
+    render();
+</script>
+</body>
+</html>

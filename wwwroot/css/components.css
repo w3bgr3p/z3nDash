@@ -1,0 +1,173 @@
+/* ═══════════════════════════════════════════════════════
+   components.css — shared UI components
+   Требует: base.css
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Header ── */
+.header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+/* ── Logo ── */
+.logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    text-decoration: none;
+}
+.logo span { color: var(--text-dim); font-weight: 400; }
+.logo-home {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-right: 8px;
+    opacity: 0.6;
+    text-decoration: none;
+}
+.logo-home:hover { opacity: 1; }
+
+/* ── Toolbar ── */
+.toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.stats   { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+/* ── Buttons ── */
+.btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 3px 9px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    transition: all 0.15s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    user-select: none;
+}
+.btn:hover             { border-color: var(--border2); color: var(--text); background: var(--border); }
+.btn.accent            { border-color: var(--accent-dim); color: var(--accent); }
+.btn.accent:hover      { background: var(--accent-dim); }
+.btn.success           { border-color: var(--green-dim); color: var(--green); }
+.btn.success:hover     { background: var(--green-dim); }
+.btn.danger            { border-color: var(--red-dim); color: var(--red); }
+.btn.danger:hover      { background: var(--red-dim); }
+.btn.warning           { border-color: var(--yellow-dim); color: var(--yellow); }
+.btn.warning:hover     { background: var(--yellow-dim); }
+.btn:disabled          { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+/* ── Stat badge ── */
+.stat-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-size: 10px;
+}
+.stat-badge span { color: var(--text); }
+
+/* ── Panel header ── */
+.panel-header {
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+/* ── Tag / Badge ── */
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    border: 1px solid transparent;
+}
+.tag.green  { background: var(--green-dim);  border-color: #1a3a28; color: var(--green); }
+.tag.red    { background: var(--red-dim);    border-color: #3a1515; color: var(--red); }
+.tag.yellow { background: var(--yellow-dim); border-color: #3a2a00; color: var(--yellow); }
+.tag.accent { background: var(--accent-dim); border-color: #1a3a5f; color: var(--accent); }
+.tag.purple { background: var(--purple-dim); border-color: #2a1050; color: var(--purple); }
+
+/* ── Toast ── */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 9999;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ── Divider ── */
+.divider { height: 1px; background: var(--border); flex-shrink: 0; }
+
+/* ── Resizer ── */
+.resizer {
+    width: 4px;
+    cursor: col-resize;
+    background: var(--border);
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+.resizer:hover { background: var(--accent-dim); }
+
+/* ── Spinner ── */
+.spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Empty state ── */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 40px;
+    text-align: center;
+}
+
+/* ── Theme toggle helper ── */
+.theme-btn {
+    font-size: 10px;
+    padding: 2px 7px;
+}

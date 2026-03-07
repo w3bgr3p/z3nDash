@@ -1,0 +1,35 @@
+
+Tasks/
+riderModule.iml
+appsettings.json
+Program.cs
+
+# Secrets and local overrides
+appsettings.Development.json
+appsettings.Local.json
+*.secrets.json
+
+
+# .NET Core #
+bin/
+obj/
+/packages/
+TestResults/
+publish-new/
+# User-specific files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.exe
+
+# Visual Studio / Rider
+.vs/
+.idea/
+/_ReSharper.Caches/
+*.iml
+
+# App-specific (Logs & Local settings)
+logs/
+http-logs/
+*.jsonl
