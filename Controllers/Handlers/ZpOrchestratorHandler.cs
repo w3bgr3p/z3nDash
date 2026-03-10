@@ -1,7 +1,6 @@
-﻿using System.Net;
+using System.Net;
 using System.Text;
 using System.Text.Json;
-using z3nSafe;
 
 namespace z3n8;
 
@@ -19,8 +18,10 @@ namespace z3n8;
 ///   GET  /zp/settings-xml     — InputSettings поля для UI (?task_id=)
 ///   POST /zp/settings-xml     — сохранить поля и создать update_settings команду
 /// </summary>
-public class ZpOrchestratorHandler
+public class ZpOrchestratorHandler : IScriptHandler
 {
+    public string PathPrefix => "/zp";
+
     private readonly DbConnectionService _dbService;
 
     private const string TasksTable    = "_tasks";

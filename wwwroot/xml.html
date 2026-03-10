@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>XML → Payload Converter</title>
+    <style>
+        :root {
+            --bg: #0d0d0f;
+            --bg1: #141417;
+            --bg2: #1c1c21;
+            --bg3: #242429;
+            --border: #2a2a32;
+            --text: #e2e2e8;
+            --text2: #7a7a8c;
+            --accent: #7c6af7;
+            --green: #3ecf8e;
+            --red: #f85149;
+            --yellow: #e6a817;
+            --mono: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: var(--bg1);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .header-title { font-size: 13px; font-weight: 700; color: var(--accent); }
+        .header-sub   { font-size: 10px; color: var(--text2); }
+        .header-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+        /* ── Main layout ── */
+        .main { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── Panels ── */
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .panel + .panel { border-left: 1px solid var(--border); }
+
+        .panel-header {
+            background: var(--bg1);
+            border-bottom: 1px solid var(--border);
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .panel-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2); }
+        .panel-badge {
+            font-size: 9px; padding: 1px 6px; border-radius: 3px;
+            background: var(--bg2); color: var(--text2); border: 1px solid var(--border);
+        }
+        .panel-badge.ok  { color: var(--green); border-color: var(--green); background: rgba(62,207,142,0.08); }
+        .panel-badge.err { color: var(--red);   border-color: var(--red);   background: rgba(248,81,73,0.08); }
+
+        .panel-body { flex: 1; overflow: auto; padding: 10px 14px; }
+
+        /* ── Textarea input ── */
+        .xml-input {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 11px;
+            line-height: 1.6;
+            tab-size: 2;
+        }
+        .xml-input::placeholder { color: var(--text2); opacity: 0.5; }
+
+        /* ── Output tabs ── */
+        .out-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--bg1); }
+        .out-tab {
+            padding: 5px 14px; font-size: 10px; color: var(--text2); cursor: pointer;
+            border-bottom: 2px solid transparent; user-select: none;
+        }
+        .out-tab:hover { color: var(--text); }
+        .out-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        /* ── Output code ── */
+        .output-wrap { flex: 1; overflow: auto; background: var(--bg); }
+        .output-code {
+            font-family: var(--mono);
+            font-size: 11px;
+            line-height: 1.7;
+            padding: 12px 14px;
+            white-space: pre;
+            color: var(--text);
+            min-height: 100%;
+        }
+
+        /* ── Preview table ── */
+        .preview-wrap { padding: 12px 14px; overflow: auto; flex: 1; }
+        .field-table { width: 100%; border-collapse: collapse; }
+        .field-table th {
+            text-align: left; padding: 4px 10px; font-size: 9px; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--text2); border-bottom: 1px solid var(--border);
+            background: var(--bg1);
+        }
+        .field-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); font-size: 11px; vertical-align: top; }
+        .field-table tr:hover td { background: var(--bg2); }
+        .type-badge {
+            display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 9px;
+            font-weight: 600; font-family: var(--mono); letter-spacing: 0.3px;
+        }
+        .type-tab        { background: rgba(124,106,247,0.15); color: var(--accent); }
+        .type-section    { background: rgba(230,168,23,0.12);  color: var(--yellow); }
+        .type-html       { background: rgba(230,168,23,0.12);  color: var(--yellow); }
+        .type-text       { background: rgba(62,207,142,0.1);   color: var(--green); }
+        .type-boolean    { background: rgba(248,81,73,0.1);    color: var(--red); }
+        .type-select     { background: rgba(124,106,247,0.1);  color: #a89df8; }
+        .type-multiselect{ background: rgba(124,106,247,0.1);  color: #a89df8; }
+        .type-password   { background: rgba(248,81,73,0.1);    color: var(--red); }
+        .td-key   { font-family: var(--mono); color: var(--accent); font-size: 10px; }
+        .td-val   { font-family: var(--mono); color: var(--text2); font-size: 10px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .td-help  { color: var(--text2); font-size: 10px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .empty-msg { color: var(--text2); font-size: 11px; padding: 20px; text-align: center; }
+
+        /* ── Buttons ── */
+        .btn {
+            padding: 4px 12px; border-radius: 3px; border: 1px solid var(--border);
+            cursor: pointer; font-size: 11px; background: var(--bg2); color: var(--text);
+        }
+        .btn:hover { background: var(--bg3); }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { opacity: 0.85; }
+        .btn.sm { padding: 2px 8px; font-size: 10px; }
+
+        /* ── Error block ── */
+        .error-block {
+            margin: 10px 14px; padding: 8px 12px;
+            background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.3);
+            border-radius: 4px; color: var(--red); font-size: 11px; font-family: var(--mono);
+            display: none;
+        }
+        .error-block.show { display: block; }
+
+        /* ── Resizer ── */
+        .resizer { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; }
+        .resizer:hover { background: var(--accent); opacity: 0.4; }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <div class="header-title">XML → Payload Converter</div>
+        <div class="header-sub">InputSettings XML → scheduler schema + values JSON</div>
+    </div>
+    <div class="header-right">
+        <button class="btn sm" onclick="loadExample()">Load example</button>
+        <button class="btn sm primary" onclick="convert()">Convert ▶</button>
+    </div>
+</div>
+
+<div class="main">
+
+    <!-- Left: XML input -->
+    <div class="panel" id="leftPanel">
+        <div class="panel-header">
+            <span class="panel-title">XML Input</span>
+            <span class="panel-badge" id="inputBadge">paste XML</span>
+            <div style="margin-left:auto;display:flex;gap:6px">
+                <button class="btn sm" onclick="clearInput()">Clear</button>
+            </div>
+        </div>
+        <div class="panel-body" style="padding:0">
+            <textarea class="xml-input" id="xmlInput" placeholder="Paste <InputSettings>...</InputSettings> XML here...&#10;&#10;Auto-converts on input." oninput="scheduleConvert()"></textarea>
+        </div>
+    </div>
+
+    <div class="resizer" id="mainResizer"></div>
+
+    <!-- Right: output -->
+    <div class="panel" id="rightPanel" style="flex:1.2">
+        <div class="panel-header">
+            <span class="panel-title">Output</span>
+            <span class="panel-badge" id="outputBadge">—</span>
+            <div style="margin-left:auto;display:flex;gap:6px">
+                <button class="btn sm" onclick="copyOutput()">Copy</button>
+            </div>
+        </div>
+
+        <div class="out-tabs">
+            <div class="out-tab active" onclick="switchTab('schema')" id="tab-schema">Schema JSON</div>
+            <div class="out-tab" onclick="switchTab('values')" id="tab-values">Values JSON</div>
+            <div class="out-tab" onclick="switchTab('combined')" id="tab-combined">Combined</div>
+            <div class="out-tab" onclick="switchTab('preview')" id="tab-preview">Preview</div>
+        </div>
+
+        <div id="errorBlock" class="error-block"></div>
+
+        <div id="outputSchemaWrap" class="output-wrap">
+            <div class="output-code" id="outputSchema"><span style="color:var(--text2)">// Convert XML to see output</span></div>
+        </div>
+        <div id="outputValuesWrap" class="output-wrap" style="display:none">
+            <div class="output-code" id="outputValues"></div>
+        </div>
+        <div id="outputCombinedWrap" class="output-wrap" style="display:none">
+            <div class="output-code" id="outputCombined"></div>
+        </div>
+        <div id="outputPreviewWrap" class="preview-wrap" style="display:none">
+            <div id="outputPreview"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    var convertTimer = null;
+    var lastSchema = [];
+    var lastValues = {};
+    var activeTabName = 'schema';
+
+    function scheduleConvert() {
+        clearTimeout(convertTimer);
+        convertTimer = setTimeout(convert, 300);
+    }
+
+    // ── Type mapping ──
+    function mapType(xmlType) {
+        switch ((xmlType || '').trim()) {
+            case 'Tab':                return 'tab';
+            case 'Comment':            return 'section';
+            case 'Boolean':            return 'boolean';
+            case 'DropDown':           return 'select';
+            case 'DropDownMultiSelect': return 'multiselect';
+            case 'Label':              return 'text';
+            case 'Number':             return 'text';
+            case 'Text':               return 'text';
+            case 'FileName':           return 'text';
+            case 'Password':           return 'password';
+            default:                   return 'text';
+        }
+    }
+
+    // Extract options from Name like "WorkMode{Cooldown|NewRandom|UpdateToken}"
+    function extractOptions(nameRaw) {
+        var m = nameRaw.match(/\{([^}]+)\}/);
+        if (!m) return { cleanName: nameRaw, options: '' };
+        var cleanName = nameRaw.replace(/\{[^}]+\}/, '').trim();
+        var options = m[1].split('|').map(function(s){ return s.trim(); }).join(', ');
+        return { cleanName: cleanName, options: options };
+    }
+
+    // Strip HTML/color tags used in section headers
+    function stripMarkup(str) {
+        if (!str) return '';
+        // str is already decoded textContent from XML parser
+        // Remove any remaining tag-like patterns (e.g. <color=#xxx>, <b>, <size=N>)
+        var cleaned = str.replace(/<[^>]+>/g, '');
+        // Remove unicode block/divider characters (▪▪▪, ─── etc)
+        cleaned = cleaned.replace(/[\u25aa\u2500-\u257f\u2580-\u259f\u25b2\u25ba\u25bc\u25c4]+/g, '');
+        // Collapse whitespace and newlines
+        cleaned = cleaned.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+        return cleaned;
+    }
+
+    // ── Core field processor ──
+    function processField(nameRaw, value, outVar, typeRaw, help, schema, values) {
+        var mappedType = mapType(typeRaw);
+        var keyMatch   = outVar.match(/\{-Variable\.([^-]+)-\}/);
+        var key        = keyMatch ? keyMatch[1] : '';
+
+        if (mappedType === 'tab') {
+            var label = stripMarkup(nameRaw) || nameRaw.trim();
+            schema.push({ key: key || '', label: label, type: 'tab' });
+            return;
+        }
+        if (mappedType === 'section') {
+            var label = stripMarkup(nameRaw);
+            if (!label) label = value.trim();
+            schema.push({ key: '', label: label, type: 'section' });
+            return;
+        }
+        var opts       = extractOptions(nameRaw);
+        var cleanLabel = stripMarkup(opts.cleanName) || opts.cleanName.trim();
+        var field      = { key: key, label: cleanLabel, type: mappedType };
+        if ((mappedType === 'select' || mappedType === 'multiselect') && opts.options)
+            field.options = opts.options;
+        if (help) field.help = help;
+        schema.push(field);
+        if (key && value !== undefined && value !== '') values[key] = value;
+    }
+
+    // ── Regex fallback (handles <n> tags, entities in names) ──
+    function parseViaRegex(xmlStr) {
+        var schema = [], values = {};
+        var itemRx = /<InputSetting>([\s\S]*?)<\/InputSetting>/gi;
+        function tagVal(tag, str) {
+            var m = str.match(new RegExp('<' + tag + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/' + tag + '>', 'i'));
+            return m ? m[1] : '';
+        }
+        function decodeEntities(s) {
+            return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#13;/g,'').replace(/&#10;/g,'\n');
+        }
+        var match;
+        while ((match = itemRx.exec(xmlStr)) !== null) {
+            var block   = match[1];
+            var nameRaw = decodeEntities(tagVal('Name', block) || tagVal('n', block));
+            var value   = tagVal('Value', block);
+            var outVar  = tagVal('OutputVariable', block);
+            var type    = tagVal('Type', block).trim();
+            var help    = decodeEntities(tagVal('Help', block)).trim();
+            processField(nameRaw, value, outVar, type, help, schema, values);
+        }
+        return { schema: schema, values: values, count: schema.length };
+    }
+
+    function convert() {
+        var raw   = document.getElementById('xmlInput').value.trim();
+        var errEl = document.getElementById('errorBlock');
+        errEl.classList.remove('show');
+
+        if (!raw) {
+            setOutputBadge('—'); setInputBadge('paste XML');
+            renderOutputs([], {}); return;
+        }
+
+        var xml = raw;
+        if (!xml.startsWith('<InputSettings>')) xml = '<InputSettings>' + xml + '</InputSettings>';
+
+        var schema = [], values = {}, nodeCount = 0, usedFallback = false;
+
+        // Try strict XML DOM parse first
+        var useRegex = false;
+        try {
+            var doc      = new DOMParser().parseFromString(xml, 'application/xml');
+            var parseErr = doc.querySelector('parsererror');
+            if (parseErr) { useRegex = true; throw new Error('parsererror'); }
+            var settings = doc.querySelectorAll('InputSetting');
+            if (!settings.length) { useRegex = true; throw new Error('no items'); }
+            nodeCount = settings.length;
+            settings.forEach(function(el) {
+                var nameEl  = el.querySelector('Name') || el.querySelector('n');
+                var nameRaw = nameEl ? nameEl.textContent : '';
+                var value   = (el.querySelector('Value')          || {textContent:''}).textContent;
+                var outVar  = (el.querySelector('OutputVariable') || {textContent:''}).textContent;
+                var typeRaw = (el.querySelector('Type')           || {textContent:''}).textContent.trim();
+                var help    = (el.querySelector('Help')           || {textContent:''}).textContent.trim();
+                processField(nameRaw, value, outVar, typeRaw, help, schema, values);
+            });
+        } catch(e) {
+            useRegex = true;
+        }
+
+        // Regex fallback — always works with the native <n> tag format
+        if (useRegex) {
+            usedFallback = true;
+            try {
+                var result = parseViaRegex(xml);
+                schema = result.schema; values = result.values; nodeCount = result.count;
+            } catch(e2) {
+                errEl.textContent = 'Parse failed: ' + e2.message;
+                errEl.classList.add('show');
+                setOutputBadge('error', true); setInputBadge('error', true); return;
+            }
+        }
+
+        if (!schema.length) {
+            errEl.textContent = 'No InputSetting elements found. Check that the XML is valid.';
+            errEl.classList.add('show');
+            setOutputBadge('0 fields'); setInputBadge('empty'); return;
+        }
+
+        lastSchema = schema; lastValues = values;
+        var count = schema.filter(function(f){ return f.key; }).length;
+        setOutputBadge(count + ' fields', false, true);
+        setInputBadge(nodeCount + ' nodes' + (usedFallback ? ' (regex)' : ''), false, true);
+        renderOutputs(schema, values);
+    }
+
+    function renderOutputs(schema, values) {
+        var schemaJson   = JSON.stringify(schema, null, 2);
+        var valuesJson   = JSON.stringify(values, null, 2);
+        var combinedJson = JSON.stringify({ schema: JSON.stringify(schema), values: JSON.stringify(values) }, null, 2);
+
+        document.getElementById('outputSchema').textContent   = schemaJson;
+        document.getElementById('outputValues').textContent   = valuesJson;
+        document.getElementById('outputCombined').textContent = combinedJson;
+        renderPreview(schema, values);
+        colorizeAll();
+    }
+
+    function renderPreview(schema, values) {
+        var el = document.getElementById('outputPreview');
+        if (!schema.length) {
+            el.innerHTML = '<div class="empty-msg">No fields parsed yet.</div>';
+            return;
+        }
+        var rows = schema.map(function(f) {
+            var typeCls = 'type-' + f.type;
+            var keyCell  = f.key  ? '<span class="td-key">'  + escHtml(f.key)  + '</span>' : '<span style="color:var(--border)">—</span>';
+            var valCell  = f.key && values[f.key] !== undefined ? '<span class="td-val">' + escHtml(values[f.key]) + '</span>' : '<span style="color:var(--border)">—</span>';
+            var helpCell = f.help ? '<span class="td-help" title="' + escHtml(f.help) + '">' + escHtml(f.help.slice(0,60)) + (f.help.length>60?'…':'') + '</span>' : '';
+            var optCell  = f.options ? '<span class="td-val">' + escHtml(f.options) + '</span>' : '';
+            return '<tr>'
+                + '<td><span class="type-badge ' + typeCls + '">' + f.type + '</span></td>'
+                + '<td>' + keyCell + '</td>'
+                + '<td>' + escHtml(f.label || '') + '</td>'
+                + '<td>' + valCell + '</td>'
+                + '<td>' + (optCell || helpCell) + '</td>'
+                + '</tr>';
+        }).join('');
+        el.innerHTML = '<table class="field-table"><thead><tr>'
+            + '<th>Type</th><th>Key</th><th>Label</th><th>Default</th><th>Options / Help</th>'
+            + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    function escHtml(s) {
+        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Simple JSON colorizer
+    function colorizeAll() {
+        ['outputSchema','outputValues','outputCombined'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = colorizeJson(el.textContent);
+        });
+    }
+
+    function colorizeJson(str) {
+        return escHtml(str)
+            .replace(/(&quot;[^&]*&quot;)(\s*:)/g, '<span style="color:#7c9ef8">$1</span>$2')
+            .replace(/:\s*(&quot;[^&]*&quot;)/g, ': <span style="color:#ce9178">$1</span>')
+            .replace(/:\s*(true|false)/g, ': <span style="color:#569cd6">$1</span>')
+            .replace(/:\s*(\d+)/g, ': <span style="color:#b5cea8">$1</span>');
+    }
+
+    function switchTab(name) {
+        activeTabName = name;
+        ['schema','values','combined','preview'].forEach(function(t) {
+            document.getElementById('tab-' + t).classList.toggle('active', t === name);
+            document.getElementById('output' + cap(t) + 'Wrap').style.display = t === name ? (t==='preview'?'':'block') : 'none';
+            if (t === 'preview' && name === 'preview') document.getElementById('outputPreviewWrap').style.display = 'block';
+        });
+    }
+    function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+    function setOutputBadge(text, isErr, isOk) {
+        var el = document.getElementById('outputBadge');
+        el.textContent = text;
+        el.className = 'panel-badge' + (isErr?' err':'') + (isOk?' ok':'');
+    }
+    function setInputBadge(text, isErr, isOk) {
+        var el = document.getElementById('inputBadge');
+        el.textContent = text;
+        el.className = 'panel-badge' + (isErr?' err':'') + (isOk?' ok':'');
+    }
+
+    function copyOutput() {
+        var id = { schema:'outputSchema', values:'outputValues', combined:'outputCombined', preview:null }[activeTabName];
+        if (!id) { alert('Switch to a JSON tab to copy.'); return; }
+        var text = document.getElementById(id).textContent;
+        navigator.clipboard.writeText(text).then(function() {
+            var btn = event.target;
+            btn.textContent = 'Copied!';
+            setTimeout(function(){ btn.textContent = 'Copy'; }, 1500);
+        });
+    }
+
+    function clearInput() {
+        document.getElementById('xmlInput').value = '';
+        convert();
+    }
+
+    function loadExample() {
+        document.getElementById('xmlInput').value = `<InputSettings>
+  <InputSetting>
+    <Name>Global</Name>
+    <Value></Value>
+    <OutputVariable>{-Variable.null-}</OutputVariable>
+    <Type>Tab</Type>
+    <Help>Main settings tab</Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Run settings</Name>
+    <Value></Value>
+    <OutputVariable></OutputVariable>
+    <Type>Comment</Type>
+    <Help></Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Force range</Name>
+    <Value></Value>
+    <OutputVariable>{-Variable.acc0Forced-}</OutputVariable>
+    <Type>Number</Type>
+    <Help>Forced run of a specific account without checks</Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Range</Name>
+    <Value>1-50</Value>
+    <OutputVariable>{-Variable.cfgAccRange-}</OutputVariable>
+    <Type>Text</Type>
+    <Help>Account range. Formats: "5", "2-5", "2,4,5"</Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>WorkMode{Cooldown|NewRandom|UpdateToken}</Name>
+    <Value>Cooldown</Value>
+    <OutputVariable>{-Variable.wkMode-}</OutputVariable>
+    <Type>DropDown</Type>
+    <Help>Select work mode for accounts</Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Tasks ToDo{daily|weekly|monthly}</Name>
+    <Value>daily</Value>
+    <OutputVariable>{-Variable.cfgToDo-}</OutputVariable>
+    <Type>DropDownMultiSelect</Type>
+    <Help>Select tasks to perform</Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Debug log</Name>
+    <Value>False</Value>
+    <OutputVariable>{-Variable.debug-}</OutputVariable>
+    <Type>Boolean</Type>
+    <Help>Enable debug logging</Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Database settings</Name>
+    <Value></Value>
+    <OutputVariable></OutputVariable>
+    <Type>Comment</Type>
+    <Help></Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Database source{SQLite|PostgreSQL}</Name>
+    <Value>PostgreSQL</Value>
+    <OutputVariable>{-Variable.DBmode-}</OutputVariable>
+    <Type>DropDown</Type>
+    <Help>Select database backend</Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Project</Name>
+    <Value></Value>
+    <OutputVariable></OutputVariable>
+    <Type>Tab</Type>
+    <Help></Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Guild</Name>
+    <Value></Value>
+    <OutputVariable>{-Variable.guildName-}</OutputVariable>
+    <Type>Text</Type>
+    <Help>Guild name for the project</Help>
+  </InputSetting>
+  <InputSetting>
+    <Name>Referral code</Name>
+    <Value>913zlp48</Value>
+    <OutputVariable>{-Variable.cfgRefCode-}</OutputVariable>
+    <Type>Text</Type>
+    <Help>Referral code for random budget ref</Help>
+  </InputSetting>
+</InputSettings>`;
+        convert();
+    }
+
+    // ── Resizer ──
+    (function() {
+        var lp = document.getElementById('leftPanel');
+        var rs = document.getElementById('mainResizer');
+        var drag = false, sx, sw;
+        rs.addEventListener('mousedown', function(e) {
+            drag = true; sx = e.clientX; sw = lp.offsetWidth;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('mousemove', function(e) {
+            if (!drag) return;
+            lp.style.flex = 'none';
+            lp.style.width = Math.max(200, Math.min(sw + e.clientX - sx, window.innerWidth - 300)) + 'px';
+        });
+        document.addEventListener('mouseup', function() {
+            drag = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        });
+    })();
+</script>
+</body>
+</html>

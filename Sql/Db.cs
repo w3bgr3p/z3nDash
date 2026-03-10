@@ -24,7 +24,7 @@ namespace z3n8
         private readonly string _defaultTable;
         private readonly dbMode _dbMode;
         private Logger _log;
-
+        private bool _debug = false;
         
         private const char RawSeparator = '·';
         private const char ColumnSeparator = '¦';
@@ -51,7 +51,7 @@ namespace z3n8
             _pgDbName = pgDbName;
             _pgUser = pgUser;
             _pgPass = pgPass;
-            _log =  log ;
+            _log = log ?? new Logger(logLevel: LogLevel.Error);
             _defaultTable = defaultTable;
         }
         public Db(
@@ -65,10 +65,14 @@ namespace z3n8
             _pgDbName = config.PostgresDatabase;
             _pgUser = config.PostgresUser;
             _pgPass = config.PostgresPassword;
-            _log =  log ;
-        }
-        
+           _log = log ?? new Logger(logLevel: LogLevel.Error);
 
+        }
+        public void SetLogger(Logger log) => _log = log;
+        public void ClearLogger() => _log = null;
+        public dbMode Mode => _dbMode;
+        public void SetDebug(bool debug) => _debug = debug;
+        
         #region Core Query
         public string Query(string query,  bool thrw = false, bool unSafe = false)
         {
@@ -81,6 +85,7 @@ namespace z3n8
                        ? new Sql($"Host={_pgHost};Port={_pgPort};Database={_pgDbName};Username={_pgUser};Password={_pgPass};Pooling=true;Connection Idle Lifetime=10;")
                        : new Sql(_sqLitePath, null))
             {
+                if (_debug) query.Debug();
                 for (int i = 0; i < maxRetries; i++)
                 {
                     try
@@ -101,23 +106,27 @@ namespace z3n8
                             Thread.Sleep(delay);
                             continue;
                         }
-
-                        _log?.Send($"Database Error: {ex.Message}\n[{query}]");
+                        ex.Err(query);
+                        _log?.Error($@"Database Error: {ex.Message}\r\n[{query}]");
+                        
                         if (thrw) throw;
                         return string.Empty;
                     }
+                    
                 }
+                if (_debug) result.Debug();
             }
 
 
-            string toLog = query.Contains("SELECT") ? $"[{query}]\n[{result}]" : $"[{query}] - [{result}]";
+            string toLog = query.Contains("SELECT") ?
+                $"[{query}]\n[{result}]" : 
+                $"[{query}] - [{result}]";
             _log?.Send($"[{(_dbMode == dbMode.Postgre ? "🐘" : "SQLite")}] {toLog}");
-            
-            
             return result;
         }
         #endregion
 
+        
         #region Get Methods
         public string Get(string columns, string tableName = null, bool log = false, bool thrw = false, string key = "id", object id = null, string where = "")
         {

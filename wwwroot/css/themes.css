@@ -610,3 +610,676 @@
     --radius-lg: 4px;
     --row-h: 19px;
 }
+/* ══════════════════════════════════════════════════════════════
+   BLOCKCHAIN THEMES — официальные бренд-цвета
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── ETHEREUM ── #627EEA на #0D0D1A */
+[data-theme="ethereum"] {
+    --bg:          #0d0d1a;
+    --bg1:         #12122a;
+    --bg2:         #1a1a38;
+    --bg3:         #222245;
+    --border:      #2e2e60;
+    --muted:       #3c3c78;
+    --muted2:      #4a4a90;
+    --text3:       #6060a0;
+    --text2:       #8888c0;
+    --text:        #c0c0e8;
+    --text-hi:     #e8e8ff;
+
+    --accent:      #627eea;
+    --accent-lo:   #8fa4f4;
+    --blue-border: #4462cc;
+    --blue-tint:   #0d0d30;
+
+    --green:       #48e0b0;
+    --green-lo:    #30c090;
+    --green-hi:    #70ffcc;
+    --green-bg:    #081e14;
+    --green-bg2:   #0e2a1e;
+    --green-tint:  #040e0a;
+
+    --red:         #e05060;
+    --red-lo:      #f07080;
+    --red-bg:      #200a10;
+    --red-bg2:     #18080c;
+    --red-tint:    #100408;
+    --red-tint2:   #0c0306;
+
+    --yellow:      #d8b060;
+    --yellow-lo:   #ecc880;
+    --yellow-tint: #1a1400;
+
+    --purple:      #a090f0;
+    --purple-tint: #100e28;
+
+    --font: 'JetBrains Mono', 'Iosevka', monospace;
+    --font-size: 12px;
+    --radius: 6px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #38386a;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #627eea;
+    --string-color: #48e0b0;
+    --number-color: #d8b060;
+    --bool-color:   #e05060;
+    --null-color:   #a090f0;
+
+    --radius-lg: 8px;
+    --row-h: 19px;
+}
+
+/* ── OPTIMISM ── #FF0421 на белом (light) */
+[data-theme="optimism"] {
+    --bg:          #ffffff;
+    --bg1:         #fff5f5;
+    --bg2:         #ffe8e8;
+    --bg3:         #ffd5d5;
+    --border:      #ffbbbb;
+    --muted:       #ffaaaa;
+    --muted2:      #ff9999;
+    --text3:       #cc4444;
+    --text2:       #991111;
+    --text:        #2a0000;
+    --text-hi:     #000000;
+
+    --accent:      #ff0421;
+    --accent-lo:   #cc0018;
+    --blue-border: #ff4455;
+    --blue-tint:   #fff0f0;
+
+    --green:       #1a7f37;
+    --green-lo:    #116329;
+    --green-hi:    #2ea043;
+    --green-bg:    #e6f8ec;
+    --green-bg2:   #ccf0d8;
+    --green-tint:  #f0faf4;
+
+    --red:         #ff0421;
+    --red-lo:      #cc0018;
+    --red-bg:      #ffe0e0;
+    --red-bg2:     #ffcccc;
+    --red-tint:    #fff5f5;
+    --red-tint2:   #fffafa;
+
+    --yellow:      #cc6600;
+    --yellow-lo:   #aa4400;
+    --yellow-tint: #fff8e8;
+
+    --purple:      #8833cc;
+    --purple-tint: #f8f0ff;
+
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-size: 12px;
+    --radius: 6px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #ffcccc;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #ff0421;
+    --string-color: #1a7f37;
+    --number-color: #cc6600;
+    --bool-color:   #cc0018;
+    --null-color:   #8833cc;
+
+    --radius-lg: 8px;
+    --row-h: 19px;
+}
+
+/* ── ARBITRUM ── #213147 navy bg, #12AAFF blue, #96BEDC teal */
+[data-theme="arbitrum"] {
+    --bg:          #0d1825;
+    --bg1:         #131f30;
+    --bg2:         #1a2840;
+    --bg3:         #213147;
+    --border:      #2c4060;
+    --muted:       #3a5070;
+    --muted2:      #4a6080;
+    --text3:       #5a7898;
+    --text2:       #96bedc;
+    --text:        #c8ddef;
+    --text-hi:     #eaf4ff;
+
+    --accent:      #12aaff;
+    --accent-lo:   #4dc4ff;
+    --blue-border: #0088dd;
+    --blue-tint:   #0a1a28;
+
+    --green:       #00d4a8;
+    --green-lo:    #00b088;
+    --green-hi:    #30ffcc;
+    --green-bg:    #001e18;
+    --green-bg2:   #002820;
+    --green-tint:  #000e0c;
+
+    --red:         #ff5566;
+    --red-lo:      #ff8899;
+    --red-bg:      #1e0810;
+    --red-bg2:     #16060c;
+    --red-tint:    #0e0408;
+    --red-tint2:   #0a0306;
+
+    --yellow:      #f0c040;
+    --yellow-lo:   #f8d870;
+    --yellow-tint: #181200;
+
+    --purple:      #7090e0;
+    --purple-tint: #0c1228;
+
+    --font: 'JetBrains Mono', 'Iosevka', monospace;
+    --font-size: 12px;
+    --radius: 4px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #304c6a;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #12aaff;
+    --string-color: #00d4a8;
+    --number-color: #f0c040;
+    --bool-color:   #ff5566;
+    --null-color:   #96bedc;
+
+    --radius-lg: 6px;
+    --row-h: 19px;
+}
+
+/* ── POLYGON ── #7B3FE4 на #1A0536 */
+[data-theme="polygon"] {
+    --bg:          #0e0120;
+    --bg1:         #130228;
+    --bg2:         #1a0536;
+    --bg3:         #220844;
+    --border:      #330c60;
+    --muted:       #441080;
+    --muted2:      #5518a0;
+    --text3:       #6630b8;
+    --text2:       #9966dd;
+    --text:        #cca8f0;
+    --text-hi:     #eedeff;
+
+    --accent:      #7b3fe4;
+    --accent-lo:   #a86ef8;
+    --blue-border: #5c28c0;
+    --blue-tint:   #120020;
+
+    --green:       #00e8b0;
+    --green-lo:    #00c890;
+    --green-hi:    #40ffd0;
+    --green-bg:    #001e16;
+    --green-bg2:   #002a20;
+    --green-tint:  #000e0b;
+
+    --red:         #ff4480;
+    --red-lo:      #ff77aa;
+    --red-bg:      #200810;
+    --red-bg2:     #18060c;
+    --red-tint:    #100408;
+    --red-tint2:   #0c0306;
+
+    --yellow:      #f0b840;
+    --yellow-lo:   #f8d060;
+    --yellow-tint: #1a1400;
+
+    --purple:      #7b3fe4;
+    --purple-tint: #0e0120;
+
+    --font: 'JetBrains Mono', 'Iosevka', monospace;
+    --font-size: 12px;
+    --radius: 8px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #3d1070;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #7b3fe4;
+    --string-color: #00e8b0;
+    --number-color: #f0b840;
+    --bool-color:   #ff4480;
+    --null-color:   #a86ef8;
+
+    --radius-lg: 10px;
+    --row-h: 19px;
+}
+
+/* ── BASE ── #0052FF на белом (Coinbase light) */
+[data-theme="base"] {
+    --bg:          #ffffff;
+    --bg1:         #f0f5ff;
+    --bg2:         #ddeaff;
+    --bg3:         #c8d8ff;
+    --border:      #a8c0ff;
+    --muted:       #8899ee;
+    --muted2:      #6677cc;
+    --text3:       #3355aa;
+    --text2:       #1144cc;
+    --text:        #001a66;
+    --text-hi:     #000000;
+
+    --accent:      #0052ff;
+    --accent-lo:   #3377ff;
+    --blue-border: #0044dd;
+    --blue-tint:   #e8f0ff;
+
+    --green:       #0a7a3e;
+    --green-lo:    #085e30;
+    --green-hi:    #10a050;
+    --green-bg:    #e8f8f0;
+    --green-bg2:   #d0f0e0;
+    --green-tint:  #f0faf5;
+
+    --red:         #cc2233;
+    --red-lo:      #ee4455;
+    --red-bg:      #ffe8ea;
+    --red-bg2:     #ffd0d4;
+    --red-tint:    #fff5f6;
+    --red-tint2:   #fffafa;
+
+    --yellow:      #996600;
+    --yellow-lo:   #bb8800;
+    --yellow-tint: #fffae8;
+
+    --purple:      #6644bb;
+    --purple-tint: #f5f0ff;
+
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-size: 12px;
+    --radius: 8px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #bbccff;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #0052ff;
+    --string-color: #0a7a3e;
+    --number-color: #996600;
+    --bool-color:   #cc2233;
+    --null-color:   #6644bb;
+
+    --radius-lg: 10px;
+    --row-h: 19px;
+}
+
+/* ── SOLANA ── #9945FF + #14F195 на #000000 */
+[data-theme="solana"] {
+    --bg:          #000000;
+    --bg1:         #070012;
+    --bg2:         #0e0020;
+    --bg3:         #15002e;
+    --border:      #220050;
+    --muted:       #330070;
+    --muted2:      #440090;
+    --text3:       #6030a8;
+    --text2:       #9060cc;
+    --text:        #cca8ee;
+    --text-hi:     #eedeff;
+
+    --accent:      #9945ff;
+    --accent-lo:   #bb77ff;
+    --blue-border: #7722dd;
+    --blue-tint:   #0a0018;
+
+    --green:       #14f195;
+    --green-lo:    #00cc77;
+    --green-hi:    #50ffbb;
+    --green-bg:    #001c10;
+    --green-bg2:   #002818;
+    --green-tint:  #000e08;
+
+    --red:         #ff3366;
+    --red-lo:      #ff6699;
+    --red-bg:      #1e0810;
+    --red-bg2:     #16060c;
+    --red-tint:    #0e0408;
+    --red-tint2:   #0a0306;
+
+    --yellow:      #f5d800;
+    --yellow-lo:   #ffee44;
+    --yellow-tint: #141200;
+
+    --purple:      #9945ff;
+    --purple-tint: #070012;
+
+    --font: 'JetBrains Mono', 'Iosevka', monospace;
+    --font-size: 12px;
+    --radius: 6px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #2c0060;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #9945ff;
+    --string-color: #14f195;
+    --number-color: #f5d800;
+    --bool-color:   #ff3366;
+    --null-color:   #bb77ff;
+
+    --radius-lg: 8px;
+    --row-h: 19px;
+}
+
+/* ── AVALANCHE ── #E84142 на #1A1A1A */
+[data-theme="avalanche"] {
+    --bg:          #111111;
+    --bg1:         #1a1a1a;
+    --bg2:         #222222;
+    --bg3:         #2a2a2a;
+    --border:      #3a1a1a;
+    --muted:       #4a2020;
+    --muted2:      #5c2828;
+    --text3:       #884040;
+    --text2:       #bb7070;
+    --text:        #e8c8c8;
+    --text-hi:     #fff0f0;
+
+    --accent:      #e84142;
+    --accent-lo:   #ff7070;
+    --blue-border: #c02828;
+    --blue-tint:   #1e0808;
+
+    --green:       #40e0a0;
+    --green-lo:    #28c080;
+    --green-hi:    #60ffcc;
+    --green-bg:    #0a1e14;
+    --green-bg2:   #0e2a1c;
+    --green-tint:  #040e0a;
+
+    --red:         #e84142;
+    --red-lo:      #ff7070;
+    --red-bg:      #2e0a0a;
+    --red-bg2:     #220808;
+    --red-tint:    #160404;
+    --red-tint2:   #100302;
+
+    --yellow:      #f0a030;
+    --yellow-lo:   #f8c060;
+    --yellow-tint: #181000;
+
+    --purple:      #cc6699;
+    --purple-tint: #180810;
+
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-size: 12px;
+    --radius: 4px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #4c2222;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #e84142;
+    --string-color: #40e0a0;
+    --number-color: #f0a030;
+    --bool-color:   #ff7070;
+    --null-color:   #cc6699;
+
+    --radius-lg: 6px;
+    --row-h: 19px;
+}
+
+/* ── BNB ── #F0B90B на #0B0E11 (официальный BNB Chain bg) */
+[data-theme="bnb"] {
+    --bg:          #0b0e11;
+    --bg1:         #12161c;
+    --bg2:         #181e26;
+    --bg3:         #1e2530;
+    --border:      #2a3040;
+    --muted:       #363d50;
+    --muted2:      #424c60;
+    --text3:       #7a6820;
+    --text2:       #b09040;
+    --text:        #e8d090;
+    --text-hi:     #fff8cc;
+
+    --accent:      #f0b90b;
+    --accent-lo:   #f8d444;
+    --blue-border: #c89008;
+    --blue-tint:   #181200;
+
+    --green:       #26e68a;
+    --green-lo:    #1cc070;
+    --green-hi:    #50ffaa;
+    --green-bg:    #081808;
+    --green-bg2:   #0c2210;
+    --green-tint:  #040c04;
+
+    --red:         #ff4444;
+    --red-lo:      #ff7777;
+    --red-bg:      #200808;
+    --red-bg2:     #180606;
+    --red-tint:    #100404;
+    --red-tint2:   #0c0302;
+
+    --yellow:      #f0b90b;
+    --yellow-lo:   #f8d444;
+    --yellow-tint: #14100a;
+
+    --purple:      #c888ff;
+    --purple-tint: #100c18;
+
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-size: 12px;
+    --radius: 6px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #303848;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #f0b90b;
+    --string-color: #26e68a;
+    --number-color: #f8d444;
+    --bool-color:   #ff4444;
+    --null-color:   #c888ff;
+
+    --radius-lg: 8px;
+    --row-h: 19px;
+}
+
+/* ── SUI ── #4DA2FF на #030F1C (официальный Sui bg) */
+[data-theme="sui"] {
+    --bg:          #030f1c;
+    --bg1:         #061524;
+    --bg2:         #0a1e30;
+    --bg3:         #0e283e;
+    --border:      #143250;
+    --muted:       #1c3e60;
+    --muted2:      #244a70;
+    --text3:       #305a80;
+    --text2:       #6090b8;
+    --text:        #a0c8e8;
+    --text-hi:     #d8f0ff;
+
+    --accent:      #4da2ff;
+    --accent-lo:   #7dbeff;
+    --blue-border: #2880dd;
+    --blue-tint:   #041018;
+
+    --green:       #00e8c0;
+    --green-lo:    #00c8a0;
+    --green-hi:    #40ffd8;
+    --green-bg:    #001e18;
+    --green-bg2:   #002820;
+    --green-tint:  #000e0c;
+
+    --red:         #ff5577;
+    --red-lo:      #ff8899;
+    --red-bg:      #1a0810;
+    --red-bg2:     #14060c;
+    --red-tint:    #0c0408;
+    --red-tint2:   #080306;
+
+    --yellow:      #50c8f0;
+    --yellow-lo:   #80dcff;
+    --yellow-tint: #001420;
+
+    --purple:      #6080ee;
+    --purple-tint: #080c20;
+
+    --font: 'JetBrains Mono', 'Iosevka', monospace;
+    --font-size: 12px;
+    --radius: 8px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #183c58;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #4da2ff;
+    --string-color: #00e8c0;
+    --number-color: #50c8f0;
+    --bool-color:   #ff5577;
+    --null-color:   #6080ee;
+
+    --radius-lg: 10px;
+    --row-h: 19px;
+}
+
+/* ── BLAST ── #FCFC03 на #000000 */
+[data-theme="blast"] {
+    --bg:          #000000;
+    --bg1:         #070700;
+    --bg2:         #0f0f00;
+    --bg3:         #171700;
+    --border:      #242400;
+    --muted:       #323200;
+    --muted2:      #444400;
+    --text3:       #5e5e00;
+    --text2:       #8c8c00;
+    --text:        #d4d400;
+    --text-hi:     #fcfc03;
+
+    --accent:      #fcfc03;
+    --accent-lo:   #ffff55;
+    --blue-border: #d4d400;
+    --blue-tint:   #0c0c00;
+
+    --green:       #00ff88;
+    --green-lo:    #00dd66;
+    --green-hi:    #44ffaa;
+    --green-bg:    #001a0e;
+    --green-bg2:   #002416;
+    --green-tint:  #000d07;
+
+    --red:         #ff3300;
+    --red-lo:      #ff6633;
+    --red-bg:      #1a0800;
+    --red-bg2:     #140600;
+    --red-tint:    #0c0400;
+    --red-tint2:   #080300;
+
+    --yellow:      #fcfc03;
+    --yellow-lo:   #ffff55;
+    --yellow-tint: #0c0c00;
+
+    --purple:      #aaff00;
+    --purple-tint: #0a1000;
+
+    --font: 'JetBrains Mono', 'Iosevka', monospace;
+    --font-size: 12px;
+    --radius: 0px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #2e2e00;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    --key-color:    #fcfc03;
+    --string-color: #00ff88;
+    --number-color: #ffff55;
+    --bool-color:   #ff3300;
+    --null-color:   #aaff00;
+
+    --radius-lg: 0px;
+    --row-h: 19px;
+}
+
+/* ── Blast glow ── */
+[data-theme="blast"] .main-header h1,
+[data-theme="blast"] .panel-title,
+[data-theme="blast"] .lp-title { text-shadow: 0 0 12px rgba(252,252,3,0.6); letter-spacing: 0.1em; }
+[data-theme="blast"] .btn:hover { box-shadow: 0 0 14px rgba(252,252,3,0.35); }
+[data-theme="blast"] .task-work-dot.working { box-shadow: 0 0 8px rgba(252,252,3,0.7); }
+
+/* ── Solana glow ── */
+[data-theme="solana"] .task-work-dot.working { box-shadow: 0 0 8px #14f195; }

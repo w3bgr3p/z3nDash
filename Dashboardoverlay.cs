@@ -54,13 +54,22 @@ public class DashboardOverlay : Form
     // Tabs: label, url fragment to match for active state, url builder from base
     private static readonly (string Label, string Match, Func<string, string> Url)[] Tabs =
     [
-        ("PM",     "page=pm",   b => b + "/?page=pm"),
+        ("⌂",     "/",   b => b + "/"),
+        ("ZP",     "page=pm",   b => b + "/?page=pm"),
+        ("z3n8",     "page=scheduler",   b => b + "/?page=scheduler"),
         ("Logs",   "page=logs", b => b + "/?page=logs"),
         ("HTTP",   "page=http", b => b + "/?page=http"),
         ("Report", "/report",   b => b + "/report"),
         ("JSON",   "/json",     b => b + "/json"),
+        ("TXT",   "/text",     b => b + "/text"),
+        ("⚙", "/page=config",   b => b + "/?page=config"),
     ];
 
+
+    
+    
+    
+    
     private Panel?   _tabBar;
     private Label[]? _tabLabels;
 
@@ -205,6 +214,13 @@ public class DashboardOverlay : Form
             _wv.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             _wv.CoreWebView2.Settings.IsStatusBarEnabled            = false;
             _wv.CoreWebView2.Settings.AreDevToolsEnabled            = true;
+            
+            
+            _wv.CoreWebView2.NewWindowRequested += (_, e) =>
+            {
+                e.Handled = true;
+                DashboardOverlay.Open(e.Uri, Width, Height);  // новое окно с тем же размером
+            };
 
             // Extract base (scheme+host+port) from initial URL
             var uri = new Uri(_url);
@@ -566,4 +582,7 @@ public class DashboardOverlay : Form
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT { public int X, Y; }
     }
+    
+    
+    
 }

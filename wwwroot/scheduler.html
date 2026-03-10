@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <title>z3n8 | Scheduler</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 11px; overflow: hidden; height: 100vh;
+            display: flex; flex-direction: column;
+        }
+
+        /* ── Header ── */
+        .main-header {
+            background: var(--bg1); padding: 6px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+        }
+        .main-header h1 { font-size: 13px; font-weight: 700; color: var(--accent); }
+        .header-stats { display: flex; gap: 14px; font-size: 10px; color: var(--text2); }
+        .stat-item { display: flex; gap: 4px; align-items: center; }
+        .stat-val  { color: var(--text); font-weight: 600; }
+        .stat-running { color: var(--green); }
+        .stat-error   { color: var(--red); }
+        .header-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+        /* ── Layout ── */
+        .content { display: flex; flex: 1; overflow: hidden; }
+        .list-panel {
+            width: 340px; flex-shrink: 0; display: flex; flex-direction: column;
+            border-right: 1px solid var(--border); overflow: hidden;
+        }
+        .list-toolbar {
+            padding: 6px 8px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+        }
+        .list-toolbar input {
+            flex: 1; background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 3px; padding: 3px 7px; color: var(--text); font-size: 11px;
+        }
+        .list-toolbar input:focus { outline: none; border-color: var(--accent); }
+        .list-scroll { flex: 1; overflow-y: auto; }
+
+        /* ── List rows ── */
+        .group-header {
+            padding: 5px 10px 3px;
+            display: flex; align-items: center; gap: 6px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 2;
+        }
+        .group-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+        .group-name { font-size: 10px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; flex: 1; }
+        .group-count { font-size: 9px; color: var(--text2); background: var(--bg2); padding: 1px 5px; border-radius: 8px; }
+
+        .schedule-row {
+            padding: 6px 10px 6px 18px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer; display: flex; align-items: center; gap: 8px;
+            transition: background 0.08s;
+        }
+        .schedule-row:hover  { background: var(--bg2); }
+        .schedule-row.active { background: var(--bg3); }
+        .schedule-row.row-disabled { opacity: 0.45; }
+
+        .row-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; cursor: pointer; }
+        .row-dot.enabled  { background: var(--green); }
+        .row-dot.disabled { background: var(--border); }
+
+        .row-info { flex: 1; min-width: 0; }
+        .row-name { font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .row-sub  { font-size: 9px; color: var(--text2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+        .row-status { font-size: 9px; padding: 1px 7px; border-radius: 3px; font-weight: 600; letter-spacing: 0.2px; }
+        .row-status.idle    { background: var(--bg2); color: var(--text2); border: 1px solid var(--border); }
+        .row-status.running { background: var(--green-bg, rgba(63,185,80,0.15)); color: var(--green, #3fb950); border: 1px solid currentColor; }
+        .row-status.error   { background: var(--red-bg, rgba(248,81,73,0.15));   color: var(--red, #f85149);   border: 1px solid currentColor; }
+        .row-counts { font-size: 9px; color: var(--text2); display: flex; gap: 4px; align-items: center; }
+        .row-done   { color: var(--green, #3fb950); font-weight: 600; }
+        .row-total  { color: var(--text2); }
+
+        /* ── Resizer ── */
+        .resizer { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; transition: background 0.15s; }
+        .resizer:hover { background: var(--accent); opacity: 0.5; }
+
+        /* ── Detail panel ── */
+        .detail-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+        .detail-header {
+            padding: 8px 14px 0; border-bottom: 1px solid var(--border);
+            flex-shrink: 0; background: var(--bg1);
+        }
+        .detail-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+        .detail-sub   { font-size: 10px; color: var(--text2); margin-bottom: 6px; font-family: monospace; }
+        .detail-actions { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
+
+        .detail-tabs { display: flex; gap: 0; }
+        .dtab {
+            padding: 5px 14px; cursor: pointer; font-size: 11px; color: var(--text2);
+            border-bottom: 2px solid transparent; transition: color 0.1s;
+            user-select: none;
+        }
+        .dtab:hover  { color: var(--text); }
+        .dtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        /* ── Detail body ── */
+        .detail-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+        .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text2); font-size: 12px; }
+
+        /* ── Settings form ── */
+        .form-grid { display: grid; grid-template-columns: 130px 1fr; gap: 7px 10px; align-items: start; max-width: 680px; }
+        .form-label { color: var(--text2); padding-top: 5px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+        .form-input { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 4px 8px; color: var(--text); font-size: 11px; width: 100%; }
+        .form-input:focus { outline: none; border-color: var(--accent); }
+        select.form-input { cursor: pointer; }
+        .form-section { grid-column: 1 / -1; margin-top: 6px; padding: 4px 0 4px 8px; border-left: 2px solid var(--accent); color: var(--text2); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-actions { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+
+        /* ── Execution / Scheduler info ── */
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 800px; }
+        .info-card { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; }
+        .info-card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 8px; }
+        .info-row { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--border); }
+        .info-row:last-child { border-bottom: none; }
+        .info-key { font-size: 10px; color: var(--text2); }
+        .info-val { font-size: 11px; color: var(--text); font-weight: 500; text-align: right; max-width: 65%; word-break: break-all; }
+        .info-val.green { color: var(--green, #3fb950); }
+        .info-val.red   { color: var(--red, #f85149); }
+        .info-val.accent { color: var(--accent); }
+
+        /* ── Output tab ── */
+        .output-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-shrink: 0; }
+        .live-badge { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--green-bg, rgba(63,185,80,0.15)); color: var(--green, #3fb950); animation: blink 1.2s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .output-box {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+            overflow-y: auto; height: calc(100% - 40px); min-height: 100px;
+        }
+        .out-line { padding: 2px 10px; border-bottom: 1px solid var(--bg2); font-family: 'Consolas', monospace; font-size: 10px; line-height: 1.6; word-break: break-all; }
+        .out-line.ERROR   { color: var(--red, #f85149); }
+        .out-line.WARNING { color: var(--yellow, #d29922); }
+        .out-line.INFO    { color: var(--text); }
+        .out-line.DEBUG   { color: var(--text2); }
+        .out-line.empty   { color: var(--text2); padding: 12px; text-align: center; }
+
+        /* ── Horizontal resizer (between detail-body and bottom-panels) ── */
+        .h-resizer {
+            height: 4px; cursor: row-resize; background: transparent; flex-shrink: 0;
+            transition: background 0.15s; border-top: 1px solid var(--border);
+        }
+        .h-resizer:hover { background: var(--accent); opacity: 0.5; }
+
+        /* ── Vertical resizer inside bottom-panels ── */
+        .v-resizer {
+            width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0;
+            transition: background 0.15s;
+        }
+        .v-resizer:hover { background: var(--accent); opacity: 0.5; }
+
+        /* ── Logs + HTTP bottom panels ── */
+        .bottom-panels { display: flex; padding: 8px 14px 8px; flex-shrink: 0; height: 220px; gap: 0; overflow: hidden; }
+        .log-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 4px; background: var(--bg1); min-width: 80px; }
+        .log-panel-header { padding: 4px 8px; border-bottom: 1px solid var(--border); display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+        .log-panel-title { font-size: 10px; font-weight: 700; color: var(--accent); flex: 1; display: flex; align-items: center; gap: 5px; }
+        .log-panel-title .icon { font-size: 11px; }
+        .log-panel-filter { display: flex; gap: 4px; align-items: center; }
+        .log-panel-filter select,
+        .log-panel-filter input {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
+            padding: 2px 5px; color: var(--text); font-size: 10px;
+        }
+        .log-panel-filter select { cursor: pointer; }
+        .log-panel-scroll { flex: 1; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 10px; }
+        .log-row { display: flex; gap: 6px; padding: 2px 8px; border-bottom: 1px solid var(--border); align-items: baseline; }
+        .log-row:hover { background: var(--bg2); }
+        .log-time    { color: var(--text2); white-space: nowrap; flex-shrink: 0; font-size: 9px; }
+        .log-level   { width: 40px; flex-shrink: 0; font-weight: 700; font-size: 9px; }
+        .log-level.INFO  { color: var(--accent); }
+        .log-level.WARN  { color: var(--yellow, #d29922); }
+        .log-level.ERROR { color: var(--red, #f85149); }
+        .log-msg     { flex: 1; color: var(--text); word-break: break-all; line-height: 1.5; }
+        .http-row { display: flex; gap: 6px; padding: 2px 8px; border-bottom: 1px solid var(--border); align-items: baseline; }
+        .http-row:hover { background: var(--bg2); }
+        .http-method { width: 35px; flex-shrink: 0; font-weight: 700; font-size: 9px; color: var(--accent); }
+        .http-status { width: 28px; flex-shrink: 0; font-size: 9px; font-weight: 600; }
+        .http-status.s2xx { color: var(--green, #3fb950); }
+        .http-status.s4xx { color: var(--yellow, #d29922); }
+        .http-status.s5xx { color: var(--red, #f85149); }
+        .http-url    { flex: 1; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+        .http-dur    { flex-shrink: 0; color: var(--text2); font-size: 9px; }
+        .log-empty   { color: var(--text2); text-align: center; padding: 16px; font-size: 10px; }
+        .panel-refresh { background: none; border: 1px solid var(--border); border-radius: 3px; color: var(--text2); cursor: pointer; font-size: 10px; padding: 1px 6px; }
+        .panel-refresh:hover { color: var(--text); border-color: var(--text2); }
+
+        /* ── Buttons ── */
+        .btn { padding: 4px 10px; border-radius: 3px; border: 1px solid var(--border); cursor: pointer; font-size: 11px; background: var(--bg2); color: var(--text); transition: opacity 0.1s; }
+        .btn:hover  { background: var(--bg3); }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { opacity: 0.85; }
+        .btn.danger  { background: transparent; color: var(--red, #f85149); border-color: var(--red, #f85149); }
+        .btn.danger:hover  { background: var(--red-bg, rgba(248,81,73,0.15)); }
+        .btn.green   { background: transparent; color: var(--green, #3fb950); border-color: var(--green, #3fb950); }
+        .btn.green:hover { background: var(--green-bg, rgba(63,185,80,0.1)); }
+        .btn.accent  { background: transparent; color: var(--accent); border-color: var(--accent); }
+        .btn.sm      { padding: 2px 7px; font-size: 10px; }
+        .btn.stop    { background: transparent; color: var(--red, #f85149); border-color: var(--red, #f85149); }
+
+        /* ── Schedule builder ── */
+        .trigger-row { display: flex; gap: 8px; align-items: center; }
+        .trigger-row .form-input { flex: 1; }
+        .wd-btn { padding: 2px 7px; border-radius: 3px; border: 1px solid var(--border); cursor: pointer; font-size: 10px; background: var(--bg2); color: var(--text2); user-select: none; }
+        .wd-btn.wd-on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        /* ── Dialog ── */
+        #dialogOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; align-items: center; justify-content: center; }
+        #dialogOverlay.open { display: flex; }
+        #dialogBox { background: var(--bg1); border: 1px solid var(--border); border-radius: 6px; padding: 16px 20px; min-width: 260px; max-width: 380px; display: flex; flex-direction: column; gap: 10px; }
+        #dialogTitle { font-weight: 700; font-size: 13px; }
+        #dialogMsg   { color: var(--text2); font-size: 11px; line-height: 1.5; }
+        #dialogInput { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 5px 8px; color: var(--text); font-size: 11px; display: none; width: 100%; }
+        #dialogButtons { display: flex; gap: 8px; justify-content: flex-end; }
+
+        /* ── Payload modals ── */
+        .pm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1001; align-items: center; justify-content: center; }
+        .pm-overlay.open { display: flex; }
+        .pm-modal { background: var(--bg1); border: 1px solid var(--border); border-radius: 6px; width: 620px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+        .pm-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+        .pm-header h3 { font-size: 13px; color: var(--text); flex: 1; }
+        .pm-close { background: none; border: none; color: var(--text2); font-size: 16px; cursor: pointer; padding: 0 4px; line-height: 1; }
+        .pm-close:hover { color: var(--text); }
+        .pm-body { flex: 1; overflow-y: auto; padding: 12px 14px; min-height: 0; }
+        .pm-footer { padding: 8px 14px; border-top: 1px solid var(--border); display: flex; gap: 7px; justify-content: flex-end; flex-shrink: 0; }
+        .schema-field-row { display: grid; grid-template-columns: 1fr 110px 1fr 28px; gap: 6px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--bg2); }
+        .schema-field-row:last-child { border-bottom: none; }
+        .schema-input { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 4px 7px; color: var(--text); font-size: 11px; width: 100%; }
+        .schema-input:focus { outline: none; border-color: var(--accent); }
+        .schema-del { background: none; border: 1px solid var(--border); border-radius: 3px; color: var(--text2); cursor: pointer; font-size: 12px; width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; }
+        .schema-del:hover { border-color: var(--red, #f85149); color: var(--red, #f85149); }
+        .schema-col-header { display: grid; grid-template-columns: 1fr 110px 1fr 28px; gap: 6px; padding: 0 0 5px; color: var(--text2); font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+        .values-field { margin-bottom: 10px; }
+        .values-label { font-size: 10px; color: var(--text2); margin-bottom: 3px; display: flex; gap: 6px; align-items: baseline; }
+        .values-key   { font-size: 9px; color: var(--text2); font-family: monospace; opacity: 0.6; }
+        .values-input { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 4px 7px; color: var(--text); font-size: 11px; width: 100%; }
+        .values-input:focus { outline: none; border-color: var(--accent); }
+        .section-div { margin: 8px 0 5px; padding: 3px 8px; background: var(--bg2); border-left: 2px solid var(--accent); border-radius: 0 3px 3px 0; font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; }
+
+        /* scrollbars */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<div class="main-header">
+    <h1>Scheduler</h1>
+    <div class="header-stats" id="headerStats"></div>
+    <div class="header-right">
+        <button class="btn primary sm" onclick="newSchedule()">+ New</button>
+        <button class="btn sm" onclick="loadList()">↺ Refresh</button>
+    </div>
+</div>
+
+<div class="content">
+    <!-- LIST -->
+    <div class="list-panel" id="listPanel">
+        <div class="list-toolbar">
+            <input type="text" id="searchInput" placeholder="Search..." oninput="filterList()">
+        </div>
+        <div class="list-scroll" id="listScroll"></div>
+    </div>
+    <div class="resizer" id="resizer"></div>
+
+    <!-- DETAIL -->
+    <div class="detail-panel" id="detailPanel">
+        <div id="detailHeader" style="display:none" class="detail-header">
+            <div class="detail-title" id="detailTitle"></div>
+            <div class="detail-sub"   id="detailSub"></div>
+            <div class="detail-actions" id="detailActions"></div>
+            <div class="detail-tabs">
+                <div class="dtab active" data-tab="execution" onclick="switchTab('execution')">Execution</div>
+                <div class="dtab"        data-tab="settings"  onclick="switchTab('settings')">Settings</div>
+                <div class="dtab"        data-tab="output"    onclick="switchTab('output')">Output</div>
+            </div>
+        </div>
+        <div class="detail-body" id="detailBody">
+            <div class="empty-state">Select a schedule or create a new one</div>
+        </div>
+        <div class="h-resizer" id="hResizer" style="display:none"></div>
+        <div class="bottom-panels" id="bottomPanels" style="display:none">
+            <!-- Logs -->
+            <div class="log-panel" id="logPanelLogs">
+                <div class="log-panel-header">
+                    <div class="log-panel-title"><span class="icon">📋</span> Logs</div>
+                    <div class="log-panel-filter">
+                        <select id="logLevel" onchange="loadLogs()">
+                            <option value="">All Levels</option>
+                            <option>INFO</option><option>WARNING</option><option>ERROR</option><option>DEBUG</option>
+                        </select>
+                        <input id="logLimit" type="number" value="50" min="10" max="500" style="width:46px" onchange="loadLogs()">
+                        <button class="panel-refresh" onclick="loadLogs()">↺</button>
+                        <button class="panel-refresh" onclick="clearLogsPanel()" style="color:var(--red,#f85149);border-color:var(--red,#f85149);" title="Clear logs for this task">🗑</button>
+                    </div>
+                </div>
+                <div class="log-panel-scroll" id="logsScroll"><div class="log-empty">No logs</div></div>
+            </div>
+            <div class="v-resizer" id="vResizer"></div>
+            <!-- HTTP -->
+            <div class="log-panel" id="logPanelHttp">
+                <div class="log-panel-header">
+                    <div class="log-panel-title"><span class="icon">🌐</span> HTTP</div>
+                    <div class="log-panel-filter">
+                        <select id="httpMethod" onchange="loadHttp()">
+                            <option value="">All Methods</option>
+                            <option>GET</option><option>POST</option><option>PUT</option>
+                        </select>
+                        <select id="httpStatus" onchange="loadHttp()">
+                            <option value="">All Status</option>
+                            <option value="2">2xx</option><option value="4">4xx</option><option value="5">5xx</option>
+                        </select>
+                        <input id="httpUrl" placeholder="URL..." style="width:80px" oninput="loadHttp()">
+                        <input id="httpLimit" type="number" value="50" min="10" max="500" style="width:46px" onchange="loadHttp()">
+                        <button class="panel-refresh" onclick="loadHttp()">↺</button>
+                        <button class="panel-refresh" onclick="clearHttpPanel()" style="color:var(--red,#f85149);border-color:var(--red,#f85149);" title="Clear HTTP logs for this task">🗑</button>
+                    </div>
+                </div>
+                <div class="log-panel-scroll" id="httpScroll"><div class="log-empty">No traffic</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dialog -->
+<div id="dialogOverlay">
+    <div id="dialogBox">
+        <div style="display:flex;align-items:center;gap:9px;">
+            <span id="dialogIcon"></span><span id="dialogTitle"></span>
+        </div>
+        <div id="dialogMsg"></div>
+        <input id="dialogInput" type="text" autocomplete="off">
+        <div id="dialogButtons"></div>
+    </div>
+</div>
+
+<!-- Schema modal -->
+<div id="schemaOverlay" class="pm-overlay" onclick="if(event.target===this)closeSchemaModal()">
+    <div class="pm-modal">
+        <div class="pm-header">
+            <h3 id="schemaTitle">Schema</h3>
+            <button class="pm-close" onclick="closeSchemaModal()">✕</button>
+        </div>
+        <div class="pm-body" id="schemaBody"></div>
+        <div class="pm-footer">
+            <button class="btn" onclick="closeSchemaModal()">Cancel</button>
+            <button class="btn primary" onclick="saveSchema()">Save Schema</button>
+        </div>
+    </div>
+</div>
+
+<!-- Values modal -->
+<div id="valuesOverlay" class="pm-overlay" onclick="if(event.target===this)closeValuesModal()">
+    <div class="pm-modal">
+        <div class="pm-header">
+            <h3 id="valuesTitle">Values</h3>
+            <button class="pm-close" onclick="closeValuesModal()">✕</button>
+        </div>
+        <div class="pm-body" id="valuesBody"></div>
+        <div class="pm-footer">
+            <button class="btn" onclick="closeValuesModal()">Cancel</button>
+            <button class="btn primary" onclick="saveValues()">Save Values</button>
+        </div>
+    </div>
+</div>
+
+<div id="importPayloadOverlay" class="pm-overlay" onclick="if(event.target===this)closeImportPayload()">
+    <div class="pm-modal" style="width:520px;">
+        <div class="pm-header">
+            <h3>Import Payload</h3>
+            <button class="pm-close" onclick="closeImportPayload()">✕</button>
+        </div>
+        <div class="pm-body" style="padding:14px;">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:8px;">Paste <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;">{"schema":"...","values":"..."}</code> copied from PM Settings</div>
+            <textarea id="importPayloadInput" style="width:100%;height:160px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;font-family:monospace;padding:8px;resize:vertical;outline:none;box-sizing:border-box;" placeholder='{"schema":"[...]","values":"{...}"}'></textarea>
+        </div>
+        <div class="pm-footer">
+            <button class="btn" onclick="closeImportPayload()">Cancel</button>
+            <button class="btn primary" onclick="confirmImportPayload()">Apply</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var schedules  = [];
+    var selectedId = null;
+    var activeTab  = 'execution';
+    var outputPoll = null;
+    var formDirty  = false;
+
+    var _sseLog  = null;
+    var _sseHttp = null;
+
+    var curProject = '';
+    var curTaskId  = '';
+    var curRunId   = '';  // last_run_id для drill-down по конкретному прогону
+
+    function closeSse() {
+        if (_sseLog)  { _sseLog.close();  _sseLog  = null; }
+        if (_sseHttp) { _sseHttp.close(); _sseHttp = null; }
+    }
+
+    function startSse() {
+        closeSse();
+        if (!curTaskId) return;
+        _sseLog = new EventSource('/logs/stream?task_id=' + encodeURIComponent(curTaskId));
+        _sseLog.addEventListener('message', function(e) {
+            try { appendLogRow(JSON.parse(e.data)); } catch(err) {}
+        });
+        _sseLog.onerror = function() { _sseLog.close(); _sseLog = null; };
+        _sseHttp = new EventSource('/http-logs/stream?task_id=' + encodeURIComponent(curTaskId));
+        _sseHttp.addEventListener('message', function(e) {
+            try { appendHttpRow(JSON.parse(e.data)); } catch(err) {}
+        });
+        _sseHttp.onerror = function() { _sseHttp.close(); _sseHttp = null; };
+    }
+
+    function appendLogRow(row) {
+        var el = document.getElementById('logsScroll');
+        if (!el) return;
+        var empty = el.querySelector('.log-empty');
+        if (empty) empty.remove();
+        var lvl  = (row.level || 'INFO').toUpperCase();
+        var cls  = lvl === 'WARNING' ? 'WARN' : lvl;
+        var time = (row.timestamp || '').slice(11, 19);
+        var msg  = row.message || '';
+        var sess = row.session && row.session !== '-'
+            ? '<span style="color:var(--text2);font-size:9px;margin-left:4px">[' + escHtml(row.session.slice(0,8)) + ']</span>' : '';
+        el.insertAdjacentHTML('beforeend',
+            '<div class="log-row">'
+            + '<span class="log-time">' + escHtml(time) + '</span>'
+            + '<span class="log-level ' + cls + '">' + lvl.slice(0,4) + '</span>'
+            + '<span class="log-msg">' + escHtml(msg) + sess + '</span>'
+            + '</div>');
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function appendHttpRow(row) {
+        var el = document.getElementById('httpScroll');
+        if (!el) return;
+        var empty = el.querySelector('.log-empty');
+        if (empty) empty.remove();
+        var sc  = row.statusCode || 0;
+        var cls = sc >= 500 ? 's5xx' : sc >= 400 ? 's4xx' : 's2xx';
+        var host = '';
+        try { host = new URL(row.url || '').host; } catch(e) { host = row.url || ''; }
+        var dur = row.durationMs != null ? row.durationMs + 'ms' : '';
+        el.insertAdjacentHTML('beforeend',
+            '<div class="http-row">'
+            + '<span class="http-method">' + escHtml(row.method || '') + '</span>'
+            + '<span class="http-status ' + cls + '">' + sc + '</span>'
+            + '<span class="http-url" title="' + escHtml(row.url||'') + '">' + escHtml(host) + '</span>'
+            + '<span class="http-dur">' + escHtml(dur) + '</span>'
+            + '</div>');
+        el.scrollTop = el.scrollHeight;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadList().catch(function(e) {
+            document.getElementById('listScroll').innerHTML =
+                '<div style="padding:12px;color:red">Error: ' + e.message + '</div>';
+        });
+        initResizer();
+        initHResizer();
+        initVResizer();
+        restoreLayout();
+        document.getElementById('detailBody').addEventListener('input',  function() { formDirty = true; });
+        document.getElementById('detailBody').addEventListener('change', function() { formDirty = true; });
+    });
+
+    async function loadList() {
+        var res = await fetch('/scheduler/list');
+        if (!res.ok) throw new Error('/scheduler/list HTTP ' + res.status);
+        schedules = await res.json();
+        updateHeaderStats();
+        renderList();
+        if (selectedId && !formDirty) {
+            var still = schedules.find(function(s) { return s.id === selectedId; });
+            if (still) renderDetail(still);
+        } else if (!selectedId) {
+            var saved = (PageState.load()).selectedId;
+            if (saved) {
+                var s = schedules.find(function(x) { return x.id === saved; });
+                if (s) selectRow(s.id);
+            }
+        }
+    }
+
+    function updateHeaderStats() {
+        var total   = schedules.length;
+        var running = schedules.filter(function(s) { return s.status === 'running'; }).length;
+        var errors  = schedules.filter(function(s) { return s.status === 'error'; }).length;
+        var enabled = schedules.filter(function(s) { return s.enabled !== 'false'; }).length;
+        document.getElementById('headerStats').innerHTML =
+            '<div class="stat-item">Tasks: <span class="stat-val">' + total + '</span></div>'
+            + '<div class="stat-item">Running: <span class="stat-val stat-running">' + running + '</span></div>'
+            + '<div class="stat-item">Active: <span class="stat-val">' + enabled + '</span></div>'
+            + (errors ? '<div class="stat-item">Errors: <span class="stat-val stat-error">' + errors + '</span></div>' : '');
+    }
+
+    /* ── List rendering with grouping ── */
+    function triggerLabel(s) {
+        if (s.cron && s.cron.trim())                                return s.cron.trim();
+        if (s.interval_minutes && parseInt(s.interval_minutes) > 0) return 'every ' + s.interval_minutes + 'm';
+        if (s.fixed_time && s.fixed_time.trim())                    return 'at ' + s.fixed_time.trim();
+        return 'on demand';
+    }
+
+    function getGroupName(name) {
+        if (!name) return '';
+        var dot = name.indexOf('.');
+        return dot > 0 ? name.substring(0, dot) : '';
+    }
+
+    function renderList() {
+        var q  = document.getElementById('searchInput').value.toLowerCase();
+        var el = document.getElementById('listScroll');
+        var filtered = schedules.filter(function(s) {
+            return !q
+                || (s.name        && s.name.toLowerCase().indexOf(q)        >= 0)
+                || (s.script_path && s.script_path.toLowerCase().indexOf(q) >= 0);
+        });
+
+        // Count members per group
+        var groupCounts = {};
+        filtered.forEach(function(s) {
+            var g = getGroupName(s.name);
+            if (g) groupCounts[g] = (groupCounts[g] || 0) + 1;
+        });
+
+        var html    = '';
+        var lastGrp = null;
+
+        filtered.forEach(function(s) {
+            var grp      = getGroupName(s.name);
+            var showGrp  = grp && groupCounts[grp] > 1;
+            var shortName = grp && s.name.length > grp.length + 1
+                ? s.name.substring(grp.length + 1)
+                : s.name;
+
+            if (showGrp && grp !== lastGrp) {
+                // Count running in group
+                var grpRunning = filtered.filter(function(x) {
+                    return getGroupName(x.name) === grp && x.status === 'running';
+                }).length;
+                var dots = grpRunning > 0
+                    ? Array(grpRunning).fill('<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green,#3fb950);margin-right:2px"></span>').join('')
+                    : '';
+                html += '<div class="group-header">'
+                    + '<span class="group-dot"></span>'
+                    + '<span class="group-name">' + escHtml(grp) + '</span>'
+                    + (dots ? '<span>' + dots + '</span>' : '')
+                    + '<span class="group-count">' + groupCounts[grp] + '</span>'
+                    + '</div>';
+                lastGrp = grp;
+            } else if (!showGrp) {
+                lastGrp = null;
+            }
+
+            var status   = s.status || 'idle';
+            var disabled = s.enabled === 'false';
+            var total    = parseInt(s.runs_total)   || 0;
+            var done     = parseInt(s.runs_success) || 0;
+            var trigger  = triggerLabel(s);
+            var lastRun  = s.last_run ? s.last_run.slice(5, 16) : '';
+
+            html += '<div class="schedule-row'
+                + (s.id === selectedId ? ' active' : '')
+                + (disabled ? ' row-disabled' : '')
+                + '" onclick="selectRow(\'' + s.id + '\')">'
+                + '<span class="row-dot ' + (disabled ? 'disabled' : 'enabled')
+                + '" title="' + (disabled ? 'Enable' : 'Disable')
+                + '" onclick="event.stopPropagation();toggleEnabled(\'' + s.id + '\',\'' + s.enabled + '\')"></span>'
+                + '<div class="row-info">'
+                + '<div class="row-name">' + escHtml(showGrp ? shortName : (s.name || '(unnamed)')) + '</div>'
+                + '<div class="row-sub">' + escHtml(trigger) + (lastRun ? ' · ' + lastRun : '') + '</div>'
+                + '</div>'
+                + '<div class="row-right">'
+                + '<span class="row-status ' + status + '">' + status + '</span>'
+                + '<span class="row-counts"><span class="row-done">' + done + '</span><span class="row-total"> / ' + total + '</span></span>'
+                + '</div>'
+                + '</div>';
+        });
+
+        el.innerHTML = html || '<div style="padding:12px;color:var(--text2);text-align:center">No results</div>';
+    }
+
+    function filterList() { renderList(); }
+
+    function selectRow(id) {
+        selectedId = id;
+        formDirty  = false;
+        stopProcStatsPoll();
+        PageState.save({ selectedId: id });
+        var s = schedules.find(function(x) { return x.id === id; });
+        if (!s) return;
+        renderList();
+        showDetailHeader(s);
+        activeTab = 'execution';
+        setActiveTab('execution');
+        renderDetail(s);
+        showBottomPanels(s);
+    }
+
+    function showDetailHeader(s) {
+        var header = document.getElementById('detailHeader');
+        header.style.display = '';
+        document.getElementById('detailTitle').textContent = s.name || '(unnamed)';
+        document.getElementById('detailSub').textContent   = s.script_path || '';
+        renderDetailActions(s);
+    }
+
+    function renderDetailActions(s) {
+        var id = s.id || '';
+        var pauseLabel = s.enabled === 'false' ? '▶ Resume' : '⏸ Pause';
+        document.getElementById('detailActions').innerHTML =
+            '<button class="btn primary sm" onclick="runNow(\'' + id + '\')">▶ Run</button>'
+            + '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled||'true') + '\')">' + pauseLabel + '</button>'
+            + '<button class="btn stop sm" onclick="stopNow(\'' + id + '\')">■ Kill</button>'
+            + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">⚙ Schema</button>'
+            + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">📋 Values</button>'
+            + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📥 Import</button>'
+            + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\')">Delete</button>';
+    }
+
+    function showBottomPanels(s) {
+        document.getElementById('bottomPanels').style.display = '';
+        document.getElementById('hResizer').style.display = '';
+        curProject  = '';                                    // не фильтруем по project
+        curTaskId   = s.schedule_tag || s.name || s.id;     // task_id в логах
+        curRunId    = s.last_run_id  || '';                  // session в логах (последний прогон)
+        loadLogs();
+        loadHttp();
+        startSse(); // PATCH: SSE live updates
+    }
+
+    function renderDetail(s) {
+        if      (activeTab === 'settings')  renderSettings(s);
+        else if (activeTab === 'output')    renderOutput(s);
+        else                                renderExecution(s);
+    }
+
+    function switchTab(tab) {
+        activeTab = tab;
+        setActiveTab(tab);
+        PageState.save({ activeTab: tab });
+        if (tab !== 'execution') stopProcStatsPoll();
+        var s = schedules.find(function(x) { return x.id === selectedId; });
+        if (!s) return;
+        clearOutputPoll();
+        renderDetail(s);
+    }
+
+    function setActiveTab(tab) {
+        document.querySelectorAll('.dtab').forEach(function(el) {
+            el.classList.toggle('active', el.dataset.tab === tab);
+        });
+    }
+
+    /* ── Execution tab ── */
+    var _procStatsPoll = null;
+
+    function stopProcStatsPoll() {
+        if (_procStatsPoll) { clearInterval(_procStatsPoll); _procStatsPoll = null; }
+    }
+
+    function renderExecution(s) {
+        stopProcStatsPoll();
+        var status     = s.status || 'idle';
+        var total      = parseInt(s.runs_total)   || 0;
+        var done       = parseInt(s.runs_success) || 0;
+        var fail       = total - done;
+        var lastRun    = s.last_run  || '—';
+        var lastExit   = s.last_exit || '—';
+        var trigger    = triggerLabel(s);
+        var isRunning  = status === 'running';
+
+        document.getElementById('detailBody').innerHTML =
+            '<div class="info-grid">'
+            + '<div class="info-card">'
+            + '<div class="info-card-title">Execution</div>'
+            + infoRow('Status',     '<span class="' + (isRunning ? 'green' : status === 'error' ? 'red' : '') + '">' + status + '</span>')
+            + infoRow('Is Working', isRunning ? '<span class="green">Yes</span>' : 'No')
+            + infoRow('Done',       '<span class="green">' + done + '</span>')
+            + infoRow('Total',      total)
+            + infoRow('Failed',     fail > 0 ? '<span class="red">' + fail + '</span>' : '0')
+            + infoRow('Last Exit',  lastExit === '0' ? '<span class="green">0</span>' : (lastExit === '-1' ? '<span class="red">-1</span>' : lastExit))
+            + (isRunning
+                ? infoRow('PID',     '<span id="procPid"    class="accent">—</span>')
+                + infoRow('Uptime',  '<span id="procUptime" class="accent">—</span>')
+                + infoRow('Memory',  '<span id="procMem"    class="accent">—</span>')
+                : '')
+            + '</div>'
+            + '<div class="info-card">'
+            + '<div class="info-card-title">Scheduler</div>'
+            + infoRow('Active',     s.enabled !== 'false' ? '<span class="green">True</span>' : '<span class="red">False</span>')
+            + infoRow('Last Run',   lastRun)
+            + infoRow('Period',     trigger)
+            + infoRow('On Overlap', s.on_overlap || '—')
+            + infoRow('Executor',   s.executor || '—')
+            + '</div>'
+            + '</div>';
+
+        if (isRunning) {
+            var id = s.id;
+            function pollStats() {
+                fetch('/scheduler/process-stats?id=' + encodeURIComponent(id))
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        var elPid    = document.getElementById('procPid');
+                        var elUptime = document.getElementById('procUptime');
+                        var elMem    = document.getElementById('procMem');
+                        if (!elPid) { stopProcStatsPoll(); return; }
+                        if (!d.running) { stopProcStatsPoll(); return; }
+                        elPid.textContent    = d.pid > 0 ? d.pid : '—';
+                        elUptime.textContent = d.uptimeSec + 's';
+                        elMem.textContent    = d.memoryMB + ' MB';
+                    })
+                    .catch(function() {});
+            }
+            pollStats();
+            _procStatsPoll = setInterval(pollStats, 2000);
+        }
+    }
+
+    function infoRow(key, val) {
+        return '<div class="info-row"><span class="info-key">' + key + '</span><span class="info-val">' + val + '</span></div>';
+    }
+
+    /* ── Settings tab ── */
+    function newSchedule() {
+        selectedId = '__new__';
+        formDirty  = true;
+        renderList();
+        var s = { id: '', name: '', executor: 'python', script_path: '', args: '',
+            enabled: 'true', cron: '', interval_minutes: '0', fixed_time: '', on_overlap: 'skip' };
+        document.getElementById('detailHeader').style.display = 'none';
+        document.getElementById('bottomPanels').style.display = 'none';
+        document.getElementById('hResizer').style.display = 'none';
+        activeTab = 'settings';
+        renderSettings(s);
+    }
+
+    function renderSettings(s) {
+        var id = s.id || '';
+        document.getElementById('detailBody').innerHTML =
+            '<div class="form-grid">'
+            + '<div class="form-label">Name</div>'
+            + '<input class="form-input" id="f_name" value="' + escHtml(s.name) + '">'
+
+            + '<div class="form-label">Script / Task</div>'
+            + '<input class="form-input" id="f_script_path" value="' + escHtml(s.script_path) + '" placeholder="/path/to/script or TaskName">'
+
+            + '<div class="form-label">Executor</div>'
+            + '<select class="form-input" id="f_executor">'
+            + ['python','node','ts-node','csx','exe','bat','bash','internal'].map(function(e) {
+                return '<option ' + (s.executor === e ? 'selected' : '') + '>' + e + '</option>';
+            }).join('') + '</select>'
+
+            + '<div class="form-label">Arguments</div>'
+            + '<input class="form-input" id="f_args" value="' + escHtml(s.args) + '">'
+
+            + '<div class="form-label">Enabled</div>'
+            + '<select class="form-input" id="f_enabled">'
+            + '<option value="true" '  + (s.enabled !== 'false' ? 'selected' : '') + '>Yes</option>'
+            + '<option value="false" ' + (s.enabled === 'false'  ? 'selected' : '') + '>No</option>'
+            + '</select>'
+
+            + '<div class="form-section">Schedule</div>'
+
+            + '<div class="form-label">Period</div>'
+            + '<select class="form-input" id="b_period" onchange="builderUpdate()">'
+            + ['OnDemand','EveryDay','EveryWeek','EveryMonth','Interval'].map(function(o) {
+                return '<option value="' + o + '" ' + (schedBuilderPeriodFromSaved(s) === o ? 'selected' : '') + '>' + o + '</option>';
+            }).join('') + '</select>'
+
+            + '<div id="b_time_row" class="form-label" style="display:none">Time(s)</div>'
+            + '<div id="b_time_wrap" style="display:none">'
+            + '<input class="form-input" id="b_times" placeholder="09:00, 14:30" oninput="builderUpdate()" value="' + escHtml(schedBuilderTimesFromSaved(s)) + '">'
+            + '</div>'
+
+            + '<div id="b_weekday_row" class="form-label" style="display:none">Day of week</div>'
+            + '<div id="b_weekday_wrap" style="display:none">'
+            + '<div style="display:flex;gap:4px;flex-wrap:wrap" id="b_weekdays">'
+            + ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d, i) {
+                var bit    = i === 6 ? 0 : i + 1;
+                var active = schedBuilderWeekdayActive(s, bit);
+                return '<div class="wd-btn' + (active ? ' wd-on' : '') + '" data-bit="' + bit + '" onclick="toggleWeekday(this)">' + d + '</div>';
+            }).join('') + '</div>'
+            + '</div>'
+
+            + '<div id="b_monthday_row" class="form-label" style="display:none">Day of month</div>'
+            + '<div id="b_monthday_wrap" style="display:none">'
+            + '<input class="form-input" id="b_monthday" type="number" min="1" max="28" placeholder="1" oninput="builderUpdate()" value="' + escHtml(schedBuilderMonthdayFromSaved(s)) + '">'
+            + '</div>'
+
+            + '<div id="b_interval_row" class="form-label" style="display:none">Every (min)</div>'
+            + '<div id="b_interval_wrap" style="display:none">'
+            + '<input class="form-input" id="b_interval" type="number" min="1" placeholder="30" oninput="builderUpdate()" value="' + escHtml(schedBuilderIntervalFromSaved(s)) + '">'
+            + '</div>'
+
+            + '<div class="form-section">Result</div>'
+
+            + '<div class="form-label">Cron</div>'
+            + '<div class="trigger-row"><input class="form-input" id="f_cron" value="' + escHtml(s.cron) + '" placeholder="0 * * * *" oninput="builderClear()"><span style="color:var(--text2);font-size:10px;white-space:nowrap">min h dom mon dow</span></div>'
+
+            + '<div class="form-label">Interval (min)</div>'
+            + '<input class="form-input" id="f_interval_minutes" type="number" min="0" value="' + (s.interval_minutes || 0) + '" oninput="builderClear()">'
+
+            + '<div class="form-label">Fixed time</div>'
+            + '<input class="form-input" id="f_fixed_time" value="' + escHtml(s.fixed_time) + '" placeholder="14:30" oninput="builderClear()">'
+
+            + '<div class="form-section">Overlap</div>'
+
+            + '<div class="form-label">On overlap</div>'
+            + '<select class="form-input" id="f_on_overlap">'
+            + '<option value="skip"         ' + (s.on_overlap === 'skip'         ? 'selected' : '') + '>Skip</option>'
+            + '<option value="parallel"     ' + (s.on_overlap === 'parallel'     ? 'selected' : '') + '>Parallel</option>'
+            + '<option value="kill_restart" ' + (s.on_overlap === 'kill_restart' ? 'selected' : '') + '>Kill &amp; restart</option>'
+            + '</select>'
+
+            + '<div class="form-actions">'
+            + '<button class="btn primary" onclick="saveSchedule(\'' + escHtml(id) + '\')">Save</button>'
+            + (id ? '<button class="btn green" onclick="runNow(\'' + escHtml(id) + '\')">▶ Run now</button>' : '')
+            + (id ? '<button class="btn stop"  onclick="stopNow(\'' + escHtml(id) + '\')">■ Stop</button>' : '')
+            + (id ? '<button class="btn danger" onclick="deleteSchedule(\'' + escHtml(id) + '\')">Delete</button>' : '')
+            + '</div>'
+            + '</div>';
+
+        builderUpdate();
+    }
+
+    /* ── Schedule builder (unchanged logic) ── */
+    function schedBuilderPeriodFromSaved(s) {
+        if (s.interval_minutes && parseInt(s.interval_minutes) > 0) return 'Interval';
+        if (!s.cron) return 'OnDemand';
+        var parts = s.cron.trim().split(/\s+/);
+        if (parts.length !== 5) return 'OnDemand';
+        var h = parts[1], dom = parts[2], dow = parts[4];
+        if (dow !== '*') return 'EveryWeek';
+        if (dom !== '*' && dom !== '?') return 'EveryMonth';
+        if (h !== '*') return 'EveryDay';
+        return 'OnDemand';
+    }
+    function schedBuilderTimesFromSaved(s) {
+        if (!s.cron) return '';
+        var parts = s.cron.trim().split(/\s+/);
+        if (parts.length !== 5) return '';
+        var min = parts[0], h = parts[1];
+        if (h === '*' || min === '*') return '';
+        var mins = min.split(','), hours = h.split(',');
+        if (mins.length === 1 && hours.length >= 1)
+            return hours.map(function(hh) { return pad2(hh) + ':' + pad2(mins[0]); }).join(', ');
+        return '';
+    }
+    function schedBuilderWeekdayActive(s, bit) {
+        if (!s.cron) return false;
+        var parts = s.cron.trim().split(/\s+/);
+        if (parts.length !== 5) return false;
+        return parts[4].split(',').indexOf(String(bit)) >= 0;
+    }
+    function schedBuilderMonthdayFromSaved(s) {
+        if (!s.cron) return '';
+        var parts = s.cron.trim().split(/\s+/);
+        if (parts.length !== 5) return '';
+        var dom = parts[2];
+        return (dom !== '*' && dom !== '?') ? dom : '';
+    }
+    function schedBuilderIntervalFromSaved(s) {
+        return (s.interval_minutes && parseInt(s.interval_minutes) > 0) ? s.interval_minutes : '';
+    }
+    function builderClear() {
+        var el = document.getElementById('b_period');
+        if (el) { el.value = 'OnDemand'; builderShowRows('OnDemand'); }
+    }
+    function toggleWeekday(el) { el.classList.toggle('wd-on'); builderUpdate(); }
+    function builderShowRows(period) {
+        var showTime     = ['EveryDay','EveryWeek','EveryMonth'].indexOf(period) >= 0;
+        var showWeekday  = period === 'EveryWeek';
+        var showMonthday = period === 'EveryMonth';
+        var showInterval = period === 'Interval';
+        setRowVisible('b_time_row', showTime); setRowVisible('b_time_wrap', showTime);
+        setRowVisible('b_weekday_row', showWeekday); setRowVisible('b_weekday_wrap', showWeekday);
+        setRowVisible('b_monthday_row', showMonthday); setRowVisible('b_monthday_wrap', showMonthday);
+        setRowVisible('b_interval_row', showInterval); setRowVisible('b_interval_wrap', showInterval);
+    }
+    function setRowVisible(id, show) { var el = document.getElementById(id); if (el) el.style.display = show ? '' : 'none'; }
+    function builderUpdate() {
+        var period = (document.getElementById('b_period') || {}).value || 'OnDemand';
+        builderShowRows(period);
+        if (period === 'OnDemand') return;
+        if (period === 'Interval') {
+            var mins = parseInt((document.getElementById('b_interval') || {}).value || '0');
+            setCronField(''); setIntervalField(mins > 0 ? mins : 0); return;
+        }
+        var timesRaw  = ((document.getElementById('b_times') || {}).value || '').trim();
+        var timesList = timesRaw ? timesRaw.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : ['00:00'];
+        if (timesList.length > 1) {
+            var minutes = timesList.map(function(t) { var p = parseHHMM(t); return p.h * 60 + p.m; }).sort(function(a,b){return a-b;});
+            var gaps = [];
+            for (var i = 1; i < minutes.length; i++) gaps.push(minutes[i] - minutes[i-1]);
+            var minGap = gaps.reduce(function(a,b){return Math.min(a,b);}, gaps[0] || 60);
+            setCronField(''); setIntervalField(Math.max(1, minGap)); return;
+        }
+        var t = parseHHMM(timesList[0]);
+        var cron = '';
+        if (period === 'EveryDay')   cron = t.m + ' ' + t.h + ' * * *';
+        else if (period === 'EveryWeek') {
+            var days = []; document.querySelectorAll('#b_weekdays .wd-btn.wd-on').forEach(function(b){days.push(b.getAttribute('data-bit'));});
+            cron = t.m + ' ' + t.h + ' * * ' + (days.length ? days.join(',') : '*');
+        } else if (period === 'EveryMonth') {
+            var dom = parseInt((document.getElementById('b_monthday') || {}).value || '1');
+            if (!dom || dom < 1 || dom > 28) dom = 1;
+            cron = t.m + ' ' + t.h + ' ' + dom + ' * *';
+        }
+        setCronField(cron); setIntervalField(0);
+    }
+    function setCronField(v)     { var el = document.getElementById('f_cron');             if (el) el.value = v; }
+    function setIntervalField(v) { var el = document.getElementById('f_interval_minutes'); if (el) el.value = v || 0; }
+    function parseHHMM(str)      { var p = (str || '00:00').split(':'); return { h: parseInt(p[0])||0, m: parseInt(p[1])||0 }; }
+    function pad2(n)             { return String(parseInt(n)||0).padStart(2,'0'); }
+
+    /* ── Output tab ── */
+    function renderOutput(s) {
+        clearOutputPoll();
+        document.getElementById('detailBody').innerHTML =
+            '<div class="output-toolbar">'
+            + '<span id="liveBadge" style="display:none" class="live-badge">LIVE</span>'
+            + '<span style="color:var(--text2)">last_run: ' + escHtml(s.last_run || '—') + '</span>'
+            + '<span style="color:var(--text2)">exit: ' + escHtml(s.last_exit || '—') + '</span>'
+            + '<button class="btn sm" onclick="loadOutput(\'' + escHtml(s.id) + '\')">↺</button>'
+            + '</div>'
+            + '<div class="output-box" id="outputBox">' + renderOutputLines(s.last_output) + '</div>';
+        loadOutput(s.id);
+    }
+
+    function renderOutputLines(text) {
+        if (!text || !text.trim()) return '<div class="out-line empty">(no output yet)</div>';
+        var normalized = text.replace(/\\n/g, '\n');
+        return normalized.split('\n').map(function(line) {
+            var level = 'INFO';
+            if (/\[ERROR\]|\[ERR\]/i.test(line))        level = 'ERROR';
+            else if (/\[WARNING\]|\[WARN\]/i.test(line)) level = 'WARNING';
+            else if (/\[DEBUG\]/i.test(line))            level = 'DEBUG';
+            return '<div class="out-line ' + level + '">' + escHtml(line) + '</div>';
+        }).join('');
+    }
+
+    async function loadOutput(id) {
+        clearOutputPoll();
+        try {
+            var res  = await fetch('/scheduler/live-output?id=' + encodeURIComponent(id));
+            var data = await res.json();
+            var box   = document.getElementById('outputBox');
+            var badge = document.getElementById('liveBadge');
+            if (!box) return;
+            if (data.isLive) {
+                if (data.output) {
+                    var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+                    box.innerHTML = renderOutputLines(data.output);
+                    if (atBottom) box.scrollTop = box.scrollHeight;
+                }
+                if (badge) badge.style.display = 'inline-block';
+                outputPoll = setTimeout(function() { loadOutput(id); }, 1000);
+            } else {
+                var finalOutput = data.output;
+                if (!finalOutput) {
+                    var res2  = await fetch('/scheduler/output?id=' + encodeURIComponent(id));
+                    var data2 = await res2.json();
+                    finalOutput = data2.output;
+                }
+                box.innerHTML = renderOutputLines(finalOutput);
+                box.scrollTop = box.scrollHeight;
+                if (badge) badge.style.display = 'none';
+            }
+        } catch(e) {}
+    }
+
+    function clearOutputPoll() { if (outputPoll) { clearTimeout(outputPoll); outputPoll = null; } }
+
+    async function clearLogsPanel() {
+        if (!curTaskId) return;
+        if (!confirm('Clear ALL logs? (no per-task filter available)')) return;
+        try {
+            await fetch('/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_id: curTaskId })
+            });
+            if (selectedId && selectedId !== '__new__') {
+                await fetch('/scheduler/clear-output', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: selectedId })
+                });
+                // обновить last_output в локальном кэше
+                var s = schedules.find(function(x) { return x.id === selectedId; });
+                if (s) s.last_output = '';
+            }
+            document.getElementById('logsScroll').innerHTML = '<div class="log-empty">No logs</div>';
+        } catch (e) { console.error('Clear logs failed:', e); }
+    }
+
+    async function clearHttpPanel() {
+        if (!curTaskId) return;
+        if (!confirm('Clear HTTP logs for task: ' + curTaskId + '?')) return;
+        try {
+            await fetch('/clear-http-logs-by-task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_id: curTaskId })
+            });
+            document.getElementById('httpScroll').innerHTML = '<div class="log-empty">No traffic</div>';
+        } catch (e) { console.error('Clear HTTP logs failed:', e); }
+    }
+
+    /* ── Bottom panels: Logs & HTTP ── */
+    async function loadLogs() {
+        if (!curTaskId) return;
+        var level    = document.getElementById('logLevel').value;
+        var limit    = document.getElementById('logLimit').value || 50;
+        var onlyRun  = document.getElementById('logOnlyRun') && document.getElementById('logOnlyRun').checked;
+        var session  = (onlyRun && curRunId) ? curRunId : '';
+        var url = '/logs?limit=' + limit
+            + '&task_id=' + encodeURIComponent(curTaskId)
+            + (level   ? '&level='   + encodeURIComponent(level)   : '')
+            + (session ? '&session=' + encodeURIComponent(session)  : '');
+        try {
+            var res  = await fetch(url);
+            var data = await res.json();
+            var el   = document.getElementById('logsScroll');
+            if (!data.length) { await showOutputFallback(el); return; }
+            el.innerHTML = data.map(function(row) {
+                var lvl  = (row.level || 'INFO').toUpperCase();
+                var cls  = lvl === 'WARNING' ? 'WARN' : lvl;
+                var time = (row.timestamp || '').slice(11, 19);
+                var msg  = row.message || '';
+                var sess = row.session && row.session !== '-' ? '<span style="color:var(--text2);font-size:9px;margin-left:4px">[' + escHtml(row.session.slice(0,8)) + ']</span>' : '';
+                return '<div class="log-row">'
+                    + '<span class="log-time">' + escHtml(time) + '</span>'
+                    + '<span class="log-level ' + cls + '">' + lvl.slice(0,4) + '</span>'
+                    + '<span class="log-msg">' + escHtml(msg) + sess + '</span>'
+                    + '</div>';
+            }).join('');
+            el.scrollTop = el.scrollHeight;
+        } catch(e) {}
+    }
+
+    async function showOutputFallback(el) {
+        if (!selectedId || selectedId === '__new__') {
+            el.innerHTML = '<div class="log-empty">No logs</div>';
+            return;
+        }
+        try {
+            var res  = await fetch('/scheduler/output?id=' + encodeURIComponent(selectedId));
+            var data = await res.json();
+            var text = (data && data.output) ? data.output.trim() : '';
+            // decode escaped newlines stored in DB
+            text = text.replace(/\\n/g, '\n');
+            if (!text) {
+                el.innerHTML = '<div class="log-empty">No logs</div>';
+                return;
+            }
+            el.innerHTML = '<div class="log-row" style="opacity:0.45;font-size:9px;padding:2px 8px;border-bottom:1px solid var(--border)">'
+                + '<span class="log-msg">— no logger output, showing task stdout —</span>'
+                + '</div>'
+                + text.split('\n').map(function(line) {
+                    return '<div class="log-row">'
+                        + '<span class="log-msg" style="white-space:pre-wrap">' + escHtml(line) + '</span>'
+                        + '</div>';
+                }).join('');
+            el.scrollTop = el.scrollHeight;
+        } catch(e) {
+            el.innerHTML = '<div class="log-empty">No logs</div>';
+        }
+    }
+
+    async function loadHttp() {
+        if (!curTaskId) return;
+        var method   = document.getElementById('httpMethod').value;
+        var status   = document.getElementById('httpStatus').value;
+        var urlFlt   = document.getElementById('httpUrl').value;
+        var limit    = document.getElementById('httpLimit').value || 50;
+        var onlyRun  = document.getElementById('httpOnlyRun') && document.getElementById('httpOnlyRun').checked;
+        var session  = (onlyRun && curRunId) ? curRunId : '';
+        var url = '/http-logs?limit=' + limit
+            + '&task_id=' + encodeURIComponent(curTaskId)
+            + (method  ? '&method='  + encodeURIComponent(method)  : '')
+            + (status  ? '&status='  + encodeURIComponent(status)  : '')
+            + (urlFlt  ? '&url='     + encodeURIComponent(urlFlt)  : '')
+            + (session ? '&session=' + encodeURIComponent(session)  : '');
+        try {
+            var res  = await fetch(url);
+            var data = await res.json();
+            var el   = document.getElementById('httpScroll');
+            if (!data.length) { el.innerHTML = '<div class="log-empty">No traffic</div>'; return; }
+            el.innerHTML = data.map(function(row) {
+                var sc   = row.statusCode || 0;
+                var cls  = sc >= 500 ? 's5xx' : sc >= 400 ? 's4xx' : 's2xx';
+                var host = '';
+                try { host = new URL(row.url || '').host; } catch(e) { host = row.url || ''; }
+                var dur  = row.durationMs != null ? row.durationMs + 'ms' : '';
+                return '<div class="http-row">'
+                    + '<span class="http-method">' + escHtml(row.method || '') + '</span>'
+                    + '<span class="http-status ' + cls + '">' + sc + '</span>'
+                    + '<span class="http-url" title="' + escHtml(row.url||'') + '">' + escHtml(host) + '</span>'
+                    + '<span class="http-dur">' + escHtml(dur) + '</span>'
+                    + '</div>';
+            }).join('');
+            el.scrollTop = el.scrollHeight;
+        } catch(e) {}
+    }
+
+    /* ── CRUD ── */
+    async function saveSchedule(existingId) {
+        var payload = {
+            id:               existingId || undefined,
+            name:             document.getElementById('f_name').value.trim(),
+            executor:         document.getElementById('f_executor').value,
+            script_path:      document.getElementById('f_script_path').value.trim(),
+            args:             document.getElementById('f_args').value.trim(),
+            enabled:          document.getElementById('f_enabled').value,
+            cron:             document.getElementById('f_cron').value.trim(),
+            interval_minutes: document.getElementById('f_interval_minutes').value,
+            fixed_time:       document.getElementById('f_fixed_time').value.trim(),
+            on_overlap:       document.getElementById('f_on_overlap').value,
+        };
+        var res  = await fetch('/scheduler/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        var data = await res.json();
+        if (data.ok) { selectedId = data.id; formDirty = false; await loadList(); switchTab('execution'); }
+        else Dialog.error(data.error || 'Save failed');
+    }
+
+    async function deleteSchedule(id) {
+        var ok = await Dialog.confirm('Delete this schedule?', 'Delete', true);
+        if (!ok) return;
+        await fetch('/scheduler/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+        selectedId = null;
+        closeSse();
+        document.getElementById('detailHeader').style.display = 'none';
+        document.getElementById('bottomPanels').style.display = 'none';
+        document.getElementById('hResizer').style.display = 'none';
+        document.getElementById('detailBody').innerHTML = '<div class="empty-state">Select a schedule or create a new one</div>';
+        await loadList();
+    }
+
+    async function toggleEnabled(id, current) {
+        var newVal = current === 'true' ? 'false' : 'true';
+        var s = schedules.find(function(x) { return x.id === id; });
+        if (!s) return;
+        var payload = Object.assign({}, s, { enabled: newVal });
+        await fetch('/scheduler/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await loadList();
+    }
+
+    async function runNow(id) {
+        await fetch('/scheduler/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+        await loadList();
+        if (activeTab === 'output') {
+            var s = schedules.find(function(x) { return x.id === id; });
+            if (s) renderOutput(s);
+        }
+    }
+
+    async function stopNow(id) {
+        await fetch('/scheduler/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+        await loadList();
+    }
+
+    /* ── Resizer ── */
+    function restoreLayout() {
+        var st = PageState.load();
+        if (st.listW) {
+            document.getElementById('listPanel').style.width = st.listW + 'px';
+        }
+        if (st.detailH && st.bottomH) {
+            var topPanel    = document.getElementById('detailBody');
+            var bottomPanel = document.getElementById('bottomPanels');
+            topPanel.style.flex      = 'none';
+            topPanel.style.height    = st.detailH + 'px';
+            bottomPanel.style.height = st.bottomH + 'px';
+        }
+        if (st.logsFlexPct) {
+            var leftPanel  = document.getElementById('logPanelLogs');
+            var rightPanel = document.getElementById('logPanelHttp');
+            leftPanel.style.flex  = '0 0 ' + st.logsFlexPct + '%';
+            rightPanel.style.flex = '1 1 0';
+        }
+        if (st.activeTab) {
+            activeTab = st.activeTab;
+            setActiveTab(st.activeTab);
+        }
+    }
+
+    function initResizer() {
+        var resizer = document.getElementById('resizer');
+        var panel   = document.getElementById('listPanel');
+        var dragging = false, startX, startW;
+        resizer.addEventListener('mousedown', function(e) {
+            dragging = true; startX = e.clientX; startW = panel.offsetWidth;
+            document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('mousemove', function(e) {
+            if (!dragging) return;
+            panel.style.width = Math.max(180, startW + (e.clientX - startX)) + 'px';
+        });
+        document.addEventListener('mouseup', function() {
+            if (dragging) {
+                dragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                PageState.save({ listW: panel.offsetWidth });
+            }
+        });
+    }
+
+    /* ── Horizontal resizer (detail-body ↕ bottom-panels) ── */
+    function initHResizer() {
+        var resizer      = document.getElementById('hResizer');
+        var topPanel     = document.getElementById('detailBody');
+        var bottomPanel  = document.getElementById('bottomPanels');
+        var detailPanel  = document.getElementById('detailPanel');
+        if (!resizer) return;
+        var dragging = false, startY, startTop, startBottom;
+        resizer.addEventListener('mousedown', function(e) {
+            dragging    = true;
+            startY      = e.clientY;
+            startTop    = topPanel.offsetHeight;
+            startBottom = bottomPanel.offsetHeight;
+            document.body.style.cursor = 'row-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', function(e) {
+            if (!dragging) return;
+            var dy      = e.clientY - startY;
+            var newTop  = Math.max(60, startTop + dy);
+            var newBot  = Math.max(80, startBottom - dy);
+            topPanel.style.flex    = 'none';
+            topPanel.style.height  = newTop + 'px';
+            bottomPanel.style.height = newBot + 'px';
+        });
+        document.addEventListener('mouseup', function() {
+            if (dragging) {
+                dragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                PageState.save({ detailH: topPanel.offsetHeight, bottomH: bottomPanel.offsetHeight });
+            }
+        });
+    }
+
+    /* ── Vertical resizer inside bottom-panels (Logs ↔ HTTP) ── */
+    function initVResizer() {
+        var resizer    = document.getElementById('vResizer');
+        var leftPanel  = document.getElementById('logPanelLogs');
+        var rightPanel = document.getElementById('logPanelHttp');
+        var container  = document.getElementById('bottomPanels');
+        if (!resizer) return;
+        var dragging = false;
+        resizer.addEventListener('mousedown', function(e) {
+            dragging = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', function(e) {
+            if (!dragging) return;
+            var rect = container.getBoundingClientRect();
+            var pct  = ((e.clientX - rect.left) / rect.width) * 100;
+            pct = Math.max(15, Math.min(85, pct));
+            leftPanel.style.flex  = '0 0 ' + pct + '%';
+            rightPanel.style.flex = '1 1 0';
+        });
+        document.addEventListener('mouseup', function() {
+            if (dragging) {
+                dragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                var raw = leftPanel.style.flexBasis || '';
+                var pct = raw ? parseFloat(raw) : (leftPanel.offsetWidth / container.offsetWidth * 100);
+                PageState.save({ logsFlexPct: Math.round(pct) });
+            }
+        });
+    }
+
+    /* ── Dialog ── */
+    var Dialog = {
+        _resolve: null,
+        _open: function(icon, title, msg, mode) {
+            document.getElementById('dialogIcon').textContent  = icon;
+            document.getElementById('dialogTitle').textContent = title;
+            document.getElementById('dialogMsg').textContent   = msg;
+            var inp = document.getElementById('dialogInput');
+            inp.style.display = mode === 'prompt' ? 'block' : 'none';
+            document.getElementById('dialogOverlay').classList.add('open');
+            var self = this;
+            return new Promise(function(r) { self._resolve = r; });
+        },
+        _close: function(val) {
+            document.getElementById('dialogOverlay').classList.remove('open');
+            if (this._resolve) { this._resolve(val); this._resolve = null; }
+        },
+        _buttons: function(btns) {
+            document.getElementById('dialogButtons').innerHTML = btns.map(function(b) {
+                return '<button class="btn ' + b.cls + '" onclick="Dialog._close(' + JSON.stringify(b.val) + ')">' + b.label + '</button>';
+            }).join('');
+        },
+        alert:   function(msg, title) { this._buttons([{ label:'OK', cls:'primary', val:true }]); return this._open('i', title||'Info', msg, 'alert'); },
+        confirm: function(msg, title, danger) { this._buttons([{label:'Cancel',cls:'',val:false},{label:'Confirm',cls:danger?'danger':'primary',val:true}]); return this._open('?', title||'Confirm', msg, 'confirm'); },
+        error:   function(msg, title) { return this.alert(msg, title||'Error'); }
+    };
+
+    /* ── Payload modals ── */
+    var pmScheduleId = null;
+    var pmSchema     = [];
+    var pmValues     = {};
+    var FIELD_TYPES  = ['text','password','boolean','select','multiselect','section','html','tab'];
+
+    async function _loadPayload(id) {
+        try {
+            var res  = await fetch('/scheduler/payload?id=' + encodeURIComponent(id));
+            var data = await res.json();
+            pmSchema = data.schema ? JSON.parse(data.schema) : [];
+            pmValues = data.values ? JSON.parse(data.values) : {};
+        } catch(e) { pmSchema = []; pmValues = {}; }
+    }
+
+    async function openSchemaModal(id, name) {
+        pmScheduleId = id;
+        await _loadPayload(id);
+        document.getElementById('schemaTitle').textContent = 'Schema: ' + (name || id);
+        document.getElementById('schemaOverlay').classList.add('open');
+        renderConstructor();
+    }
+    function closeSchemaModal() { document.getElementById('schemaOverlay').classList.remove('open'); }
+
+    async function openValuesModal(id, name) {
+        pmScheduleId = id;
+        await _loadPayload(id);
+        document.getElementById('valuesTitle').textContent = 'Values: ' + (name || id);
+        document.getElementById('valuesOverlay').classList.add('open');
+        renderValues();
+    }
+    function closeValuesModal() { document.getElementById('valuesOverlay').classList.remove('open'); }
+
+    // ── Import Payload (from PM clipboard) ──
+    var _importPayloadId = null;
+
+    function openImportPayload(id) {
+        _importPayloadId = id;
+        document.getElementById('importPayloadInput').value = '';
+        document.getElementById('importPayloadOverlay').classList.add('open');
+        setTimeout(function() { document.getElementById('importPayloadInput').focus(); }, 50);
+    }
+
+    function closeImportPayload() {
+        document.getElementById('importPayloadOverlay').classList.remove('open');
+        _importPayloadId = null;
+    }
+
+    async function confirmImportPayload() {
+        var raw = document.getElementById('importPayloadInput').value.trim();
+        if (!raw) return;
+        var parsed;
+        try { parsed = JSON.parse(raw); } catch(e) { alert('Invalid JSON: ' + e.message); return; }
+        if (!parsed.schema || !parsed.values) { alert('Missing schema or values fields'); return; }
+        try {
+            var res = await fetch('/scheduler/payload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: _importPayloadId, schema: parsed.schema, values: parsed.values })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            closeImportPayload();
+            var s = schedules.find(function(x) { return x.id === _importPayloadId || x.id === selectedId; });
+            if (s) openSchemaModal(s.id, s.name || s.id);
+        } catch(e) { alert('Import failed: ' + e.message); }
+    }
+
+    function renderConstructor() {
+        var body = document.getElementById('schemaBody');
+        function thirdColPlaceholder(f) {
+            if (f.type === 'select' || f.type === 'multiselect') return 'opt1, opt2';
+            if (f.type === 'section') return 'Section title';
+            if (f.type === 'html')    return '<b>HTML</b>...';
+            if (f.type === 'tab')     return 'Tab title';
+            return 'Label';
+        }
+        function thirdColProp(f) { return (f.type === 'select' || f.type === 'multiselect') ? 'options' : 'label'; }
+        function thirdColVal(f)  { return (f.type === 'select' || f.type === 'multiselect') ? (f.options||'') : (f.label||''); }
+        function keyInput(f, i) {
+            var disabled = (f.type==='section'||f.type==='html'||f.type==='tab') ? ' disabled style="opacity:0.35"' : '';
+            return '<input class="schema-input" placeholder="key" value="' + escHtml(f.key) + '"' + disabled + ' oninput="pmSchemaUpdate(' + i + ',\'key\',this.value)">';
+        }
+        var rows = pmSchema.map(function(f, i) {
+            var typeOpts = FIELD_TYPES.map(function(t) { return '<option value="' + t + '"' + (f.type===t?' selected':'') + '>' + t + '</option>'; }).join('');
+            var prop = thirdColProp(f);
+            return '<div class="schema-field-row">'
+                + keyInput(f, i)
+                + '<select class="schema-input" onchange="pmSchemaUpdate(' + i + ',\'type\',this.value);renderConstructor()">' + typeOpts + '</select>'
+                + '<input class="schema-input" placeholder="' + thirdColPlaceholder(f) + '" value="' + escHtml(thirdColVal(f)) + '" oninput="pmSchemaUpdate(' + i + ',\'' + prop + '\',this.value)">'
+                + '<button class="schema-del" onclick="pmSchemaRemove(' + i + ')">✕</button>'
+                + '</div>';
+        }).join('');
+        body.innerHTML = (pmSchema.length ? '<div class="schema-col-header"><span>Key</span><span>Type</span><span>Label / Options</span><span></span></div>' : '')
+            + rows
+            + '<div style="margin-top:10px;display:flex;gap:6px">'
+            + '<button class="btn sm" onclick="pmSchemaAdd(\'text\')">+ Field</button>'
+            + '<button class="btn sm accent" onclick="pmSchemaAdd(\'section\')">+ Section</button>'
+            + '<button class="btn sm" onclick="pmSchemaAdd(\'html\')">+ HTML</button>'
+            + (pmSchema.length===0 ? '<span style="color:var(--text2);font-size:10px;margin-left:6px">No fields</span>' : '')
+            + '</div>';
+    }
+    function pmSchemaUpdate(idx, prop, val) {
+        if (!pmSchema[idx]) return;
+        pmSchema[idx][prop] = val;
+        if (prop === 'type' && (val === 'section' || val === 'html' || val === 'tab')) pmSchema[idx].key = '';
+    }
+    function pmSchemaAdd(type) { pmSchema.push({ key:'', label:'', type: type||'text', options:'' }); renderConstructor(); }
+    function pmSchemaRemove(idx) { pmSchema.splice(idx, 1); renderConstructor(); }
+
+    function renderFieldHtml(f) {
+        if (f.type === 'section') return '<div class="section-div">' + escHtml(f.label||'') + '</div>';
+        if (f.type === 'html')    return '<div style="margin-bottom:8px">' + (f.label||'') + '</div>';
+        if (!f.key) return '';
+        var val = pmValues[f.key] !== undefined ? pmValues[f.key] : '';
+        var labelHtml = '<div class="values-label">' + escHtml(f.label||f.key) + '<span class="values-key">' + escHtml(f.key) + '</span></div>';
+        var inputHtml = '';
+        if (f.type === 'boolean') {
+            inputHtml = '<input type="checkbox" data-vkey="' + escHtml(f.key) + '" ' + ((val==='true'||val===true)?'checked':'') + ' style="width:14px;height:14px;cursor:pointer" onchange="pmValuesSet(\'' + escHtml(f.key) + '\',this.checked?\'true\':\'false\')">';
+        } else if (f.type === 'password') {
+            inputHtml = '<input class="values-input" type="password" data-vkey="' + escHtml(f.key) + '" value="' + escHtml(val) + '" oninput="pmValuesSet(\'' + escHtml(f.key) + '\',this.value)" autocomplete="new-password">';
+        } else if (f.type === 'select') {
+            var opts = (f.options||'').split(',').map(function(o){return o.trim();}).filter(Boolean);
+            inputHtml = '<select class="values-input" data-vkey="' + escHtml(f.key) + '" onchange="pmValuesSet(\'' + escHtml(f.key) + '\',this.value)">'
+                + opts.map(function(o){return '<option value="' + escHtml(o) + '"' + (o===val?' selected':'') + '>' + escHtml(o) + '</option>';}).join('') + '</select>';
+        } else {
+            inputHtml = '<input class="values-input" data-vkey="' + escHtml(f.key) + '" value="' + escHtml(val) + '" oninput="pmValuesSet(\'' + escHtml(f.key) + '\',this.value)">';
+        }
+        return '<div class="values-field">' + labelHtml + inputHtml + '</div>';
+    }
+
+    var vmActiveTab = 0;
+    function renderValues() {
+        var body = document.getElementById('valuesBody');
+        if (!pmSchema.length) { body.innerHTML = '<div style="color:var(--text2);font-size:11px;padding:12px 0">No fields. Open Schema to add fields.</div>'; return; }
+        var groups = [], current = { label: null, fields: [] };
+        pmSchema.forEach(function(f) {
+            if (f.type === 'tab') { groups.push(current); current = { label: f.label||('Tab '+(groups.length+1)), fields: [] }; }
+            else current.fields.push(f);
+        });
+        groups.push(current);
+        if (groups.length > 1 && groups[0].label === null && groups[0].fields.length === 0) groups.shift();
+        var hasTabs = groups.length > 1 || groups[0].label !== null;
+        if (!hasTabs) { body.innerHTML = groups[0].fields.map(renderFieldHtml).join(''); return; }
+        if (vmActiveTab >= groups.length) vmActiveTab = 0;
+        var tabBar = '<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:10px">'
+            + groups.map(function(g,i){
+                var a = i===vmActiveTab;
+                return '<div onclick="vmSwitchTab('+i+')" style="padding:6px 14px;font-size:11px;cursor:pointer;color:'+(a?'var(--accent)':'var(--text2)')+';border-bottom:2px solid '+(a?'var(--accent)':'transparent')+'">'+escHtml(g.label||'General')+'</div>';
+            }).join('') + '</div>';
+        body.innerHTML = tabBar + groups[vmActiveTab].fields.map(renderFieldHtml).join('');
+    }
+    function vmSwitchTab(idx) {
+        document.querySelectorAll('#valuesBody [data-vkey]').forEach(function(el){
+            pmValues[el.dataset.vkey] = el.type==='checkbox'?(el.checked?'true':'false'):el.value;
+        });
+        vmActiveTab = idx; renderValues();
+    }
+    function pmValuesSet(key, val) { pmValues[key] = val; }
+
+    async function saveSchema() {
+        if (!pmScheduleId) return;
+        for (var i = 0; i < pmSchema.length; i++) {
+            var f = pmSchema[i];
+            if (f.type !== 'section' && f.type !== 'html' && f.type !== 'tab' && !f.key.trim()) {
+                Dialog.error('Field #'+(i+1)+' must have a key.'); return;
+            }
+        }
+        try {
+            var res  = await fetch('/scheduler/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: pmScheduleId, schema: JSON.stringify(pmSchema), values: JSON.stringify(pmValues) }) });
+            var data = await res.json();
+            if (data.ok) closeSchemaModal(); else Dialog.error(data.error||'Save failed');
+        } catch(e) { Dialog.error(e.message); }
+    }
+
+    async function saveValues() {
+        if (!pmScheduleId) return;
+        document.querySelectorAll('#valuesBody [data-vkey]').forEach(function(el){
+            pmValues[el.dataset.vkey] = el.type==='checkbox'?(el.checked?'true':'false'):el.value;
+        });
+        try {
+            var res  = await fetch('/scheduler/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: pmScheduleId, schema: JSON.stringify(pmSchema), values: JSON.stringify(pmValues) }) });
+            var data = await res.json();
+            if (data.ok) closeValuesModal(); else Dialog.error(data.error||'Save failed');
+        } catch(e) { Dialog.error(e.message); }
+    }
+
+    function escHtml(s) {
+        if (s === null || s === undefined) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Polling ──
+    setInterval(loadList, 10000);
+    // Logs/HTTP обновляются через SSE (startSse), polling убран
+</script>
+</body>
+</html>

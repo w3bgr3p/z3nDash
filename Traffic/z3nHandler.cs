@@ -99,13 +99,19 @@ namespace z3n8
     {
         private readonly string _projectName;
         private readonly string _logHost;
+        private readonly string _proxy;
         private readonly bool _fallbackToStackTrace;
         private static readonly HttpClient _logClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-
-        public HttpDebugHandler(string projectName, string logHost = "http://localhost:10993/http-log", bool fallbackToStackTrace = true)
+        private readonly string _taskId;
+        private readonly string _account;
+        public HttpDebugHandler(string projectName, string logHost = "http://localhost:38109/http-log", 
+            string proxy = "", string taskId = "", string account = "", bool fallbackToStackTrace = true)
         {
             _projectName = projectName;
-            _logHost = logHost;
+            _logHost     = logHost;
+            _proxy       = proxy;
+            _taskId      = taskId;
+            _account     = account;
             _fallbackToStackTrace = fallbackToStackTrace;
         }
 
@@ -193,7 +199,7 @@ namespace z3n8
                     url = req.RequestUri.ToString(),
                     statusCode = (int)res.StatusCode,
                     durationMs = (int)(end - start).TotalMilliseconds,
-                    
+                    proxy = MaskProxy(_proxy),
                     diagnostics = diagnostics != null ? new
                     {
                         caller = $"{diagnostics.CallerClass}.{diagnostics.CallerMethod}",
@@ -204,6 +210,8 @@ namespace z3n8
                         lineNumber = diagnostics.CallerLine,
                         assembly = diagnostics.AssemblyName,
                         threadId = diagnostics.ThreadId,
+                        task_id  = _taskId,
+                        account  = _account,
                         //memoryMB = diagnostics.MemoryMB,
                         capturedAt = diagnostics.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")
                     } : null,
@@ -234,7 +242,16 @@ namespace z3n8
                 Console.WriteLine($"[HttpDebugHandler ERROR] {ex.Message}"); 
             }
         }
-
+        private static string MaskProxy(string proxy)
+        {
+            if (string.IsNullOrEmpty(proxy)) return "";
+            try
+            {
+                var uri = new Uri(proxy.StartsWith("http") ? proxy : $"http://{proxy}");
+                return $"{uri.Host}:{uri.Port}";
+            }
+            catch { return proxy; }
+        }
         private string[] GetHeaders(HttpRequestMessage req)
         {
             var headers = req.Headers.Concat(req.Content?.Headers ?? Enumerable.Empty<KeyValuePair<string, IEnumerable<string>>>());

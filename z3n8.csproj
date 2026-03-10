@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>WinExe</OutputType>
-        <TargetFramework>net8.0-windows</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0-windows</TargetFramework>
         <UseWindowsForms>true</UseWindowsForms>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
@@ -34,7 +34,7 @@
         <PackageReference Include="Nethereum.Web3" Version="4.29.0.0" />
 
         <PackageReference Include="Otp.NET" Version="1.4.0" />
-
+        <PackageReference Include="Cronos" Version="0.8.*" />
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.*" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.*" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.*" />   <!-- для Bind -->
@@ -44,58 +44,96 @@
 
     <ItemGroup>
         <None Update="appsettings.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="appsettings.secrets.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        
         <None Update="wwwroot\home.html">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\json.html">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\pm.html">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\config.html">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\logs.html">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\text.html">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\scheduler.html">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\http.html">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\report.html">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-
+        <None Update="wwwroot\text.html">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Update="wwwroot\css\base.css">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\css\components.css">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\css\themes.css">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\js\theme.js">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\js\nav.js">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
 
 
         <None Update="icon.ico">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+
+       
+        <None Remove="z3nStub\**" />
+
+       
+        <None Remove="installer_output\**" />
+
+       
+        <None Remove="publish-new\**" />
 
        
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Remove="Controllers\ZpOrchestratorHandler.cs" />
+      <Compile Remove="z3nStub\**" />
+      <Compile Remove="installer_output\**" />
+      <Compile Remove="publish-new\**" />
+    </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="scripts\" />
+      <Folder Include="Tasks\py\ts\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Remove="z3nStub\**" />
+      <EmbeddedResource Remove="installer_output\**" />
+      <EmbeddedResource Remove="publish-new\**" />
+    </ItemGroup>
+
+
+    
+    
     
     
 </Project>

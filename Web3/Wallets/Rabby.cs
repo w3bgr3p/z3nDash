@@ -1,70 +1,61 @@
 ﻿using z3n8;
-using Microsoft.Playwright;
 using z3n8.Browser;
-using z3nSafe;
-
 
 public class Rabby
 {
-    private readonly string _extId ;
-    private IPage _page;
-    private readonly IBrowserContext _context;
-    private readonly int _delay = 108;
-    private Db _db ;
-    private readonly string _password;
-    
-    public Rabby( IBrowserContext context, int?acc = 0,  Db db = null, string key = null, string extId = null)
+    private readonly string          _extId;
+    private readonly IBrowserInstance _instance;
+    private readonly string          _password;
+    private readonly int             _delay = 108;
+
+    private const string DefaultExtId = "acmacodkjbdgmoleebolmdjonilkdbch";
+
+    public Rabby(IBrowserInstance instance, Db db, int acc = 0, string extId = null)
     {
-        _db = db;
-        _password = _db.Get("evm", "_addresses", where: $"id = {acc}");
-        _context = context;
-        _extId = (!string.IsNullOrEmpty(extId)) ? extId : "acmacodkjbdgmoleebolmdjonilkdbch";
+        _instance = instance;
+        _password = db.Get("evm", "_addresses", where: $"id = {acc}");
+        _extId    = !string.IsNullOrEmpty(extId) ? extId : DefaultExtId;
     }
-    
-    private async Task EnsurePage()
+
+    // ── Navigation ────────────────────────────────────────────────────────────
+
+    public void ProfilePage()
+        => _instance.Go($"chrome-extension://{_extId}/desktop.html#/desktop/profile", strict: true);
+
+    // ── Actions ───────────────────────────────────────────────────────────────
+
+    public void Unlock()
     {
-        if (_page == null || _page.IsClosed)
-            _page = await _context.NewPageAsync();
+        ProfilePage();
+        _instance.HeSet(("input", "placeholder", "Enter\\ the\\ Password\\ to\\ Unlock", "regexp", 0), _password);
+        _instance.HeClick(("button", "innertext", "Unlock", "text", 0));
     }
-    
-    public async Task ProfilePage()
+
+    public void ImportNew(string key)
     {
-        await EnsurePage();
-        await _page.GotoAsync($"chrome-extension://{_extId}/desktop.html#/desktop/profile");
+        _instance.ClearShit(_extId);
+        _instance.Go($"chrome-extension://{_extId}/index.html#/new-user/guide", strict: true);
+
+        _instance.HeClick(("button", "innertext", "I\\ already\\ have\\ an\\ address", "regexp", 0));
+        Thread.Sleep(_delay);
+        _instance.HeClick(("div",    "innertext", "Private\\ Key",                   "regexp", 0));
+        Thread.Sleep(_delay);
+        _instance.HeSet  (("input",  "placeholder", "Input\\ private\\ key",         "regexp", 0), key);
+        Thread.Sleep(_delay);
+        _instance.HeClick(("button", "innertext", "Confirm",                         "text",   0));
+        Thread.Sleep(_delay);
+        _instance.HeSet  (("password",        "id"), _password);
+        Thread.Sleep(_delay);
+        _instance.HeSet  (("confirmPassword", "id"), _password);
+        Thread.Sleep(_delay);
+        _instance.HeClick(("button", "innertext", "Confirm",     "text", 0));
+        Thread.Sleep(_delay);
+        _instance.HeClick(("button", "innertext", "Get\\ Started","regexp", 0));
+        Thread.Sleep(_delay);
+        _instance.HeClick(("button", "innertext", "Done",         "text", 0));
+        Thread.Sleep(_delay);
+
+        _instance.ClearShit(_extId);
+        ProfilePage();
     }
-    public async Task Unlock()
-    {
-        await  ProfilePage();
-        await _page.GetByPlaceholder("Enter the Password to Unlock").FillAsync(_password, new() { Timeout = 3000 });
-        await _page.GetByRole(AriaRole.Button, new() { Name = "Unlock" }).ClickAsync();
-    }
-    
-    public async Task ImportNew(string key)
-    {
-        await _context.CloseExtraTabs();
-        await EnsurePage(); 
-        await _page.GotoAsync($"chrome-extension://{_extId}/index.html#/new-user/guide");
-        await _page.GetByRole(AriaRole.Button, new() { Name = "I already have an address" }).ClickAsync();
-        await _page.Sleep(_delay);
-        await _page.GetByText("Private Key" ).ClickAsync();
-        await _page.Sleep(_delay);
-        await _page.GetByPlaceholder("Input private key").FillAsync(key);
-        await _page.Sleep(_delay);
-        await _page.GetByRole(AriaRole.Button, new() { Name = "Confirm" }).ClickAsync();
-        await _page.Sleep(_delay);
-        await _page.Locator("[id='password']").FillAsync(_password);
-        await _page.Sleep(_delay);
-        await _page.Locator("[id='confirmPassword']").FillAsync(_password);
-        await _page.Sleep(_delay);
-        await _page.GetByRole(AriaRole.Button, new() { Name = "Confirm" }).ClickAsync();        
-        await _page.Sleep(_delay);
-        await _page.GetByRole(AriaRole.Button, new() { Name = "Get Started" }).ClickAsync();
-        await _page.Sleep(_delay);
-        await _page.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
-        await _page.Sleep(_delay);
-        Console.WriteLine("imported");
-        await _context.CloseExtraTabs();
-        await  ProfilePage();
-    }
-    
 }

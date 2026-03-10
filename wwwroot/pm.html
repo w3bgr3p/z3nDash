@@ -270,9 +270,19 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 0;
             overflow: hidden;
         }
+
+        .h-resizer {
+            height: 5px;
+            background: var(--bg2);
+            cursor: row-resize;
+            flex-shrink: 0;
+            margin: 1px 0;
+            border-radius: 2px;
+        }
+        .h-resizer:hover { background: var(--accent); }
 
         .detail-panel {
             flex: 1;
@@ -713,6 +723,8 @@
             </div>
         </div>
 
+        <div class="h-resizer" id="hResizerTop"></div>
+
         <div class="logs-area" id="logsArea">
             <div class="logs-panel" id="lpLogsPanel">
                 <div class="lp-header">
@@ -766,6 +778,8 @@
                 </div>
             </div>
         </div>
+
+        <div class="h-resizer" id="hResizerBot"></div>
 
         <div class="commands-panel">
             <div class="panel-header">
@@ -834,6 +848,7 @@
         </div>
         <div class="modal-footer">
             <button class="btn btn-update" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-update" id="copyPayloadBtn" onclick="copySettingsPayload()" style="border-color:#58a6ff;color:#58a6ff;" title="Copy settings as scheduler payload to clipboard">📋 Copy Payload</button>
             <button class="btn btn-start" onclick="saveSettings()">💾 Save & Apply</button>
         </div>
     </div>
@@ -856,14 +871,13 @@
         startAuto();
         initResizer();
         initLogsResizer();
+        initHResizers();
     });
 
     function startAuto() {
         autoInterval = setInterval(() => {
             refreshTasks();
             refreshCommands();
-            refreshTaskLogs();
-            refreshTaskHttp();
         }, 3000);
     }
 
@@ -909,7 +923,7 @@
     function getProject(task) {
         const name = task.Name || '';
         const dot = name.indexOf('.');
-        return dot > 0 ? name.substring(0, dot).trim() : '';
+        return dot > 0 ? name.substring(0, dot).trim() : name.trim();
     }
 
     // Extract tags from GroupLabels
@@ -1003,25 +1017,19 @@
 
         // Group by project (part before first ".")
         const groups = {};
-        const noProject = '__NO_PROJECT__';
 
         tasks.forEach(t => {
-            const proj = getProject(t) || noProject;
+            const proj = getProject(t);
             if (!groups[proj]) groups[proj] = [];
             groups[proj].push(t);
         });
 
-        const keys = Object.keys(groups).sort((a, b) => {
-            if (a === noProject) return 1;
-            if (b === noProject) return -1;
-            return a.localeCompare(b);
-        });
-
-        // Single project → flat list
-        const singleGroup = keys.length === 1;
+        const keys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
 
         container.innerHTML = keys.map(key => {
             const items = groups[key];
+            // Folder only when group has more than 1 member
+            const useFolder = items.length > 1;
             const isOpen = _groupCollapsed[key] !== false;
             const workingCount = items.filter(t => t.ExecutionSettings_IsWork === 'True').length;
 
@@ -1032,13 +1040,12 @@
                 const done = t.ExecutionSettings_DoneSuccessfully || '0';
                 const total = t.ExecutionSettings_DoneAll || '0';
                 const isSelected = t.Id === selectedTaskId ? 'selected' : '';
-                const indent = (!singleGroup && key !== noProject) ? 'indented' : '';
+                const indent = useFolder ? 'indented' : '';
 
-                // Show task name without the project prefix for cleaner display
                 const proj = getProject(t);
                 let displayName = t.Name;
                 let subName = '';
-                if (proj && t.Name.startsWith(proj + '.')) {
+                if (useFolder && proj && t.Name.startsWith(proj + '.')) {
                     displayName = proj;
                     subName = t.Name.substring(proj.length + 1);
                 }
@@ -1052,13 +1059,13 @@
                 </div>`;
             }).join('');
 
-            if (singleGroup) return rows;
+            if (!useFolder) return rows;
 
             const dotsHtml = workingCount > 0
                 ? `<div class="tree-group-dots">${Array.from({length: Math.min(workingCount, 5)}, () => '<div class="tree-dot working"></div>').join('')}</div>`
                 : '';
 
-            const label = key === noProject ? '(no project)' : key;
+            const label = key;
 
             return `<div class="tree-group">
                 <div class="tree-group-header" onclick="toggleGroup(this, '${escHtml(key)}')">
@@ -1088,7 +1095,7 @@
         if (!task) return;
 
         // auto-expand project group
-        const proj = getProject(task) || '__NO_PROJECT__';
+        const proj = getProject(task);
         if (_groupCollapsed[proj] === false) {
             _groupCollapsed[proj] = true;
         }
@@ -1099,12 +1106,72 @@
 
     // ── TASK LOGS & HTTP ──
     let _currentTaskId = null;
+    let _sseLog  = null;
+    let _sseHttp = null;
+
+    function _closeSse() {
+        if (_sseLog)  { _sseLog.close();  _sseLog  = null; }
+        if (_sseHttp) { _sseHttp.close(); _sseHttp = null; }
+    }
+
+    function _appendLogEntry(log) {
+        const c = document.getElementById('lpLogsContent');
+        const empty = c.querySelector('.lp-empty');
+        if (empty) empty.remove();
+        const lvl = (log.level || '').toUpperCase();
+        const div = document.createElement('div');
+        div.className = `tl-entry ${lvl}`;
+        div.innerHTML = `
+            <div class="tl-header">
+                <span class="tl-ts">${log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}</span>
+                <span class="tl-lvl ${lvl}">${lvl}</span>
+                <span class="tl-acc">${escHtml(log.account || '')}</span>
+            </div>
+            <div class="tl-msg">${escHtml(log.message || '')}</div>`;
+        c.appendChild(div);
+        c.scrollTop = c.scrollHeight;
+    }
+
+    function _appendHttpEntry(log) {
+        const c = document.getElementById('lpHttpContent');
+        const empty = c.querySelector('.lp-empty');
+        if (empty) empty.remove();
+        const method = log.method || '';
+        const sc = log.statusCode || 0;
+        const scClass = sc>=200&&sc<300?'s2xx':sc>=300&&sc<400?'s3xx':sc>=400&&sc<500?'s4xx':'s5xx';
+        const ts = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '';
+        const div = document.createElement('div');
+        div.className = 'th-entry';
+        div.innerHTML = `
+            <span class="tl-ts">${ts}</span>
+            <span class="th-method ${method}">${method}</span>
+            <span class="th-url" title="${escHtml(log.url||'')}">${escHtml(log.url||'')}</span>
+            <span class="th-status ${scClass}">${sc}</span>
+            <span class="th-dur">${log.durationMs ? log.durationMs+'ms' : '-'}</span>
+            <span class="th-acc">${escHtml(log.account||'-')}</span>`;
+        c.appendChild(div);
+        c.scrollTop = c.scrollHeight;
+    }
 
     function showLogsArea(taskId) {
+        _closeSse();
         _currentTaskId = taskId;
         document.getElementById('logsArea').classList.add('visible');
+
+        // Initial fetch (history)
         refreshTaskLogs();
         refreshTaskHttp();
+
+        // SSE for live updates
+        _sseLog = new EventSource(`${SERVER}/logs/stream?task_id=${encodeURIComponent(taskId)}`);
+        _sseLog.onmessage = e => {
+            try { _appendLogEntry(JSON.parse(e.data)); } catch {}
+        };
+
+        _sseHttp = new EventSource(`${SERVER}/http-logs/stream?task_id=${encodeURIComponent(taskId)}`);
+        _sseHttp.onmessage = e => {
+            try { _appendHttpEntry(JSON.parse(e.data)); } catch {}
+        };
     }
 
     async function refreshTaskLogs() {
@@ -1213,6 +1280,42 @@
         document.addEventListener('mouseup', () => {
             if (active) { active = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; }
         });
+    }
+
+    function initHResizers() {
+        const rightCol = document.querySelector('.right-col');
+        const detail   = document.querySelector('.detail-panel');
+        const logsArea = document.getElementById('logsArea');
+        const commands = document.querySelector('.commands-panel');
+
+        function makeRowResizer(resizerId, topEl, botEl) {
+            const r = document.getElementById(resizerId);
+            if (!r) return;
+            let active = false, startY, startTopH, startBotH;
+            r.addEventListener('mousedown', e => {
+                active    = true;
+                startY    = e.clientY;
+                startTopH = topEl.getBoundingClientRect().height;
+                startBotH = botEl.getBoundingClientRect().height;
+                document.body.style.cursor     = 'row-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', e => {
+                if (!active) return;
+                const dy    = e.clientY - startY;
+                const newTop = Math.max(40, startTopH + dy);
+                const newBot = Math.max(40, startBotH - dy);
+                topEl.style.flex = `0 0 ${newTop}px`;
+                botEl.style.flex = `0 0 ${newBot}px`;
+            });
+            document.addEventListener('mouseup', () => {
+                if (active) { active = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; }
+            });
+        }
+
+        makeRowResizer('hResizerTop', detail, logsArea);
+        makeRowResizer('hResizerBot', logsArea, commands);
     }
 
     function renderDetail(t) {
@@ -1358,6 +1461,60 @@
         document.getElementById('settingsModal').classList.remove('open');
         modalTaskId = null;
         modalFields = [];
+    }
+
+    // ── PM → Scheduler payload export ──
+    function _pmTypeToSchemaType(t) {
+        switch (t) {
+            case 'Tab':                 return 'tab';
+            case 'Comment':             return 'section';
+            case 'Boolean':             return 'boolean';
+            case 'DropDown':            return 'select';
+            case 'DropDownMultiSelect': return 'multiselect';
+            case 'Password':            return 'password';
+            default:                    return 'text';
+        }
+    }
+
+    async function copySettingsPayload() {
+        if (!modalFields.length) return;
+
+        // Build schema — strip {opts} from label, put in options field
+        const schema = modalFields.map(f => {
+            const type = _pmTypeToSchemaType(f.type);
+            const optMatch = (f.label || '').match(/\{([^}]+)\}/);
+            const cleanLabel = (f.label || '').replace(/\{[^}]+\}/g, '').trim() || f.key || '';
+            const item = { key: f.key || '', label: cleanLabel, type };
+            if (optMatch && (type === 'select' || type === 'multiselect'))
+                item.options = optMatch[1].split('|').map(function(s) { return s.trim(); }).join(', ');
+            if (f.help) item.help = f.help;
+            return item;
+        });
+
+        // Read current DOM values
+        const values = {};
+        document.querySelectorAll('#modalBody [data-key]').forEach(function(el) {
+            values[el.dataset.key] = el.type === 'checkbox' ? (el.checked ? 'True' : 'False') : el.value;
+        });
+        document.querySelectorAll('#modalBody [data-multi]').forEach(function(el) {
+            const k = el.dataset.multi;
+            if (!values[k]) values[k] = [];
+            if (el.checked) values[k].push(el.value);
+        });
+        for (const k in values) {
+            if (Array.isArray(values[k])) values[k] = values[k].join(', ');
+        }
+
+        const payload = { schema: JSON.stringify(schema), values: JSON.stringify(values) };
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(payload));
+            const btn = document.getElementById('copyPayloadBtn');
+            const orig = btn.textContent;
+            btn.textContent = '✓ Copied';
+            setTimeout(function() { btn.textContent = orig; }, 1500);
+        } catch (e) {
+            await _dialog.error('Clipboard write failed: ' + e.message);
+        }
     }
 
     function renderModalFields(fields) {

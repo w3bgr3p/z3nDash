@@ -1,162 +1,304 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
-
 using System.Text;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-
 namespace z3n8
 {
     public enum LogLevel
     {
-        Debug = 0,
-        Info = 1,
+        Debug   = 0,
+        Info    = 1,
         Warning = 2,
-        Error = 3,
-        Off = 99
+        Error   = 3,
+        Off     = 99
     }
-    
+
     public class Logger
     {
-        private string _emoji = null;
-        private readonly bool _persistent;
-        private readonly Stopwatch _stopwatch;
-        private int _timezone;
-        private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-        private string _logHost;
-        private readonly bool _http;
-        public string  _acc;
-        
-        public Logger( string classEmoji = null, bool persistent = true, LogLevel logLevel = LogLevel.Info, string logHost = null, bool http = true, int timezoneOffset = -5, string acc = "")
-        {
-            _emoji = classEmoji;
-            _persistent = persistent;
-            _stopwatch = persistent ? Stopwatch.StartNew() : null;
-            _http = http;
-            _logHost =  logHost;
-            _timezone = timezoneOffset;
-            _acc = acc;
-        }
-        
-        public void Send(object toLog, string type = "INFO",
-            [CallerMemberName] string callerName = "",
-            [CallerFilePath] string callerFilePath = ""
-            , int cut = 0)
-        {
-            string className = Path.GetFileNameWithoutExtension(callerFilePath);
-            string fullCaller = $"{className}.{callerName}";
-            
-            string header = string.Empty;
-            string body = toLog?.ToString() ?? "null";
+        // ── ThreadStatic cache ────────────────────────────────────────────────
 
-            header = LogHeader(fullCaller); 
-            if (cut > 0 && body.Count(c => c == '\n') > cut)
-                body = body.Replace("\r\n", " ").Replace('\n', ' ');
-            body = $"          {(!string.IsNullOrEmpty(_emoji) ? $"[ {_emoji} ] " : "")}{body.Trim()}";
-            string toSend = header + body;
-            
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"■ [{fullCaller}]");
-            Console.ForegroundColor = ConsoleColor.Gray; 
-            Console.Write($"          {body}\n");
-            Console.ResetColor();
-            
-            
-            if (_http)
-            {
-                string prjName =  "ZBTest";
-                string acc = (string.IsNullOrEmpty(_acc)) ? _acc : "-";
-                string port =  "-";
-                string pid =  "-";
-                string sessionId =  "-";
-                SendToHttpLogger(body, type, fullCaller, prjName, acc, port, pid ,sessionId);
-            }
+        [ThreadStatic]
+        private static Logger _threadLogger;
+        public static Logger Current => _threadLogger;
+        public static Logger Init(string acc = "", string logHost = null, LogLevel logLevel = LogLevel.Info)
+        {
+            _threadLogger = Get(acc, logHost, logLevel);
+            return _threadLogger;
         }
+
+        public static void log(string msg,  [CallerMemberName] string caller = "")
+            => _threadLogger?.Info(msg, caller);
+        public static void warn(string msg, [CallerMemberName] string caller = "")
+            => _threadLogger?.Warn(msg, caller);
+        public static void err(string msg,  [CallerMemberName] string caller = "")
+            => _threadLogger?.Error(msg, caller);
+
+        private static readonly ConcurrentDictionary<string, Logger> _loggerCache
+            = new ConcurrentDictionary<string, Logger>();
+
+        public static Logger Get(string acc = "", string logHost = null, LogLevel logLevel = LogLevel.Info)
+        {
+            string key = string.IsNullOrEmpty(acc) ? "__default__" : acc;
+            return _loggerCache.GetOrAdd(key, _ => new Logger(acc: acc, logHost: logHost, logLevel: logLevel));
+        }
+
+        public static void ClearCache(string acc = "")
+        {
+            string key = string.IsNullOrEmpty(acc) ? "__default__" : acc;
+            _loggerCache.TryRemove(key, out _);
+            _threadLogger = null;
+        }
+
+        // ── Config ────────────────────────────────────────────────────────────
+
+        private readonly bool      _persistent;
+        private readonly Stopwatch _stopwatch;
+        private readonly int       _timezone;
+        private readonly bool      _http;
+        private readonly string    _logHost;
+        private readonly LogLevel  _minLevel;
+
+        public string Emoji   { get; set; }
+        public string Acc     { get; set; }
+        public string TaskId  { get; set; }  // schedule_tag — фильтр "все прогоны задачи"
+        public string Session { get; set; }  // run_id — фильтр конкретного прогона
+        public string Project { get; set; }
         
-        private void SendToHttpLogger(string message, string type, string caller, string prj, string acc, string port,  string pid, string session)
-        { _ = Task.Run(async () =>
+        private readonly Action<string>? _sink;
+        public string LogHost => _logHost;
+        
+        // cfgLog flags
+        private readonly bool _fAcc, _fTime, _fCaller, _fWrap, _fForce;
+
+        private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+
+        // ── Constructor ───────────────────────────────────────────────────────
+
+        public Logger(
+            string          classEmoji     = null,
+            bool            persistent     = true,
+            LogLevel        logLevel       = LogLevel.Info,
+            string          logHost        = null,
+            bool            http           = true,
+            int             timezoneOffset = -5,
+            string          acc            = "",
+            string          taskId         = "",
+            string          session        = "",
+            string          project        = "z3n8",
+            string          cfgLog         = "caller,wrap",
+            Action<string>? sink           = null)
+        {
+            Emoji       = classEmoji;
+            Acc         = acc;
+            TaskId      = taskId;
+            Session     = session;
+            _persistent = persistent;
+            _stopwatch  = persistent ? Stopwatch.StartNew() : null;
+            _http       = http;
+            _timezone   = timezoneOffset;
+            _minLevel   = logLevel;
+            _logHost    = logHost ?? "http://localhost:38109/log";
+            _sink       = sink;
+
+            _fAcc    = cfgLog.Contains("acc");
+            _fTime   = cfgLog.Contains("time");
+            _fCaller = cfgLog.Contains("caller");
+            _fWrap   = cfgLog.Contains("wrap");
+            _fForce  = cfgLog.Contains("force");
+        }
+
+        // ── Public API ────────────────────────────────────────────────────────
+
+        public void Send(
+            object   toLog,
+            [CallerMemberName] string callerName = "",
+            [CallerFilePath]   string callerFilePath = "",
+            bool     show  = false,
+            bool     thrw  = false,
+            int      cut   = 0,
+            LogLevel level = LogLevel.Info)
+        {
+            if (_fForce) show = true;
+            if (!show && level < _minLevel) return;
+
+            string className  = Path.GetFileNameWithoutExtension(callerFilePath);
+            string fullCaller = _fCaller ? $"{className}.{callerName}" : callerName;
+
+            string body   = BuildBody(toLog?.ToString() ?? "null", cut);
+            string header = _fWrap ? BuildHeader(fullCaller) : string.Empty;
+            string full   = header + body;
+
+            WriteConsole(fullCaller, body, level);
+
+            if (_http)
+                SendHttp(body, fullCaller, level);
+
+            if (thrw)
+                throw new Exception(full);
+        }
+
+        public void Debug(object toLog, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "")
+            => Send(toLog, callerName, callerFilePath, level: LogLevel.Debug);
+
+        public void Info(object toLog, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "")
+            => Send(toLog, callerName, callerFilePath, level: LogLevel.Info);
+
+        public void Warn(
+            object   toLog,
+            [CallerMemberName] string callerName    = "",
+            [CallerFilePath]   string callerFilePath = "",
+            bool     show  = false,
+            bool     thrw  = false,
+            int      cut   = 0)
+            => Send(toLog, callerName, callerFilePath, show, thrw, cut, LogLevel.Warning);
+
+        public void Error(
+            object   toLog,
+            [CallerMemberName] string callerName    = "",
+            [CallerFilePath]   string callerFilePath = "",
+            bool     thrw = false)
+            => Send(toLog, callerName, callerFilePath, show: true, thrw: thrw, level: LogLevel.Error);
+
+        // ── Private helpers ───────────────────────────────────────────────────
+
+        private string BuildHeader(string fullCaller)
+        {
+            var sb = new StringBuilder();
+            if (_fAcc  && !string.IsNullOrEmpty(Acc))  sb.Append($"  🤖 [{Acc}]");
+            if (_fTime && _stopwatch != null)           sb.Append($"  ⏱️ [{_stopwatch.Elapsed:hh\\:mm\\:ss}]");
+            if (_fCaller)                               sb.Append($"  🔲 [{fullCaller}]");
+            return sb.ToString();
+        }
+
+        private string BuildBody(string text, int cut)
+        {
+            if (cut > 0 && text.Count(c => c == '\n') > cut)
+                text = text.Replace("\r\n", " ").Replace('\n', ' ');
+            string prefix = !string.IsNullOrEmpty(Emoji) ? $"[ {Emoji} ] " : "";
+            return $"{prefix}{text.Trim()}";
+        }
+
+        private void WriteConsole(string fullCaller, string body, LogLevel level)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.Write($"{fullCaller}.");
+            
+            Console.ForegroundColor = level switch
+            {
+                LogLevel.Debug   => ConsoleColor.DarkGray,
+                LogLevel.Warning => ConsoleColor.Yellow,
+                LogLevel.Error   => ConsoleColor.Red,
+                _                => ConsoleColor.Cyan
+            };
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.Write($"{body}\n");
+            Console.ResetColor();
+            _sink?.Invoke($"[{level.ToString().ToUpper()}] [{fullCaller}] {body.Trim()}");
+        }
+
+        private void SendHttp(string body, string caller, LogLevel level)
+        {
+            string acc = !string.IsNullOrEmpty(Acc) ? Acc : "-";
+
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    var logData = new
+                    var payload = new
                     {
-                        machine = Environment.MachineName,
-                        project = prj,
+                        machine   = Environment.MachineName,
+                        project   = !string.IsNullOrEmpty(Project) ? Project : "z3n8",
                         timestamp = DateTime.UtcNow.AddHours(_timezone).ToString("yyyy-MM-dd HH:mm:ss"),
-                        level = type.ToString().ToUpper(),
-                        account = acc,
-                        session = session,
-                        port = port,
-                        pid = pid,
-                        caller = caller,
-                        extra = new { caller },
-                        message = message.Trim(),
+                        level     = level.ToString().ToUpper(),
+                        account   = acc,
+                        session   = !string.IsNullOrEmpty(Session) ? Session : "-",
+                        port      = "-",
+                        pid       = "-",
+                        task_id   = !string.IsNullOrEmpty(TaskId) ? TaskId : "-",
+                        caller,
+                        message   = body.Trim(),
                     };
 
-                    string json = JsonConvert.SerializeObject(logData);
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"[DEBUG] {json}");
-                    Console.ResetColor();
-                    using (var cts = new System.Threading.CancellationTokenSource(1000))
-                    using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-                    {
-                        await _httpClient.PostAsync(_logHost, content, cts.Token);
-                    }
+                    string json = JsonConvert.SerializeObject(payload);
+                    using var cts     = new System.Threading.CancellationTokenSource(1000);
+                    using var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    await _httpClient.PostAsync(_logHost, content, cts.Token);
                 }
                 catch { }
             });
-        }      
-
-        private string LogHeader(string callerName)
-        {
-            var sb = new StringBuilder();
-            sb.Append($"🔲 [{callerName}]");
-            return sb.ToString();
-            
         }
-        private string LogBody(string toLog, int cut)
-        {
-            if (string.IsNullOrEmpty(toLog)) return string.Empty;
-            
-            if (cut > 0)
-            {
-                int lineCount = toLog.Count(c => c == '\n') + 1;
-                if (lineCount > cut)
-                {
-                    toLog = toLog.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ');
-                }
-            }
-            
-            if (!string.IsNullOrEmpty(_emoji))
-            {
-                toLog = $"[ {_emoji} ] {toLog}";
-            }
-            return $"\n          {toLog.Trim()}";
-        }
-        private string GetFullCallerName(string methodName)
-        {
-            try
-            {
-                var stackTrace = new StackTrace();
-                var frame = stackTrace.GetFrame(2); // Пропускаем Send() и GetFullCallerName()
-                var method = frame?.GetMethod();
         
-                if (method != null)
-                {
-                    string className = method.DeclaringType?.Name ?? "Unknown";
-                    return $"{className}.{methodName}";
-                }
-            }
-            catch { }
-    
-            return methodName;
-        }
-
+        
+        
+        
     }
-}
 
+    public static class LoggerExt
+    {
+        private static readonly object _lock = new();
+
+        public static void Debug(this object toLog,
+            [CallerMemberName] string callerName = "",
+            [CallerFilePath]   string callerFilePath = "")
+        {
+            string className = Path.GetFileNameWithoutExtension(callerFilePath);
+            lock (_lock)
+            {
+                //Console.ForegroundColor = ConsoleColor.Gray;
+                //Console.Write(toLog.GetHashCode());
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Write($" {className}.");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"{callerName}");
+                Console.ResetColor();
+                Console.WriteLine($" {toLog}");
+            }
+        }
+        
+        public static void Err(this object toLog,
+            bool thrw = false,
+            [CallerMemberName] string callerName = "",
+            [CallerFilePath]   string callerFilePath = "")
+        {
+            string className = Path.GetFileNameWithoutExtension(callerFilePath);
+            lock (_lock)
+            {
+
+                Console.ForegroundColor = ConsoleColor.DarkRed;
+                Console.Write($" {className}.");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write($"{callerName}");
+                Console.ResetColor();
+                Console.WriteLine($" {toLog}");
+                Console.ForegroundColor = ConsoleColor.Red;
+            }
+        }
+        public static void Err(this Exception ex,
+            object toLog = null,
+            bool thrw = false,
+            [CallerMemberName] string callerName = "",
+            [CallerFilePath]   string callerFilePath = "")
+        {
+            string className = Path.GetFileNameWithoutExtension(callerFilePath);
+            lock (_lock)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkRed;
+                Console.Write($" {className}.");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write($"{callerName}");
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($" {toLog}");
+                Console.ResetColor();
+            }
+            if (thrw) throw ex;
+        }
+    }
+
+}

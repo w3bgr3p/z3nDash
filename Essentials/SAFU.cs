@@ -2,8 +2,9 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using Newtonsoft.Json;
 
-namespace z3nSafe;
+namespace z3n8;
 
 public class SAFU
 {
@@ -202,7 +203,7 @@ public class SAFU
             return "fallback_password";
         }
     }
-    byte[] DeriveKeyFromHWID(string hardwareId)
+    static byte[] DeriveKeyFromHWID(string hardwareId)
     {
         if (string.IsNullOrEmpty(hardwareId)) return null;
         
@@ -217,7 +218,7 @@ public class SAFU
         }
     }
 
-    string EncryptHWIDOnly( string plaintext)
+    public static string EncryptHWIDOnly( string plaintext)
     {
         if (string.IsNullOrEmpty(plaintext)) return string.Empty;
         
@@ -258,7 +259,7 @@ public class SAFU
         catch { return string.Empty; }
     }
 
-    string DecryptHWIDOnly( string ciphertext)
+    public static string DecryptHWIDOnly( string ciphertext)
     {
         if (string.IsNullOrEmpty(ciphertext) || !ciphertext.StartsWith("HWID:")) 
             return string.Empty;
@@ -365,4 +366,6 @@ public class SAFU
         catch { return string.Empty; }
     }
         
+
+    
 }

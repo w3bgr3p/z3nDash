@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <Optimize>true</Optimize>
+    </PropertyGroup>
+
+    <!-- z3n8.dll лежит рядом (скопировать из bin/publish основного проекта) -->
+    <ItemGroup>
+        <Reference Include="z3n8">
+            <HintPath>z3n8.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Newtonsoft.Json"             Version="13.0.3" />
+        <PackageReference Include="Nethereum.Signer.Ledger"    Version="4.29.0" />
+    </ItemGroup>
+</Project>

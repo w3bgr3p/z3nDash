@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Library</OutputType>
+        <TargetFramework>net8.0-windows</TargetFramework>
+        <UseWindowsForms>false</UseWindowsForms>
+        <RootNamespace>z3n8</RootNamespace>
+        <AssemblyName>z3n8.Stub</AssemblyName>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>disable</Nullable>
+        <!-- ZENNOPOSTER не определён → ZennoStub.cs компилируется вместо ZP SDK -->
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="..\..\Tasks\Zenno\ZennoStub.cs" />
+        <Compile Include="..\..\Tasks\Zenno\InternalTasks.cs" />
+        <Compile Include="..\..\Tasks\Zenno\InternalTasks.Context.cs" />
+        <Compile Include="..\..\Essentials\Logger.cs" />
+        <Compile Include="..\..\Essentials\SAFU.cs" />
+        <Compile Include="..\..\Sql\Db.cs" />
+        <Compile Include="..\..\Sql\Sql.cs" />
+        <Compile Include="..\..\Sql\DbConnectionService.cs" />
+        <Compile Include="..\..\App\Config\ConfigModels.cs" />
+        <Compile Include="..\..\App\Config\Config.cs" />
+        <Compile Include="..\..\Traffic\z3nHandler.cs" />
+        <Compile Include="..\..\Controllers\SchedulerService.cs" />
+        <Compile Include="..\..\Web3\StringExtentions.cs" />
+        <Compile Include="..\..\Web3\Blockchain.cs" />
+        <Compile Include="..\..\Tasks\zp\MarketMavericks.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Newtonsoft.Json"    Version="13.0.4" />
+        <PackageReference Include="Npgsql"             Version="10.0.1" />
+        <PackageReference Include="System.Data.Odbc"   Version="10.0.2" />
+        <PackageReference Include="System.Management"  Version="10.0.0-rc.2.25502.107" />
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.*" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.*" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="8.0.*" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.*" />
+
+
+        <PackageReference Include="Nethereum.ABI" Version="4.29.0.0" />
+        <PackageReference Include="Nethereum.HdWallet" Version="4.29.0.0" />
+        <PackageReference Include="Nethereum.Web3" Version="4.29.0.0" />
+        <PackageReference Include="Cronos" Version="0.8.*" />
+
+    </ItemGroup>
+
+</Project>

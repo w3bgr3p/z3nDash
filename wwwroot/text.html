@@ -1,0 +1,467 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z3n8 | Tools</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Header ── */
+        .main-header {
+            background: var(--bg1);
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .main-header h1 { font-size: 14px; font-weight: 700; color: var(--accent); }
+        .header-sub { font-size: 10px; color: var(--text2); margin-left: 4px; }
+
+        /* ── Layout ── */
+        .page-body {
+            flex: 1;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ── Tool card ── */
+        .tool-card {
+            background: var(--bg1);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .tool-header {
+            padding: 7px 12px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tool-icon { font-size: 13px; }
+        .tool-title { font-size: 11px; font-weight: 700; color: var(--accent); flex: 1; text-transform: uppercase; letter-spacing: 0.4px; }
+        .tool-desc { font-size: 10px; color: var(--text2); }
+
+        .tool-body {
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* ── Two-column converter ── */
+        .converter-row {
+            display: grid;
+            grid-template-columns: 1fr 32px 1fr;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .converter-col { display: flex; flex-direction: column; gap: 4px; }
+        .col-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text2);
+            padding-left: 2px;
+        }
+
+        textarea, input[type=text] {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: 'Consolas', 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 6px 8px;
+            width: 100%;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.1s;
+            line-height: 1.5;
+        }
+        textarea:focus, input[type=text]:focus { border-color: var(--accent); }
+        textarea { min-height: 80px; }
+
+        /* ── Arrow button ── */
+        .arrow-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding-top: 16px; /* align with textarea, not label */
+        }
+        .arrow-btn {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text2);
+            cursor: pointer;
+            font-size: 13px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: border-color 0.1s, color 0.1s;
+        }
+        .arrow-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── Action row ── */
+        .action-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 11px;
+            background: var(--bg2);
+            color: var(--text);
+            font-family: inherit;
+            transition: background 0.1s, border-color 0.1s;
+        }
+        .btn:hover { background: var(--bg3); border-color: var(--text2); }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { opacity: 0.85; }
+        .btn.sm { padding: 2px 7px; font-size: 10px; }
+
+        .copy-btn {
+            margin-left: auto;
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 10px;
+            background: none;
+            color: var(--text2);
+            font-family: inherit;
+            transition: color 0.1s, border-color 0.1s;
+        }
+        .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+        .copy-btn.copied { color: var(--green, #3fb950); border-color: var(--green, #3fb950); }
+
+        .status-text {
+            font-size: 10px;
+            color: var(--text2);
+            font-style: italic;
+        }
+
+        /* ── Single-input escaper ── */
+        .single-col { display: flex; flex-direction: column; gap: 4px; }
+
+        /* ── Divider ── */
+        .section-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text2);
+            padding: 4px 0 2px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2px;
+        }
+
+        /* scrollbars */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<div class="main-header">
+    <h1>Tools</h1>
+    <span class="header-sub">Escapers · Converters</span>
+</div>
+
+<div class="page-body">
+
+    <!-- ── URL ↔ String ─────────────────────────────────────── -->
+    <div class="tool-card">
+        <div class="tool-header">
+            <span class="tool-icon">🔗</span>
+            <span class="tool-title">URL Encode / Decode</span>
+            <span class="tool-desc">encodeURIComponent ↔ decoded string</span>
+        </div>
+        <div class="tool-body">
+            <div class="converter-row">
+                <div class="converter-col">
+                    <div class="col-label">Plain string</div>
+                    <textarea id="url_plain" placeholder="Hello World / foo=bar&baz=qux" oninput="urlFromPlain()"></textarea>
+                </div>
+                <div class="arrow-col">
+                    <button class="arrow-btn" onclick="urlFromPlain()" title="Encode →">→</button>
+                    <button class="arrow-btn" onclick="urlFromEncoded()" title="← Decode">←</button>
+                </div>
+                <div class="converter-col">
+                    <div class="col-label">URL encoded</div>
+                    <textarea id="url_encoded" placeholder="Hello%20World%20%2F%20foo%3Dbar%26baz%3Dqux" oninput="urlFromEncoded()"></textarea>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn sm" onclick="urlClear()">✕ Clear</button>
+                <button class="copy-btn" id="url_copy" onclick="copyField('url_encoded','url_copy')">Copy encoded</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── C# String Escaper ─────────────────────────────────── -->
+    <div class="tool-card">
+        <div class="tool-header">
+            <span class="tool-icon">⚙</span>
+            <span class="tool-title">C# String Escaper</span>
+            <span class="tool-desc">Любая строка → C# string literal (экранирует \, ", \n, \r, \t и др.)</span>
+        </div>
+        <div class="tool-body">
+            <div class="converter-row">
+                <div class="converter-col">
+                    <div class="col-label">Исходная строка</div>
+                    <textarea id="cs_raw" placeholder='Вставь любой текст, путь или JSON...' oninput="csEscape()"></textarea>
+                </div>
+                <div class="arrow-col">
+                    <button class="arrow-btn" onclick="csEscape()" title="Escape →">→</button>
+                    <button class="arrow-btn" onclick="csUnescape()" title="← Unescape">←</button>
+                </div>
+                <div class="converter-col">
+                    <div class="col-label">C# literal (готово к вставке)</div>
+                    <textarea id="cs_escaped" placeholder='"Вставь любой текст, путь или JSON..."' oninput="csUnescape()"></textarea>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn sm" onclick="csClear()">✕ Clear</button>
+                <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer">
+                    <input type="checkbox" id="cs_verbatim" onchange="csEscape()" style="cursor:pointer">
+                    verbatim (@"...") — только удваивает "
+                </label>
+                <button class="copy-btn" id="cs_copy" onclick="copyField('cs_escaped','cs_copy')">Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Base64 ─────────────────────────────────────────────── -->
+    <div class="tool-card">
+        <div class="tool-header">
+            <span class="tool-icon">🔢</span>
+            <span class="tool-title">Base64 Encode / Decode</span>
+            <span class="tool-desc">UTF-8 string ↔ Base64</span>
+        </div>
+        <div class="tool-body">
+            <div class="converter-row">
+                <div class="converter-col">
+                    <div class="col-label">Plain text</div>
+                    <textarea id="b64_plain" placeholder="any text..." oninput="b64Encode()"></textarea>
+                </div>
+                <div class="arrow-col">
+                    <button class="arrow-btn" onclick="b64Encode()" title="Encode →">→</button>
+                    <button class="arrow-btn" onclick="b64Decode()" title="← Decode">←</button>
+                </div>
+                <div class="converter-col">
+                    <div class="col-label">Base64</div>
+                    <textarea id="b64_encoded" placeholder="YW55IHRleHQu..." oninput="b64Decode()"></textarea>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn sm" onclick="b64Clear()">✕ Clear</button>
+                <span id="b64_err" class="status-text"></span>
+                <button class="copy-btn" id="b64_copy" onclick="copyField('b64_encoded','b64_copy')">Copy encoded</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── JSON Escape ───────────────────────────────────────── -->
+    <div class="tool-card">
+        <div class="tool-header">
+            <span class="tool-icon">{}</span>
+            <span class="tool-title">JSON String Escape</span>
+            <span class="tool-desc">Строка → JSON-safe значение (для вставки внутрь JSON)</span>
+        </div>
+        <div class="tool-body">
+            <div class="converter-row">
+                <div class="converter-col">
+                    <div class="col-label">Raw string</div>
+                    <textarea id="json_raw" placeholder='He said "hello" and left.' oninput="jsonEscape()"></textarea>
+                </div>
+                <div class="arrow-col">
+                    <button class="arrow-btn" onclick="jsonEscape()" title="Escape →">→</button>
+                    <button class="arrow-btn" onclick="jsonUnescape()" title="← Unescape">←</button>
+                </div>
+                <div class="converter-col">
+                    <div class="col-label">JSON escaped</div>
+                    <textarea id="json_escaped" placeholder='"He said \\"hello\\" and left."' oninput="jsonUnescape()"></textarea>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn sm" onclick="jsonClear()">✕ Clear</button>
+                <button class="copy-btn" id="json_copy" onclick="copyField('json_escaped','json_copy')">Copy</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ── URL ──────────────────────────────────────────────────────────────────
+    function urlFromPlain() {
+        var v = document.getElementById('url_plain').value;
+        document.getElementById('url_encoded').value = encodeURIComponent(v);
+    }
+    function urlFromEncoded() {
+        var v = document.getElementById('url_encoded').value;
+        try { document.getElementById('url_plain').value = decodeURIComponent(v); }
+        catch(e) { document.getElementById('url_plain').value = '[Invalid URL encoding]'; }
+    }
+    function urlClear() {
+        document.getElementById('url_plain').value = '';
+        document.getElementById('url_encoded').value = '';
+    }
+
+    // ── C# Escaper ───────────────────────────────────────────────────────────
+    function csEscape() {
+        var raw      = document.getElementById('cs_raw').value;
+        var verbatim = document.getElementById('cs_verbatim').checked;
+        var result;
+        if (verbatim) {
+            result = '@"' + raw.replace(/"/g, '""') + '"';
+        } else {
+            result = '"' + raw
+                    .replace(/\\/g, '\\\\')
+                    .replace(/"/g,  '\\"')
+                    .replace(/\r\n/g, '\\r\\n')
+                    .replace(/\n/g,  '\\n')
+                    .replace(/\r/g,  '\\r')
+                    .replace(/\t/g,  '\\t')
+                    .replace(/\0/g,  '\\0')
+                + '"';
+        }
+        document.getElementById('cs_escaped').value = result;
+    }
+    function csUnescape() {
+        var v = document.getElementById('cs_escaped').value.trim();
+        try {
+            // verbatim: @"..."
+            if (v.startsWith('@"') && v.endsWith('"')) {
+                var inner = v.slice(2, -1).replace(/""/g, '"');
+                document.getElementById('cs_raw').value = inner;
+                return;
+            }
+            // regular: "..."
+            if (v.startsWith('"') && v.endsWith('"')) {
+                var inner2 = v.slice(1, -1)
+                    .replace(/\\r\\n/g, '\r\n')
+                    .replace(/\\n/g,  '\n')
+                    .replace(/\\r/g,  '\r')
+                    .replace(/\\t/g,  '\t')
+                    .replace(/\\0/g,  '\0')
+                    .replace(/\\"/g,  '"')
+                    .replace(/\\\\/g, '\\');
+                document.getElementById('cs_raw').value = inner2;
+                return;
+            }
+            document.getElementById('cs_raw').value = '[Ожидается строка в кавычках]';
+        } catch(e) {
+            document.getElementById('cs_raw').value = '[Parse error]';
+        }
+    }
+    function csClear() {
+        document.getElementById('cs_raw').value = '';
+        document.getElementById('cs_escaped').value = '';
+    }
+
+    // ── Base64 ───────────────────────────────────────────────────────────────
+    function b64Encode() {
+        var v = document.getElementById('b64_plain').value;
+        try {
+            var bytes = new TextEncoder().encode(v);
+            var bin   = String.fromCharCode(...bytes);
+            document.getElementById('b64_encoded').value = btoa(bin);
+            document.getElementById('b64_err').textContent = '';
+        } catch(e) {
+            document.getElementById('b64_err').textContent = e.message;
+        }
+    }
+    function b64Decode() {
+        var v = document.getElementById('b64_encoded').value.trim();
+        try {
+            var bin   = atob(v);
+            var bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+            document.getElementById('b64_plain').value = new TextDecoder().decode(bytes);
+            document.getElementById('b64_err').textContent = '';
+        } catch(e) {
+            document.getElementById('b64_err').textContent = 'Invalid Base64';
+        }
+    }
+    function b64Clear() {
+        document.getElementById('b64_plain').value = '';
+        document.getElementById('b64_encoded').value = '';
+        document.getElementById('b64_err').textContent = '';
+    }
+
+    // ── JSON Escape ──────────────────────────────────────────────────────────
+    function jsonEscape() {
+        var raw = document.getElementById('json_raw').value;
+        var escaped = JSON.stringify(raw); // даёт "строку с кавычками и эскейпами"
+        document.getElementById('json_escaped').value = escaped;
+    }
+    function jsonUnescape() {
+        var v = document.getElementById('json_escaped').value.trim();
+        try {
+            var parsed = JSON.parse(v);
+            document.getElementById('json_raw').value = typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2);
+        } catch(e) {
+            document.getElementById('json_raw').value = '[Invalid JSON string]';
+        }
+    }
+    function jsonClear() {
+        document.getElementById('json_raw').value = '';
+        document.getElementById('json_escaped').value = '';
+    }
+
+    // ── Copy helper ──────────────────────────────────────────────────────────
+    function copyField(fieldId, btnId) {
+        var val = document.getElementById(fieldId).value;
+        if (!val) return;
+        navigator.clipboard.writeText(val).then(function() {
+            var btn = document.getElementById(btnId);
+            var orig = btn.textContent;
+            btn.textContent = '✓ Copied';
+            btn.classList.add('copied');
+            setTimeout(function() {
+                btn.textContent = orig;
+                btn.classList.remove('copied');
+            }, 1500);
+        });
+    }
+</script>
+
+</body>
+</html>

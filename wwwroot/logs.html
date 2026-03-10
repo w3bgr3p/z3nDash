@@ -695,7 +695,10 @@
         const cookieSource = document.getElementById('httpCookieSourceFilter').value;
         const account = document.getElementById('httpAccountFilter')?.value || '';
         const limit = document.getElementById('httpLimitInput').value;
-
+        
+        PageState.save({ http: { method, status, url, machine, project, cookieSource, account, limit } }); // ← ДОБАВИТЬ
+        
+        
         let apiUrl = `${SERVER}/http-logs?limit=${limit}`;
         if (method) apiUrl += `&method=${method}`;
         if (status) apiUrl += `&status=${status}`;
@@ -831,6 +834,9 @@
         const pid = document.getElementById('logsPidFilter').value;
         const limit = document.getElementById('logsLimitInput').value;
         const account = document.getElementById('logsAccountFilter').value;
+
+        PageState.save({ logs: { level, machine, project, session, port, pid, account, limit } }); // ← ДОБАВИТЬ
+
 
         let url = `${SERVER}/logs?limit=${limit}`;
         if (level) url += `&level=${level}`;
@@ -1246,6 +1252,8 @@
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
                 resizer.style.background = ''; // Возвращаем исходный цвет
+                PageState.save({ resizerPct: parseFloat(leftPanel.style.flex.replace('0 0 ', '')) }); // ← ДОБАВИТЬ
+
             }
         });
 
@@ -1255,6 +1263,26 @@
 
     // Запуск
     initResizablePanels();
+
+    const _s = PageState.load();                                                              // читаем сохранённое
+
+    if (_s.resizerPct) {                                                                      // ширина панелей
+        document.getElementById('logsPanel').style.flex = `0 0 ${_s.resizerPct}%`;
+        document.getElementById('httpPanel').style.flex = '1 1 0';
+    }
+    if (_s.http) {                                                                            // HTTP-фильтры
+        const h = _s.http;
+        if (h.method)       document.getElementById('httpMethodFilter').value       = h.method;
+        if (h.status)       document.getElementById('httpStatusFilter').value       = h.status;
+        if (h.url)          document.getElementById('httpUrlFilter').value          = h.url;
+        if (h.cookieSource) document.getElementById('httpCookieSourceFilter').value = h.cookieSource;
+        if (h.limit)        document.getElementById('httpLimitInput').value         = h.limit;
+    }
+    if (_s.logs) {                                                                            // Logs-фильтры
+        const l = _s.logs;
+        if (l.level) document.getElementById('logsLevelFilter').value = l.level;
+        if (l.limit) document.getElementById('logsLimitInput').value  = l.limit;
+    }
 
     // Initialize both panels (это уже есть в коде)
     refreshHttp();
