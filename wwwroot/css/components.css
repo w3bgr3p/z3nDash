@@ -171,3 +171,23 @@
     font-size: 10px;
     padding: 2px 7px;
 }
+
+
+/* ── Common Task Status ── */
+.task-status {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.task-status.newbie,  .st-Newbie   { background: var(--yellow-tint); color: var(--yellow); }
+.task-status.running, .st-Perform  { background: var(--green-tint); color: var(--green); border: 1px solid var(--green-bg); }
+.task-status.done,    .st-Complete { background: var(--purple-tint); color: var(--purple); }
+.task-status.fail,    .st-Fail     { background: var(--red-tint); color: var(--red); border: 1px solid var(--red-bg); }
+.task-status.planned, .st-Schedule { background: var(--blue-tint); color: var(--accent); border: 1px solid var(--blue-border); }
+.task-status.paused,  .st-Stop     { background: var(--bg2); color: var(--text2); }
+.task-status.empty,   .st-empty    { background: var(--bg2); color: var(--muted); }

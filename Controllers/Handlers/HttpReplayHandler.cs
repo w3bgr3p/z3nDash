@@ -12,7 +12,7 @@ internal sealed class HttpReplayHandler
         AllowAutoRedirect                = true,
         MaxAutomaticRedirections         = 5,
         ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-    }) { Timeout = TimeSpan.FromSeconds(30) };
+    }) { Timeout = TimeSpan.FromSeconds(5) };
 
     public async Task Handle(HttpListenerContext ctx)
     {
@@ -27,6 +27,9 @@ internal sealed class HttpReplayHandler
         var method = req.TryGetProperty("method", out var m) ? m.GetString() ?? "GET" : "GET";
         var headers = req.TryGetProperty("headers", out var h) && h.ValueKind == JsonValueKind.Object ? h : default;
         var body   = req.TryGetProperty("body",   out var b) ? b.GetString() : null;
+        
+        
+        $"[REPLAY] body_len={body?.Length} \r\nbody={body}".Debug();
 
         if (string.IsNullOrEmpty(url)) { await HttpHelpers.WriteJson(ctx.Response, new { error = "url required" }); return; }
 
@@ -44,10 +47,22 @@ internal sealed class HttpReplayHandler
             var ct = "application/json";
             try { if (msg.Headers.Contains("content-type")) ct = msg.Headers.GetValues("content-type").First(); } catch { }
             msg.Content = new StringContent(body, System.Text.Encoding.UTF8, ct);
+            msg.Content.Headers.ContentType!.CharSet = null; // убрать charset
         }
 
+        
+        
         try
         {
+            $"[REPLAY] >>> {method} {url}".Debug();
+            foreach (var he in msg.Headers)
+                $"[REPLAY] HDR: {he.Key}: {string.Join(", ", he.Value)}".Debug();
+            if (msg.Content != null)
+            {
+                foreach (var he in msg.Content.Headers)
+                    $"[REPLAY] CNT: {he.Key}: {string.Join(", ", he.Value)}".Debug();
+            }
+
             var res = await _client.SendAsync(msg);
             sw.Stop();
 
@@ -55,7 +70,8 @@ internal sealed class HttpReplayHandler
             var responseHeaders = new Dictionary<string, string>();
             foreach (var kv in res.Headers)         responseHeaders[kv.Key] = string.Join(", ", kv.Value);
             foreach (var kv in res.Content.Headers) responseHeaders[kv.Key] = string.Join(", ", kv.Value);
-
+            
+            ctx.Response.Headers["Connection"] = "close";
             await HttpHelpers.WriteJson(ctx.Response, new
             {
                 statusCode      = (int)res.StatusCode,

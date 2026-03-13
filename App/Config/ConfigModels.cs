@@ -19,6 +19,7 @@ public class LogsConfig
     public string LogHost { get; set; } = string.Empty;
     public string TrafficHost { get; set; } = string.Empty;
     public string DashboardPort { get; set; } = string.Empty;
+    public string ReplayPort { get; set; } = string.Empty;
     public string LogsFolder { get; set; } = string.Empty;
     public string TempFolder { get; set; } = string.Empty;
     public string ReportsFolder { get; set; } = string.Empty;
@@ -30,7 +31,10 @@ public class ApiConfig
 {
     public string ZB { get; set; } = string.Empty;
 }
-
+public class SecurityConfig
+{
+    public string JVarsPath { get; set; } = string.Empty;
+}
 public class CrxItem
 {
     public string Id { get; set; } = string.Empty;

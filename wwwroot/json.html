@@ -733,9 +733,10 @@
     // ════════════════════════════════════════════════════════
     // MUTATIONS
     // ════════════════════════════════════════════════════════
-    function toggleCollapse(path) { collapseStates[path] = !collapseStates[path]; rebuildAndRender(); }
+    function toggleCollapse(path) { collapseStates[path] = !collapseStates[path]; PageState.save({ collapseStates: collapseStates }); rebuildAndRender(); }
     function toggleManualHide(path) {
         if (manualHideStates[path]) delete manualHideStates[path]; else manualHideStates[path] = true;
+        PageState.save({ manualHideStates: manualHideStates });
         rebuildAndRender(); updateHiddenPanel();
     }
     function rebuildAndRender(resetScroll) {
@@ -780,6 +781,7 @@
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => {
             searchQuery = document.getElementById('search').value.toLowerCase().trim();
+            PageState.save({ searchQuery: searchQuery });
             if (!parsedData) return;
             applySearch(); scheduleRender();
         }, 200);
@@ -804,6 +806,7 @@
         searchQuery = ''; filterHideKeys = null;
         document.getElementById('search').value = '';
         document.getElementById('search-count').textContent = '';
+        PageState.save({ inputJson: raw, collapseStates: {}, manualHideStates: {}, searchQuery: '', filterHideKeys: null, activePreset: null });
 
         if (raw.length >= LARGE_THRESHOLD) {
             document.getElementById('info-banner').classList.add('show');
@@ -836,11 +839,12 @@
         const val = document.getElementById('input').value;
         const len = val.length;
         document.getElementById('char-count').textContent = len ? len.toLocaleString() + ' chars' : '';
-        if (!val.trim()) return;
+        if (!val.trim()) { PageState.save({ inputJson: '' }); return; }
         if (len > AUTO_PARSE_MAX) {
             document.getElementById('info-banner').classList.add('show');
             document.getElementById('info-banner').textContent =
                 '⚡ ' + (len / 1e6).toFixed(2) + ' MB — click ▶ Parse (Ctrl+Enter)';
+            PageState.save({ inputJson: val });
             return;
         }
         clearTimeout(inputTimer);
@@ -851,6 +855,7 @@
                 document.getElementById('info-banner').classList.remove('show');
                 rebuildAndRender(true); updateStats(); initDepthButtons();
             } catch {}
+            PageState.save({ inputJson: val });
         }, 300);
     }
 
@@ -871,26 +876,29 @@
         document.getElementById('vscroll-rows').innerHTML = '';
         document.getElementById('vscroll-spacer').style.height = '0';
         updateHiddenPanel();
+        PageState.save({ inputJson: '', collapseStates: {}, manualHideStates: {}, searchQuery: '', filterHideKeys: null, activePreset: null, ffPanelOpen: false });
     }
 
     // ════════════════════════════════════════════════════════
     // BULK OPS
     // ════════════════════════════════════════════════════════
-    function expandAll() { collapseStates = {}; document.querySelectorAll('.depth-btn').forEach(b => b.classList.remove('active')); rebuildAndRender(); }
+    function expandAll() { collapseStates = {}; PageState.save({ collapseStates: {} }); document.querySelectorAll('.depth-btn').forEach(b => b.classList.remove('active')); rebuildAndRender(); }
     function collapseAll() {
         if (!parsedData) return;
         collapseStates = {};
         iWalkPaths(parsedData, (p, v) => { if (v !== null && typeof v === 'object') collapseStates[p] = true; });
+        PageState.save({ collapseStates: collapseStates });
         rebuildAndRender();
     }
     function collapseToDepth(maxDepth) {
         if (!parsedData) return;
         collapseStates = {};
         iWalkPaths(parsedData, (p, v, d) => { if (v !== null && typeof v === 'object') collapseStates[p] = (d >= maxDepth); });
+        PageState.save({ collapseStates: collapseStates });
         rebuildAndRender();
         document.querySelectorAll('.depth-btn').forEach(b => { b.classList.toggle('active', parseInt(b.dataset.depth) === maxDepth); });
     }
-    function showAll() { manualHideStates = {}; updateHiddenPanel(); rebuildAndRender(); }
+    function showAll() { manualHideStates = {}; PageState.save({ manualHideStates: {} }); updateHiddenPanel(); rebuildAndRender(); }
 
     function iWalkPaths(obj, fn) {
         const stack = [{ val: obj, path: '', depth: 0 }];
@@ -1103,12 +1111,14 @@
         const all = [...document.querySelectorAll('.chip')];
         const off = all.filter(c => !c.classList.contains('on')).map(c => c.dataset.field);
         filterHideKeys = off.length ? new Set(off) : null;
+        PageState.save({ filterHideKeys: off.length ? off : null, activePreset: null });
         setPresetActive(null); updateFFBadge(); rebuildAndRender();
     }
 
     function toggleFFPanel() {
         const body = document.getElementById('ff-body'); const arrow = document.getElementById('ff-arrow');
         body.classList.toggle('open'); arrow.textContent = body.classList.contains('open') ? '▼' : '▶';
+        PageState.save({ ffPanelOpen: body.classList.contains('open') });
     }
 
     function applyPreset(name) {
@@ -1122,6 +1132,8 @@
             const body = document.getElementById('ff-body');
             if (!body.classList.contains('open')) toggleFFPanel();
         }
+        const offKeys = filterHideKeys ? [...filterHideKeys] : null;
+        PageState.save({ activePreset: name, filterHideKeys: offKeys });
         setPresetActive(name); updateFFBadge(); rebuildAndRender();
     }
 
@@ -1156,6 +1168,43 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReplay(); });
 
     window.addEventListener('load', () => {
+        // Restore saved state
+        const st = PageState.load();
+        if (st.inputJson) {
+            document.getElementById('input').value = st.inputJson;
+            const len = st.inputJson.length;
+            document.getElementById('char-count').textContent = len ? len.toLocaleString() + ' chars' : '';
+            if (st.searchQuery) {
+                searchQuery = st.searchQuery;
+                document.getElementById('search').value = st.searchQuery;
+            }
+            if (st.collapseStates)   collapseStates   = st.collapseStates;
+            if (st.manualHideStates) manualHideStates = st.manualHideStates;
+            try {
+                parsedData = JSON.parse(st.inputJson);
+                if (len >= LARGE_THRESHOLD) {
+                    document.getElementById('info-banner').classList.add('show');
+                    document.getElementById('info-banner').textContent =
+                        '⚡ Large JSON (' + (len / 1e6).toFixed(2) + ' MB) — virtual rendering, deep nodes auto-collapsed';
+                }
+                rebuildAndRender(false); updateStats(); initDepthButtons(); initFieldFilter(); updateHiddenPanel();
+                // Restore field filter state after initFieldFilter rebuilt chips
+                if (st.filterHideKeys && st.filterHideKeys.length) {
+                    filterHideKeys = new Set(st.filterHideKeys);
+                    document.querySelectorAll('.chip').forEach(c => {
+                        if (filterHideKeys.has(c.dataset.field)) c.classList.remove('on'); else c.classList.add('on');
+                    });
+                    updateFFBadge();
+                }
+                if (st.activePreset) setPresetActive(st.activePreset);
+                if (st.ffPanelOpen) {
+                    const body = document.getElementById('ff-body'); const arrow = document.getElementById('ff-arrow');
+                    body.classList.add('open'); arrow.textContent = '▼';
+                }
+                if (st.searchQuery && parsedData) { applySearch(); scheduleRender(); }
+            } catch {}
+            return;
+        }
         // Demo: реальные запросы к httpbin.org — публичный echo-сервис
         // ⚡ Replay работает сразу: нажми ⚡ на любом url или кнопку Replay в тулбаре
         const demo = JSON.stringify({

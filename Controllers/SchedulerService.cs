@@ -31,6 +31,7 @@ public sealed class SchedulerService : IDisposable
         { "interval_minutes", "TEXT DEFAULT '0'" },
         { "fixed_time",       "TEXT DEFAULT ''" },
         { "on_overlap",       "TEXT DEFAULT 'skip'" },
+        { "max_threads",      "TEXT DEFAULT '1'" },
         { "status",           "TEXT DEFAULT 'idle'" },
         { "last_run",         "TEXT DEFAULT ''" },
         { "last_exit",        "TEXT DEFAULT ''" },
@@ -41,6 +42,19 @@ public sealed class SchedulerService : IDisposable
         { "runs_success",     "TEXT DEFAULT '0'" },
         { "schedule_tag",     "TEXT DEFAULT ''" },  // стабильный тег = имя задачи, фильтр логов
         { "last_run_id",      "TEXT DEFAULT ''" },  // run_id последнего прогона
+    };
+
+    private const string QueueTable = "_schedule_queue";
+
+    private static readonly Dictionary<string, string> QueueSchema = new()
+    {
+        { "uuid",        "TEXT PRIMARY KEY" },
+        { "schedule_id", "TEXT DEFAULT ''" },
+        { "queued_at",   "TEXT DEFAULT ''" },
+        { "status",      "TEXT DEFAULT 'pending'" },  // pending | running | done | error
+        { "priority",    "TEXT DEFAULT '10'" },        // 0=explicit, 10=cron/interval
+        { "run_id",      "TEXT DEFAULT ''" },
+        { "args_b64",    "TEXT DEFAULT ''" },
     };
 
     public SchedulerService(DbConnectionService dbService, Logger? log = null)
@@ -54,6 +68,9 @@ public sealed class SchedulerService : IDisposable
     {
         if (!_dbService.TryGetDb(out var db) || db == null) return;
         db.PrepareTable(Schema, Table);
+        db.PrepareTable(QueueSchema, QueueTable);
+        db.Query($"UPDATE \"{Table}\" SET \"status\" = 'idle' WHERE \"status\" = 'running'");
+        db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'error' WHERE \"status\" = 'running'");
     }
 
     private void Tick(object? _)
@@ -68,30 +85,134 @@ public sealed class SchedulerService : IDisposable
 
         foreach (var row in rows)
         {
-            var record = ParseRow(row, columns);
+            var record     = ParseRow(row, columns);
             if (!ShouldFire(record, now)) continue;
 
-            var overlap = record.GetValueOrDefault("on_overlap", "skip");
-            var id      = record.GetValueOrDefault("id", "");
+            var overlap    = record.GetValueOrDefault("on_overlap", "skip");
+            var id         = record.GetValueOrDefault("id", "");
+            var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
+            var active     = CountActiveInstances(id);
 
-            if (_running.TryGetValue(id, out var existing) && !existing.HasExited)
+            switch (overlap)
             {
-                switch (overlap)
-                {
-                    case "skip":
-                        continue;
-                    case "kill_restart":
-                        existing.Kill();
-                        _running.TryRemove(id, out RunningProcess _);
-                        break;
-                }
+                case "skip":
+                    if (active > 0) continue;
+                    break;
+                case "kill_restart":
+                    if (active > 0) { KillAllInstances(id); RemoveInstancesFromRunning(id); }
+                    break;
+                case "parallel":
+                    if (active >= maxThreads) { EnqueueItem(db, id, record, priority: 10); continue; }
+                    break;
             }
 
             _ = LaunchAsync(db, record, now);
         }
+
+        DrainQueue(db, now);
     }
 
-    private async Task LaunchAsync(Db db, Dictionary<string, string> record, DateTime firedAt)
+    private int CountActiveInstances(string scheduleId)
+        => _running.Count(kv => kv.Key.StartsWith(scheduleId + ":") && !kv.Value.HasExited);
+
+    private void RemoveInstancesFromRunning(string scheduleId)
+    {
+        foreach (var key in _running.Keys.Where(k => k.StartsWith(scheduleId + ":")).ToList())
+            _running.TryRemove(key, out _);
+    }
+
+    private void KillAllInstances(string scheduleId)
+    {
+        foreach (var kv in _running.Where(kv => kv.Key.StartsWith(scheduleId + ":")))
+            kv.Value.Kill();
+    }
+
+    private void EnqueueItem(Db db, string scheduleId, Dictionary<string, string> record, int priority)
+    {
+        db.InsertDic(new Dictionary<string, string>
+        {
+            { "uuid",        Guid.NewGuid().ToString() },
+            { "schedule_id", scheduleId },
+            { "queued_at",   DateTime.UtcNow.ToString("o") },
+            { "status",      "pending" },
+            { "priority",    priority.ToString() },
+            { "run_id",      "" },
+            { "args_b64",    record.GetValueOrDefault("args", "") },
+        }, QueueTable);
+    }
+
+    private void DrainQueue(Db db, DateTime now)
+    {
+        var schedCols = db.GetTableColumns(Table);
+        if (schedCols.Count == 0) return;
+
+        var qCols = db.GetTableColumns(QueueTable);
+        if (qCols.Count == 0) return;
+
+        var colsSql = string.Join(", ", qCols.Select(c => $"\"{c}\""));
+        var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"status\" = 'pending' ORDER BY \"priority\" ASC, \"queued_at\" ASC");
+        if (string.IsNullOrWhiteSpace(raw)) return;
+
+        foreach (var qRow in raw.Split('·').Where(r => !string.IsNullOrWhiteSpace(r)))
+        {
+            var qRecord    = ParseRow(qRow, qCols);
+            var scheduleId = qRecord.GetValueOrDefault("schedule_id", "");
+            if (string.IsNullOrEmpty(scheduleId)) continue;
+
+            var schedRows = db.GetLines(string.Join(",", schedCols), Table, where: $"\"id\" = '{scheduleId}'");
+            if (schedRows.Count == 0) continue;
+
+            var record     = ParseRow(schedRows[0], schedCols);
+            var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
+            if (CountActiveInstances(scheduleId) >= maxThreads) continue;
+
+            var qUuid   = qRecord.GetValueOrDefault("uuid", "");
+            var argsB64 = qRecord.GetValueOrDefault("args_b64", "");
+            db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'running' WHERE \"uuid\" = '{qUuid}'");
+
+            if (!string.IsNullOrWhiteSpace(argsB64)) record["args"] = argsB64;
+            _ = LaunchFromQueue(db, record, now, qUuid);
+        }
+    }
+
+    private void TryDrainOne(Db db, string scheduleId)
+    {
+        var schedCols = db.GetTableColumns(Table);
+        if (schedCols.Count == 0) return;
+
+        var schedRows = db.GetLines(string.Join(",", schedCols), Table, where: $"\"id\" = '{scheduleId}'");
+        if (schedRows.Count == 0) return;
+
+        var record     = ParseRow(schedRows[0], schedCols);
+        var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
+        if (CountActiveInstances(scheduleId) >= maxThreads) return;
+
+        var qCols = db.GetTableColumns(QueueTable);
+        if (qCols.Count == 0) return;
+
+        var colsSql = string.Join(", ", qCols.Select(c => $"\"{c}\""));
+        var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"status\" = 'pending' AND \"schedule_id\" = '{scheduleId}' ORDER BY \"priority\" ASC, \"queued_at\" ASC LIMIT 1");
+        if (string.IsNullOrWhiteSpace(raw)) return;
+
+        var qRecord = ParseRow(raw.Split('·')[0], qCols);
+        var qUuid   = qRecord.GetValueOrDefault("uuid", "");
+        var argsB64 = qRecord.GetValueOrDefault("args_b64", "");
+        db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'running' WHERE \"uuid\" = '{qUuid}'");
+
+        if (!string.IsNullOrWhiteSpace(argsB64)) record["args"] = argsB64;
+        _ = LaunchFromQueue(db, record, DateTime.UtcNow, qUuid);
+    }
+
+    private static void FinishQueueEntry(Db db, string? queueUuid, string status, string runId)
+    {
+        if (string.IsNullOrEmpty(queueUuid)) return;
+        db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = '{status}', \"run_id\" = '{runId}' WHERE \"uuid\" = '{queueUuid}'");
+    }
+
+    private Task LaunchAsync(Db db, Dictionary<string, string> record, DateTime firedAt)
+        => LaunchFromQueue(db, record, firedAt, queueUuid: null);
+
+    private async Task LaunchFromQueue(Db db, Dictionary<string, string> record, DateTime firedAt, string? queueUuid)
     {
         var id         = record.GetValueOrDefault("id", "");
         var name       = record.GetValueOrDefault("name", id);
@@ -101,6 +222,7 @@ public sealed class SchedulerService : IDisposable
 
         // ── уникальный id прогона ──────────────────────────────────────────────
         var runId       = Guid.NewGuid().ToString("N")[..12];
+        var instanceKey = $"{id}:{runId}";
         var scheduleTag = BuildScheduleTag(name);
 
         var payloadValues = record.GetValueOrDefault("payload_values", "");
@@ -137,6 +259,9 @@ public sealed class SchedulerService : IDisposable
 
             args = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
         }
+        
+        Action<string> broadcast = line =>
+            SseHub.BroadcastOutput(JsonSerializer.Serialize(new { line, level = line.StartsWith("[ERR]") ? "ERROR" : "INFO" }), id);
 
         if (executor == "internal")
         {
@@ -149,11 +274,12 @@ public sealed class SchedulerService : IDisposable
 
             UpdateStatus(db, id, "running", firedAt, "", "", runId);
             var cts = new CancellationTokenSource();
-            var rp  = new RunningProcess(null, firedAt, cts);
-            _running[id] = rp;
+
+            var rp  = new RunningProcess(null, firedAt, cts, broadcast);
+            _running[instanceKey] = rp;
 
             Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"[LIVE] internal task started id={id} name={name} run={runId}");
+            Console.WriteLine($"[LIVE] internal task started id={id} name={name} run={runId} key={instanceKey}");
             Console.ResetColor();
 
             try
@@ -168,23 +294,28 @@ public sealed class SchedulerService : IDisposable
                 payload["__scheduleTag"] = scheduleTag;
 
                 var output = await handler(payload, cts.Token, rp.AddLine);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
                 rp.Result = output ?? "";
                 RunLogger(scheduleTag, runId)?.Info($"[{name}] done run={runId}");
-                _running.TryRemove(id, out RunningProcess _);
-                UpdateStatus(db, id, "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
+                _running.TryRemove(instanceKey, out _);
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
+                FinishQueueEntry(db, queueUuid, "done", runId);
             }
             catch (Exception ex)
             {
                 rp.AddLine("[ERR] " + ex.Message);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
                 var runLog = RunLogger(scheduleTag, runId);
                 runLog?.Error($"[{name}] internal task failed: {ex.Message}");
                 rp.Result = ex.Message;
-                _running.TryRemove(id, out RunningProcess _);
-                UpdateStatus(db, id, "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
+                _running.TryRemove(instanceKey, out _);
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
+                FinishQueueEntry(db, queueUuid, "error", runId);
             }
             finally
             {
                 cts.Dispose();
+                TryDrainOne(db, id);
             }
 
             return;
@@ -204,44 +335,50 @@ public sealed class SchedulerService : IDisposable
                                         : Environment.CurrentDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError  = true,
+            RedirectStandardInput  = true,
             UseShellExecute        = false,
             CreateNoWindow         = true,
         };
 
         var process = new System.Diagnostics.Process { StartInfo = psi, EnableRaisingEvents = true };
-        var rp2     = new RunningProcess(process, firedAt, null);
+        var rp2     = new RunningProcess(process, firedAt, null, broadcast);
 
         process.OutputDataReceived += (_, e) => { if (e.Data != null) rp2.AddLine(e.Data); };
         process.ErrorDataReceived  += (_, e) => { if (e.Data != null) rp2.AddLine("[ERR] " + e.Data); };
 
         Console.ForegroundColor = ConsoleColor.Magenta;
-        Console.WriteLine($"[LIVE] process task starting id={id} name={name} run={runId} exe={fileName}");
+        Console.WriteLine($"[LIVE] process task starting id={id} name={name} run={runId} key={instanceKey} exe={fileName}");
         Console.ResetColor();
 
         try
         {
             process.Start();
+            process.StandardInput.Close();  
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
-            _running[id] = rp2;
+            _running[instanceKey] = rp2;
 
             await process.WaitForExitAsync();
+            SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
 
             string output = rp2.Snapshot();
             _log?.Info($"[{name}] exit {process.ExitCode} run={runId}");
-            _running.TryRemove(id, out RunningProcess _);
-            UpdateStatus(db, id, "idle", DateTime.UtcNow, process.ExitCode.ToString(), output, runId);
+            _running.TryRemove(instanceKey, out _);
+            UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, process.ExitCode.ToString(), output, runId);
+            FinishQueueEntry(db, queueUuid, "done", runId);
         }
         catch (Exception ex)
         {
             _log?.Error($"[{name}] launch failed: {ex.Message}");
-            _running.TryRemove(id, out RunningProcess _);
-            UpdateStatus(db, id, "error", DateTime.UtcNow, "-1", ex.Message, runId);
+            _running.TryRemove(instanceKey, out _);
+            UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", ex.Message, runId);
+            FinishQueueEntry(db, queueUuid, "error", runId);
         }
         finally
         {
             process.Dispose();
+            TryDrainOne(db, id);
         }
     }
 
@@ -363,7 +500,8 @@ public sealed class SchedulerService : IDisposable
             "csx"     => ("cmd.exe",  $"/c dotnet-script \"{scriptPath}\" {args}".Trim()),
             "exe"     => (scriptPath, args),
             "bat"     => ("cmd.exe",  $"/c \"{scriptPath}\" {args}".Trim()),
-            "bash" => (ResolveGitBash(), $"-c \"stdbuf -oL -eL bash '{scriptPath}' {args}\"".Trim()),
+            "bash" => (ResolveGitBash(), $"--login -i \"{scriptPath}\" {args}".Trim()),
+            "ps1" => ("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" {args}".Trim()),
             _         => ("python",   $"\"{scriptPath}\" {args}".Trim()),
         };
     }
@@ -379,33 +517,72 @@ public sealed class SchedulerService : IDisposable
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    public bool IsRunning(string id) =>
-        _running.TryGetValue(id, out var p) && !p.HasExited;
+    public bool IsRunning(string id)
+        => _running.Any(kv => kv.Key.StartsWith(id + ":") && !kv.Value.HasExited);
 
     public (int pid, long uptimeSec, long memoryMB, bool running) GetProcessInfo(string id)
     {
-        if (!_running.TryGetValue(id, out var rp) || rp.HasExited)
-            return (-1, 0, 0, false);
-        return (rp.Pid, rp.UptimeSec, rp.MemoryMB, true);
+        var inst = _running
+            .Where(kv => kv.Key.StartsWith(id + ":") && !kv.Value.HasExited)
+            .Select(kv => kv.Value)
+            .FirstOrDefault();
+        if (inst == null) return (-1, 0, 0, false);
+        return (inst.Pid, inst.UptimeSec, inst.MemoryMB, true);
     }
 
-    public string GetLiveOutput(string id)
+    // runId == null → все инстансы; задан → только этот
+    public string GetLiveOutput(string id, string? runId = null)
     {
-        var found = _running.TryGetValue(id, out var rp);
-        var snap  = found ? rp!.Snapshot() : "";
-        Console.ForegroundColor = ConsoleColor.DarkMagenta;
-        Console.WriteLine($"[LIVE?] id={id} found={found} len={snap.Length}");
-        Console.ResetColor();
-        return snap;
+        var keys = _running.Keys
+            .Where(k => k.StartsWith(id + ":"))
+            .Where(k => runId == null || k == $"{id}:{runId}")
+            .ToList();
+
+        if (keys.Count == 0) return "";
+        if (keys.Count == 1)
+            return _running.TryGetValue(keys[0], out var single) ? single.Snapshot() : "";
+
+        return string.Join("\n\n", keys
+            .Where(k => _running.ContainsKey(k))
+            .Select(k => $"── {k[(id.Length + 1)..]} ──\n{_running[k].Snapshot()}"));
     }
 
-    public string GetResult(string id) =>
-        _running.TryGetValue(id, out var rp) ? rp.Result : "";
+    public string GetResult(string id)
+        => _running
+            .Where(kv => kv.Key.StartsWith(id + ":"))
+            .Select(kv => kv.Value.Result)
+            .FirstOrDefault() ?? "";
 
     public void ClearLiveOutput(string id)
     {
-        if (_running.TryGetValue(id, out var rp)) rp.Clear();
+        foreach (var kv in _running.Where(kv => kv.Key.StartsWith(id + ":")))
+            kv.Value.Clear();
     }
+
+    public List<Dictionary<string, string>> GetInstances(string id)
+        => _running
+            .Where(kv => kv.Key.StartsWith(id + ":") && !kv.Value.HasExited)
+            .Select(kv => new Dictionary<string, string>
+            {
+                { "runId",     kv.Key[(id.Length + 1)..] },
+                { "uptimeSec", kv.Value.UptimeSec.ToString() },
+                { "pid",       kv.Value.Pid.ToString() },
+                { "memoryMB",  kv.Value.MemoryMB.ToString() },
+            })
+            .ToList();
+
+    public List<Dictionary<string, string>> GetQueueItems(Db db, string scheduleId)
+    {
+        var qCols = db.GetTableColumns(QueueTable);
+        if (qCols.Count == 0) return new();
+        var colsSql = string.Join(", ", qCols.Select(c => $"\"{c}\""));
+        var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"schedule_id\" = '{scheduleId}' ORDER BY \"priority\" ASC, \"queued_at\" ASC");
+        if (string.IsNullOrWhiteSpace(raw)) return new();
+        return raw.Split('·').Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => ParseRow(r, qCols)).ToList();
+    }
+
+    public void ClearQueue(Db db, string scheduleId)
+        => db.Query($"DELETE FROM \"{QueueTable}\" WHERE \"schedule_id\" = '{scheduleId}' AND \"status\" = 'pending'");
 
     private readonly SemaphoreSlim _reserveLock = new(1, 1);
 
@@ -441,13 +618,12 @@ public sealed class SchedulerService : IDisposable
             record["__keyCol"]   = keyCol;
             record["__table"]    = table;
             record["__lockedAt"] = DateTime.UtcNow.ToString("o");  // ISO timestamp
-        
-            // ── логируем какой аккаунт залочен ────────────────────────
-            var acctLabel = record.GetValueOrDefault("address",
-                record.GetValueOrDefault("login",
-                    record.GetValueOrDefault("name", id)));
-            log?.Info($"account locked  table={table} id={id} label={acctLabel}");
-        
+            
+            
+            var countRaw  = db.Query($"SELECT COUNT(*) FROM \"{table}\" WHERE ({condition})");
+            var total     = int.TryParse(countRaw?.Trim(), out var n) ? n : 0;
+            log?.Info($"account {id} locked by condition {condition} from  table {table}  remaining={total - 1}");
+            
             return record;
         }
         finally
@@ -484,24 +660,35 @@ public sealed class SchedulerService : IDisposable
 
     public void Kill(string id)
     {
-        if (!_running.TryGetValue(id, out var rp)) return;
+        KillAllInstances(id);
+        RemoveInstancesFromRunning(id);
+    }
+
+    public void KillInstance(string id, string runId)
+    {
+        var key = $"{id}:{runId}";
+        if (!_running.TryGetValue(key, out var rp)) return;
         rp.Kill();
+        _running.TryRemove(key, out _);
     }
 
     public void FireNow(string id, Dictionary<string, string> record, Db db)
     {
-        var overlap = record.GetValueOrDefault("on_overlap", "skip");
+        var overlap    = record.GetValueOrDefault("on_overlap", "skip");
+        var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
+        var active     = CountActiveInstances(id);
 
-        if (_running.TryGetValue(id, out var existing) && !existing.HasExited)
+        switch (overlap)
         {
-            switch (overlap)
-            {
-                case "skip":    return;
-                case "kill_restart":
-                    existing.Kill();
-                    _running.TryRemove(id, out RunningProcess _);
-                    break;
-            }
+            case "skip":
+                if (active > 0) return;
+                break;
+            case "kill_restart":
+                if (active > 0) { KillAllInstances(id); RemoveInstancesFromRunning(id); }
+                break;
+            case "parallel":
+                if (active >= maxThreads) { EnqueueItem(db, id, record, priority: 0); return; }
+                break;
         }
 
         _ = LaunchAsync(db, record, DateTime.UtcNow);
@@ -522,16 +709,19 @@ public sealed class SchedulerService : IDisposable
         private readonly CancellationTokenSource?    _cts;
         private readonly List<string>                _lines = new();
         private readonly object                      _lock  = new();
+        private readonly Action<string>?             _broadcast;
 
-        public string Result { get; set; } = "";
+        public string   Result    { get; set; } = "";
         public DateTime StartedAt { get; }
 
-        public RunningProcess(System.Diagnostics.Process? process, DateTime startedAt, CancellationTokenSource? cts)
+        public RunningProcess(System.Diagnostics.Process? process, DateTime startedAt, CancellationTokenSource? cts, Action<string>? broadcast = null)
         {
-            _process  = process;
-            StartedAt = startedAt;
-            _cts      = cts;
+            _process   = process;
+            StartedAt  = startedAt;
+            _cts       = cts;
+            _broadcast = broadcast;
         }
+
 
         public int Pid =>
             _process == null ? -1 : (_process.HasExited ? -1 : _process.Id);
@@ -568,6 +758,7 @@ public sealed class SchedulerService : IDisposable
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine($"[LIVE+] {line}");
             Console.ResetColor();
+            _broadcast?.Invoke(line);
         }
 
         public string Snapshot()

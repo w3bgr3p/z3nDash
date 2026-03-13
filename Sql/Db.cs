@@ -179,7 +179,7 @@ namespace z3n8
             return Get(columns, tableName, log, thrw, key, id, where).Split(ColumnSeparator);
         }
 
-        public List<string> GetLines(string columns, string tableName = null, bool log = false, bool thrw = false, string key = "id", object id = null, string where = "")
+        public List<string> GetLines(string columns, string tableName = null, bool log = false, bool thrw = false, string key = "id", object id = null, string where = "1=1")
         {
             return Get(columns, tableName, log, thrw, key, id, where).Split(RawSeparator).ToList();
         }
@@ -554,7 +554,7 @@ namespace z3n8
         {
             var tableStructure = new Dictionary<string, string>
             {
-                { "id", "INTEGER PRIMARY KEY AUTOINCREMENT" }
+                { "id", "INTEGER PRIMARY KEY" }
             };
 
             foreach (var column in columns)
@@ -577,7 +577,6 @@ namespace z3n8
             if (string.IsNullOrEmpty(tableName))
                 throw new ArgumentException("Table name must be provided");
 
-            ValidateName(tableName, "table name");
 
             string quotedTable = Quote(tableName);
             string tempTable = Quote($"{tableName}_temp_{DateTime.Now.Ticks}");
@@ -1127,16 +1126,6 @@ namespace z3n8
 
         private static readonly Regex ValidNamePattern = new Regex(@"^[a-zA-Z_][a-zA-Z0-9_]*$", RegexOptions.Compiled);
 
-        private static string ValidateName(string name, string paramName)
-        {
-            if (string.IsNullOrEmpty(name))
-                throw new ArgumentException($"{paramName} cannot be null or empty");
-
-            if (!ValidNamePattern.IsMatch(name))
-                throw new ArgumentException($"Invalid {paramName}: {name}. Only alphanumeric characters and underscores are allowed.");
-
-            return name;
-        }
         #endregion
     }
 }

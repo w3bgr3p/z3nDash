@@ -28,11 +28,10 @@ public sealed class SchedulerHandler : IScriptHandler
     private static readonly List<string> Columns = new()
     {
         "id", "name", "executor", "script_path", "args", "enabled",
-        "cron", "interval_minutes", "fixed_time", "on_overlap",
+        "cron", "interval_minutes", "fixed_time", "on_overlap", "max_threads",
         "status", "last_run", "last_exit", "last_output",
         "payload_schema", "payload_values",
         "runs_total", "runs_success", "schedule_tag", "last_run_id"
-
     };
 
     public SchedulerHandler(DbConnectionService dbService, SchedulerService scheduler, string wwwrootPath)
@@ -71,6 +70,11 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/scheduler/payload"      && method == "GET")  { await GetPayload(context, db); return true; }
             if (path == "/scheduler/payload" && method == "POST")        { await SavePayload(context, db);             return true; }
             if (path == "/scheduler/process-stats" && method == "GET") { await ProcessStats(context); return true; }
+            if (path == "/scheduler/instances"     && method == "GET")  { await Instances(context); return true; }
+            if (path == "/scheduler/kill-instance" && method == "POST") { await KillInstance(context); return true; }
+            if (path == "/scheduler/queue"         && method == "GET")  { await QueueItems(context, db); return true; }
+            if (path == "/scheduler/clear-queue"   && method == "POST") { await ClearQueue(context, db); return true; }
+            if (path == "/scheduler/output/stream" && method == "GET") { await SseHub.SubscribeOutput(context.Response, context.Request.QueryString["id"] ?? "", GetDisconnectToken(context)); return true; }
 
         }
         catch (Exception ex)
@@ -174,9 +178,10 @@ public sealed class SchedulerHandler : IScriptHandler
 
     private async Task LiveOutput(HttpListenerContext ctx)
     {
-        var id = ctx.Request.QueryString["id"] ?? "";
+        var id    = ctx.Request.QueryString["id"]    ?? "";
+        var runId = ctx.Request.QueryString["runId"] ?? "";
         if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
-        var output = _scheduler.GetLiveOutput(id);
+        var output = _scheduler.GetLiveOutput(id, string.IsNullOrEmpty(runId) ? null : runId);
         var isLive = _scheduler.IsRunning(id);
         var result = _scheduler.GetResult(id);
         await HttpHelpers.WriteJson(ctx.Response, new { id, isLive, output, result });
@@ -228,6 +233,61 @@ public sealed class SchedulerHandler : IScriptHandler
         if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
 
         db.Query($"UPDATE \"{Table}\" SET \"payload_schema\" = '{schema.Replace("'", "''")}', \"payload_values\" = '{values.Replace("'", "''")}' WHERE \"id\" = '{id}'");
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
+    }
+    
+    private static CancellationToken GetDisconnectToken(HttpListenerContext ctx)
+    {
+        var cts = new CancellationTokenSource();
+        _ = Task.Run(async () =>
+        {
+            while (!cts.Token.IsCancellationRequested)
+            {
+                await Task.Delay(5000);
+                try
+                {
+                    await ctx.Response.OutputStream.WriteAsync(Array.Empty<byte>());
+                    await ctx.Response.OutputStream.FlushAsync();
+                }
+                catch { cts.Cancel(); break; }
+            }
+        });
+        return cts.Token;
+    }
+
+    private async Task Instances(HttpListenerContext ctx)
+    {
+        var id = ctx.Request.QueryString["id"] ?? "";
+        if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
+        await HttpHelpers.WriteJson(ctx.Response, _scheduler.GetInstances(id));
+    }
+
+    private async Task KillInstance(HttpListenerContext ctx)
+    {
+        var json = await ReadJson(ctx.Request);
+        if (json == null) { ctx.Response.StatusCode = 400; return; }
+        var id    = json.Value.TryGetProperty("id",    out var eid)    ? eid.GetString()    ?? "" : "";
+        var runId = json.Value.TryGetProperty("runId", out var erunid) ? erunid.GetString() ?? "" : "";
+        if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
+        if (string.IsNullOrEmpty(runId)) _scheduler.Kill(id);
+        else                             _scheduler.KillInstance(id, runId);
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
+    }
+
+    private async Task QueueItems(HttpListenerContext ctx, Db db)
+    {
+        var id = ctx.Request.QueryString["id"] ?? "";
+        if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
+        await HttpHelpers.WriteJson(ctx.Response, _scheduler.GetQueueItems(db, id));
+    }
+
+    private async Task ClearQueue(HttpListenerContext ctx, Db db)
+    {
+        var json = await ReadJson(ctx.Request);
+        if (json == null) { ctx.Response.StatusCode = 400; return; }
+        var id = json.Value.TryGetProperty("id", out var eid) ? eid.GetString() ?? "" : "";
+        if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
+        _scheduler.ClearQueue(db, id);
         await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
     }
 

@@ -14,15 +14,15 @@ internal sealed class HttpLogHandler
     }
 
     public bool Matches(string path, string method) =>
-        (method == "POST" && path is "/http-log" or "/clear-http" or "/clear-http-logs-by-task") ||
-        (method == "GET"  && path is "/http-logs" or "/http-stats" or "/http-logs/stream");
+        (method == "POST" && path is "/http-log" or "/traffic" or "/clear-http" or "/clear-http-logs-by-task") ||
+        (method == "GET"  && path is "/http-logs" or "/traffic-logs" or "/http-stats" or "/traffic-stats" or "/http-logs/stream" or "/traffic-logs/stream");
 
     public async Task Handle(HttpListenerContext ctx)
     {
         var path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
         var method = ctx.Request.HttpMethod;
 
-        if (method == "POST" && path == "/http-log")
+        if (method == "POST" && (path == "/http-log" || path == "/traffic"))
         {
             using var r = new StreamReader(ctx.Request.InputStream);
             await Save(await r.ReadToEndAsync());
@@ -30,7 +30,7 @@ internal sealed class HttpLogHandler
             return;
         }
 
-        if (method == "GET" && path == "/http-logs")
+        if (method == "GET" && (path == "/http-logs" || path == "/traffic-logs"))
         {
             var q     = ctx.Request.QueryString;
             int limit = int.TryParse(q["limit"], out var l) ? l : 100;
@@ -38,10 +38,16 @@ internal sealed class HttpLogHandler
             return;
         }
 
-        if (method == "GET" && path == "/http-logs/stream")
+        if (method == "GET" && (path == "/http-stats" || path == "/traffic-stats"))
         {
             var taskId = ctx.Request.QueryString["task_id"] ?? "";
             await SseHub.SubscribeHttp(ctx.Response, taskId, GetDisconnectToken(ctx));
+            return;
+        }
+
+        if (method == "GET" && (path == "/http-logs/stream" || path == "/traffic-logs/stream"))
+        {
+            await SseHub.SubscribeHttp(ctx.Response, "", GetDisconnectToken(ctx));
             return;
         }
 
@@ -98,8 +104,7 @@ internal sealed class HttpLogHandler
                          ?? (log.TryGetProperty("taskId",  out var t2) ? t2.ToString() : null)
                          ?? (log.TryGetProperty("diagnostics", out var diag) && diag.TryGetProperty("task_id", out var dt) ? dt.ToString() : null)
                          ?? "";
-            if (!string.IsNullOrEmpty(tid))
-                SseHub.BroadcastHttp(json, tid);
+            SseHub.BroadcastHttp(json, tid);
         }
         catch { }
     }

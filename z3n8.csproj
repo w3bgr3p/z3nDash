@@ -111,6 +111,15 @@
         <None Remove="publish-new\**" />
 
        
+        <None Remove="UnitTests\**" />
+
+       
+        <None Remove="z3nLib\**" />
+
+       
+        <None Remove="z3n7\**" />
+
+       
     </ItemGroup>
 
     <ItemGroup>
@@ -118,6 +127,10 @@
       <Compile Remove="z3nStub\**" />
       <Compile Remove="installer_output\**" />
       <Compile Remove="publish-new\**" />
+      <Compile Remove="UnitTests\**" />
+      <Compile Remove="z3nLib\**" />
+      <Compile Remove="z3n7\**" />
+      <Compile Remove="Controllers\Handlers\TrafficHandler.cs" />
     </ItemGroup>
 
     <ItemGroup>
@@ -129,6 +142,9 @@
       <EmbeddedResource Remove="z3nStub\**" />
       <EmbeddedResource Remove="installer_output\**" />
       <EmbeddedResource Remove="publish-new\**" />
+      <EmbeddedResource Remove="UnitTests\**" />
+      <EmbeddedResource Remove="z3nLib\**" />
+      <EmbeddedResource Remove="z3n7\**" />
     </ItemGroup>
 
 

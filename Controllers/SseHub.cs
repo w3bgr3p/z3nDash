@@ -48,7 +48,10 @@ internal static class SseHub
         => Broadcast(_http, json, taskId);
 
     public static void BroadcastOutput(string line, string scheduleId)
-        => Broadcast(_output, line, scheduleId, isOutput: true);
+    {
+        Console.WriteLine($"[SSE-OUT] broadcast scheduleId={scheduleId} subscribers={_output.Count} data={line[..Math.Min(50,line.Length)]}");
+        Broadcast(_output, line, scheduleId, isOutput: true);
+    }
 
     // ── Core ──────────────────────────────────────────────────────────────────
 

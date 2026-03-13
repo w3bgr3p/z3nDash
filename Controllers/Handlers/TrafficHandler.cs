@@ -66,7 +66,8 @@ internal sealed class TrafficHandler
             if (File.Exists(f) && new FileInfo(f).Length > 50 * 1024 * 1024)
                 File.Move(f, Path.Combine(_logPath, $"traffic_{DateTime.Now:yyyyMMdd_HHmmss}.jsonl"));
             await File.AppendAllTextAsync(f, json + Environment.NewLine);
-            Console.WriteLine($"saved to {f}");
+            $" {json} saved to {f}".Debug();
+            
         }
         finally { _lock.Release(); }
     }
@@ -101,6 +102,7 @@ internal sealed class TrafficHandler
         var methods  = new Dictionary<string, int>(); var statuses  = new Dictionary<string, int>();
         var projects = new Dictionary<string, int>(); var accounts  = new Dictionary<string, int>();
         var urls     = new Dictionary<string, int>();
+        long totalDuration = 0; int durationCount = 0;
 
         foreach (JsonElement log in logs)
         {
@@ -120,12 +122,21 @@ internal sealed class TrafficHandler
                 urls[u]       = urls.GetValueOrDefault(u)       + 1;
                 if (!string.IsNullOrEmpty(acc))
                     accounts[acc] = accounts.GetValueOrDefault(acc) + 1;
+                if (log.TryGetProperty("durationMs", out var d) && d.TryGetInt64(out var ms)) 
+                { totalDuration += ms; durationCount++; }
             }
             catch { continue; }
         }
 
-        return new { totalRequests = logs.Count, byMethod = methods, byStatus = statuses,
-                     byProject = projects, byAccount = accounts,
-                     byUrl = urls.OrderByDescending(kv => kv.Value).Take(20).ToDictionary(kv => kv.Key, kv => kv.Value) };
+        return new { 
+            totalRequests = logs.Count,
+            byMethod = methods,
+            byStatus = statuses,
+            byProject = projects,
+            byAccount = accounts,
+            byUrl = urls.OrderByDescending(kv => kv.Value).Take(20).ToDictionary(kv => kv.Key, kv => kv.Value),
+            avgDurationMs = durationCount > 0 ? totalDuration / durationCount : 0 
+        };
     }
 }
+

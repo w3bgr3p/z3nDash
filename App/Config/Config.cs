@@ -12,6 +12,8 @@ public class Config
     public static LogsConfig LogsConfig { get; private set; } = new();
     public static ApiConfig ApiConfig { get; private set; } = new();
     
+    public static SecurityConfig SecurityConfig { get; private set; } = new();
+
     public static Dictionary<string, CrxItem> Crx { get; private set; } = new();
     public static void Init()
     {
@@ -30,6 +32,8 @@ public class Config
         DbConfig = config.GetSection("DbConfig").Get<DbConfig>() ?? new();
         LogsConfig = config.GetSection("LogsConfig").Get<LogsConfig>() ?? new();
         ApiConfig = config.GetSection("ApiConfig").Get<ApiConfig>() ?? new();
+        SecurityConfig = config.GetSection("SecurityConfig").Get<SecurityConfig>() ?? new();
+
         Crx = config.GetSection("Crx").Get<Dictionary<string, CrxItem>>() ?? new();
         IsConfigured = true;
     }

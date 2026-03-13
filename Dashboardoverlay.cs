@@ -3,6 +3,7 @@ using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -43,7 +44,7 @@ public class DashboardOverlay : Form
 
     private readonly string _url;
     private WebView2?       _wv;
-    private bool            _isTopmost = true;
+    private bool            _isTopmost = false;
     private double          _opacity   = 0.98;
     private NotifyIcon?     _trayIcon;
 
@@ -51,25 +52,19 @@ public class DashboardOverlay : Form
     private const int DH  = 28;  // drag bar height px
     private const int TH  = 26;  // tab bar height px
 
-    // Tabs: label, url fragment to match for active state, url builder from base
     private static readonly (string Label, string Match, Func<string, string> Url)[] Tabs =
     [
-        ("⌂",     "/",   b => b + "/"),
-        ("ZP",     "page=pm",   b => b + "/?page=pm"),
-        ("z3n8",     "page=scheduler",   b => b + "/?page=scheduler"),
-        ("Logs",   "page=logs", b => b + "/?page=logs"),
-        ("HTTP",   "page=http", b => b + "/?page=http"),
-        ("Report", "/report",   b => b + "/report"),
-        ("JSON",   "/json",     b => b + "/json"),
-        ("TXT",   "/text",     b => b + "/text"),
-        ("⚙", "/page=config",   b => b + "/?page=config"),
+        ("⌂",     "/",              b => b + "/"),
+        ("z3n8",  "page=scheduler", b => b + "/?page=scheduler"),
+        ("ZP7",   "page=pm",        b => b + "/?page=pm"),
+        ("Logs",  "page=logs",      b => b + "/?page=logs"),
+        ("HTTP",  "page=http",      b => b + "/?page=http"),
+        ("Report","/report",        b => b + "/report"),
+        ("JSON",  "/json",          b => b + "/json"),
+        ("TXT",   "/text",          b => b + "/text"),
+        ("⚙",    "/page=config",   b => b + "/?page=config"),
     ];
 
-
-    
-    
-    
-    
     private Panel?   _tabBar;
     private Label[]? _tabLabels;
 
@@ -81,6 +76,9 @@ public class DashboardOverlay : Form
     private int       _resizeDir;
     private Point     _resizeStartScreen;
     private Rectangle _resizeStartBounds;
+
+    // Navigation watchdog
+    private CancellationTokenSource? _navTimeoutCts;
 
     // ── Static open ───────────────────────────────────────────────────
     public static void Open(string url, int width = 1400, int height = 900,
@@ -108,16 +106,12 @@ public class DashboardOverlay : Form
         BackColor       = Color.FromArgb(13, 15, 20);
         Opacity         = _opacity;
         ShowInTaskbar   = true;
-        Text            = "z3n Dashboard";
+        Text            = "z3n8";
         DoubleBuffered  = true;
         try { var p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico"); if (File.Exists(p)) Icon = new Icon(p); } catch { }
         MinimumSize     = new Size(400, 300);
 
         InitTray();
-
-        // Порядок ВАЖЕН:
-        // 1. WebView2 — добавляется первым → низший Z-order
-        // 2. UI поверх — добавляются после → выше в Z-order
         InitWebView();
 
         Application.AddMessageFilter(new GlobalMouseFilter(this));
@@ -128,11 +122,10 @@ public class DashboardOverlay : Form
     {
         _trayIcon = new NotifyIcon
         {
-            Text    = "z3n Dashboard",
+            Text    = "z3n8",
             Visible = false,
         };
 
-        // Reuse window icon if available, fallback to generic app icon
         try
         {
             var p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
@@ -147,12 +140,11 @@ public class DashboardOverlay : Form
         _trayIcon.ContextMenuStrip = menu;
         _trayIcon.DoubleClick += (_, _) => ShowFromTray();
 
-        // "─" minimize → tray instead of taskbar
         Resize += (_, _) =>
         {
             if (WindowState == FormWindowState.Minimized)
             {
-                ShowInTaskbar  = false;
+                ShowInTaskbar     = false;
                 _trayIcon.Visible = true;
                 Hide();
             }
@@ -162,11 +154,10 @@ public class DashboardOverlay : Form
     private void ShowFromTray()
     {
         Show();
-        ShowInTaskbar     = true;
-        WindowState       = FormWindowState.Normal;
+        ShowInTaskbar      = true;
+        WindowState        = FormWindowState.Normal;
         _trayIcon!.Visible = false;
         Activate();
-        // Re-apply topmost so it surfaces above other windows
         if (_isTopmost)
             SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -177,32 +168,25 @@ public class DashboardOverlay : Form
         if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == HOTKEY_ID)
         {
             if (Visible && WindowState != FormWindowState.Minimized)
-            {
-                // Already visible — minimize to tray
                 WindowState = FormWindowState.Minimized;
-            }
             else
-            {
                 ShowFromTray();
-            }
             return;
         }
         base.WndProc(ref m);
     }
 
-    // ── WebView2 — добавляем первым ───────────────────────────────────
+    // ── WebView2 ──────────────────────────────────────────────────────
     private async void InitWebView()
     {
         _wv = new WebView2
         {
-            // Оставляем место для drag bar + tab bar сверху и border по бокам/снизу
-            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+            Anchor   = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
             Location = new Point(B, DH + TH),
             Size     = new Size(Width - B * 2, Height - DH - TH - B)
         };
-        Controls.Add(_wv);   // <-- WebView2 в Controls первым = ниже всех
+        Controls.Add(_wv);
 
-        // Теперь строим UI поверх
         BuildUI();
 
         try
@@ -210,24 +194,28 @@ public class DashboardOverlay : Form
             var env = await CoreWebView2Environment.CreateAsync(null,
                 System.IO.Path.GetTempPath() + "\\z3n_webview2_cache");
             await _wv.EnsureCoreWebView2Async(env);
+            await _wv.CoreWebView2.Profile.ClearBrowsingDataAsync();
 
+            _wv.CoreWebView2.Settings.IsWebMessageEnabled          = true;
             _wv.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             _wv.CoreWebView2.Settings.IsStatusBarEnabled            = false;
             _wv.CoreWebView2.Settings.AreDevToolsEnabled            = true;
-            
-            
+
             _wv.CoreWebView2.NewWindowRequested += (_, e) =>
             {
                 e.Handled = true;
-                DashboardOverlay.Open(e.Uri, Width, Height);  // новое окно с тем же размером
+                DashboardOverlay.Open(e.Uri, Width, Height);
             };
 
-            // Extract base (scheme+host+port) from initial URL
             var uri = new Uri(_url);
             _base = $"{uri.Scheme}://{uri.Host}:{uri.Port}";
 
             _wv.CoreWebView2.NavigationCompleted += (_, _) =>
+            {
+                // Cancel watchdog — navigation succeeded
+                _navTimeoutCts?.Cancel();
                 BeginInvoke(UpdateActiveTab);
+            };
 
             _wv.CoreWebView2.Navigate(_url);
             UpdateActiveTab();
@@ -235,14 +223,13 @@ public class DashboardOverlay : Form
         catch (Exception ex)
         {
             MessageBox.Show($"WebView2 init failed:\n{ex.Message}\n\nInstall WebView2 Runtime.",
-                "z3n Dashboard", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                "z3n8", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
-    // ── UI: drag bar + resize borders — добавляем после WebView2 ─────
+    // ── UI: drag bar + resize borders ────────────────────────────────
     private void BuildUI()
     {
-        // ── Drag bar ──
         var dragBar = new Panel
         {
             Location  = new Point(0, 0),
@@ -259,7 +246,6 @@ public class DashboardOverlay : Form
             Opacity  = _opacity;
         };
 
-        // Кнопки в drag bar
         int bx = Width - 8;
         bx -= AddBarBtn(dragBar, bx, "✕",  Color.FromArgb(255, 80, 80),   () => Close());
         bx -= AddBarBtn(dragBar, bx, "□",  Color.FromArgb(100, 160, 255), ToggleMaximize);
@@ -268,7 +254,7 @@ public class DashboardOverlay : Form
 
         var title = new Label
         {
-            Text      = "⬡ z3n Dashboard",
+            Text      = "⬡ z3n8",
             ForeColor = Color.FromArgb(80, 140, 255),
             BackColor = Color.Transparent,
             Font      = new Font("Segoe UI", 8f, FontStyle.Bold),
@@ -282,32 +268,22 @@ public class DashboardOverlay : Form
         Controls.Add(dragBar);
         BuildTabBar();
 
-        // ── Resize borders ──
-        // Left
-        AddResizePanel(new Point(0, DH + TH), new Size(B, Height - DH - TH - B),
-            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left,
-            Cursors.SizeWE, 1);
-        // Right
-        AddResizePanel(new Point(Width - B, DH + TH), new Size(B, Height - DH - TH - B),
-            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
-            Cursors.SizeWE, 2);
-        // Top (под tab bar)
-        AddResizePanel(new Point(B, DH + TH), new Size(Width - B * 2, B),
-            AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            Cursors.SizeNS, 3);
-        // Bottom
-        AddResizePanel(new Point(B, Height - B), new Size(Width - B * 2, B),
-            AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-            Cursors.SizeNS, 4);
-        // Corners
-        AddResizePanel(new Point(0, DH),          new Size(B * 2, B * 2),
-            AnchorStyles.Top | AnchorStyles.Left,           Cursors.SizeNWSE, 5); // TL
-        AddResizePanel(new Point(Width - B*2, DH), new Size(B * 2, B * 2),
-            AnchorStyles.Top | AnchorStyles.Right,          Cursors.SizeNESW, 6); // TR
-        AddResizePanel(new Point(0, Height - B*2), new Size(B * 2, B * 2),
-            AnchorStyles.Bottom | AnchorStyles.Left,        Cursors.SizeNESW, 7); // BL
+        AddResizePanel(new Point(0, DH + TH),           new Size(B, Height - DH - TH - B),
+            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left,  Cursors.SizeWE,   1);
+        AddResizePanel(new Point(Width - B, DH + TH),   new Size(B, Height - DH - TH - B),
+            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right, Cursors.SizeWE,   2);
+        AddResizePanel(new Point(B, DH + TH),            new Size(Width - B * 2, B),
+            AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,   Cursors.SizeNS,   3);
+        AddResizePanel(new Point(B, Height - B),         new Size(Width - B * 2, B),
+            AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right, Cursors.SizeNS,  4);
+        AddResizePanel(new Point(0, DH),                 new Size(B * 2, B * 2),
+            AnchorStyles.Top | AnchorStyles.Left,                        Cursors.SizeNWSE, 5);
+        AddResizePanel(new Point(Width - B*2, DH),       new Size(B * 2, B * 2),
+            AnchorStyles.Top | AnchorStyles.Right,                       Cursors.SizeNESW, 6);
+        AddResizePanel(new Point(0, Height - B*2),       new Size(B * 2, B * 2),
+            AnchorStyles.Bottom | AnchorStyles.Left,                     Cursors.SizeNESW, 7);
         AddResizePanel(new Point(Width - B*2, Height - B*2), new Size(B * 2, B * 2),
-            AnchorStyles.Bottom | AnchorStyles.Right,       Cursors.SizeNWSE, 8); // BR
+            AnchorStyles.Bottom | AnchorStyles.Right,                    Cursors.SizeNWSE, 8);
     }
 
     private void AddResizePanel(Point loc, Size sz, AnchorStyles anchor, Cursor cur, int dir)
@@ -338,9 +314,9 @@ public class DashboardOverlay : Form
             Cursor    = Cursors.Hand,
             Font      = new Font("Segoe UI", 9f)
         };
-        btn.Location   = new Point(rightX - W, 0);
-        btn.Anchor     = AnchorStyles.Top | AnchorStyles.Right;
-        btn.Click     += (s, e) => click();
+        btn.Location    = new Point(rightX - W, 0);
+        btn.Anchor      = AnchorStyles.Top | AnchorStyles.Right;
+        btn.Click      += (s, e) => click();
         btn.MouseEnter += (s, e) => btn.BackColor = Color.FromArgb(40, 40, 60);
         btn.MouseLeave += (s, e) => btn.BackColor = Color.Transparent;
         parent.Controls.Add(btn);
@@ -424,7 +400,7 @@ public class DashboardOverlay : Form
         foreach (Control c in Controls) c.Capture = false;
     }
 
-    // ── Tab bar ──────────────────────────────────────────────────────
+    // ── Tab bar ───────────────────────────────────────────────────────
     private void BuildTabBar()
     {
         _tabBar = new Panel
@@ -434,7 +410,6 @@ public class DashboardOverlay : Form
             Anchor    = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             BackColor = Color.FromArgb(13, 17, 23),
         };
-        // Bottom border line
         _tabBar.Paint += (_, pe) =>
         {
             using var pen = new Pen(Color.FromArgb(48, 54, 61));
@@ -445,7 +420,7 @@ public class DashboardOverlay : Form
         int tx = 4;
         for (int i = 0; i < Tabs.Length; i++)
         {
-            var idx = i; // capture
+            var idx = i;
             var lbl = new Label
             {
                 Text      = Tabs[i].Label,
@@ -477,19 +452,54 @@ public class DashboardOverlay : Form
     private void TabLabel_Paint(object? sender, PaintEventArgs e)
     {
         if (sender is not Label lbl) return;
-        int idx = (int)lbl.Tag!;
-        if (idx != _activeTab) return;
-        // Active indicator: bottom border accent line
+        if ((int)lbl.Tag! != _activeTab) return;
         using var pen = new Pen(Color.FromArgb(56, 139, 253), 2);
         e.Graphics.DrawLine(pen, 0, lbl.Height - 2, lbl.Width, lbl.Height - 2);
     }
 
-    private string _base = "";   // e.g. "http://localhost:7000"
+    private string _base = "";
 
     private void NavigateTo(int idx)
     {
         if (_wv?.CoreWebView2 is null) return;
-        _wv.CoreWebView2.Navigate(Tabs[idx].Url(_base));
+
+        // Stop pending load — hanging fetch/XHR/setInterval won't block navigation
+        _wv.CoreWebView2.Stop();
+
+        // Auto-accept any beforeunload dialog (borderless window can't show native dialogs)
+        _wv.CoreWebView2.ScriptDialogOpening += SkipDialogOnce;
+
+        var targetUrl = Tabs[idx].Url(_base);
+
+        // Cancel previous watchdog
+        _navTimeoutCts?.Cancel();
+        _navTimeoutCts = new CancellationTokenSource();
+        var cts = _navTimeoutCts;
+
+        _wv.CoreWebView2.Navigate(targetUrl);
+
+        // Watchdog: if NavigationCompleted didn't fire in 3s — force retry
+        Task.Delay(3000, cts.Token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
+            BeginInvoke(() =>
+            {
+                if (_wv?.CoreWebView2 is null) return;
+                var current = _wv.Source?.ToString() ?? "";
+                if (!current.Contains(Tabs[idx].Match, StringComparison.OrdinalIgnoreCase))
+                {
+                    _wv.CoreWebView2.Stop();
+                    _wv.CoreWebView2.Navigate(targetUrl);
+                }
+            });
+        }, TaskScheduler.Default);
+    }
+
+    private void SkipDialogOnce(object? sender, CoreWebView2ScriptDialogOpeningEventArgs e)
+    {
+        e.Accept();
+        if (_wv?.CoreWebView2 is not null)
+            _wv.CoreWebView2.ScriptDialogOpening -= SkipDialogOnce;
     }
 
     private void UpdateActiveTab()
@@ -507,13 +517,13 @@ public class DashboardOverlay : Form
         for (int i = 0; i < _tabLabels.Length; i++)
         {
             bool active = i == _activeTab;
-            _tabLabels[i].ForeColor  = active ? Color.FromArgb(201, 209, 217) : Color.FromArgb(139, 148, 158);
-            _tabLabels[i].BackColor  = active ? Color.FromArgb(22, 27, 34)    : Color.Transparent;
-            _tabLabels[i].Invalidate(); // repaint to update bottom line
+            _tabLabels[i].ForeColor = active ? Color.FromArgb(201, 209, 217) : Color.FromArgb(139, 148, 158);
+            _tabLabels[i].BackColor = active ? Color.FromArgb(22, 27, 34)    : Color.Transparent;
+            _tabLabels[i].Invalidate();
         }
     }
 
-    // ── Always on top ──────────────────────────────────────────────────
+    // ── Always on top ─────────────────────────────────────────────────
     private void ToggleTopmost()
     {
         _isTopmost = !_isTopmost;
@@ -537,7 +547,6 @@ public class DashboardOverlay : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        // Только реальный выход (из меню трея) закрывает — всё остальное в трей
         if (e.CloseReason != CloseReason.ApplicationExitCall)
         {
             e.Cancel = true;
@@ -582,7 +591,4 @@ public class DashboardOverlay : Form
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT { public int X, Y; }
     }
-    
-    
-    
 }

@@ -5,6 +5,7 @@ using z3n8;
 public class EmbeddedServer
 {
     private readonly HttpListener _listener = new();
+    private readonly HttpListener _replayListener = new();
     private readonly int _port;
     private bool _isRunning;
     private bool _debug = false;
@@ -14,14 +15,14 @@ public class EmbeddedServer
 
     private readonly LogHandler        _logHandler;
     private readonly HttpLogHandler    _httpLogHandler;
-    private readonly TrafficHandler    _trafficHandler;
+    //private readonly TrafficHandler    _trafficHandler;
     private readonly ReportHandler     _reportHandler;
     private readonly HttpReplayHandler _replayHandler;
     private readonly ConfigHandler     _configHandler;
 
     private const int DefaultPort = 10993;
 
-    public EmbeddedServer(LogsConfig config)
+    public EmbeddedServer(LogsConfig config, DbConnectionService dbService)
     {
         _port = int.TryParse(config.DashboardPort, out var p) ? p : DefaultPort;
 
@@ -63,10 +64,21 @@ public class EmbeddedServer
 
         _logHandler     = new LogHandler(logPath);
         _httpLogHandler = new HttpLogHandler(logPath);
-        _trafficHandler = new TrafficHandler(logPath);
+        //_trafficHandler = new TrafficHandler(logPath);
         _reportHandler  = new ReportHandler(reportsPath, _wwwrootPath);
         _replayHandler  = new HttpReplayHandler();
-        _configHandler  = new ConfigHandler(logPath, _listener, _port);
+        _configHandler  = new ConfigHandler(logPath, _listener, _port, dbService);
+
+        int replayPort = int.TryParse(config.ReplayPort, out var rp) ? rp : _port + 1;
+        try
+        {
+            //_replayListener.Prefixes.Add($"http://*:{replayPort}/");
+            _replayListener.Prefixes.Add($"http://localhost:{replayPort}/");
+
+            _replayListener.Start();
+            Console.WriteLine($"Replay port: {replayPort}");
+        }
+        catch (Exception ex)  { $"Replay port {replayPort} unavailable: {ex.Message}".Debug(); }
     }
 
     public string WwwrootPath => _wwwrootPath;
@@ -82,6 +94,7 @@ public class EmbeddedServer
         _isRunning = true;
         _listener.Start();
         Task.Run(Listen);
+        if (_replayListener.IsListening) Task.Run(ListenReplay);
         Console.WriteLine($"Listening {_port}");
     }
 
@@ -89,6 +102,7 @@ public class EmbeddedServer
     {
         _isRunning = false;
         if (_listener.IsListening) _listener.Stop();
+        if (_replayListener.IsListening) _replayListener.Stop();
     }
 
     // ── Core loop ──────────────────────────────────────────────────────────────
@@ -104,6 +118,37 @@ public class EmbeddedServer
             }
             catch { if (!_isRunning) break; }
         }
+    }
+
+    private async Task ListenReplay()
+    {
+        while (_isRunning)
+        {
+            try
+            {
+                var context = await _replayListener.GetContextAsync();
+                _ = Task.Run(() => ProcessReplayRequest(context));
+            }
+            catch { if (!_isRunning) break; }
+        }
+    }
+
+    private async Task ProcessReplayRequest(HttpListenerContext context)
+    {
+        context.Response.Headers.Add("Access-Control-Allow-Origin",  "*");
+        context.Response.Headers.Add("Access-Control-Allow-Methods", "POST, OPTIONS");
+        context.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type");
+
+        if (context.Request.HttpMethod == "OPTIONS")
+        {
+            context.Response.StatusCode = 204;
+            context.Response.Close();
+            return;
+        }
+
+        try   { await _replayHandler.Handle(context); }
+        catch { }
+        finally { try { context.Response.Close(); } catch { } }
     }
 
     private async Task ProcessRequest(HttpListenerContext context)
@@ -150,10 +195,9 @@ public class EmbeddedServer
             // Domain handlers
             if (path.StartsWith("/report"))                              { await _reportHandler.Handle(context, path);  return; }
             if (path.StartsWith("/config") || path == "/clear-all-logs"){ await _configHandler.Handle(context);        return; }
-            if (path == "/http-replay")                                  { await _replayHandler.Handle(context);        return; }
             if (_logHandler.Matches(path, method))                       { await _logHandler.Handle(context);           return; }
             if (_httpLogHandler.Matches(path, method))                   { await _httpLogHandler.Handle(context);       return; }
-            if (_trafficHandler.Matches(path, method))                   { await _trafficHandler.Handle(context);       return; }
+            //if (_trafficHandler.Matches(path, method))                   { await _trafficHandler.Handle(context);       return; }
 
             // Static (wwwroot)
             if (method == "GET") { await ServeFile(response, request.Url!.AbsolutePath.TrimStart('/'), _wwwrootPath); return; }

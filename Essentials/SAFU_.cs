@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace z3n8;
 
-public class SAFU
+public class SAFU_
 {
     static string GetStableHWId(bool log = false, string forced = null)
     {

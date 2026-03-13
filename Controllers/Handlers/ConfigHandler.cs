@@ -10,37 +10,51 @@ internal sealed class ConfigHandler
     private readonly string _logPath;
     private readonly HttpListener _listener;
     private readonly int _port;
+    private readonly DbConnectionService _dbService;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    public ConfigHandler(string logPath, HttpListener listener, int port)
+    public ConfigHandler(string logPath, HttpListener listener, int port, DbConnectionService dbService)
     {
-        _logPath  = logPath;
-        _listener = listener;
-        _port     = port;
+        _logPath   = logPath;
+        _listener  = listener;
+        _port      = port;
+        _dbService = dbService;
     }
 
     public bool Matches(string path, string method) =>
         (method == "GET"  && path is "/config" or "/config/status" or "/config/storage") ||
-        (method == "POST" && path is "/config" or "/clear-all-logs");
+        (method == "POST" && path is "/config" or "/config/jvars" or "/clear-all-logs");
 
     public async Task Handle(HttpListenerContext ctx)
     {
         var path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
         var method = ctx.Request.HttpMethod;
 
-        if (method == "GET" && path == "/config")        { await GetConfig(ctx.Response);    return; }
-        if (method == "POST" && path == "/config")       { using var r = new StreamReader(ctx.Request.InputStream); await SaveConfig(ctx.Response, await r.ReadToEndAsync()); return; }
-        if (method == "GET" && path == "/config/status") { await GetStatus(ctx.Response);    return; }
-        if (method == "GET" && path == "/config/storage"){ await GetStorage(ctx.Response);   return; }
-        if (method == "POST" && path == "/clear-all-logs"){ await ClearAllLogs(ctx.Response); return; }
-       
+        if (method == "GET"  && path == "/config")          { await GetConfig(ctx.Response);    return; }
+        if (method == "POST" && path == "/config")          { using var r = new StreamReader(ctx.Request.InputStream); await SaveConfig(ctx.Response, await r.ReadToEndAsync()); return; }
+        if (method == "POST" && path == "/config/jvars")    { using var r = new StreamReader(ctx.Request.InputStream); await SaveJVars(ctx.Response, await r.ReadToEndAsync()); return; }
+        if (method == "GET"  && path == "/config/status")   { await GetStatus(ctx.Response);    return; }
+        if (method == "GET"  && path == "/config/storage")  { await GetStorage(ctx.Response);   return; }
+        if (method == "POST" && path == "/clear-all-logs")  { await ClearAllLogs(ctx.Response); return; }
     }
 
     private static async Task GetConfig(HttpListenerResponse response)
     {
         string cfgPath = Path.Combine(AppContext.BaseDirectory, "appsettings.secrets.json");
         if (!File.Exists(cfgPath)) { response.StatusCode = 404; await HttpHelpers.WriteText(response, "Config file not found"); return; }
-        await HttpHelpers.WriteRawJson(response, await File.ReadAllTextAsync(cfgPath, Encoding.UTF8));
+
+        // Inject securityConfig.jVarsPath into response without exposing PIN
+        var raw  = await File.ReadAllTextAsync(cfgPath, Encoding.UTF8);
+        var json = JsonSerializer.Deserialize<JsonElement>(raw);
+
+        var dict = new Dictionary<string, object?>();
+        if (json.ValueKind == JsonValueKind.Object)
+            foreach (var p in json.EnumerateObject())
+                dict[p.Name] = p.Value;
+
+        dict["securityConfig"] = new { jVarsPath = Config.SecurityConfig.JVarsPath };
+
+        await HttpHelpers.WriteJson(response, dict);
     }
 
     private static async Task SaveConfig(HttpListenerResponse response, string body)
@@ -87,6 +101,70 @@ internal sealed class ConfigHandler
         }
     }
 
+    // Принимает Base64(JSON{pin, jVarsPath})
+    // Шифрует и сохраняет jVars файл, записывает jVarsPath в конфиг
+    private static async Task SaveJVars(HttpListenerResponse response, string body)
+    {
+        try
+        {
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(body.Trim()));
+            var doc     = JsonSerializer.Deserialize<JsonElement>(decoded);
+
+            var pin       = doc.GetProperty("pin").GetString() ?? "";
+            var jVarsPath = doc.GetProperty("jVarsPath").GetString() ?? "";
+
+            if (string.IsNullOrWhiteSpace(pin))      { response.StatusCode = 400; await HttpHelpers.WriteText(response, "pin is required");       return; }
+            if (string.IsNullOrWhiteSpace(jVarsPath)) { response.StatusCode = 400; await HttpHelpers.WriteText(response, "jVarsPath is required"); return; }
+
+            // Строим jVars JSON — только pin, остальное в конфиге
+            var vars      = new Dictionary<string, string> { ["cfgPin"] = pin };
+            if (doc.TryGetProperty("localVars", out var localVarsEl) && localVarsEl.ValueKind == JsonValueKind.Object)
+                foreach (var prop in localVarsEl.EnumerateObject())
+                    vars[prop.Name] = prop.Value.GetString() ?? "";
+            var plaintext = System.Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(vars)));
+            var encrypted = SAFU.EncryptHWIDOnly(plaintext);
+
+            if (string.IsNullOrEmpty(encrypted))
+            {
+                response.StatusCode = 500;
+                await HttpHelpers.WriteText(response, "Encryption failed");
+                return;
+            }
+
+            var dir = Path.GetDirectoryName(jVarsPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            await File.WriteAllTextAsync(jVarsPath, encrypted, Encoding.UTF8);
+
+            // Сохраняем jVarsPath в конфиг
+            string cfgPath = Path.Combine(AppContext.BaseDirectory, "appsettings.secrets.json");
+            var existing   = new Dictionary<string, JsonElement>();
+            if (File.Exists(cfgPath))
+            {
+                var existingDoc = JsonSerializer.Deserialize<JsonElement>(await File.ReadAllTextAsync(cfgPath, Encoding.UTF8));
+                if (existingDoc.ValueKind == JsonValueKind.Object)
+                    foreach (var prop in existingDoc.EnumerateObject())
+                        existing[prop.Name] = prop.Value;
+            }
+
+            existing["SecurityConfig"] = JsonSerializer.Deserialize<JsonElement>(
+                JsonSerializer.Serialize(new { JVarsPath = jVarsPath }));
+
+            if (File.Exists(cfgPath)) File.Copy(cfgPath, cfgPath + ".bak", overwrite: true);
+            await File.WriteAllTextAsync(cfgPath, JsonSerializer.Serialize(existing, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+
+            Config.Init();
+            InternalTasks.Load();
+            await HttpHelpers.WriteJson(response, new { ok = true });
+        }
+        catch (Exception ex)
+        {
+            response.StatusCode = 400;
+            await HttpHelpers.WriteJson(response, new { ok = false, error = ex.Message });
+        }
+    }
+
     private async Task GetStatus(HttpListenerResponse response)
     {
         var ports = _listener.Prefixes
@@ -98,6 +176,9 @@ internal sealed class ConfigHandler
 
         await HttpHelpers.WriteJson(response, new
         {
+            isConfigured   = Config.IsConfigured,
+            isUnlocked     = InternalTasks.IsUnlocked,
+            isDbConnected  = _dbService.IsConnected,
             dashboardPort  = _port,
             listeningPorts = ports,
             logHost        = cfg.LogHost,

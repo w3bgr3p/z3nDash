@@ -14,8 +14,8 @@
 
     <ItemGroup>
         <Compile Include="..\..\Tasks\Zenno\ZennoStub.cs" />
-        <Compile Include="..\..\Tasks\Zenno\InternalTasks.cs" />
-        <Compile Include="..\..\Tasks\Zenno\InternalTasks.Context.cs" />
+        <Compile Include="..\..\Tasks\Internal\InternalTasks.cs" />
+        <Compile Include="..\..\Tasks\Internal\InternalTasks.Context.cs" />
         <Compile Include="..\..\Essentials\Logger.cs" />
         <Compile Include="..\..\Essentials\SAFU.cs" />
         <Compile Include="..\..\Sql\Db.cs" />
@@ -25,6 +25,7 @@
         <Compile Include="..\..\App\Config\Config.cs" />
         <Compile Include="..\..\Traffic\z3nHandler.cs" />
         <Compile Include="..\..\Controllers\SchedulerService.cs" />
+        <Compile Include="..\..\Controllers\SseHub.cs" />
         <Compile Include="..\..\Web3\StringExtentions.cs" />
         <Compile Include="..\..\Web3\Blockchain.cs" />
         <Compile Include="..\..\Tasks\zp\MarketMavericks.cs" />

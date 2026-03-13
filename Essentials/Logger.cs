@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.IO;
-using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
@@ -22,26 +22,29 @@ namespace z3n8
 
     public class Logger
     {
-        // ── ThreadStatic cache ────────────────────────────────────────────────
+        // ── Static API ────────────────────────────────────────────────────────
+        #region Static API
 
         [ThreadStatic]
         private static Logger _threadLogger;
         public static Logger Current => _threadLogger;
+
         public static Logger Init(string acc = "", string logHost = null, LogLevel logLevel = LogLevel.Info)
         {
             _threadLogger = Get(acc, logHost, logLevel);
             return _threadLogger;
         }
 
-        public static void log(string msg,  [CallerMemberName] string caller = "")
-            => _threadLogger?.Info(msg, caller);
-        public static void warn(string msg, [CallerMemberName] string caller = "")
-            => _threadLogger?.Warn(msg, caller);
-        public static void err(string msg,  [CallerMemberName] string caller = "")
-            => _threadLogger?.Error(msg, caller);
+        public static void log(string msg,  [CallerMemberName] string caller = "") => _threadLogger?.Info(msg,  caller);
+        public static void warn(string msg, [CallerMemberName] string caller = "") => _threadLogger?.Warn(msg,  caller);
+        public static void err(string msg,  [CallerMemberName] string caller = "") => _threadLogger?.Error(msg, caller);
 
-        private static readonly ConcurrentDictionary<string, Logger> _loggerCache
-            = new ConcurrentDictionary<string, Logger>();
+        #endregion
+
+        // ── Cache ─────────────────────────────────────────────────────────────
+        #region Cache
+
+        private static readonly ConcurrentDictionary<string, Logger> _loggerCache = new();
 
         public static Logger Get(string acc = "", string logHost = null, LogLevel logLevel = LogLevel.Info)
         {
@@ -56,30 +59,33 @@ namespace z3n8
             _threadLogger = null;
         }
 
-        // ── Config ────────────────────────────────────────────────────────────
+        #endregion
 
-        private readonly bool      _persistent;
-        private readonly Stopwatch _stopwatch;
-        private readonly int       _timezone;
-        private readonly bool      _http;
-        private readonly string    _logHost;
-        private readonly LogLevel  _minLevel;
+        // ── Fields & Properties ───────────────────────────────────────────────
+        #region Fields & Properties
 
+        // Identity
         public string Emoji   { get; set; }
         public string Acc     { get; set; }
-        public string TaskId  { get; set; }  // schedule_tag — фильтр "все прогоны задачи"
-        public string Session { get; set; }  // run_id — фильтр конкретного прогона
+        public string TaskId  { get; set; }
+        public string Session { get; set; }
         public string Project { get; set; }
-        
-        private readonly Action<string>? _sink;
         public string LogHost => _logHost;
-        
-        // cfgLog flags
-        private readonly bool _fAcc, _fTime, _fCaller, _fWrap, _fForce;
 
-        private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        // Config flags
+        private readonly LogLevel        _minLevel;
+        private readonly bool            _persistent;
+        private readonly bool            _http;
+        private readonly int             _timezone;
+        private readonly string          _logHost;
+        private readonly bool            _fAcc, _fTime, _fCaller, _fWrap, _fForce;
+        private readonly Stopwatch       _stopwatch;
+        private readonly Action<string>? _sink;
+        private readonly string _source = "z3n8";
+        #endregion
 
         // ── Constructor ───────────────────────────────────────────────────────
+        #region Constructor
 
         public Logger(
             string          classEmoji     = null,
@@ -92,33 +98,37 @@ namespace z3n8
             string          taskId         = "",
             string          session        = "",
             string          project        = "z3n8",
-            string          cfgLog         = "caller,wrap",
+            string          cfgLog         = "caller,wrap,acc,stopwatch",
             Action<string>? sink           = null)
         {
             Emoji       = classEmoji;
             Acc         = acc;
             TaskId      = taskId;
             Session     = session;
+            Project     = project;
             _persistent = persistent;
-            _stopwatch  = persistent ? Stopwatch.StartNew() : null;
             _http       = http;
             _timezone   = timezoneOffset;
             _minLevel   = logLevel;
             _logHost    = logHost ?? "http://localhost:38109/log";
             _sink       = sink;
+            _stopwatch  = persistent ? Stopwatch.StartNew() : null;
 
             _fAcc    = cfgLog.Contains("acc");
-            _fTime   = cfgLog.Contains("time");
+            _fTime   = cfgLog.Contains("stopwatch");
             _fCaller = cfgLog.Contains("caller");
             _fWrap   = cfgLog.Contains("wrap");
             _fForce  = cfgLog.Contains("force");
         }
 
+        #endregion
+
         // ── Public API ────────────────────────────────────────────────────────
+        #region Public API
 
         public void Send(
             object   toLog,
-            [CallerMemberName] string callerName = "",
+            [CallerMemberName] string callerName     = "",
             [CallerFilePath]   string callerFilePath = "",
             bool     show  = false,
             bool     thrw  = false,
@@ -138,7 +148,7 @@ namespace z3n8
             WriteConsole(fullCaller, body, level);
 
             if (_http)
-                SendHttp(body, fullCaller, level);
+                HttpSink.Send(_logHost, _timezone, level, body, fullCaller, this);
 
             if (thrw)
                 throw new Exception(full);
@@ -152,7 +162,7 @@ namespace z3n8
 
         public void Warn(
             object   toLog,
-            [CallerMemberName] string callerName    = "",
+            [CallerMemberName] string callerName     = "",
             [CallerFilePath]   string callerFilePath = "",
             bool     show  = false,
             bool     thrw  = false,
@@ -161,19 +171,22 @@ namespace z3n8
 
         public void Error(
             object   toLog,
-            [CallerMemberName] string callerName    = "",
+            [CallerMemberName] string callerName     = "",
             [CallerFilePath]   string callerFilePath = "",
             bool     thrw = false)
             => Send(toLog, callerName, callerFilePath, show: true, thrw: thrw, level: LogLevel.Error);
 
-        // ── Private helpers ───────────────────────────────────────────────────
+        #endregion
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+        #region Helpers
 
         private string BuildHeader(string fullCaller)
         {
             var sb = new StringBuilder();
-            if (_fAcc  && !string.IsNullOrEmpty(Acc))  sb.Append($"  🤖 [{Acc}]");
-            if (_fTime && _stopwatch != null)           sb.Append($"  ⏱️ [{_stopwatch.Elapsed:hh\\:mm\\:ss}]");
-            if (_fCaller)                               sb.Append($"  🔲 [{fullCaller}]");
+            if (_fAcc  && !string.IsNullOrEmpty(Acc)) sb.Append($"  🤖 [{Acc}]");
+            if (_fTime && _stopwatch != null)          sb.Append($"  ⏱️ [{_stopwatch.Elapsed:hh\\:mm\\:ss}]");
+            if (_fCaller)                              sb.Append($"  🔲 [{fullCaller}]");
             return sb.ToString();
         }
 
@@ -189,7 +202,7 @@ namespace z3n8
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             Console.Write($"{fullCaller}.");
-            
+
             Console.ForegroundColor = level switch
             {
                 LogLevel.Debug   => ConsoleColor.DarkGray,
@@ -200,59 +213,70 @@ namespace z3n8
             Console.ForegroundColor = ConsoleColor.Gray;
             Console.Write($"{body}\n");
             Console.ResetColor();
+
             _sink?.Invoke($"[{level.ToString().ToUpper()}] [{fullCaller}] {body.Trim()}");
         }
 
-        private void SendHttp(string body, string caller, LogLevel level)
-        {
-            string acc = !string.IsNullOrEmpty(Acc) ? Acc : "-";
+        #endregion
+    }
 
+    // ── HTTP Sink ─────────────────────────────────────────────────────────────
+    #region HTTP Sink
+
+    internal static class HttpSink
+    {
+        private static readonly HttpClient _client = new() { Timeout = TimeSpan.FromSeconds(5) };
+
+        public static void Send(string logHost, int timezone, LogLevel level, string body, string caller, Logger ctx)
+        {
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    var payload = new
-                    {
-                        machine   = Environment.MachineName,
-                        project   = !string.IsNullOrEmpty(Project) ? Project : "z3n8",
-                        timestamp = DateTime.UtcNow.AddHours(_timezone).ToString("yyyy-MM-dd HH:mm:ss"),
-                        level     = level.ToString().ToUpper(),
-                        account   = acc,
-                        session   = !string.IsNullOrEmpty(Session) ? Session : "-",
-                        port      = "-",
-                        pid       = "-",
-                        task_id   = !string.IsNullOrEmpty(TaskId) ? TaskId : "-",
-                        caller,
-                        message   = body.Trim(),
-                    };
-
+                    var payload = BuildPayload(timezone, level, body, caller, ctx);
                     string json = JsonConvert.SerializeObject(payload);
+
                     using var cts     = new System.Threading.CancellationTokenSource(1000);
                     using var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    await _httpClient.PostAsync(_logHost, content, cts.Token);
+                    await _client.PostAsync(logHost, content, cts.Token);
                 }
                 catch { }
             });
         }
-        
-        
-        
-        
+
+        private static object BuildPayload(int timezone, LogLevel level, string body, string caller, Logger ctx) => new
+        {
+            machine  = Environment.MachineName,
+            project  = !string.IsNullOrEmpty(ctx.Project) ? ctx.Project : "z3n8",
+            timestamp = DateTime.UtcNow.AddHours(timezone).ToString("yyyy-MM-dd HH:mm:ss"),
+            level    = level.ToString().ToUpper(),
+            account  = !string.IsNullOrEmpty(ctx.Acc)     ? ctx.Acc     : "-",
+            session  = !string.IsNullOrEmpty(ctx.Session) ? ctx.Session : "-",
+            port     = "-",
+            pid      = "-",
+            task_id  = !string.IsNullOrEmpty(ctx.TaskId)  ? ctx.TaskId  : "-",
+            caller,
+            message  = body.Trim(),
+            origin = "z3n8"
+        };
     }
+
+    #endregion
+
+    // ── Extension Methods ─────────────────────────────────────────────────────
+    #region Extension Methods
 
     public static class LoggerExt
     {
         private static readonly object _lock = new();
 
         public static void Debug(this object toLog,
-            [CallerMemberName] string callerName = "",
+            [CallerMemberName] string callerName     = "",
             [CallerFilePath]   string callerFilePath = "")
         {
             string className = Path.GetFileNameWithoutExtension(callerFilePath);
             lock (_lock)
             {
-                //Console.ForegroundColor = ConsoleColor.Gray;
-                //Console.Write(toLog.GetHashCode());
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.Write($" {className}.");
                 Console.ForegroundColor = ConsoleColor.Yellow;
@@ -261,16 +285,15 @@ namespace z3n8
                 Console.WriteLine($" {toLog}");
             }
         }
-        
+
         public static void Err(this object toLog,
             bool thrw = false,
-            [CallerMemberName] string callerName = "",
+            [CallerMemberName] string callerName     = "",
             [CallerFilePath]   string callerFilePath = "")
         {
             string className = Path.GetFileNameWithoutExtension(callerFilePath);
             lock (_lock)
             {
-
                 Console.ForegroundColor = ConsoleColor.DarkRed;
                 Console.Write($" {className}.");
                 Console.ForegroundColor = ConsoleColor.Red;
@@ -280,10 +303,11 @@ namespace z3n8
                 Console.ForegroundColor = ConsoleColor.Red;
             }
         }
+
         public static void Err(this Exception ex,
             object toLog = null,
-            bool thrw = false,
-            [CallerMemberName] string callerName = "",
+            bool thrw    = false,
+            [CallerMemberName] string callerName     = "",
             [CallerFilePath]   string callerFilePath = "")
         {
             string className = Path.GetFileNameWithoutExtension(callerFilePath);
@@ -301,4 +325,5 @@ namespace z3n8
         }
     }
 
+    #endregion
 }

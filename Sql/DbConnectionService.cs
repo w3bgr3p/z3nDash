@@ -11,8 +11,7 @@ public class DbConnectionService
     private DbConfig? _config;
     private readonly object _lock = new object();
     public bool debug { get; set; } =  false;
-
-
+    
 
     public bool IsConnected => _db != null;
     public Db GetDb()

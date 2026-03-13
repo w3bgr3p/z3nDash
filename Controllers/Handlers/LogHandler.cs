@@ -52,6 +52,7 @@ internal sealed class LogHandler
             await SseHub.SubscribeLogs(ctx.Response, taskId, GetDisconnectToken(ctx));
             return;
         }
+        
 
         if (method == "GET" && path == "/stats")
         {
@@ -91,9 +92,9 @@ internal sealed class LogHandler
             if (File.Exists(f) && new FileInfo(f).Length > 100 * 1024 * 1024)
                 File.Move(f, Path.Combine(_logPath, $"log_{DateTime.Now:yyyyMMdd_HHmmss}.jsonl"));
             await File.AppendAllTextAsync(f, json + Environment.NewLine);
+            //$" {json} saved to {f}".Debug();
         }
         finally { _lock.Release(); }
-
         // broadcast после релиза лока
         BroadcastToSse(json);
     }

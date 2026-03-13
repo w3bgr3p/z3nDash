@@ -99,16 +99,25 @@ namespace z3n8
     {
         private readonly string _projectName;
         private readonly string _logHost;
+        private readonly string _trafficHost;
         private readonly string _proxy;
         private readonly bool _fallbackToStackTrace;
         private static readonly HttpClient _logClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         private readonly string _taskId;
         private readonly string _account;
-        public HttpDebugHandler(string projectName, string logHost = "http://localhost:38109/http-log", 
-            string proxy = "", string taskId = "", string account = "", bool fallbackToStackTrace = true)
+        private readonly string _source = "z3n8";
+        public HttpDebugHandler(string projectName, 
+            string logHost = "http://localhost:38109/http-log", 
+            string trafficHost = "http://localhost:38109/traffic",
+            string proxy = "",
+            string taskId = "",
+            string account = "",
+            bool fallbackToStackTrace = true
+            )
         {
             _projectName = projectName;
             _logHost     = logHost;
+            _trafficHost = trafficHost;
             _proxy       = proxy;
             _taskId      = taskId;
             _account     = account;
@@ -228,15 +237,20 @@ namespace z3n8
                     },
                     machine = Environment.MachineName,
                     project = _projectName,
-                    processId = System.Diagnostics.Process.GetCurrentProcess().Id
+                    processId = System.Diagnostics.Process.GetCurrentProcess().Id,
+                    origin = _source
                 };
-
+                var body = JsonConvert.SerializeObject(httpLog);
+                body.Debug();
                 var content = new StringContent(
-                    Newtonsoft.Json.JsonConvert.SerializeObject(httpLog), 
+                    body, 
                     Encoding.UTF8, 
                     "application/json");
-                    
-                await _logClient.PostAsync(_logHost, content);
+                if(!string.IsNullOrEmpty (_logHost) )   
+                    await _logClient.PostAsync(_logHost, content);
+                if(!string.IsNullOrEmpty (_trafficHost) )   
+                    await _logClient.PostAsync(_trafficHost, content);
+                
             }
             catch (Exception ex) { 
                 Console.WriteLine($"[HttpDebugHandler ERROR] {ex.Message}"); 

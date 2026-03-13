@@ -126,33 +126,343 @@
             overflow-y: auto;
         }
 
+        /* ── DETAILS PANEL ── */
         .details-panel {
             width: 500px;
+            min-height: 0;
             background: var(--bg);
             border: 1px solid var(--border);
             border-radius: 6px;
             display: none;
             flex-direction: column;
+            overflow: hidden;
+            overflow-y: auto;
         }
 
         .details-panel.visible {
             display: flex;
         }
 
+        .details-header {
+            padding: 10px 12px;
+            background: var(--bg1);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .details-title {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text2);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0 8px;
+        }
+
+        .close-btn:hover { color: var(--text); }
+
+        /* ── DETAILS SCROLLABLE BODY ── */
+        .details-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* ── OVERVIEW SECTION ── */
+        .ov-url {
+            font-family: monospace;
+            font-size: 11px;
+            color: var(--text);
+            word-break: break-all;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .ov-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .ov-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+        }
+
+        /* reuse method/status badge styles */
+        .badge-method {
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: monospace;
+        }
+        .badge-method.GET    { background: rgba(88, 166, 255, 0.15); color: var(--accent-lo); }
+        .badge-method.POST   { background: rgba(63, 185, 80, 0.15);  color: var(--green-lo); }
+        .badge-method.PUT    { background: rgba(210, 153, 34, 0.15); color: var(--yellow-lo); }
+        .badge-method.DELETE { background: rgba(248, 81, 73, 0.15);  color: var(--red-lo); }
+        .badge-method.PATCH  { background: rgba(210, 153, 34, 0.15); color: var(--yellow-lo); }
+        .badge-method.HEAD   { background: rgba(88, 166, 255, 0.15); color: var(--accent-lo); }
+
+        .badge-status {
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: monospace;
+        }
+        .badge-status.s2xx { background: rgba(63, 185, 80, 0.15);  color: var(--green-lo); }
+        .badge-status.s3xx { background: rgba(88, 166, 255, 0.15); color: var(--accent-lo); }
+        .badge-status.s4xx { background: rgba(210, 153, 34, 0.15); color: var(--yellow-lo); }
+        .badge-status.s5xx { background: rgba(248, 81, 73, 0.15);  color: var(--red-lo); }
+        .badge-status.s0xx { background: rgba(248, 81, 73, 0.12);  color: var(--red-lo); }
+
+        .badge-duration {
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: monospace;
+            background: rgba(163, 113, 247, 0.12);
+            color: #a371f7;
+        }
+
+        .badge-meta {
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+            background: var(--bg2);
+            color: var(--text2);
+            font-family: monospace;
+        }
+
+        .badge-origin {
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+            background: rgba(41, 182, 246, 0.1);
+            color: #29b6f6;
+            font-family: monospace;
+        }
+
+        /* ── ACTION BUTTONS ── */
+        .action-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .act-btn {
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid;
+            font-family: inherit;
+            transition: filter 0.15s;
+        }
+        .act-btn:hover { filter: brightness(1.2); }
+
+        .act-btn.play     { background: rgba(63,185,80,0.15);   border-color: rgba(63,185,80,0.4);    color: var(--green-lo); }
+        .act-btn.api-sk   { background: rgba(255,123,114,0.12); border-color: rgba(255,123,114,0.4);  color: #ff7b72; }
+        .act-btn.api-ex   { background: rgba(255,123,114,0.12); border-color: rgba(255,123,114,0.4);  color: #ff7b72; }
+        .act-btn.httpcl   { background: rgba(88,166,255,0.12);  border-color: rgba(88,166,255,0.4);   color: var(--accent-lo); }
+        .act-btn.zp7      { background: rgba(63,185,80,0.12);   border-color: rgba(63,185,80,0.4);    color: var(--green-lo); }
+        .act-btn.hybrid   { background: rgba(210,153,34,0.12);  border-color: rgba(210,153,34,0.4);   color: var(--yellow-lo); }
+        .act-btn.python   { background: rgba(255,166,88,0.12);  border-color: rgba(255,166,88,0.4);   color: #f0883e; }
+        .act-btn.ts       { background: rgba(41,182,246,0.12);  border-color: rgba(41,182,246,0.4);   color: #29b6f6; }
+        .act-btn.curl     { background: rgba(163,113,247,0.12); border-color: rgba(163,113,247,0.4);  color: #a371f7; }
+
+        /* ── COLLAPSIBLE SECTIONS ── */
+        .detail-section {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .section-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: var(--bg1);
+            cursor: pointer;
+            user-select: none;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .section-toggle:hover { background: var(--bg2); }
+
+        .section-arrow {
+            font-size: 9px;
+            transition: transform 0.15s;
+            color: var(--text3);
+        }
+        .section-toggle.open .section-arrow { transform: rotate(90deg); }
+
+        .section-body {
+            display: none;
+        }
+        .section-body.open {
+            display: block;
+        }
+
+        /* ── SUBSECTIONS (headers / body) ── */
+        .subsection-toggle {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--bg2);
+            background: var(--bg);
+        }
+        .subsection-toggle:hover { background: var(--bg1); }
+
+        .subsection-arrow {
+            font-size: 8px;
+            transition: transform 0.15s;
+        }
+        .subsection-toggle.open .subsection-arrow { transform: rotate(90deg); }
+
+        .subsection-body {
+            display: none;
+        }
+        .subsection-body.open {
+            display: block;
+        }
+
+        /* ── HEADER ITEMS (clickable copy) ── */
+        .header-list {
+            background: var(--bg);
+        }
+
+        .header-item {
+            padding: 5px 10px;
+            border-bottom: 1px solid var(--bg2);
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .header-item:last-child { border-bottom: none; }
+        .header-item:hover { background: var(--bg2); }
+
+        .header-key {
+            color: var(--green-hi);
+        }
+
+        .header-value {
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        /* ── BODY BLOCK ── */
+        .body-block {
+            max-height: 400px;
+            overflow-y: auto;
+            background: var(--bg);
+            padding: 8px 10px;
+            font-family: monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--text);
+            cursor: pointer;
+            transition: background 0.1s;
+            min-height: 24px;
+        }
+        .body-block:hover { background: var(--bg1); }
+
+        .cookies-block {
+            max-height: 200px;      /* <-- добавить */
+            overflow-y: auto;       /* <-- добавить */
+            background: var(--bg);
+            padding: 8px 10px;
+            font-family: monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--yellow-lo);
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .cookies-block:hover { background: var(--bg1); }
+
+        .empty-note {
+            color: var(--text3);
+            font-style: italic;
+            padding: 8px 10px;
+            font-size: 11px;
+        }
+
+        /* ── COPY FLASH ── */
+        .flash-copied {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(63,185,80,0.2);
+            border: 1px solid rgba(63,185,80,0.4);
+            color: var(--green-lo);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 9999;
+        }
+        .flash-copied.show { opacity: 1; }
+
+        /* ── LIST ITEMS ── */
         .request-item {
-            padding: 8px 12px;
+            padding: 6px 12px;
             border-bottom: 1px solid var(--bg2);
             cursor: pointer;
             transition: background 0.15s;
             display: grid;
             grid-template-columns: 80px 60px auto 60px 80px 100px;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
         }
 
-        .request-item:hover {
-            background: var(--bg1);
-        }
+        .request-item:hover { background: var(--bg1); }
 
         .request-item.selected {
             background: var(--bg2);
@@ -212,178 +522,22 @@
             font-size: 11px;
         }
 
-        .details-header {
-            padding: 12px;
-            background: var(--bg1);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        /* ── PLAY MODAL ── */
+        .play-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+        .play-modal-overlay.show { display: flex; }
+        .play-modal { background: var(--bg1); border: 1px solid var(--border); border-radius: 10px; width: 900px; max-width: 96vw; height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+        .play-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .play-modal-title { font-weight: 700; font-size: 13px; color: var(--text); }
+        .play-modal-close { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+        .play-modal-close:hover { color: var(--text); }
+        .play-modal-url-row { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center; }
+        .play-modal-body { display: flex; gap: 0; flex: 1; overflow: hidden; }
+        .play-modal-left { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+        .play-modal-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .play-modal-label { font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px 4px; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .play-modal-area { flex: 1; background: var(--bg); border: none; outline: none; color: var(--text); font-family: monospace; font-size: 10.5px; padding: 8px 12px; resize: none; line-height: 1.5; }
+        .play-modal-footer { padding: 8px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
-        .details-title {
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .close-btn {
-            background: transparent;
-            border: none;
-            color: var(--text2);
-            cursor: pointer;
-            font-size: 18px;
-            padding: 0 8px;
-        }
-
-        .close-btn:hover {
-            color: var(--text);
-        }
-
-        .tabs {
-            display: flex;
-            background: var(--bg1);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .tab {
-            padding: 8px 16px;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-            font-size: 12px;
-        }
-
-        .tab:hover {
-            background: var(--bg2);
-        }
-
-        .tab.active {
-            border-bottom-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .tab-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px;
-        }
-
-        .tab-panel {
-            display: none;
-        }
-
-        .tab-panel.active {
-            display: block;
-        }
-
-        #play.tab-panel.active {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        .info-grid {
-            display: grid;
-            gap: 8px;
-        }
-
-        .info-row {
-            display: grid;
-            grid-template-columns: 120px 1fr;
-            gap: 8px;
-        }
-
-        .info-label {
-            color: var(--text2);
-            font-weight: 500;
-        }
-
-        .info-value {
-            color: var(--text);
-            word-break: break-all;
-        }
-
-        .code-block {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 12px;
-            margin-top: 8px;
-            font-family: monospace;
-            font-size: 11px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .header-list {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            margin-top: 8px;
-        }
-
-        .header-item {
-            padding: 6px 12px;
-            border-bottom: 1px solid var(--bg2);
-            display: grid;
-            grid-template-columns: 150px 1fr;
-            gap: 8px;
-            font-family: monospace;
-            font-size: 11px;
-        }
-
-        .header-item:last-child {
-            border-bottom: none;
-        }
-
-        .header-key {
-            color: var(--green-hi);
-        }
-
-        .header-value {
-            color: var(--text);
-            word-break: break-all;
-        }
-
-        .copy-btn {
-            background: var(--bg2);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 11px;
-            margin-top: 8px;
-        }
-
-        .copy-btn:hover {
-            background: var(--border);
-        }
-
-        ::-webkit-scrollbar {
-            width: 12px;
-            height: 12px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 6px;
-            border: 2px solid var(--bg);
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--muted);
-        }
-
-        /* ── PLAY TAB ── */
-        .play-layout { display: flex; flex-direction: column; height: 100%; gap: 0; }
-        .play-url-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
         .play-method-select {
             background: var(--bg2); border: 1px solid var(--border); color: var(--text);
             font-family: inherit; font-size: 11px; padding: 4px 6px; border-radius: 4px; outline: none;
@@ -399,19 +553,12 @@
             font-weight: 600; transition: background 0.2s; white-space: nowrap;
         }
         .play-send-btn:hover { background: var(--green-bg2); }
-        .play-section-label {
-            font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em;
-            padding: 4px 0 3px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
-        }
         .play-textarea {
             width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
             font-family: monospace; font-size: 10.5px; padding: 6px 8px; border-radius: 4px;
             outline: none; resize: vertical; line-height: 1.5; min-height: 60px;
         }
         .play-textarea:focus { border-color: var(--accent); }
-        .play-response-wrap {
-            flex: 1; display: flex; flex-direction: column; margin-top: 8px; min-height: 0;
-        }
         .play-response-area {
             flex: 1; width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
             font-family: monospace; font-size: 10.5px; padding: 6px 8px; border-radius: 4px;
@@ -420,11 +567,27 @@
         .play-status { font-size: 10px; color: var(--text2); margin-left: auto; }
         .play-status.ok  { color: var(--green-lo); }
         .play-status.err { color: var(--red-lo); }
-        .play-footer { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+
+        .copy-btn {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .copy-btn:hover { background: var(--border); }
+
         .status-2xx { color: var(--green-lo); }
         .status-3xx { color: var(--accent-lo); }
         .status-4xx { color: var(--yellow-lo); }
         .status-5xx { color: var(--red-lo); }
+
+        ::-webkit-scrollbar { width: 12px; height: 12px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; border: 2px solid var(--bg); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     </style>
 </head>
 <body>
@@ -491,49 +654,122 @@
             <button class="close-btn" onclick="closeDetails()">×</button>
         </div>
 
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('overview')">Overview</div>
-            <div class="tab" onclick="switchTab('request')">Request</div>
-            <div class="tab" onclick="switchTab('response')">Response</div>
-            <div class="tab" onclick="switchTab('play')">⚡ Play</div>
-        </div>
+        <div class="details-body" id="detailsBody"></div>
+    </div>
+</div>
 
-        <div class="tab-content">
-            <div class="tab-panel active" id="overview"></div>
-            <div class="tab-panel" id="request"></div>
-            <div class="tab-panel" id="response"></div>
-            <div class="tab-panel" id="play"></div>
+<!-- PLAY MODAL -->
+<div class="play-modal-overlay" id="playModalOverlay" onclick="closePlayModalOnBg(event)">
+    <div class="play-modal">
+        <div class="play-modal-header">
+            <span class="play-modal-title">⚡ Request Replay</span>
+            <button class="play-modal-close" onclick="closePlayModal()">✕</button>
+        </div>
+        <div class="play-modal-url-row">
+            <select class="play-method-select" id="playMethod">
+                <option>GET</option><option>POST</option><option>PUT</option>
+                <option>DELETE</option><option>PATCH</option><option>HEAD</option>
+            </select>
+            <input class="play-url-input" id="playUrl" placeholder="https://..." />
+            <button class="play-send-btn" onclick="sendPlay()">&#9654; Send</button>
+            <span class="play-status" id="playStatus"></span>
+        </div>
+        <div class="play-modal-body">
+            <div class="play-modal-left">
+                <div class="play-modal-label">Headers (one per line, Key: Value)</div>
+                <textarea class="play-textarea play-modal-area" id="playHeaders" placeholder="Content-Type: application/json&#10;Authorization: Bearer token..."></textarea>
+                <div class="play-modal-label" style="border-top:1px solid var(--border)">Body (JSON)</div>
+                <textarea class="play-textarea play-modal-area" id="playBody" style="flex:0 0 130px" placeholder='{"key": "value"}'></textarea>
+            </div>
+            <div class="play-modal-right">
+                <div class="play-modal-label">Response</div>
+                <textarea class="play-textarea play-modal-area" id="playResponse" readonly placeholder="Response will appear here..."></textarea>
+            </div>
+        </div>
+        <div class="play-modal-footer">
+            <button class="copy-btn" onclick="copyPlayResponse(this)">&#x1F4CB; Copy response</button>
+            <button class="copy-btn" onclick="copyCurlBtn2(this)">&#x1F4CB; cURL</button>
         </div>
     </div>
 </div>
 
+<!-- COPY FLASH -->
+<div class="flash-copied" id="flashCopied">Copied!</div>
+
 <script>
     const SERVER = window.location.origin;
+    const REPLAY_SERVER = (() => {
+        const u = new URL(window.location.href);
+        const replayPort = parseInt(u.port || '80') + 1;
+        return `${u.protocol}//${u.hostname}:${replayPort}`;
+    })();
     let autoRefresh = true;
-    let autoRefreshInterval = null;
+    let refreshAbortController = null;
+    let playAbortController = null;
+    let _sse = null;
     let selectedRequest = null;
+    let selectedIdx = null;
     let currentLogs = [];
 
+    // ── save/restore filters ──
+    function saveFilters() {
+        PageState.save({
+            methodFilter:  document.getElementById('methodFilter').value,
+            statusFilter:  document.getElementById('statusFilter').value,
+            urlFilter:     document.getElementById('urlFilter').value,
+            machineFilter: document.getElementById('machineFilter').value,
+            projectFilter: document.getElementById('projectFilter').value,
+            limitInput:    document.getElementById('limitInput').value,
+            autoRefresh:   autoRefresh,
+            selectedIdx:   selectedIdx
+        });
+    }
+
+    // ── flash notification ──
+    function flashCopied() {
+        const el = document.getElementById('flashCopied');
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 1200);
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(flashCopied);
+    }
+
+    // ── collapsible helper ──
+    function toggleSection(toggleEl) {
+        const isOpen = toggleEl.classList.contains('open');
+        const body = toggleEl.nextElementSibling;
+        if (isOpen) {
+            toggleEl.classList.remove('open');
+            body.classList.remove('open');
+        } else {
+            toggleEl.classList.add('open');
+            body.classList.add('open');
+        }
+    }
+
     async function refresh() {
-        const method = document.getElementById('methodFilter').value;
-        const status = document.getElementById('statusFilter').value;
-        const url = document.getElementById('urlFilter').value;
+        const method  = document.getElementById('methodFilter').value;
+        const status  = document.getElementById('statusFilter').value;
+        const url     = document.getElementById('urlFilter').value;
         const machine = document.getElementById('machineFilter').value;
         const project = document.getElementById('projectFilter').value;
-        const limit = document.getElementById('limitInput').value;
+        const limit   = document.getElementById('limitInput').value;
+        saveFilters();
 
         let apiUrl = `${SERVER}/traffic-logs?limit=${limit}`;
-        if (method) apiUrl += `&method=${method}`;
-        if (status) apiUrl += `&status=${status}`;
-        if (url) apiUrl += `&url=${encodeURIComponent(url)}`;
+        if (method)  apiUrl += `&method=${method}`;
+        if (status)  apiUrl += `&status=${status}`;
+        if (url)     apiUrl += `&url=${encodeURIComponent(url)}`;
         if (machine) apiUrl += `&machine=${encodeURIComponent(machine)}`;
         if (project) apiUrl += `&project=${encodeURIComponent(project)}`;
 
         try {
-            const response = await fetch(apiUrl);
+            refreshAbortController = new AbortController();
+            const response = await fetch(apiUrl, { signal: refreshAbortController.signal });
             let logs = await response.json();
 
-            // client-side filtering (server may not support all params)
             if (method)  logs = logs.filter(l => l.method === method);
             if (status)  logs = logs.filter(l => String(l.statusCode || '').startsWith(status));
             if (url)     logs = logs.filter(l => (l.url || '').toLowerCase().includes(url.toLowerCase()));
@@ -543,7 +779,16 @@
             currentLogs = logs;
             renderRequests(currentLogs);
             await updateStats();
+            // Restore machine/project after stats populated their selects
+            const _st = PageState.load();
+            if (_st.machineFilter) document.getElementById('machineFilter').value = _st.machineFilter;
+            if (_st.projectFilter) document.getElementById('projectFilter').value = _st.projectFilter;
+            // Re-open detail panel for previously selected row
+            if (_st.detailsVisible && _st.selectedIdx != null && currentLogs[_st.selectedIdx]) {
+                showDetails(_st.selectedIdx);
+            }
         } catch (e) {
+            if (e.name === 'AbortError') return;
             console.error('Refresh failed:', e);
         }
     }
@@ -573,6 +818,7 @@
 
     function showDetails(idx) {
         selectedRequest = currentLogs[idx];
+        selectedIdx = idx;
         const panel = document.getElementById('detailsPanel');
         panel.classList.add('visible');
 
@@ -580,178 +826,313 @@
             el.classList.toggle('selected', i === idx);
         });
 
-        renderOverview();
-        renderRequest();
-        renderResponse();
-        renderPlay();
+        renderDetails();
+        PageState.save({ selectedIdx: idx, detailsVisible: true });
     }
 
     function closeDetails() {
         document.getElementById('detailsPanel').classList.remove('visible');
         document.querySelectorAll('.request-item').forEach(el => el.classList.remove('selected'));
+        selectedRequest = null;
+        selectedIdx = null;
+        PageState.save({ selectedIdx: null, detailsVisible: false });
     }
 
-    function switchTab(tab) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-
-        event.target.classList.add('active');
-        document.getElementById(tab).classList.add('active');
+    // ── STATUS BADGE CLASS ──
+    function statusBadgeClass(code) {
+        if (code >= 200 && code < 300) return 's2xx';
+        if (code >= 300 && code < 400) return 's3xx';
+        if (code >= 400 && code < 500) return 's4xx';
+        if (code >= 500) return 's5xx';
+        return 's0xx';
     }
 
-    function renderOverview() {
+    function methodBadgeClass(m) {
+        return ['GET','POST','PUT','DELETE','PATCH','HEAD'].includes(m) ? m : 'GET';
+    }
+
+    function isEmpty(val) {
+        return val === null || val === undefined || val === '' || val === '-';
+    }
+
+    // ── MAIN RENDER ──
+    function renderDetails() {
         if (!selectedRequest) return;
+        const r = selectedRequest;
+        const body = document.getElementById('detailsBody');
+        body.innerHTML = '';
 
-        const overview = document.getElementById('overview');
-        overview.innerHTML = `
-        <div class="info-grid">
-            <div class="info-row">
-                <span class="info-label">URL:</span>
-                <span class="info-value">${escapeHtml(selectedRequest.url)}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Method:</span>
-                <span class="info-value">${selectedRequest.method}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Status:</span>
-                <span class="info-value">${selectedRequest.statusCode}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Duration:</span>
-                <span class="info-value">${selectedRequest.durationMs}ms</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Timestamp:</span>
-                <span class="info-value">${selectedRequest.timestamp}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Machine:</span>
-                <span class="info-value">${selectedRequest.machine}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Project:</span>
-                <span class="info-value">${selectedRequest.project}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Account:</span>
-                <span class="info-value">${selectedRequest.account || '-'}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Session:</span>
-                <span class="info-value">${selectedRequest.session || '-'}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Proxy:</span>
-                <span class="info-value">${selectedRequest.request.proxy || '-'}</span>
-            </div>
-        </div>
-        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-            <button class="copy-btn" onclick="copyCodeHttpClient(this)" style="border-color:rgba(88,166,255,0.4);color:var(--accent);">&#x2398; HttpClient</button>
-            <button class="copy-btn" onclick="copyCodeZP7(this)"        style="border-color:rgba(63,185,80,0.4);color:var(--green-lo);">&#x2398; ZP7</button>
-            <button class="copy-btn" onclick="copyCodeHybrid(this)"     style="border-color:rgba(210,153,34,0.4);color:var(--yellow-lo);">&#x2398; Hybrid</button>
-            <button class="copy-btn" onclick="copyCodePython(this)"     style="border-color:rgba(255,166,88,0.4);color:#f0883e;">&#x2398; Python</button>
-            <button class="copy-btn" onclick="copyCodeTS(this)"         style="border-color:rgba(41,182,246,0.4);color:#29b6f6;">&#x2398; TypeScript</button>
-            <button class="copy-btn" onclick="copyCodeCurl(this)"       style="border-color:rgba(163,113,247,0.4);color:#a371f7;">&#x2398; cURL</button>
-            <select id="apiStructureMode" style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);font-family:inherit;font-size:11px;padding:3px 6px;border-radius:4px;cursor:pointer;"><option value="skeleton">skeleton</option><option value="first">first</option><option value="last">last</option></select><button class="copy-btn" onclick="copyApiStructure(this)" style="border-color:rgba(255,123,114,0.4);color:#ff7b72;">&#x2398; API Structure</button>
-        </div>
-    `;
+        // URL
+        const urlDiv = document.createElement('div');
+        urlDiv.className = 'ov-url';
+        urlDiv.style.cursor = 'pointer';
+        urlDiv.title = 'Click to copy URL';
+        urlDiv.textContent = r.url;
+        urlDiv.onclick = () => { copyToClipboard(r.url); };
+        body.appendChild(urlDiv);
+
+        // Badges row 1: method + status + duration
+        const badges = document.createElement('div');
+        badges.className = 'ov-badges';
+        badges.innerHTML = `
+            <span class="badge-method ${methodBadgeClass(r.method)}">${r.method}</span>
+            <span class="badge-status ${statusBadgeClass(r.statusCode)}">${r.statusCode}</span>
+            ${r.durationMs ? `<span class="badge-duration">${r.durationMs}ms</span>` : ''}
+            ${!isEmpty(r.timestamp) ? `<span class="badge-meta">${r.timestamp}</span>` : ''}
+        `;
+        body.appendChild(badges);
+
+        // Meta row: machine, project, origin, account, session, proxy
+        const metaParts = [];
+        if (!isEmpty(r.machine)) metaParts.push(`<span class="badge-meta">${escapeHtml(r.machine)}</span>`);
+        if (!isEmpty(r.project)) metaParts.push(`<span class="badge-meta">${escapeHtml(r.project)}</span>`);
+        if (!isEmpty(r.origin))  metaParts.push(`<span class="badge-origin">${escapeHtml(r.origin)}</span>`);
+        if (!isEmpty(r.account)) metaParts.push(`<span class="badge-meta">acc:${escapeHtml(r.account)}</span>`);
+        if (!isEmpty(r.session)) metaParts.push(`<span class="badge-meta">sess:${escapeHtml(r.session)}</span>`);
+        const proxy = r.request && r.request.proxy ? r.request.proxy : null;
+        if (!isEmpty(proxy))     metaParts.push(`<span class="badge-meta">proxy:${escapeHtml(proxy)}</span>`);
+
+        if (metaParts.length > 0) {
+            const meta = document.createElement('div');
+            meta.className = 'ov-meta';
+            meta.innerHTML = metaParts.join('');
+            body.appendChild(meta);
+        }
+
+        // Action buttons - row 1: PLAY, API SKELETON, API EXAMPLE
+        const row1 = document.createElement('div');
+        row1.className = 'action-row';
+        row1.innerHTML = `
+            <button class="act-btn play"   onclick="openPlayModal()">&#9654; Play</button>
+            <button class="act-btn api-sk" onclick="copyApiStructureBtn(this,'skeleton')">&#x2398; API Skeleton</button>
+            <button class="act-btn api-ex" onclick="copyApiStructureBtn(this,'last')">&#x2398; API Example</button>
+        `;
+
+        // Action buttons - row 2: copy code buttons
+        const row2 = document.createElement('div');
+        row2.className = 'action-row';
+        row2.innerHTML = `
+            <button class="act-btn httpcl" onclick="copyCodeHttpClientBtn(this)">&#x2398; HttpClient</button>
+            <button class="act-btn zp7"    onclick="copyCodeZP7Btn(this)">&#x2398; ZP7</button>
+            <button class="act-btn hybrid" onclick="copyCodeHybridBtn(this)">&#x2398; Hybrid</button>
+            <button class="act-btn python" onclick="copyCodePythonBtn(this)">&#x2398; Python</button>
+            <button class="act-btn ts"     onclick="copyCodeTSBtn(this)">&#x2398; TypeScript</button>
+            <button class="act-btn curl"   onclick="copyCodeCurlBtn(this)">&#x2398; cURL</button>
+        `;
+
+        const actionRows = document.createElement('div');
+        actionRows.className = 'action-rows';
+        actionRows.appendChild(row1);
+        actionRows.appendChild(row2);
+        body.appendChild(actionRows);
+
+        // REQUEST SECTION
+        body.appendChild(buildRequestSection(r));
+
+        // RESPONSE SECTION
+        body.appendChild(buildResponseSection(r));
     }
 
-    function parseHeaderLines(raw) {
-        if (!raw) return [];
-        if (Array.isArray(raw)) return raw.filter(h => h && h.trim());
-        if (typeof raw === 'string') return raw.split('\r\n').filter(h => h.trim());
-        return [];
-    }
-
-    function buildHeadersHtml(lines) {
-        return lines.map(h => {
-            const colonIdx = h.indexOf(':');
-            if (colonIdx === -1) return '';
-            const key   = h.substring(0, colonIdx).trim();
-            const value = h.substring(colonIdx + 1).trim();
-            return `<div class="header-item"><span class="header-key">${escapeHtml(key)}</span><span class="header-value">${escapeHtml(value)}</span></div>`;
-        }).join('');
-    }
-
-    function prettyJson(str) {
-        try { return JSON.stringify(JSON.parse(str), null, 2); } catch(e) { return str; }
-    }
-
-    function renderRequest() {
-        if (!selectedRequest) return;
-        const r = selectedRequest.request;
-        const headerLines = parseHeaderLines(r.headers);
-        let cookies = r.cookies || r.Cookies || '';
+    function buildRequestSection(r) {
+        const req = r.request || {};
+        const headerLines = parseHeaderLines(req.headers);
+        let cookies = req.cookies || req.Cookies || '';
         if (!cookies) {
             const cl = headerLines.find(h => h.toLowerCase().startsWith('cookie:'));
             if (cl) cookies = cl.substring(cl.indexOf(':') + 1).trim();
         }
-        const body = r.body || '';
-        const headersHtml = buildHeadersHtml(headerLines);
-        const el = document.getElementById('request');
-        el.innerHTML = `
-        <h4>Headers:</h4>
-        <div class="header-list">${headersHtml || '<i style="color:var(--text3);padding:8px 12px;display:block;">No headers</i>'}</div>
-        <h4 style="margin-top:16px;">Cookies:</h4>
-        <div id="req-cookies-block" class="code-block" style="color:var(--yellow-lo);min-height:20px;word-break:break-all;white-space:pre-wrap;">${cookies ? escapeHtml(cookies) : '<i style="color:var(--text3);">No cookies</i>'}</div>
-        <h4 style="margin-top:16px;">Body:</h4>
-        <div id="req-body-content" class="code-block" style="min-height:20px;white-space:pre-wrap;">${body ? escapeHtml(prettyJson(body)) : '<i style="color:var(--text3);">Empty body</i>'}</div>
-        `;
-        if (cookies) {
-            const btn = document.createElement('button');
-            btn.className = 'copy-btn';
-            btn.textContent = '\u{1F4CB} Copy Cookies';
-            btn.onclick = () => navigator.clipboard.writeText(cookies).then(() => {
-                const o = btn.textContent; btn.textContent = '\u2713 Copied!'; btn.style.background = 'rgba(63,185,80,0.2)';
-                setTimeout(() => { btn.textContent = o; btn.style.background = ''; }, 1500);
+        const nonCookieHeaders = headerLines.filter(h => !h.toLowerCase().startsWith('cookie:'));
+        const body = req.body || '';
+
+        const section = document.createElement('div');
+        section.className = 'detail-section';
+
+        // Section header
+        const toggle = document.createElement('div');
+        toggle.className = 'section-toggle open';
+        toggle.innerHTML = '<span class="section-arrow">&#9654;</span> Request';
+        toggle.onclick = () => toggleSection(toggle);
+        section.appendChild(toggle);
+
+        const sBody = document.createElement('div');
+        sBody.className = 'section-body open';
+
+        // -- Headers subsection (collapsed by default)
+        const hdrToggle = document.createElement('div');
+        hdrToggle.className = 'subsection-toggle';
+        hdrToggle.innerHTML = `<span class="subsection-arrow">&#9654;</span> Headers (${nonCookieHeaders.length})`;
+        hdrToggle.onclick = () => toggleSection(hdrToggle);
+
+        const hdrBody = document.createElement('div');
+        hdrBody.className = 'subsection-body';
+
+        if (nonCookieHeaders.length > 0) {
+            const list = document.createElement('div');
+            list.className = 'header-list';
+            nonCookieHeaders.forEach(h => {
+                const ci = h.indexOf(':');
+                if (ci === -1) return;
+                const key = h.substring(0, ci).trim();
+                const val = h.substring(ci + 1).trim();
+                const item = document.createElement('div');
+                item.className = 'header-item';
+                item.title = 'Click key to copy "Key: Value", click value to copy value';
+                item.innerHTML = `<span class="header-key">${escapeHtml(key)}</span><span class="header-value">${escapeHtml(val)}</span>`;
+                item.querySelector('.header-key').onclick = (e) => { e.stopPropagation(); copyToClipboard(`${key}: ${val}`); };
+                item.querySelector('.header-value').onclick = (e) => { e.stopPropagation(); copyToClipboard(val); };
+                list.appendChild(item);
             });
-            document.getElementById('req-cookies-block').after(btn);
+            hdrBody.appendChild(list);
+        } else {
+            hdrBody.innerHTML = '<div class="empty-note">No headers</div>';
         }
+
+        // -- Cookies subsection (collapsed by default, only if present)
+        sBody.appendChild(hdrToggle);
+        sBody.appendChild(hdrBody);
+
+        if (cookies) {
+            const ckToggle = document.createElement('div');
+            ckToggle.className = 'subsection-toggle';
+            ckToggle.innerHTML = '<span class="subsection-arrow">&#9654;</span> Cookie';
+            ckToggle.onclick = () => toggleSection(ckToggle);
+
+            const ckBody = document.createElement('div');
+            ckBody.className = 'subsection-body';
+            const ckBlock = document.createElement('div');
+            ckBlock.className = 'cookies-block';
+            ckBlock.title = 'Click to copy cookies';
+            ckBlock.textContent = cookies;
+            ckBlock.onclick = () => copyToClipboard(cookies);
+            ckBody.appendChild(ckBlock);
+
+            sBody.appendChild(ckToggle);
+            sBody.appendChild(ckBody);
+        }
+
+        // -- Body subsection (open by default)
+        const bdToggle = document.createElement('div');
+        bdToggle.className = 'subsection-toggle open';
+        bdToggle.innerHTML = '<span class="subsection-arrow">&#9654;</span> Body';
+        bdToggle.onclick = () => toggleSection(bdToggle);
+
+        const bdBody = document.createElement('div');
+        bdBody.className = 'subsection-body open';
+
         if (body) {
-            const btn = document.createElement('button');
-            btn.className = 'copy-btn';
-            btn.textContent = '\u{1F4CB} Copy Body';
-            btn.onclick = () => copyBodyById('req-body-content', btn);
-            document.getElementById('req-body-content').after(btn);
+            const bdBlock = document.createElement('div');
+            bdBlock.className = 'body-block';
+            bdBlock.title = 'Click to copy body';
+            bdBlock.textContent = prettyJson(body);
+            bdBlock.onclick = () => copyToClipboard(body);
+            bdBody.appendChild(bdBlock);
+        } else {
+            bdBody.innerHTML = '<div class="empty-note">Empty body</div>';
         }
+
+        sBody.appendChild(bdToggle);
+        sBody.appendChild(bdBody);
+
+        section.appendChild(sBody);
+        return section;
     }
 
-    function renderResponse() {
-        if (!selectedRequest) return;
-        const res = selectedRequest.response;
-        const body = res.body || '';
+    function buildResponseSection(r) {
+        const res = r.response || {};
         const headerLines = parseHeaderLines(res.headers);
-        const headersHtml = buildHeadersHtml(headerLines);
-        const el = document.getElementById('response');
-        el.innerHTML = `
-        <h4>Headers:</h4>
-        <div class="header-list">${headersHtml || '<i style="color:var(--text3);padding:8px 12px;display:block;">No headers</i>'}</div>
-        <h4 style="margin-top:16px;">Body:</h4>
-        <div id="res-body-content" class="code-block" style="min-height:20px;white-space:pre-wrap;">${body ? escapeHtml(prettyJson(body)) : '<i style="color:var(--text3);">Empty body</i>'}</div>
-        `;
-        if (body) {
-            const btn = document.createElement('button');
-            btn.className = 'copy-btn';
-            btn.textContent = '\u{1F4CB} Copy Body';
-            btn.onclick = () => copyBodyById('res-body-content', btn);
-            document.getElementById('res-body-content').after(btn);
+        const body = res.body || '';
+
+        const section = document.createElement('div');
+        section.className = 'detail-section';
+
+        const toggle = document.createElement('div');
+        toggle.className = 'section-toggle open';
+        toggle.innerHTML = '<span class="section-arrow">&#9654;</span> Response';
+        toggle.onclick = () => toggleSection(toggle);
+        section.appendChild(toggle);
+
+        const sBody = document.createElement('div');
+        sBody.className = 'section-body open';
+
+        // Headers (collapsed)
+        const hdrToggle = document.createElement('div');
+        hdrToggle.className = 'subsection-toggle';
+        hdrToggle.innerHTML = `<span class="subsection-arrow">&#9654;</span> Headers (${headerLines.length})`;
+        hdrToggle.onclick = () => toggleSection(hdrToggle);
+
+        const hdrBody = document.createElement('div');
+        hdrBody.className = 'subsection-body';
+
+        if (headerLines.length > 0) {
+            const list = document.createElement('div');
+            list.className = 'header-list';
+            headerLines.forEach(h => {
+                const ci = h.indexOf(':');
+                if (ci === -1) return;
+                const key = h.substring(0, ci).trim();
+                const val = h.substring(ci + 1).trim();
+                const item = document.createElement('div');
+                item.className = 'header-item';
+                item.innerHTML = `<span class="header-key">${escapeHtml(key)}</span><span class="header-value">${escapeHtml(val)}</span>`;
+                item.querySelector('.header-key').onclick = (e) => { e.stopPropagation(); copyToClipboard(`${key}: ${val}`); };
+                item.querySelector('.header-value').onclick = (e) => { e.stopPropagation(); copyToClipboard(val); };
+                list.appendChild(item);
+            });
+            hdrBody.appendChild(list);
+        } else {
+            hdrBody.innerHTML = '<div class="empty-note">No headers</div>';
         }
+
+        sBody.appendChild(hdrToggle);
+        sBody.appendChild(hdrBody);
+
+        // Body (open)
+        const bdToggle = document.createElement('div');
+        bdToggle.className = 'subsection-toggle open';
+        bdToggle.innerHTML = '<span class="subsection-arrow">&#9654;</span> Body';
+        bdToggle.onclick = () => toggleSection(bdToggle);
+
+        const bdBody = document.createElement('div');
+        bdBody.className = 'subsection-body open';
+
+        if (body) {
+            const bdBlock = document.createElement('div');
+            bdBlock.className = 'body-block';
+            bdBlock.title = 'Click to copy body';
+            bdBlock.textContent = prettyJson(body);
+            bdBlock.onclick = () => copyToClipboard(body);
+            bdBody.appendChild(bdBlock);
+        } else {
+            bdBody.innerHTML = '<div class="empty-note">Empty body</div>';
+        }
+
+        sBody.appendChild(bdToggle);
+        sBody.appendChild(bdBody);
+
+        section.appendChild(sBody);
+        return section;
     }
 
-
-    function copyBodyById(elementId, btn) {
-        const text = document.getElementById(elementId)?.innerText?.trim();
-        if (!text) return;
+    // ── BUTTON HANDLERS ──
+    function copyCodeWithFeedback(btn, text) {
         navigator.clipboard.writeText(text).then(() => {
             const orig = btn.textContent;
             btn.textContent = '\u2713 Copied!';
-            btn.style.background = 'rgba(63, 185, 80, 0.2)';
-            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+            setTimeout(() => { btn.textContent = orig; }, 1800);
         });
     }
 
+    function copyApiStructureBtn(btn, mode) {
+        copyCodeWithFeedback(btn, buildApiStructure(mode));
+    }
+    function copyCodeHttpClientBtn(btn) { copyCodeWithFeedback(btn, buildCSharpCode(selectedRequest)); }
+    function copyCodeZP7Btn(btn)        { copyCodeWithFeedback(btn, buildZP7Code(selectedRequest)); }
+    function copyCodeHybridBtn(btn)     { copyCodeWithFeedback(btn, buildHybridCode(selectedRequest)); }
+    function copyCodePythonBtn(btn)     { copyCodeWithFeedback(btn, buildPythonCode(selectedRequest)); }
+    function copyCodeTSBtn(btn)         { copyCodeWithFeedback(btn, buildTSCode(selectedRequest)); }
+    function copyCodeCurlBtn(btn)       { copyCodeWithFeedback(btn, buildCurlCode(selectedRequest)); }
+
+    // ── STATS ──
     async function updateStats() {
         try {
             const response = await fetch(`${SERVER}/traffic-stats`);
@@ -762,12 +1143,10 @@
             const success = stats.byStatus['2xx'] || 0;
             const successRate = stats.totalRequests > 0 ? Math.round((success / stats.totalRequests) * 100) : 0;
             document.getElementById('successRate').textContent = successRate + '%';
-
             document.getElementById('avgTime').textContent = stats.avgDurationMs + 'ms';
 
             const machineFilter = document.getElementById('machineFilter');
             const projectFilter = document.getElementById('projectFilter');
-
             const curMachine = machineFilter.value;
             const curProject = projectFilter.value;
 
@@ -792,11 +1171,46 @@
     function toggleAutoRefresh() {
         autoRefresh = !autoRefresh;
         document.getElementById('autoStatus').textContent = autoRefresh ? 'ON' : 'OFF';
-        if (autoRefresh) {
-            autoRefreshInterval = setInterval(refresh, 3000);
-        } else {
-            clearInterval(autoRefreshInterval);
-        }
+        if (autoRefresh) startSse(); else stopSse();
+        PageState.save({ autoRefresh: autoRefresh });
+    }
+
+    function startSse() {
+        if (_sse) return;
+        _sse = new EventSource(`${SERVER}/traffic-logs/stream`);
+        _sse.onmessage = e => {
+            try {
+                const log = JSON.parse(e.data);
+                currentLogs.unshift(log);
+                const limit = parseInt(document.getElementById('limitInput').value) || 200;
+                if (currentLogs.length > limit * 2) currentLogs = currentLogs.slice(0, limit * 2);
+                applyFiltersAndRender();
+                updateStats();
+            } catch {}
+        };
+        _sse.onerror = () => { stopSse(); setTimeout(() => { if (autoRefresh) startSse(); }, 3000); };
+    }
+
+    function stopSse() {
+        if (_sse) { _sse.close(); _sse = null; }
+    }
+
+    function applyFiltersAndRender() {
+        const method  = document.getElementById('methodFilter').value;
+        const status  = document.getElementById('statusFilter').value;
+        const url     = document.getElementById('urlFilter').value;
+        const machine = document.getElementById('machineFilter').value;
+        const project = document.getElementById('projectFilter').value;
+        const limit   = parseInt(document.getElementById('limitInput').value) || 200;
+
+        let logs = currentLogs;
+        if (method)  logs = logs.filter(l => l.method === method);
+        if (status)  logs = logs.filter(l => String(l.statusCode || '').startsWith(status));
+        if (url)     logs = logs.filter(l => (l.url || '').toLowerCase().includes(url.toLowerCase()));
+        if (machine) logs = logs.filter(l => (l.machine || '') === machine);
+        if (project) logs = logs.filter(l => (l.project || '') === project);
+
+        renderRequests(logs.slice(0, limit));
     }
 
     function clearFilters() {
@@ -805,6 +1219,7 @@
         document.getElementById('urlFilter').value = '';
         document.getElementById('machineFilter').value = '';
         document.getElementById('projectFilter').value = '';
+        PageState.save({ methodFilter: '', statusFilter: '', urlFilter: '', machineFilter: '', projectFilter: '' });
         refresh();
     }
 
@@ -818,25 +1233,155 @@
         }
     }
 
-    function buildCurlString(req) {
-        let curl = `curl -X ${req.method} '${req.url}'`;
-        const headerLines = parseHeaderLines(req.request.headers);
-        headerLines.forEach(h => {
-            if (!h.includes('***MASKED***')) curl += ` \\\n  -H '${h.replace(/'/g, "\\'")}'`;
+    // ── PLAY MODAL ──
+    function openPlayModal() {
+        if (!selectedRequest) return;
+
+        stopSse();
+        if (refreshAbortController) {
+            refreshAbortController.abort();
+            refreshAbortController = null;
+        }
+
+        const r = selectedRequest.request;
+        const headerLines = parseHeaderLines(r.headers);
+        const replayHeaders = headerLines.filter(h => !h.startsWith(':')).join('\n');
+        const body = r.body || '';
+
+        const methodEl = document.getElementById('playMethod');
+        ['GET','POST','PUT','DELETE','PATCH','HEAD'].forEach((m, i) => {
+            methodEl.options[i].selected = (selectedRequest.method === m);
         });
-        if (req.request.body) curl += ` \\\n  -d '${req.request.body.replace(/'/g, "\\'")}'`;
-        return curl;
+        document.getElementById('playUrl').value = selectedRequest.url;
+        document.getElementById('playHeaders').value = replayHeaders;
+        document.getElementById('playBody').value = prettyJson(body);
+        document.getElementById('playResponse').value = '';
+        document.getElementById('playStatus').textContent = '';
+        document.getElementById('playStatus').className = 'play-status';
+
+        document.getElementById('playModalOverlay').classList.add('show');
     }
 
-    function copyCurlBtn(btn) {
+    function closePlayModal() {
+        document.getElementById('playModalOverlay').classList.remove('show');
+        if (playAbortController) {
+            playAbortController.abort();
+            playAbortController = null;
+        }
+        if (autoRefresh) startSse();
+    }
+
+    function closePlayModalOnBg(e) {
+        if (e.target === document.getElementById('playModalOverlay')) closePlayModal();
+    }
+
+    function copyCurlBtn2(btn) {
         if (!selectedRequest) return;
-        const text = buildCurlString(selectedRequest);
-        navigator.clipboard.writeText(text).then(() => {
-            const orig = btn.textContent;
-            btn.textContent = '\u2713 Copied!';
-            btn.style.background = 'rgba(63, 185, 80, 0.2)';
-            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+        const method = document.getElementById('playMethod')?.value || selectedRequest.method;
+        const url    = document.getElementById('playUrl')?.value    || selectedRequest.url;
+        const hText  = document.getElementById('playHeaders')?.value || '';
+        const body   = document.getElementById('playBody')?.value   || '';
+        let curl = `curl -X ${method} '${url}'`;
+        hText.split('\n').forEach(h => {
+            if (h.trim() && !h.includes('***MASKED***')) curl += ` \\\n  -H '${h.trim().replace(/'/g, "\\'")}'`;
         });
+        if (body.trim()) curl += ` \\\n  -d '${body.replace(/'/g, "\\'")}'`;
+        copyCodeWithFeedback(btn, curl);
+    }
+
+    async function sendPlay() {
+        const url      = document.getElementById('playUrl').value.trim();
+        const method   = document.getElementById('playMethod').value;
+        const hText    = document.getElementById('playHeaders').value;
+        const body     = document.getElementById('playBody').value.trim();
+        const statusEl = document.getElementById('playStatus');
+        const respEl   = document.getElementById('playResponse');
+
+        if (!url) { respEl.value = 'URL is empty'; return; }
+
+        statusEl.className   = 'play-status';
+        statusEl.textContent = 'Sending...';
+        respEl.value = '';
+
+        stopSse();
+
+        playAbortController = new AbortController();
+
+        const headers = parseHeadersTextToObj(hText);
+        delete headers['accept-encoding'];
+        delete headers['Accept-Encoding'];
+
+        let res;
+        try {
+            res = await fetch(`${REPLAY_SERVER}/http-replay`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, method, headers, body: body || null }),
+                signal: playAbortController.signal
+            });
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+            if (autoRefresh) startSse();
+            statusEl.className   = 'play-status err';
+            statusEl.textContent = 'Unreachable';
+            respEl.value = 'Cannot connect to ' + SERVER + '\n\nError: ' + e.message;
+            return;
+        }
+
+        if (autoRefresh) startSse();
+
+        let rawText = '';
+        try { rawText = await res.text(); } catch {}
+        let json = null;
+        try { json = JSON.parse(rawText); } catch {}
+
+        if (!json || json.error) {
+            statusEl.className   = 'play-status err';
+            statusEl.textContent = json?.error ? json.error : ('HTTP ' + res.status);
+            respEl.value = json?.error || ('HTTP ' + res.status + '\n\n' + rawText);
+            return;
+        }
+
+        const status = json.statusCode || res.status;
+        const cls = status >= 200 && status < 300 ? 'status-2xx'
+            : status >= 300 && status < 400 ? 'status-3xx'
+                : status >= 400 && status < 500 ? 'status-4xx' : 'status-5xx';
+        statusEl.className = 'play-status ok';
+        statusEl.innerHTML = `<span class="${cls}">${status}</span> &middot; ${json.durationMs ?? '?'}ms`;
+
+        let respBody = json.responseBody || '';
+        try { respBody = JSON.stringify(JSON.parse(respBody), null, 2); } catch {}
+        const respHeaders = Object.entries(json.responseHeaders || {}).map(([k,v]) => `${k}: ${v}`).join('\n');
+        respEl.value = `-- Headers --\n${respHeaders}\n\n-- Body --\n${respBody}`;
+    }
+
+    function copyPlayResponse(btn) {
+        const text = document.getElementById('playResponse')?.value;
+        if (!text) return;
+        copyCodeWithFeedback(btn, text);
+    }
+
+    // ── CODE BUILDERS ──
+
+    function parseHeaderLines(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw.filter(h => h && h.trim());
+        if (typeof raw === 'string') return raw.split('\r\n').filter(h => h.trim());
+        return [];
+    }
+
+    function prettyJson(str) {
+        try { return JSON.stringify(JSON.parse(str), null, 2); } catch(e) { return str; }
+    }
+
+    function parseHeadersTextToObj(text) {
+        const h = {};
+        if (!text.trim()) return h;
+        text.split('\n').forEach(line => {
+            const idx = line.indexOf(':');
+            if (idx > 0) { h[line.slice(0, idx).trim()] = line.slice(idx + 1).trim(); }
+        });
+        return h;
     }
 
     function buildCSharpCode(req) {
@@ -910,23 +1455,6 @@
         return lines.join('\n');
     }
 
-    function copyCSharpCode(btn) {
-        if (!selectedRequest) return;
-        const code = buildCSharpCode(selectedRequest);
-        navigator.clipboard.writeText(code).then(() => {
-            const orig = btn.textContent;
-            btn.textContent = '\u2713 Copied!';
-            btn.style.background = 'rgba(163, 113, 247, 0.2)';
-            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1800);
-        });
-    }
-    // ── HttpClient (async, with usings) ──
-    function copyCodeHttpClient(btn) {
-        if (!selectedRequest) return;
-        copyCodeWithFeedback(btn, buildCSharpCode(selectedRequest), 'rgba(88,166,255,0.2)');
-    }
-
-    // ── ZP7 ──
     function buildZP7Code(req) {
         const method  = req.method;
         const url     = req.url;
@@ -951,7 +1479,6 @@
             additionalHeaders.push(`${key}: ${val}`);
         });
 
-        const esc = s => { let r = ''; for (let i = 0; i < s.length; i++) { const ch = s[i]; r += ch === '"' ? '\\"' : ch === '\\' ? '\\\\' : ch; } return r; };
         const vEsc = s => String(s).split('"').join('""');
         const zpMethod = `ZennoLab.InterfacesLibrary.Enums.Http.HttpMethod.${method}`;
 
@@ -984,12 +1511,6 @@
         return lines.join('\n');
     }
 
-    function copyCodeZP7(btn) {
-        if (!selectedRequest) return;
-        copyCodeWithFeedback(btn, buildZP7Code(selectedRequest), 'rgba(63,185,80,0.2)');
-    }
-
-    // ── Hybrid: HttpClient, no usings, sync (.Result) ──
     function buildHybridCode(req) {
         const method  = req.method;
         const url     = req.url;
@@ -1055,12 +1576,6 @@
         return lines.join('\n');
     }
 
-    function copyCodeHybrid(btn) {
-        if (!selectedRequest) return;
-        copyCodeWithFeedback(btn, buildHybridCode(selectedRequest), 'rgba(210,153,34,0.2)');
-    }
-
-    // ── Python (requests) ──
     function buildPythonCode(req) {
         const method  = req.method;
         const url     = req.url;
@@ -1083,7 +1598,6 @@
             headersObj[key] = val;
         });
 
-        // escape for python single-quoted string
         const pyEsc = s => String(s).split('\\').join('\\\\').split("'").join("\\'");
         const pyStr = s => "'" + pyEsc(s) + "'";
         const pyDict = obj => {
@@ -1133,12 +1647,6 @@
         return lines.join('\n');
     }
 
-    function copyCodePython(btn) {
-        if (!selectedRequest) return;
-        copyCodeWithFeedback(btn, buildPythonCode(selectedRequest), 'rgba(255,166,88,0.2)');
-    }
-
-    // ── TypeScript (fetch) ──
     function buildTSCode(req) {
         const method  = req.method;
         const url     = req.url;
@@ -1187,12 +1695,6 @@
         return lines.join('\n');
     }
 
-    function copyCodeTS(btn) {
-        if (!selectedRequest) return;
-        copyCodeWithFeedback(btn, buildTSCode(selectedRequest), 'rgba(41,182,246,0.2)');
-    }
-
-    // ── cURL ──
     function buildCurlCode(req) {
         const headerLines = parseHeaderLines(req.request.headers)
             .filter(h => !h.startsWith(':') && !h.includes('***MASKED***'));
@@ -1209,12 +1711,7 @@
         return curl;
     }
 
-    function copyCodeCurl(btn) {
-        if (!selectedRequest) return;
-        copyCodeWithFeedback(btn, buildCurlCode(selectedRequest), 'rgba(163,113,247,0.2)');
-    }
-
-    // ── API Structure (from all currentLogs) ──
+    // ── API STRUCTURE ──
     function bodyToSkeleton(val) {
         if (val === null || val === undefined) return null;
         if (Array.isArray(val)) return val.length > 0 ? [bodyToSkeleton(val[0])] : [];
@@ -1236,12 +1733,10 @@
     }
 
     function buildApiStructure(mode) {
-        // mode: "skeleton" | "first" | "last"
         mode = mode || 'skeleton';
         const logs = currentLogs;
         if (!logs || !logs.length) return '[]';
 
-        // endpointMap: key -> { meta, requestBodies: [{skelKey, skeleton, raw}], responseBody, lastRespRaw }
         const endpointMap = {};
 
         logs.forEach(log => {
@@ -1258,10 +1753,10 @@
             const reqHdrs  = parseHeaderLines((log.request  && log.request.headers)  || '');
             const respHdrs = parseHeaderLines((log.response && log.response.headers) || '');
 
-            const cookieLine    = reqHdrs.find(h => h.toLowerCase().startsWith('cookie:'));
-            const reqCookies    = cookieLine ? cookieLine.substring(cookieLine.indexOf(':') + 1).trim() : '';
+            const cookieLine     = reqHdrs.find(h => h.toLowerCase().startsWith('cookie:'));
+            const reqCookies     = cookieLine ? cookieLine.substring(cookieLine.indexOf(':') + 1).trim() : '';
             const setCookieLines = respHdrs.filter(h => h.toLowerCase().startsWith('set-cookie:'));
-            const respCookies   = setCookieLines.map(h => h.substring(h.indexOf(':') + 1).trim()).join('\n');
+            const respCookies    = setCookieLines.map(h => h.substring(h.indexOf(':') + 1).trim()).join('\n');
 
             const reqHeaderObj = {}, respHeaderObj = {};
             reqHdrs.forEach(h => {
@@ -1290,7 +1785,6 @@
                     responseHeaders: respHeaderObj,
                     requestCookies:  reqCookies,
                     responseCookies: respCookies,
-                    // each entry: { skelKey, skeleton, firstRaw, lastRaw }
                     requestBodies: {},
                     firstRespRaw: null, lastRespRaw: null,
                     firstRespParsed: null, lastRespParsed: null
@@ -1299,7 +1793,6 @@
 
             const ep = endpointMap[key];
 
-            // request bodies — track first/last raw per unique skeleton
             if (reqSkeleton !== null) {
                 if (!ep.requestBodies[skelKey]) {
                     ep.requestBodies[skelKey] = {
@@ -1312,7 +1805,6 @@
                 }
             }
 
-            // response body — track first and last
             if (respBody) {
                 const rp = tryParseJson(respBody);
                 if (!ep.firstRespRaw) {
@@ -1361,180 +1853,11 @@
         return JSON.stringify(result, null, 2);
     }
 
-    function copyApiStructure(btn) {
-        const mode = (document.getElementById('apiStructureMode') || {}).value || 'skeleton';
-        const json = buildApiStructure(mode);
-        copyCodeWithFeedback(btn, json, 'rgba(255,123,114,0.2)');
-    }
-
-
-
-    function copyCodeWithFeedback(btn, text, bgColor) {
-        navigator.clipboard.writeText(text).then(() => {
-            const orig = btn.textContent;
-            btn.textContent = '\u2713 Copied!';
-            btn.style.background = bgColor;
-            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1800);
-        });
-    }
-
-    function parseHeadersTextToObj(text) {
-        const h = {};
-        if (!text.trim()) return h;
-        text.split('\n').forEach(line => {
-            const idx = line.indexOf(':');
-            if (idx > 0) { h[line.slice(0, idx).trim()] = line.slice(idx + 1).trim(); }
-        });
-        return h;
-    }
-
-    function renderPlay() {
-        if (!selectedRequest) return;
-        const r = selectedRequest.request;
-        const headerLines = parseHeaderLines(r.headers);
-        // Filter out pseudo-headers (:authority etc) for replay
-        const replayHeaders = headerLines.filter(h => !h.startsWith(':')).join('\n');
-        const body = r.body || '';
-
-        const el = document.getElementById('play');
-        el.innerHTML = `
-        <div class="play-url-row">
-            <select class="play-method-select" id="playMethod">
-                <option${selectedRequest.method==='GET'?' selected':''}>GET</option>
-                <option${selectedRequest.method==='POST'?' selected':''}>POST</option>
-                <option${selectedRequest.method==='PUT'?' selected':''}>PUT</option>
-                <option${selectedRequest.method==='DELETE'?' selected':''}>DELETE</option>
-                <option${selectedRequest.method==='PATCH'?' selected':''}>PATCH</option>
-                <option${selectedRequest.method==='HEAD'?' selected':''}>HEAD</option>
-            </select>
-            <input class="play-url-input" id="playUrl" value="${escapeHtml(selectedRequest.url)}" />
-            <button class="play-send-btn" onclick="sendPlay()">▶ Send</button>
-            <span class="play-status" id="playStatus"></span>
-        </div>
-        <div class="play-section-label">Headers (one per line, Key: Value)</div>
-        <textarea class="play-textarea" id="playHeaders" style="min-height:90px;max-height:150px;">${escapeHtml(replayHeaders)}</textarea>
-        <div class="play-section-label" style="margin-top:6px;">Body</div>
-        <textarea class="play-textarea" id="playBody" style="min-height:50px;max-height:100px;">${escapeHtml(prettyJson(body))}</textarea>
-        <div class="play-response-wrap">
-            <div class="play-section-label" style="display:flex;align-items:center;gap:8px;">
-                Response
-                <button class="copy-btn" style="margin-top:0;padding:2px 8px;font-size:10px;" onclick="copyPlayResponse(this)">📋 Copy</button>
-                <button class="copy-btn" style="margin-top:0;padding:2px 8px;font-size:10px;" onclick="copyCurlBtn2(this)">📋 cURL</button>
-            </div>
-            <textarea class="play-response-area" id="playResponse" readonly placeholder="Response will appear here..."></textarea>
-        </div>
-        `;
-    }
-
-    function copyCurlBtn2(btn) {
-        if (!selectedRequest) return;
-        // Build curl from current play tab inputs
-        const method = document.getElementById('playMethod')?.value || selectedRequest.method;
-        const url    = document.getElementById('playUrl')?.value    || selectedRequest.url;
-        const hText  = document.getElementById('playHeaders')?.value || '';
-        const body   = document.getElementById('playBody')?.value   || '';
-        let curl = `curl -X ${method} '${url}'`;
-        hText.split('\n').forEach(h => {
-            if (h.trim() && !h.includes('***MASKED***')) curl += ` \\\n  -H '${h.trim().replace(/'/g, "\\'")}'`;
-        });
-        if (body.trim()) curl += ` \\\n  -d '${body.replace(/'/g, "\\'")}'`;
-        navigator.clipboard.writeText(curl).then(() => {
-            const orig = btn.textContent;
-            btn.textContent = '\u2713 Copied!';
-            btn.style.background = 'rgba(63, 185, 80, 0.2)';
-            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
-        });
-    }
-
-    async function sendPlay() {
-        const url    = document.getElementById('playUrl').value.trim();
-        const method = document.getElementById('playMethod').value;
-        const hText  = document.getElementById('playHeaders').value;
-        const body   = document.getElementById('playBody').value.trim();
-        const statusEl = document.getElementById('playStatus');
-        const respEl   = document.getElementById('playResponse');
-
-        if (!url) { respEl.value = 'URL is empty'; return; }
-
-        statusEl.className = 'play-status';
-        statusEl.textContent = '⏳ Sending...';
-        respEl.value = '';
-
-        const headers = parseHeadersTextToObj(hText);
-        // Remove accept-encoding — decompression must be handled by the C# server (AutomaticDecompression)
-        delete headers['accept-encoding'];
-        delete headers['Accept-Encoding'];
-        let res;
-        try {
-            res = await fetch(`${SERVER}/http-replay`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, method, headers, body: body || null })
-            });
-        } catch (e) {
-            statusEl.className = 'play-status err';
-            statusEl.textContent = '✕ Unreachable';
-            respEl.value = 'Cannot connect to ' + SERVER + '\n\nError: ' + e.message;
-            return;
-        }
-
-        let rawText = '';
-        try { rawText = await res.text(); } catch {}
-        let json = null;
-        try { json = JSON.parse(rawText); } catch {}
-
-        if (!json || json.error) {
-            statusEl.className = 'play-status err';
-            statusEl.textContent = json?.error ? ('✕ ' + json.error) : ('✕ HTTP ' + res.status);
-            respEl.value = json?.error || ('HTTP ' + res.status + '\n\n' + rawText);
-            return;
-        }
-
-        const status = json.statusCode || res.status;
-        const cls = status >= 200 && status < 300 ? 'status-2xx'
-            : status >= 300 && status < 400 ? 'status-3xx'
-                : status >= 400 && status < 500 ? 'status-4xx' : 'status-5xx';
-        statusEl.className = 'play-status ok';
-        statusEl.innerHTML = `<span class="${cls}">${status}</span> · ${json.durationMs ?? '?'}ms`;
-
-        let respBody = json.responseBody || '';
-        try { respBody = JSON.stringify(JSON.parse(respBody), null, 2); } catch {}
-        const respHeaders = Object.entries(json.responseHeaders || {}).map(([k,v]) => `${k}: ${v}`).join('\n');
-        respEl.value = `── Headers ──\n${respHeaders}\n\n── Body ──\n${respBody}`;
-    }
-
-    function copyPlayResponse(btn) {
-        const text = document.getElementById('playResponse')?.value;
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-            const orig = btn.textContent;
-            btn.textContent = '\u2713 Copied!';
-            btn.style.background = 'rgba(63, 185, 80, 0.2)';
-            setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
-        });
-    }
-
-    function copyText(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            const btn = event.target;
-            const originalText = btn.textContent;
-            btn.textContent = '✓ Copied!';
-            btn.style.background = 'rgba(63, 185, 80, 0.2)';
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.style.background = '';
-            }, 1500);
-        });
-    }
-
+    // ── UTILS ──
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    }
-
-    function escapeForJs(text) {
-        return text.replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r');
     }
 
     function truncate(str, len) {
@@ -1542,8 +1865,20 @@
         return str.substring(0, len) + '...';
     }
 
+    // Restore controls from saved state before first refresh
+    (function restoreState() {
+        const st = PageState.load();
+        if (st.methodFilter  != null) document.getElementById('methodFilter').value  = st.methodFilter;
+        if (st.statusFilter  != null) document.getElementById('statusFilter').value  = st.statusFilter;
+        if (st.urlFilter     != null) document.getElementById('urlFilter').value     = st.urlFilter;
+        if (st.limitInput    != null) document.getElementById('limitInput').value    = st.limitInput;
+        if (st.autoRefresh   === false) {
+            autoRefresh = false;
+            document.getElementById('autoStatus').textContent = 'OFF';
+        }
+    })();
     refresh();
-    autoRefreshInterval = setInterval(refresh, 3000);
+    if (autoRefresh) startSse();
 </script>
 
 </body>
