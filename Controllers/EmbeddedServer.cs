@@ -18,7 +18,8 @@ public class EmbeddedServer
     //private readonly TrafficHandler    _trafficHandler;
     private readonly ReportHandler     _reportHandler;
     private readonly HttpReplayHandler _replayHandler;
-    private readonly ConfigHandler     _configHandler;
+    private readonly ConfigHandler     _configHandler; 
+    private readonly ZbHandler _zbHandler;
 
     private const int DefaultPort = 10993;
 
@@ -65,7 +66,8 @@ public class EmbeddedServer
         _logHandler     = new LogHandler(logPath);
         _httpLogHandler = new HttpLogHandler(logPath);
         //_trafficHandler = new TrafficHandler(logPath);
-        _reportHandler  = new ReportHandler(reportsPath, _wwwrootPath);
+        _reportHandler = new ReportHandler(reportsPath, _wwwrootPath, dbService);
+        _zbHandler = new ZbHandler();
         _replayHandler  = new HttpReplayHandler();
         _configHandler  = new ConfigHandler(logPath, _listener, _port, dbService);
 
@@ -157,7 +159,7 @@ public class EmbeddedServer
         var response = context.Response;
 
         response.Headers.Add("Access-Control-Allow-Origin",  "*");
-        response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+        response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         response.Headers.Add("Access-Control-Allow-Headers", "Content-Type");
 
         if (request.HttpMethod == "OPTIONS")
@@ -175,33 +177,163 @@ public class EmbeddedServer
             string path   = request.Url?.AbsolutePath.ToLower() ?? "";
             string method = request.HttpMethod;
 
-            // Script handlers (/zp, /py, /node, ...)
+// Script handlers (/zp, /py, /node, ...)
             foreach (var handler in _scriptHandlers)
             {
                 if (path.StartsWith(handler.PathPrefix))
                 {
+                    if (_debug )  $"[handler] Script:{handler.PathPrefix} → {path}".Debug();
                     await handler.HandleRequest(context);
                     return;
                 }
             }
 
-            // Pages
+            // Docs
+            if (method == "GET" && path.StartsWith("/docs"))
+            {
+                if (path == "/docs")
+                {
+                    response.StatusCode = 301;
+                    response.Headers["Location"] = "/docs/";
+                    response.Close();
+                    return;
+                }
+
+                var relative = Uri.UnescapeDataString(path.TrimStart('/'));
+                var filePath = Path.Combine(_wwwrootPath, relative).Replace("\\", "/");
+
+                // 1. Точное совпадение
+                if (!File.Exists(filePath))
+                    filePath = Path.Combine(_wwwrootPath, relative, "index.html").Replace("\\", "/");
+
+                // 2. Quartz кладёт страницы как Slug.html рядом, без подпапки
+                if (!File.Exists(filePath))
+                    filePath = Path.Combine(_wwwrootPath, relative + ".html").Replace("\\", "/");
+
+                if (!File.Exists(filePath))
+                {
+                    response.StatusCode = 404;
+                    var msg = Encoding.UTF8.GetBytes($"Not found: {filePath}");
+                    await response.OutputStream.WriteAsync(msg);
+                    response.Close();
+                    return;
+                }
+
+                var rel = Path.GetRelativePath(_wwwrootPath, filePath).Replace("\\", "/");
+                
+                if (filePath.EndsWith(".html"))
+                {
+                    var html = await File.ReadAllTextAsync(filePath);
+                    var inject = """
+                                 <link rel="stylesheet" href="/css/themes.css">
+                                 <link rel="stylesheet" href="/css/quartz-bridge.css">
+                                 <script src="/js/theme.js"></script>
+                                 <script>
+                                   (function() {
+                                     function applyTheme() {
+                                       var theme = localStorage.getItem('zp-theme') || 'dark';
+                                       var quartzTheme = theme === 'light' ? 'light' : 'dark';
+                                       localStorage.setItem('theme', quartzTheme);
+                                       document.documentElement.setAttribute('data-theme', theme);
+                                       document.documentElement.setAttribute('saved-theme', quartzTheme);
+                                     }
+                                     applyTheme();
+                                     document.addEventListener('nav', applyTheme);
+
+                                     document.addEventListener('nav', function() {
+                                       var old = document.getElementById('zp-dock-wrap');
+                                       var oldZone = document.getElementById('zp-dock-zone');
+                                       var oldOtp = document.getElementById('zp-otp-overlay');
+                                       if (old) old.remove();
+                                       if (oldZone) oldZone.remove();
+                                       if (oldOtp) oldOtp.remove();
+                                       var s = document.createElement('script');
+                                       s.src = '/js/nav.js?' + Date.now();
+                                       document.body.appendChild(s);
+                                     });
+                                   })();
+                                 </script>
+                                 """;
+                    
+                    var before = html.Contains("<script src=\"./prescript.js\"");
+
+                    var prescriptTag = html.Contains("<script src=\"./prescript.js\"")
+                        ? "<script src=\"./prescript.js\""
+                        : "<script src=\"../prescript.js\"";
+
+                    html = html.Replace(prescriptTag, inject + prescriptTag);
+                    
+                    html = html.Replace("</body>", "<script src=\"/js/nav.js\"></script></body>");
+
+                    var after = html.Contains(inject.Substring(0, 20));
+                    $"[docs inject] found={before} injected={after} path={filePath}".Debug();
+                    
+                    var bytes = Encoding.UTF8.GetBytes(html);
+                    response.ContentType = "text/html; charset=utf-8";
+                    response.ContentLength64 = bytes.Length;
+                    await response.OutputStream.WriteAsync(bytes);
+                    response.Close();
+                    return;
+                }
+
+                await ServeFile(response, rel, _wwwrootPath);
+                return;
+            }
+// Pages
             if (method == "GET" && (path == "/" || path == "/index.html"))
             {
-                await ServePage(response, request.QueryString["page"] ?? "home");
+                var page = request.QueryString["page"] ?? "home";
+                if (_debug )  $"[handler] Page → {page}".Debug();
+                await ServePage(response, page);
                 return;
             }
 
-            // Domain handlers
-            if (path.StartsWith("/report"))                              { await _reportHandler.Handle(context, path);  return; }
-            if (path.StartsWith("/config") || path == "/clear-all-logs"){ await _configHandler.Handle(context);        return; }
-            if (_logHandler.Matches(path, method))                       { await _logHandler.Handle(context);           return; }
-            if (_httpLogHandler.Matches(path, method))                   { await _httpLogHandler.Handle(context);       return; }
-            //if (_trafficHandler.Matches(path, method))                   { await _trafficHandler.Handle(context);       return; }
+// Domain handlers
+            if (path.StartsWith("/report"))
+            {
+                if (_debug )  $"[handler] ReportHandler → {path}".Debug();
+                await _reportHandler.Handle(context, path);
+                return;
+            }
+            if (path.StartsWith("/config") || path == "/clear-all-logs")
+            {
+                if (_debug )  $"[handler] ConfigHandler → {path}".Debug();
+                await _configHandler.Handle(context);
+                return;
+            }
+            if (_zbHandler.Matches(path)) 
+            {
+                $"[handler] ZbHandler → {method} {path}".Debug();
+                await _zbHandler.Handle(context);
+                 return;
+            }
+            if (_logHandler.Matches(path, method))
+            {
+                if (_debug )  $"[handler] LogHandler → {method} {path}".Debug();
+                await _logHandler.Handle(context);
+                return;
+            }
+            if (_httpLogHandler.Matches(path, method))
+            {
+                if (_debug )  $"[handler] HttpLogHandler → {method} {path}".Debug();
+                await _httpLogHandler.Handle(context);
+                return;
+            }
+            if (_zbHandler.Matches(path))
+            {
+                 $"[handler] ZbHandler → {method} {path}".Debug();
+                 await _zbHandler.Handle(context);
+                 return;
+            }
+// Static (wwwroot)
+            if (method == "GET")
+            {
+                if (_debug ) $"[handler] StaticFile → {request.Url!.AbsolutePath}".Debug();
+                await ServeFile(response, request.Url!.AbsolutePath.TrimStart('/'), _wwwrootPath);
+                return;
+            }
 
-            // Static (wwwroot)
-            if (method == "GET") { await ServeFile(response, request.Url!.AbsolutePath.TrimStart('/'), _wwwrootPath); return; }
-
+            if (_debug ) $"[handler] 404 → {method} {path}".Debug();
             response.StatusCode = 404;
         }
         catch (Exception ex)

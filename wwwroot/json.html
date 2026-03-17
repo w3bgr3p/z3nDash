@@ -8,8 +8,10 @@
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;800&display=swap">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;800&display=swap');
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11.5px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -105,7 +107,7 @@
         .node-bracket { color: var(--text-dim); cursor: pointer; }
         .node-summary { color: var(--text-muted); font-size: 10px; margin-left: 3px; font-style: italic; }
 
-        .node-actions { opacity: 0; display: flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; transition: opacity 0.1s; flex-shrink: 0; }
+        .node-actions { opacity: 0; display: flex; align-items: center; gap: 2px; margin-right: 6px; transition: opacity 0.1s; flex-shrink: 0; }
         .act-btn { width: 17px; height: 17px; border-radius: 3px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: all 0.1s; font-size: 10px; padding: 0; }
         .act-btn:hover { background: var(--border2); color: var(--text); }
         .act-btn.copy-btn:hover { color: var(--accent); }
@@ -448,6 +450,9 @@
         div.className = 'vrow' + (row.hidden ? ' is-hidden' : '');
 
         if (row.isClose) {
+            const actsClose = document.createElement('div');
+            actsClose.className = 'node-actions';
+            div.appendChild(actsClose);
             div.appendChild(makeIndent(row.depth));
             const sp = document.createElement('span');
             sp.style.display = 'inline-block'; sp.style.width = '14px';
@@ -455,6 +460,41 @@
             appendText(div, 'node-bracket', row.isArray ? ']' : '}');
             return div;
         }
+
+        // Build actions block first (placed left)
+        const acts = document.createElement('div');
+        acts.className = 'node-actions';
+
+        const cpBtn = document.createElement('button');
+        cpBtn.className = 'act-btn copy-btn'; cpBtn.title = 'Copy'; cpBtn.textContent = '⎘';
+        cpBtn.onclick = (e) => { e.stopPropagation(); copyNode(row.value, row.path); };
+        acts.appendChild(cpBtn);
+
+        if (!row.isComplex && row.path) {
+            const csBtn = document.createElement('button');
+            csBtn.className = 'act-btn csharp-btn'; csBtn.title = 'Copy C# selector'; csBtn.textContent = 'C#';
+            csBtn.style.fontSize = '8px'; csBtn.style.fontWeight = '700'; csBtn.style.letterSpacing = '-0.5px';
+            csBtn.onclick = (e) => { e.stopPropagation(); copyCSharpSelector(row.path); };
+            acts.appendChild(csBtn);
+        }
+
+        const isUrlLike = typeof row.value === 'string' && /^https?:\/\//i.test(row.value);
+        const isUrlKey  = row.key && /^(url|requestUrl|endpoint|href)$/i.test(String(row.key));
+        if (isUrlLike || isUrlKey) {
+            const rpBtn = document.createElement('button');
+            rpBtn.className = 'act-btn replay-act'; rpBtn.title = 'Replay this request'; rpBtn.textContent = '⚡';
+            rpBtn.onclick = (e) => { e.stopPropagation(); openReplayFromNode(row); };
+            acts.appendChild(rpBtn);
+        }
+
+        const hdBtn = document.createElement('button');
+        hdBtn.className = 'act-btn hide-btn';
+        hdBtn.title = row.hidden ? 'Show' : 'Hide';
+        hdBtn.textContent = row.hidden ? '👁' : '🚫';
+        hdBtn.onclick = (e) => { e.stopPropagation(); toggleManualHide(row.path); };
+        acts.appendChild(hdBtn);
+
+        div.appendChild(acts);
 
         div.appendChild(makeIndent(row.depth));
 
@@ -513,43 +553,6 @@
                 appendText(div, 'node-bracket', row.isArray ? ']' : '}');
             }
         }
-
-        // Actions
-        const acts = document.createElement('div');
-        acts.className = 'node-actions';
-
-        const cpBtn = document.createElement('button');
-        cpBtn.className = 'act-btn copy-btn'; cpBtn.title = 'Copy'; cpBtn.textContent = '⎘';
-        cpBtn.onclick = (e) => { e.stopPropagation(); copyNode(row.value, row.path); };
-        acts.appendChild(cpBtn);
-
-        // C# selector button — only for leaf (non-complex) nodes with a path
-        if (!row.isComplex && row.path) {
-            const csBtn = document.createElement('button');
-            csBtn.className = 'act-btn csharp-btn'; csBtn.title = 'Copy C# selector'; csBtn.textContent = 'C#';
-            csBtn.style.fontSize = '8px'; csBtn.style.fontWeight = '700'; csBtn.style.letterSpacing = '-0.5px';
-            csBtn.onclick = (e) => { e.stopPropagation(); copyCSharpSelector(row.path); };
-            acts.appendChild(csBtn);
-        }
-
-        // Replay button — show if value looks like a URL or parent key is "url"/"requestUrl"
-        const isUrlLike = typeof row.value === 'string' && /^https?:\/\//i.test(row.value);
-        const isUrlKey  = row.key && /^(url|requestUrl|endpoint|href)$/i.test(String(row.key));
-        if (isUrlLike || isUrlKey) {
-            const rpBtn = document.createElement('button');
-            rpBtn.className = 'act-btn replay-act'; rpBtn.title = 'Replay this request'; rpBtn.textContent = '⚡';
-            rpBtn.onclick = (e) => { e.stopPropagation(); openReplayFromNode(row); };
-            acts.appendChild(rpBtn);
-        }
-
-        const hdBtn = document.createElement('button');
-        hdBtn.className = 'act-btn hide-btn';
-        hdBtn.title = row.hidden ? 'Show' : 'Hide';
-        hdBtn.textContent = row.hidden ? '👁' : '🚫';
-        hdBtn.onclick = (e) => { e.stopPropagation(); toggleManualHide(row.path); };
-        acts.appendChild(hdBtn);
-
-        div.appendChild(acts);
 
         div.addEventListener('mouseenter', () => {
             document.getElementById('path-bar').innerHTML = '<span>' + (row.path || '(root)') + '</span>';

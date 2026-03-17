@@ -8,11 +8,13 @@ internal sealed class ReportHandler
 {
     private readonly string _reportsPath;
     private readonly string _wwwrootPath;
+    private readonly DbConnectionService _dbService;
 
-    public ReportHandler(string reportsPath, string wwwrootPath)
+    public ReportHandler(string reportsPath, string wwwrootPath, DbConnectionService dbService)
     {
         _reportsPath = reportsPath;
         _wwwrootPath = wwwrootPath;
+        _dbService   = dbService;
     }
 
     public async Task Handle(HttpListenerContext ctx, string path)
@@ -83,8 +85,78 @@ internal sealed class ReportHandler
                 await HttpHelpers.WriteJson(ctx.Response, new { metadata = JsonSerializer.Deserialize<JsonElement>(metaJson), social = JsonSerializer.Deserialize<JsonElement>(socialJson), projects = projectsDict, processes = processesDict });
                 break;
             }
+            case "/projects-db":
+            {
+                if (!_dbService.TryGetDb(out var db))
+                {
+                    ctx.Response.StatusCode = 503;
+                    await HttpHelpers.WriteJson(ctx.Response, new { error = "Database not connected" });
+                    break;
+                }
+                await HttpHelpers.WriteJson(ctx.Response, new { projects = ReadProjectsFromDb(db!) });
+                break;
+            }
             default: ctx.Response.StatusCode = 404; ctx.Response.Close(); break;
         }
+    }
+
+    private static Dictionary<string, object> ReadProjectsFromDb(Db db)
+    {
+        var result = new Dictionary<string, object>();
+
+        var projectTables = db.GetTables()
+            .Where(t => t.StartsWith("__") && !t.StartsWith("__|"))
+            .ToList();
+
+        foreach (var tableName in projectTables)
+        {
+            var projectName = tableName.Replace("__", "");
+            result[projectName] = new
+            {
+                name      = projectName,
+                timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                accounts  = ReadProjectAccounts(db, tableName)
+            };
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, object> ReadProjectAccounts(Db db, string tableName)
+    {
+        var accounts = new Dictionary<string, object>();
+
+        var lines = db.GetLines(
+            "id, last",
+            tableName: tableName,
+            where: "\"last\" LIKE '+ %' OR \"last\" LIKE '- %'"
+        );
+
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            var columns = line.Split('¦');
+            if (columns.Length < 2) continue;
+
+            var id       = columns[0].Trim();
+            var lastData = columns[1];
+            if (string.IsNullOrWhiteSpace(lastData)) continue;
+
+            var rows  = lastData.Split('\n');
+            var parts = rows[0].Split(' ');
+            if (parts.Length < 2) continue;
+
+            accounts[id] = new
+            {
+                status        = parts[0].Trim(),
+                timestamp     = parts.Length >= 2 ? parts[1].Trim() : "",
+                completionSec = parts.Length >= 3 ? parts[2].Trim() : "",
+                report        = rows.Length > 1 ? string.Join("\n", rows.Skip(1)).Trim() : ""
+            };
+        }
+
+        return accounts;
     }
 
     private async Task ServePage(HttpListenerResponse response, string page)

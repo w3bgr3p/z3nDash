@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z3n8 | ZB</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 20px 20px 80px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; background: var(--bg); color: var(--text); }
+
+        .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+        .page-header h1 { font-size: 16px; font-weight: 700; color: var(--text-hi); margin: 0; letter-spacing: 0.04em; }
+        .page-header .subtitle { font-size: 11px; color: var(--text-dim); }
+
+        .status-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding: 9px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; }
+        .status-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: #484f58; flex-shrink: 0; transition: background 0.2s; }
+        .status-bar .dot.ok  { background: #3fb950; }
+        .status-bar .dot.err { background: #f85149; }
+        .status-bar .sep { color: var(--border); }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+        .stat-card .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 4px; }
+        .stat-card .stat-value { font-size: 22px; font-weight: 700; color: var(--text-hi); line-height: 1; }
+        .stat-card .stat-sub   { font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+        .stat-card.running .stat-value { color: #3fb950; }
+        .stat-card.warn    .stat-value { color: #d29922; }
+
+        .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+        .tab-btn { padding: 7px 14px; font-family: inherit; font-size: 11px; font-weight: 600; color: var(--text-dim); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.1s; }
+        .tab-btn:hover  { color: var(--text); }
+        .tab-btn.active { color: var(--accent, #58a6ff); border-bottom-color: var(--accent, #58a6ff); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .section-header  { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .section-title   { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); }
+        .section-count   { font-size: 10px; color: var(--text-dim); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; }
+        .section-actions { margin-left: auto; display: flex; gap: 6px; }
+
+        .tbl-wrap { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: var(--surface); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+        tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: var(--surface2); }
+        td { padding: 7px 10px; font-size: 11px; color: var(--text); vertical-align: middle; }
+        td.mono       { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+        td.name-cell  { color: var(--text-hi); font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        td.token-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--text-dim); }
+
+        .tag { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 9px; color: var(--text-dim); margin: 1px 2px 1px 0; }
+
+        .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; }
+        .badge.running { background: rgba(63,185,80,0.12); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+        .badge.stopped { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+        .badge.unknown { background: rgba(210,153,34,0.1); color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
+
+        .btn { padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); font-size: 10px; font-family: inherit; cursor: pointer; background: var(--surface); color: var(--text); transition: background 0.1s; white-space: nowrap; }
+        .btn:hover    { background: var(--surface2); }
+        .btn:disabled { opacity: 0.4; cursor: default; }
+        .btn.green  { background: rgba(35,134,54,0.15); border-color: rgba(35,134,54,0.5); color: #3fb950; }
+        .btn.green:hover { background: rgba(35,134,54,0.25); }
+        .btn.red    { background: rgba(248,81,73,0.12); border-color: rgba(248,81,73,0.4); color: #f85149; }
+        .btn.red:hover   { background: rgba(248,81,73,0.22); }
+        .btn.orange { background: rgba(210,153,34,0.12); border-color: rgba(210,153,34,0.4); color: #d29922; }
+        .btn.orange:hover { background: rgba(210,153,34,0.22); }
+        .btn.sm { padding: 2px 7px; font-size: 9px; }
+        .btn-row { display: flex; gap: 4px; }
+
+        .filter-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+        .filter-row input, .filter-row select { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: inherit; font-size: 11px; padding: 4px 8px; outline: none; }
+        .filter-row input { width: 220px; }
+        .filter-row input:focus, .filter-row select:focus { border-color: var(--accent, #58a6ff); }
+
+        .empty   { text-align: center; padding: 32px; color: var(--text-dim); font-size: 11px; }
+        .loading { text-align: center; padding: 20px; color: var(--text-dim); font-size: 11px; }
+        .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent, #58a6ff); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .uptime { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { color: var(--text); }
+        th.sort-asc::after  { content: ' ↑'; color: var(--accent, #58a6ff); }
+        th.sort-desc::after { content: ' ↓'; color: var(--accent, #58a6ff); }
+
+        #toast { position: fixed; bottom: 90px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 9px 14px; font-size: 11px; color: var(--text); box-shadow: 0 4px 16px rgba(0,0,0,0.4); z-index: 9000; opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
+        #toast.show { opacity: 1; transform: translateY(0); }
+        #toast.ok  { border-color: rgba(63,185,80,0.5); color: #3fb950; }
+        #toast.err { border-color: rgba(248,81,73,0.4); color: #f85149; }
+    </style>
+</head>
+<body>
+
+<div class="page-header">
+    <h1>ZB</h1>
+    <span class="subtitle">ZennoBrowser API</span>
+</div>
+
+<div class="status-bar">
+    <div class="dot" id="statusDot"></div>
+    <span style="color:var(--text-dim)">Host:</span>
+    <span id="zbHost" style="color:var(--text);font-weight:600">—</span>
+    <span class="sep">|</span>
+    <span style="color:var(--text-dim)">Key:</span>
+    <span id="zbKeyStatus" style="color:var(--text-dim)">—</span>
+    <span class="sep">|</span>
+    <a href="/?page=config" style="font-size:10px;color:var(--accent,#58a6ff);text-decoration:none">⚙ Config</a>
+    <button class="btn sm" id="btnConnect" style="margin-left:auto">↻ Connect</button>
+</div>
+
+<div class="stats-row">
+    <div class="stat-card running"><div class="stat-label">Running</div><div class="stat-value" id="statRunning">—</div><div class="stat-sub">browser instances</div></div>
+    <div class="stat-card"><div class="stat-label">Profiles</div><div class="stat-value" id="statProfiles">—</div><div class="stat-sub">total</div></div>
+    <div class="stat-card"><div class="stat-label">Proxies</div><div class="stat-value" id="statProxies">—</div><div class="stat-sub">configured</div></div>
+    <div class="stat-card warn"><div class="stat-label">Threads</div><div class="stat-value" id="statThreads">—</div><div class="stat-sub">active</div></div>
+    <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value uptime" id="statUptime">—</div><div class="stat-sub">since connect</div></div>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" data-tab="instances">Instances</button>
+    <button class="tab-btn" data-tab="profiles">Profiles</button>
+    <button class="tab-btn" data-tab="proxies">Proxies</button>
+    <button class="tab-btn" data-tab="threads">Threads</button>
+</div>
+
+<!-- Instances -->
+<div class="tab-panel active" id="tab-instances">
+    <div class="section-header">
+        <span class="section-title">Running Browsers</span>
+        <span class="section-count" id="instancesCount">0</span>
+        <div class="section-actions">
+            <button class="btn sm" id="btnRefreshInstances">↻ Refresh</button>
+            <button class="btn sm red" id="btnStopAll">⛔ Stop All</button>
+        </div>
+    </div>
+    <div class="tbl-wrap">
+        <table>
+            <thead><tr><th>Profile ID</th><th>PID</th><th>WS Endpoint</th><th>Uptime</th><th></th></tr></thead>
+            <tbody id="instancesTbody"><tr><td colspan="4" class="empty">Not connected</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Profiles -->
+<div class="tab-panel" id="tab-profiles">
+    <div class="section-header">
+        <span class="section-title">Profiles</span>
+        <span class="section-count" id="profilesCount">0</span>
+        <div class="section-actions"><button class="btn sm" id="btnRefreshProfiles">↻ Refresh</button></div>
+    </div>
+    <div class="filter-row">
+        <input type="text" id="profileSearch" placeholder="Search by name or tag...">
+        <select id="profileFolderFilter"><option value="">All folders</option></select>
+    </div>
+    <div class="tbl-wrap">
+        <table>
+            <thead><tr>
+                <th class="sortable" data-sort="name">Name</th>
+                <th class="sortable" data-sort="folder">Folder</th>
+                <th>Tags</th>
+                <th class="sortable" data-sort="status">Status</th>
+                <th class="sortable" data-sort="lastStart">Last Start</th>
+                <th></th>
+            </tr></thead>
+            <tbody id="profilesTbody"><tr><td colspan="6" class="empty">Not connected</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Proxies -->
+<div class="tab-panel" id="tab-proxies">
+    <div class="section-header">
+        <span class="section-title">Proxies</span>
+        <span class="section-count" id="proxiesCount">0</span>
+        <div class="section-actions"><button class="btn sm" id="btnRefreshProxies">↻ Refresh</button></div>
+    </div>
+    <div class="tbl-wrap">
+        <table>
+            <thead><tr><th>Name</th><th>URI</th><th>Check Status</th><th>Last Check</th></tr></thead>
+            <tbody id="proxiesTbody"><tr><td colspan="4" class="empty">Not connected</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Threads -->
+<div class="tab-panel" id="tab-threads">
+    <div class="section-header">
+        <span class="section-title">Threads</span>
+        <span class="section-count" id="threadsCount">0</span>
+        <div class="section-actions">
+            <button class="btn sm" id="btnRefreshThreads">↻ Refresh</button>
+            <button class="btn sm red" id="btnFreeAllThreads">✕ Free All</button>
+        </div>
+    </div>
+    <div class="tbl-wrap">
+        <table>
+            <thead><tr><th>Token</th><th>Type</th><th>Created</th><th></th></tr></thead>
+            <tbody id="threadsTbody"><tr><td colspan="4" class="empty">Not connected</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    let _connected = false, _uptimeStart = null, _uptimeTimer = null, _refreshTimer = null;
+    let _allProfiles = [], _folders = [];
+
+    // Все запросы через прокси /zb/api/v1/*
+    async function zbGet(path) {
+        const r = await fetch('/zb/api/v1' + path);
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        return r.json();
+    }
+    async function zbDelete(path, body) {
+        const opts = { method: 'DELETE' };
+        if (body) { opts.headers = { 'Content-Type': 'application/json' }; opts.body = JSON.stringify(body); }
+        const r = await fetch('/zb/api/v1' + path, opts);
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        return r.text();
+    }
+    async function serverKill(pid) {
+        const r = await fetch('/zb/process/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid }) });
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        return r.json();
+    }
+
+    let _toastTimer = null;
+    function toast(msg, type = '') {
+        const el = document.getElementById('toast');
+        el.textContent = msg; el.className = 'show ' + type;
+        clearTimeout(_toastTimer); _toastTimer = setTimeout(() => { el.className = ''; }, 2500);
+    }
+
+    document.getElementById('btnConnect').addEventListener('click', connect);
+
+    async function connect() {
+        const dot = document.getElementById('statusDot');
+        const btn = document.getElementById('btnConnect');
+        btn.disabled = true; dot.className = 'dot';
+        try {
+            const cfg = await fetch('/config').then(r => r.json());
+            const ac   = cfg?.apiConfig || cfg?.ApiConfig || {};
+            const host = ac.zbHost || ac.ZbHost || 'localhost:8160';
+            const key  = ac.zb || ac.ZB;
+            document.getElementById('zbHost').textContent      = host;
+            document.getElementById('zbKeyStatus').textContent = key ? '●●●●' : 'not set';
+            document.getElementById('zbKeyStatus').style.color = key ? 'var(--text-dim)' : '#f85149';
+        } catch (_) {}
+        try {
+            await zbGet('/workspaces?start=0&total=1');
+            _connected = true; dot.className = 'dot ok';
+            toast('Connected', 'ok');
+            _uptimeStart = Date.now();
+            startUptimeTick(); await refreshAll(); startAutoRefresh();
+        } catch (e) {
+            _connected = false; dot.className = 'dot err';
+            toast('Failed: ' + e.message, 'err');
+        } finally { btn.disabled = false; }
+    }
+
+    function startUptimeTick() {
+        clearInterval(_uptimeTimer);
+        _uptimeTimer = setInterval(() => {
+            if (!_uptimeStart) return;
+            const s = Math.floor((Date.now() - _uptimeStart) / 1000);
+            document.getElementById('statUptime').textContent =
+                String(Math.floor(s/3600)).padStart(2,'0') + ':' +
+                String(Math.floor((s%3600)/60)).padStart(2,'0') + ':' +
+                String(s%60).padStart(2,'0');
+        }, 1000);
+    }
+    function startAutoRefresh() {
+        clearInterval(_refreshTimer);
+        _refreshTimer = setInterval(() => { if (_connected) loadInstances(); }, 10000);
+    }
+    async function refreshAll() {
+        await Promise.allSettled([loadInstances(), loadProfiles(), loadProxies(), loadThreads()]);
+    }
+
+    // ── Instances ─────────────────────────────────────────────────────────────────
+    document.getElementById('btnRefreshInstances').addEventListener('click', loadInstances);
+    document.getElementById('btnStopAll').addEventListener('click', async () => {
+        if (!_connected) return;
+        const ids = [...document.querySelectorAll('#instancesTbody tr[data-profileid]')].map(r => r.dataset.profileid).filter(Boolean);
+        if (!ids.length) { toast('No running instances'); return; }
+        if (!confirm(`Stop ${ids.length} instance(s)?`)) return;
+        try { await zbDelete('/browser_instances/delete_bulk?workspaceId=-1', ids); toast(`Stopped ${ids.length}`, 'ok'); await loadInstances(); }
+        catch (e) { toast('Error: ' + e.message, 'err'); }
+    });
+
+    async function loadInstances() {
+        if (!_connected) return;
+        const tbody = document.getElementById('instancesTbody');
+        try {
+            const data = await zbGet('/browser_instances?workspaceId=-1&start=0&total=1000');
+            const items = data.items || [];
+            document.getElementById('statRunning').textContent    = items.length;
+            document.getElementById('instancesCount').textContent = items.length;
+            if (!items.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No running instances</td></tr>'; return; }
+
+            // Рендерим без аптайма сначала
+            tbody.innerHTML = items.map(i => {
+                const pid = i.processId ?? 0;
+                const ws  = i.connectionString || '—';
+                return `<tr data-profileid="${i.profileId}" data-pid="${pid}">
+                <td class="mono">${i.profileId}</td>
+                <td class="mono">${pid||'—'}</td>
+                <td class="mono" title="${ws}">${ws.length>52?ws.slice(0,52)+'…':ws}</td>
+                <td class="mono" id="uptime-${pid}">—</td>
+                <td><div class="btn-row">
+                    <button class="btn sm red"    onclick="stopInstance('${i.profileId}',this)">Stop</button>
+                    ${pid?`<button class="btn sm orange" onclick="killInstance(${pid},'${i.profileId}',this)" title="Force kill (Process.Kill)">Kill</button>`:''}
+                    <button class="btn sm"        onclick="copyText('${ws}')">WS</button>
+                    <button class="btn sm"        onclick="copyText('${i.profileId}')">ID</button>
+                </div></td>
+            </tr>`;
+            }).join('');
+
+            // Подгружаем аптаймы по PID
+            const pids = items.map(i => i.processId).filter(Boolean);
+            if (pids.length) {
+                try {
+                    const up = await fetch('/zb/process/uptime?pids=' + pids.join(',')).then(r => r.json());
+                    pids.forEach(pid => {
+                        const el = document.getElementById('uptime-' + pid);
+                        if (!el) return;
+                        const d = up[String(pid)];
+                        if (!d) { el.textContent = 'dead?'; el.style.color = '#f85149'; return; }
+                        el.textContent = fmtUptime(d.uptimeSeconds);
+                    });
+                } catch (_) {}
+            }
+        } catch (e) { tbody.innerHTML = `<tr><td colspan="4" class="empty">Error: ${e.message}</td></tr>`; }
+    }
+
+    async function stopInstance(profileId, btn) {
+        btn.disabled = true;
+        try { await zbDelete(`/browser_instances/${profileId}?workspaceId=-1`); toast('Stopped', 'ok'); await loadInstances(); }
+        catch (e) { toast('Stop failed: ' + e.message, 'err'); btn.disabled = false; }
+    }
+    async function killInstance(pid, profileId, btn) {
+        if (!confirm(`Force kill PID ${pid}?\nZB API не используется — прямой Process.Kill.`)) return;
+        btn.disabled = true;
+        try {
+            const res = await serverKill(pid);
+            toast(res.killed ? `Killed PID ${pid}` : `PID ${pid} already dead`, 'ok');
+            await loadInstances();
+        } catch (e) { toast('Kill failed: ' + e.message, 'err'); btn.disabled = false; }
+    }
+
+    // ── Profiles ─────────────────────────────────────────────────────────────────
+    document.getElementById('btnRefreshProfiles').addEventListener('click', loadProfiles);
+    document.getElementById('profileSearch').addEventListener('input', renderProfilesTable);
+    document.getElementById('profileFolderFilter').addEventListener('change', renderProfilesTable);
+
+    let _sortField = 'name', _sortDir = 1; // 1=asc, -1=desc
+
+    document.querySelector('#tab-profiles table thead').addEventListener('click', function(e) {
+        const th = e.target.closest('th[data-sort]');
+        if (!th) return;
+        const field = th.dataset.sort;
+        if (_sortField === field) { _sortDir *= -1; }
+        else { _sortField = field; _sortDir = 1; }
+        renderProfilesTable();
+    });
+
+    async function loadProfiles() {
+        if (!_connected) return;
+        const tbody = document.getElementById('profilesTbody');
+        tbody.innerHTML = '<tr><td colspan="6" class="loading"><span class="spin"></span>Loading...</td></tr>';
+        try {
+            const [pd, fd] = await Promise.all([
+                zbGet('/profiles?workspaceId=-1&start=0&total=1000'),
+                zbGet('/profile_folders?workspaceId=-1&start=0&total=1000'),
+            ]);
+            _allProfiles = pd.items || []; _folders = fd.items || [];
+            const sel = document.getElementById('profileFolderFilter');
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">All folders</option>' + _folders.map(f=>`<option value="${f.id}">${f.name||f.id.slice(0,8)}</option>`).join('');
+            sel.value = cur;
+            document.getElementById('statProfiles').textContent  = _allProfiles.length;
+            document.getElementById('profilesCount').textContent = _allProfiles.length;
+            renderProfilesTable();
+        } catch (e) { tbody.innerHTML = `<tr><td colspan="6" class="empty">Error: ${e.message}</td></tr>`; }
+    }
+    function renderProfilesTable() {
+        const tbody    = document.getElementById('profilesTbody');
+        const search   = document.getElementById('profileSearch').value.toLowerCase();
+        const folderId = document.getElementById('profileFolderFilter').value;
+        let items = _allProfiles;
+        if (search)   items = items.filter(p => (p.name||'').toLowerCase().includes(search) || (p.tags||[]).map(t=>(t.name||'').toLowerCase()).join(' ').includes(search));
+        if (folderId) items = items.filter(p => p.folderId === folderId);
+
+        // Sort
+        items = [...items].sort((a, b) => {
+            let va, vb;
+            if (_sortField === 'name') {
+                return _sortDir * (a.name||'').localeCompare(b.name||'', undefined, { numeric: true, sensitivity: 'base' });
+            } else if (_sortField === 'folder') {
+                const fa = _folders.find(f => f.id === a.folderId); const fb = _folders.find(f => f.id === b.folderId);
+                return _sortDir * (fa?.name||'').localeCompare(fb?.name||'', undefined, { numeric: true, sensitivity: 'base' });
+            } else if (_sortField === 'status') {
+                va = (a.status||'').toLowerCase(); vb = (b.status||'').toLowerCase();
+            } else if (_sortField === 'lastStart') {
+                va = a.lastStartTime ? new Date(a.lastStartTime).getTime() : 0;
+                vb = b.lastStartTime ? new Date(b.lastStartTime).getTime() : 0;
+            }
+            if (va < vb) return -1 * _sortDir;
+            if (va > vb) return  1 * _sortDir;
+            return 0;
+        });
+
+        // Update th classes
+        document.querySelectorAll('#tab-profiles th[data-sort]').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+            if (th.dataset.sort === _sortField) th.classList.add(_sortDir === 1 ? 'sort-asc' : 'sort-desc');
+        });
+
+        document.getElementById('profilesCount').textContent = items.length;
+        if (!items.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No profiles found</td></tr>'; return; }
+        tbody.innerHTML = items.map(p => {
+            const folder    = _folders.find(f => f.id === p.folderId);
+            const folderName = folder ? (folder.name||p.folderId?.slice(0,8)) : (p.folderId?p.folderId.slice(0,8):'—');
+            const tags      = (p.tags||[]).map(t=>`<span class="tag">${t.name||''}</span>`).join('');
+            const lastStart = p.lastStartTime ? new Date(p.lastStartTime).toLocaleString() : '—';
+            return `<tr>
+            <td class="name-cell" title="${p.id}">${p.name||p.id.slice(0,8)}</td>
+            <td class="mono">${folderName}</td>
+            <td>${tags||'—'}</td>
+            <td>${p.status?`<span class="badge unknown">${p.status}</span>`:'<span class="badge stopped">—</span>'}</td>
+            <td class="mono">${lastStart}</td>
+            <td><div class="btn-row">
+                <button class="btn sm green" onclick="startProfile('${p.id}',this)">▶ Start</button>
+                <button class="btn sm" onclick="copyText('${p.id}')">ID</button>
+            </div></td>
+        </tr>`;
+        }).join('');
+    }
+    async function startProfile(profileId, btn) {
+        btn.disabled = true;
+        try {
+            const r = await fetch('/zb/api/v1/browser_instances/create?profileId='+profileId+'&workspaceId=-1&desktopName=&threadToken=', { method: 'POST' });
+            if (!r.ok) throw new Error(r.status+' '+r.statusText);
+            const d = await r.json();
+            toast('Started — PID ' + (d.processId||'?'), 'ok');
+            await loadInstances();
+        } catch (e) { toast('Error: '+e.message,'err'); }
+        finally { btn.disabled = false; }
+    }
+
+    // ── Proxies ──────────────────────────────────────────────────────────────────
+    document.getElementById('btnRefreshProxies').addEventListener('click', loadProxies);
+    async function loadProxies() {
+        if (!_connected) return;
+        const tbody = document.getElementById('proxiesTbody');
+        tbody.innerHTML = '<tr><td colspan="4" class="loading"><span class="spin"></span>Loading...</td></tr>';
+        try {
+            const data = await zbGet('/proxies?workspaceId=-1&start=0&total=1000');
+            const items = data.items || [];
+            document.getElementById('statProxies').textContent  = items.length;
+            document.getElementById('proxiesCount').textContent = items.length;
+            if (!items.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No proxies</td></tr>'; return; }
+            tbody.innerHTML = items.map(p => {
+                const sc = p.checkStatus==='Ok'?'running':p.checkStatus==='Unknown'?'unknown':'stopped';
+                const lc = p.checkStatusLastUpdateTime ? new Date(p.checkStatusLastUpdateTime).toLocaleString() : '—';
+                const uri = p.proxyUri||'—';
+                return `<tr><td class="name-cell">${p.name||'—'}</td><td class="mono" title="${uri}">${uri.length>52?uri.slice(0,52)+'…':uri}</td><td><span class="badge ${sc}">${p.checkStatus||'—'}</span></td><td class="mono">${lc}</td></tr>`;
+            }).join('');
+        } catch (e) { tbody.innerHTML = `<tr><td colspan="4" class="empty">Error: ${e.message}</td></tr>`; }
+    }
+
+    // ── Threads ──────────────────────────────────────────────────────────────────
+    document.getElementById('btnRefreshThreads').addEventListener('click', loadThreads);
+    document.getElementById('btnFreeAllThreads').addEventListener('click', async () => {
+        if (!_connected) return;
+        const tokens = [...document.querySelectorAll('#threadsTbody tr[data-token]')].map(r=>r.dataset.token).filter(Boolean);
+        if (!tokens.length) { toast('No threads'); return; }
+        if (!confirm(`Free ${tokens.length} thread(s)?`)) return;
+        try { await zbDelete('/threads/delete_bulk?workspaceId=-1', tokens); toast(`Freed ${tokens.length}`,'ok'); await loadThreads(); }
+        catch (e) { toast('Error: '+e.message,'err'); }
+    });
+    async function loadThreads() {
+        if (!_connected) return;
+        const tbody = document.getElementById('threadsTbody');
+        tbody.innerHTML = '<tr><td colspan="4" class="loading"><span class="spin"></span>Loading...</td></tr>';
+        try {
+            const data = await zbGet('/threads?workspaceId=-1&start=0&total=1000');
+            const items = data.items || [];
+            document.getElementById('statThreads').textContent  = items.length;
+            document.getElementById('threadsCount').textContent = items.length;
+            if (!items.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No threads</td></tr>'; return; }
+            tbody.innerHTML = items.map(t => {
+                const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : '—';
+                return `<tr data-token="${t.threadToken||''}">
+                <td class="token-cell" title="${t.threadToken||''}">${t.threadToken||'—'}</td>
+                <td>${t.type||'—'}</td><td class="mono">${created}</td>
+                <td><button class="btn sm red" onclick="freeThread('${t.threadToken}',this)">Free</button></td>
+            </tr>`;
+            }).join('');
+        } catch (e) { tbody.innerHTML = `<tr><td colspan="4" class="empty">Error: ${e.message}</td></tr>`; }
+    }
+    async function freeThread(token, btn) {
+        btn.disabled = true;
+        try { await zbDelete('/threads/'+encodeURIComponent(token)+'?workspaceId=-1'); toast('Thread freed','ok'); await loadThreads(); }
+        catch (e) { toast('Error: '+e.message,'err'); btn.disabled = false; }
+    }
+
+    // ── Tabs ─────────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById('tab-'+this.dataset.tab).classList.add('active');
+        });
+    });
+
+    function copyText(t) { navigator.clipboard?.writeText(t); toast('Copied','ok'); }
+
+    function fmtUptime(sec) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        if (h) return `${h}h ${String(m).padStart(2,'0')}m`;
+        if (m) return `${m}m ${String(s).padStart(2,'0')}s`;
+        return `${s}s`;
+    }
+
+    connect();
+</script>
+</body>
+</html>

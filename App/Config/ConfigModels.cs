@@ -30,6 +30,8 @@ public class LogsConfig
 public class ApiConfig
 {
     public string ZB { get; set; } = string.Empty;
+    // ZB API base URL. Default: http://localhost:8160
+    public string ZbHost { get; set; } = string.Empty;
 }
 public class SecurityConfig
 {

@@ -1,0 +1,114 @@
+/* quartz-bridge.css
+   Маппинг переменных z3n8 → Quartz
+   Инжектируется в каждую docs-страницу через EmbeddedServer
+*/
+
+html[data-theme="dark"] {
+    --light:     #0d1117 !important;
+    --lightgray: #30363d !important;
+    --gray:      #484f58 !important;
+    --darkgray:  #8b949e !important;
+    --dark:      #c9d1d9 !important;
+    --secondary: #58a6ff !important;
+    --tertiary:  #3fb950 !important;
+    --highlight: rgba(88, 166, 255, 0.1) !important;
+}
+
+html[data-theme="light"] {
+    --light:     #ffffff !important;
+    --lightgray: #d0d7de !important;
+    --gray:      #9ea8b3 !important;
+    --darkgray:  #656d76 !important;
+    --dark:      #1f2328 !important;
+    --secondary: #0969da !important;
+    --tertiary:  #1a7f37 !important;
+    --highlight: rgba(9, 105, 218, 0.1) !important;
+}
+
+html[data-theme="tokyo"] {
+    --light:     #1a1b26 !important;
+    --lightgray: #2a2b3d !important;
+    --gray:      #565f89 !important;
+    --darkgray:  #9aa5ce !important;
+    --dark:      #c0caf5 !important;
+    --secondary: #7aa2f7 !important;
+    --tertiary:  #9ece6a !important;
+    --highlight: rgba(122, 162, 247, 0.1) !important;
+}
+
+html[data-theme="nord"] {
+    --light:     #2e3440 !important;
+    --lightgray: #3b4252 !important;
+    --gray:      #4c566a !important;
+    --darkgray:  #d8dee9 !important;
+    --dark:      #eceff4 !important;
+    --secondary: #88c0d0 !important;
+    --tertiary:  #a3be8c !important;
+    --highlight: rgba(136, 192, 208, 0.1) !important;
+}
+
+html[data-theme="gruvbox"] {
+    --light:     #282828 !important;
+    --lightgray: #3c3836 !important;
+    --gray:      #665c54 !important;
+    --darkgray:  #bdae93 !important;
+    --dark:      #ebdbb2 !important;
+    --secondary: #fabd2f !important;
+    --tertiary:  #b8bb26 !important;
+    --highlight: rgba(250, 189, 47, 0.1) !important;
+}
+
+html[data-theme="amber"] {
+    --light:     #0a0800 !important;
+    --lightgray: #1a1500 !important;
+    --gray:      #4a3800 !important;
+    --darkgray:  #b8860b !important;
+    --dark:      #ffb000 !important;
+    --secondary: #ffd700 !important;
+    --tertiary:  #ff8c00 !important;
+    --highlight: rgba(255, 176, 0, 0.1) !important;
+}
+
+html[data-theme="amoled"] {
+    --light:     #000000 !important;
+    --lightgray: #111111 !important;
+    --gray:      #333333 !important;
+    --darkgray:  #888888 !important;
+    --dark:      #ffffff !important;
+    --secondary: #00bcd4 !important;
+    --tertiary:  #69f0ae !important;
+    --highlight: rgba(0, 188, 212, 0.1) !important;
+}
+
+html[data-theme="hyper"] {
+    --light:     #0a0a0a !important;
+    --lightgray: #1a1a2e !important;
+    --gray:      #16213e !important;
+    --darkgray:  #a0a0c0 !important;
+    --dark:      #e0e0ff !important;
+    --secondary: #00ff9f !important;
+    --tertiary:  #00d4ff !important;
+    --highlight: rgba(0, 255, 159, 0.1) !important;
+}
+
+html[data-theme="ethereum"] {
+    --light:     #0d0f14 !important;
+    --lightgray: #1a1d2e !important;
+    --gray:      #2a2d3e !important;
+    --darkgray:  #8892a4 !important;
+    --dark:      #c8d0e0 !important;
+    --secondary: #627eea !important;
+    --tertiary:  #48cae4 !important;
+    --highlight: rgba(98, 126, 234, 0.1) !important;
+}
+
+html[data-theme="solana"] {
+    --light:     #0a0a14 !important;
+    --lightgray: #141428 !important;
+    --gray:      #2a2a4a !important;
+    --darkgray:  #9945ff !important;
+    --dark:      #e0d0ff !important;
+    --secondary: #14f195 !important;
+    --tertiary:  #9945ff !important;
+    --highlight: rgba(20, 241, 149, 0.1) !important;
+}

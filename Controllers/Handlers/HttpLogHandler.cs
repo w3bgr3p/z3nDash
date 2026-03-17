@@ -40,22 +40,18 @@ internal sealed class HttpLogHandler
 
         if (method == "GET" && (path == "/http-stats" || path == "/traffic-stats"))
         {
-            var taskId = ctx.Request.QueryString["task_id"] ?? "";
-            await SseHub.SubscribeHttp(ctx.Response, taskId, GetDisconnectToken(ctx));
+            await HttpHelpers.WriteJson(ctx.Response, await GetStats());
             return;
         }
 
         if (method == "GET" && (path == "/http-logs/stream" || path == "/traffic-logs/stream"))
         {
-            await SseHub.SubscribeHttp(ctx.Response, "", GetDisconnectToken(ctx));
+            var taskId = ctx.Request.QueryString["task_id"] ?? "";
+            await SseHub.SubscribeHttp(ctx.Response, taskId, GetDisconnectToken(ctx));
             return;
         }
 
-        if (method == "GET" && path == "/http-stats")
-        {
-            await HttpHelpers.WriteJson(ctx.Response, await GetStats());
-            return;
-        }
+
 
         if (method == "POST" && path == "/clear-http")
         {

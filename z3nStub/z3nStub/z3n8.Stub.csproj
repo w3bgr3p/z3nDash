@@ -13,9 +13,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="..\..\Tasks\Zenno\ZennoStub.cs" />
-        <Compile Include="..\..\Tasks\Internal\InternalTasks.cs" />
-        <Compile Include="..\..\Tasks\Internal\InternalTasks.Context.cs" />
+        <Compile Include="..\..\Essentials\ZennoStub.cs" />
+        <Compile Include="..\..\Controllers\Internal\InternalTasks.cs" />
+        <Compile Include="..\..\Controllers\Internal\InternalTasks.Context.cs" />
         <Compile Include="..\..\Essentials\Logger.cs" />
         <Compile Include="..\..\Essentials\SAFU.cs" />
         <Compile Include="..\..\Sql\Db.cs" />

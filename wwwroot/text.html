@@ -40,7 +40,6 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
-            max-width: 900px;
             width: 100%;
             margin: 0 auto;
         }
@@ -298,6 +297,42 @@
         </div>
     </div>
 
+    <!-- ── TX Data Decoder ──────────────────────────────────── -->
+    <div class="tool-card">
+        <div class="tool-header">
+            <span class="tool-icon">&#x26D3;</span>
+            <span class="tool-title">TX Data Decoder</span>
+            <span class="tool-desc">0x hex &#x2192; ABI chunks (4b selector + 32b words)</span>
+        </div>
+        <div class="tool-body">
+            <div class="single-col">
+                <div class="col-label">Transaction data (hex)</div>
+                <textarea id="tx_input" placeholder="0xa9059cbb000000000000000000000000..." oninput="txDecode()" style="min-height:54px;font-size:10px"></textarea>
+            </div>
+            <div id="tx_selector_row" style="display:none;padding:4px 0;display:flex;align-items:center;gap:8px">
+                <span class="col-label" style="margin:0">Selector</span>
+                <span id="tx_selector_hex" style="font-family:'Consolas','JetBrains Mono',monospace;font-size:11px;color:var(--accent)"></span>
+                <button class="copy-btn" id="tx_sel_copy" onclick="copyText(document.getElementById('tx_selector_hex').textContent,'tx_sel_copy')">Copy</button>
+            </div>
+            <div id="tx_table_wrap" style="display:none;overflow-x:auto">
+                <table id="tx_table" style="width:100%;border-collapse:collapse;font-size:10px;font-family:'Consolas','JetBrains Mono',monospace">
+                    <thead>
+                    <tr>
+                        <th style="text-align:right;padding:3px 8px 3px 0;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border);width:24px">#</th>
+                        <th style="text-align:left;padding:3px 12px 3px 0;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border)">hex (32b)</th>
+                        <th style="text-align:left;padding:3px 0;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border);min-width:200px">decoded</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tx_tbody"></tbody>
+                </table>
+            </div>
+            <div id="tx_err" class="status-text"></div>
+            <div class="action-row">
+                <button class="btn sm" onclick="txClear()">&#x2715; Clear</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ── JSON Escape ───────────────────────────────────────── -->
     <div class="tool-card">
         <div class="tool-header">
@@ -444,6 +479,114 @@
     function jsonClear() {
         document.getElementById('json_raw').value = '';
         document.getElementById('json_escaped').value = '';
+    }
+
+    // ── TX Data Decoder ──────────────────────────────────────────────────────
+    function txDecode() {
+        var raw = document.getElementById('tx_input').value.trim();
+        var err = document.getElementById('tx_err');
+        var selRow = document.getElementById('tx_selector_row');
+        var tblWrap = document.getElementById('tx_table_wrap');
+        var tbody = document.getElementById('tx_tbody');
+
+        err.textContent = '';
+        selRow.style.display = 'none';
+        tblWrap.style.display = 'none';
+        tbody.innerHTML = '';
+
+        if (!raw) return;
+
+        var hex = raw.startsWith('0x') || raw.startsWith('0X') ? raw.slice(2) : raw;
+        hex = hex.replace(/\s+/g, '');
+
+        if (!/^[0-9a-fA-F]*$/.test(hex)) { err.textContent = 'Invalid hex'; return; }
+        if (hex.length < 8) { err.textContent = 'Too short (min 4 bytes for selector)'; return; }
+
+        // selector
+        var selector = hex.slice(0, 8);
+        document.getElementById('tx_selector_hex').textContent = '0x' + selector;
+        selRow.style.display = 'flex';
+
+        // 32-byte words
+        var payload = hex.slice(8);
+        if (payload.length === 0) return;
+
+        var rows = [];
+        for (var i = 0; i < payload.length; i += 64) {
+            rows.push(payload.slice(i, i + 64).padEnd(64, '0'));
+        }
+
+        tblWrap.style.display = '';
+
+        rows.forEach(function(word, idx) {
+            var uint = txDecodeUint(word);
+            var addr = txDecodeAddress(word);
+            var utf8 = txDecodeUtf8(word);
+
+            var decoded = '<span style="color:var(--text2);font-size:9px">uint256</span> ' + escHtml(uint)
+                + '<br><span style="color:var(--text2);font-size:9px">address</span> ' + escHtml(addr)
+                + '<br><span style="color:var(--text2);font-size:9px">utf-8&nbsp;&nbsp;</span> ' + escHtml(utf8);
+
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td style="text-align:right;padding:3px 8px 3px 0;color:var(--text2);vertical-align:top">' + (idx + 1) + '</td>'
+                + '<td style="padding:3px 12px 3px 0;vertical-align:top;word-break:break-all;color:var(--text)">' + word + '</td>'
+                + '<td style="padding:3px 0;vertical-align:top;line-height:1.7">' + decoded + '</td>';
+            tbody.appendChild(tr);
+        });
+    }
+
+    function txDecodeUint(word64) {
+        try {
+            var n = BigInt('0x' + word64);
+            return n.toString(10);
+        } catch(e) { return ''; }
+    }
+
+    function txDecodeAddress(word64) {
+        // last 20 bytes (40 hex chars)
+        var leading = word64.slice(0, 24);
+        if (/^0+$/.test(leading)) {
+            return '0x' + word64.slice(24);
+        }
+        return '(not address)';
+    }
+
+    function txDecodeUtf8(word64) {
+        try {
+            var bytes = [];
+            for (var i = 0; i < word64.length; i += 2) {
+                var b = parseInt(word64.slice(i, i + 2), 16);
+                if (b !== 0) bytes.push(b);
+            }
+            if (bytes.length === 0) return '(empty)';
+            var str = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes));
+            // filter non-printable
+            var printable = str.replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '.');
+            return printable || '(non-printable)';
+        } catch(e) { return '(binary)'; }
+    }
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function txClear() {
+        document.getElementById('tx_input').value = '';
+        document.getElementById('tx_err').textContent = '';
+        document.getElementById('tx_selector_row').style.display = 'none';
+        document.getElementById('tx_table_wrap').style.display = 'none';
+        document.getElementById('tx_tbody').innerHTML = '';
+    }
+
+    function copyText(text, btnId) {
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(function() {
+            var btn = document.getElementById(btnId);
+            var orig = btn.textContent;
+            btn.textContent = '&#x2713; Copied';
+            btn.classList.add('copied');
+            setTimeout(function() { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+        });
     }
 
     // ── Copy helper ──────────────────────────────────────────────────────────

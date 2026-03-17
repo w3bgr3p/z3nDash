@@ -19,7 +19,7 @@ public class DashboardOverlay : Form
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out POINT pt);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
     [DllImport("user32.dll")]
@@ -32,9 +32,11 @@ public class DashboardOverlay : Form
     private const uint   MOD_CONTROL  = 0x0002;
     private const uint   MOD_SHIFT    = 0x0004;
     private const uint   MOD_NOREPEAT = 0x4000;
-    // Ctrl+Shift+D — activate / restore from tray
+    private const uint   MOD_ALT      = 0x0001;
+
     private const int    HOTKEY_ID    = 0xB00B;
     private const uint   VK_D         = 0x44;
+    private const uint   VK_Z         = 0x5A;
 
     private static readonly IntPtr HWND_TOPMOST   = new(-1);
     private static readonly IntPtr HWND_NOTOPMOST = new(-2);
@@ -47,22 +49,27 @@ public class DashboardOverlay : Form
     private bool            _isTopmost = false;
     private double          _opacity   = 0.98;
     private NotifyIcon?     _trayIcon;
+    private HotkeyReceiver? _hotkeyReceiver;
 
-    private const int B   = 5;   // resize border px
-    private const int DH  = 28;  // drag bar height px
-    private const int TH  = 26;  // tab bar height px
+    private const int B   = 5;
+    private const int DH  = 28;
+    private const int TH  = 26;
 
     private static readonly (string Label, string Match, Func<string, string> Url)[] Tabs =
     [
-        ("⌂",     "/",              b => b + "/"),
-        ("z3n8",  "page=scheduler", b => b + "/?page=scheduler"),
-        ("ZP7",   "page=pm",        b => b + "/?page=pm"),
-        ("Logs",  "page=logs",      b => b + "/?page=logs"),
-        ("HTTP",  "page=http",      b => b + "/?page=http"),
-        ("Report","/report",        b => b + "/report"),
-        ("JSON",  "/json",          b => b + "/json"),
-        ("TXT",   "/text",          b => b + "/text"),
-        ("⚙",    "/page=config",   b => b + "/?page=config"),
+        //("⌂",     "/",              b => b + "/"),
+        ("⏻ z3n8",  "page=scheduler", b => b + "/?page=scheduler"),
+        ("߷ ZP7",   "page=pm",        b => b + "/?page=pm"),
+        ("🌍 ZB",   "page=zb",        b => b + "/?page=zb"),
+        ("☰ Logs",  "page=logs",      b => b + "/?page=logs"),
+        ("⭾ HTTP",  "page=http",      b => b + "/?page=http"),
+        // ("Report","/report",        b => b + "/report"),
+        ("{} JSON",  "/json",          b => b + "/json"),
+        ("¶ TXT",   "/text",          b => b + "/text"),
+        ("☻ Clips",  "/cliplates",     b => b + "/?page=cliplates"),
+        ("⚙ Config",    "/page=config",   b => b + "/?page=config"),
+        //("Help",     "/help",              b => b + "/?page=help"),
+        ("❓ Docs", "/docs", b => b + "/docs"),
     ];
 
     private Panel?   _tabBar;
@@ -77,7 +84,6 @@ public class DashboardOverlay : Form
     private Point     _resizeStartScreen;
     private Rectangle _resizeStartBounds;
 
-    // Navigation watchdog
     private CancellationTokenSource? _navTimeoutCts;
 
     // ── Static open ───────────────────────────────────────────────────
@@ -114,10 +120,30 @@ public class DashboardOverlay : Form
         InitTray();
         InitWebView();
 
+        // Регистрируем хоткей через отдельный NativeWindow —
+        // он получает WM_HOTKEY независимо от видимости основного окна
+        _hotkeyReceiver = new HotkeyReceiver(ToggleVisibility);
+        bool ok = RegisterHotKey(_hotkeyReceiver.Handle, HOTKEY_ID, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_Z);
+
+        if (!ok)
+            MessageBox.Show($"Hotkey Ctrl+Shift+D already in use (err {Marshal.GetLastWin32Error()})",
+                "z3n8", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
         Application.AddMessageFilter(new GlobalMouseFilter(this));
     }
 
-    // ── Tray + global hotkey ──────────────────────────────────────────
+    // ── Hotkey toggle ─────────────────────────────────────────────────
+    private void ToggleVisibility()
+    {
+        if (InvokeRequired) { BeginInvoke(ToggleVisibility); return; }
+
+        if (Visible && WindowState != FormWindowState.Minimized)
+            WindowState = FormWindowState.Minimized;
+        else
+            ShowFromTray();
+    }
+
+    // ── Tray ──────────────────────────────────────────────────────────
     private void InitTray()
     {
         _trayIcon = new NotifyIcon
@@ -134,7 +160,7 @@ public class DashboardOverlay : Form
         catch { _trayIcon.Icon = SystemIcons.Application; }
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Show  (Ctrl+Shift+D)", null, (_, _) => ShowFromTray());
+        menu.Items.Add("Show  (Ctrl+Alt+Z)", null, (_, _) => ShowFromTray());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Environment.Exit(0));
         _trayIcon.ContextMenuStrip = menu;
@@ -163,16 +189,10 @@ public class DashboardOverlay : Form
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
+    // WndProc на основном окне больше не нужен для хоткея —
+    // оставляем только для совместимости
     protected override void WndProc(ref Message m)
     {
-        if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == HOTKEY_ID)
-        {
-            if (Visible && WindowState != FormWindowState.Minimized)
-                WindowState = FormWindowState.Minimized;
-            else
-                ShowFromTray();
-            return;
-        }
         base.WndProc(ref m);
     }
 
@@ -196,7 +216,7 @@ public class DashboardOverlay : Form
             await _wv.EnsureCoreWebView2Async(env);
             await _wv.CoreWebView2.Profile.ClearBrowsingDataAsync();
 
-            _wv.CoreWebView2.Settings.IsWebMessageEnabled          = true;
+            _wv.CoreWebView2.Settings.IsWebMessageEnabled           = true;
             _wv.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             _wv.CoreWebView2.Settings.IsStatusBarEnabled            = false;
             _wv.CoreWebView2.Settings.AreDevToolsEnabled            = true;
@@ -212,7 +232,6 @@ public class DashboardOverlay : Form
 
             _wv.CoreWebView2.NavigationCompleted += (_, _) =>
             {
-                // Cancel watchdog — navigation succeeded
                 _navTimeoutCts?.Cancel();
                 BeginInvoke(UpdateActiveTab);
             };
@@ -257,7 +276,7 @@ public class DashboardOverlay : Form
             Text      = "⬡ z3n8",
             ForeColor = Color.FromArgb(80, 140, 255),
             BackColor = Color.Transparent,
-            Font      = new Font("Segoe UI", 8f, FontStyle.Bold),
+            Font      = new Font("Cascadia Mono", 8f, FontStyle.Bold),
             AutoSize  = true,
             Location  = new Point(8, 7)
         };
@@ -268,22 +287,22 @@ public class DashboardOverlay : Form
         Controls.Add(dragBar);
         BuildTabBar();
 
-        AddResizePanel(new Point(0, DH + TH),           new Size(B, Height - DH - TH - B),
-            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left,  Cursors.SizeWE,   1);
-        AddResizePanel(new Point(Width - B, DH + TH),   new Size(B, Height - DH - TH - B),
-            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right, Cursors.SizeWE,   2);
-        AddResizePanel(new Point(B, DH + TH),            new Size(Width - B * 2, B),
-            AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,   Cursors.SizeNS,   3);
-        AddResizePanel(new Point(B, Height - B),         new Size(Width - B * 2, B),
-            AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right, Cursors.SizeNS,  4);
-        AddResizePanel(new Point(0, DH),                 new Size(B * 2, B * 2),
-            AnchorStyles.Top | AnchorStyles.Left,                        Cursors.SizeNWSE, 5);
-        AddResizePanel(new Point(Width - B*2, DH),       new Size(B * 2, B * 2),
-            AnchorStyles.Top | AnchorStyles.Right,                       Cursors.SizeNESW, 6);
-        AddResizePanel(new Point(0, Height - B*2),       new Size(B * 2, B * 2),
-            AnchorStyles.Bottom | AnchorStyles.Left,                     Cursors.SizeNESW, 7);
+        AddResizePanel(new Point(0, DH + TH),                new Size(B, Height - DH - TH - B),
+            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left,   Cursors.SizeWE,   1);
+        AddResizePanel(new Point(Width - B, DH + TH),        new Size(B, Height - DH - TH - B),
+            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,  Cursors.SizeWE,   2);
+        AddResizePanel(new Point(B, DH + TH),                new Size(Width - B * 2, B),
+            AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,    Cursors.SizeNS,   3);
+        AddResizePanel(new Point(B, Height - B),             new Size(Width - B * 2, B),
+            AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right, Cursors.SizeNS,   4);
+        AddResizePanel(new Point(0, DH),                     new Size(B * 2, B * 2),
+            AnchorStyles.Top | AnchorStyles.Left,                         Cursors.SizeNWSE, 5);
+        AddResizePanel(new Point(Width - B*2, DH),           new Size(B * 2, B * 2),
+            AnchorStyles.Top | AnchorStyles.Right,                        Cursors.SizeNESW, 6);
+        AddResizePanel(new Point(0, Height - B*2),           new Size(B * 2, B * 2),
+            AnchorStyles.Bottom | AnchorStyles.Left,                      Cursors.SizeNESW, 7);
         AddResizePanel(new Point(Width - B*2, Height - B*2), new Size(B * 2, B * 2),
-            AnchorStyles.Bottom | AnchorStyles.Right,                    Cursors.SizeNWSE, 8);
+            AnchorStyles.Bottom | AnchorStyles.Right,                     Cursors.SizeNWSE, 8);
     }
 
     private void AddResizePanel(Point loc, Size sz, AnchorStyles anchor, Cursor cur, int dir)
@@ -463,22 +482,17 @@ public class DashboardOverlay : Form
     {
         if (_wv?.CoreWebView2 is null) return;
 
-        // Stop pending load — hanging fetch/XHR/setInterval won't block navigation
         _wv.CoreWebView2.Stop();
-
-        // Auto-accept any beforeunload dialog (borderless window can't show native dialogs)
         _wv.CoreWebView2.ScriptDialogOpening += SkipDialogOnce;
 
         var targetUrl = Tabs[idx].Url(_base);
 
-        // Cancel previous watchdog
         _navTimeoutCts?.Cancel();
         _navTimeoutCts = new CancellationTokenSource();
         var cts = _navTimeoutCts;
 
         _wv.CoreWebView2.Navigate(targetUrl);
 
-        // Watchdog: if NavigationCompleted didn't fire in 3s — force retry
         Task.Delay(3000, cts.Token).ContinueWith(t =>
         {
             if (t.IsCanceled) return;
@@ -541,8 +555,6 @@ public class DashboardOverlay : Form
         if (_isTopmost)
             SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-
-        RegisterHotKey(Handle, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_D);
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -553,6 +565,8 @@ public class DashboardOverlay : Form
             WindowState = FormWindowState.Minimized;
             return;
         }
+        UnregisterHotKey(_hotkeyReceiver?.Handle ?? IntPtr.Zero, HOTKEY_ID);
+        _hotkeyReceiver?.ReleaseHandle();
         base.OnFormClosing(e);
     }
 
@@ -560,6 +574,28 @@ public class DashboardOverlay : Form
     {
         if (keyData == Keys.Escape) { Close(); return true; }
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    // ── HotkeyReceiver — отдельный NativeWindow для приёма WM_HOTKEY ──
+    // Работает независимо от видимости основного окна (даже после Hide())
+    private sealed class HotkeyReceiver : NativeWindow
+    {
+        private const int WM_HOTKEY = 0x0312;
+        private readonly Action _onFired;
+
+        public HotkeyReceiver(Action onFired)
+        {
+            _onFired = onFired;
+            CreateHandle(new CreateParams());
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_HOTKEY)
+                _onFired();
+            else
+                base.WndProc(ref m);
+        }
     }
 
     // ── GlobalMouseFilter ─────────────────────────────────────────────

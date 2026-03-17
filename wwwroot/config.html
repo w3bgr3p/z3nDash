@@ -437,6 +437,10 @@
             <div class="section-label">API Keys</div>
             <div class="field-row">
                 <div class="field">
+                    <label>ZB Host</label>
+                    <input id="cfgZbHost" type="text" placeholder="http://localhost:8160">
+                </div>
+                <div class="field">
                     <label>ZB API Key</label>
                     <input id="cfgZbKey" type="password" placeholder="••••••••">
                 </div>
@@ -694,6 +698,7 @@
             setVal('cfgReportsFolder', d.logsConfig?.reportsFolder ?? '');
             setVal('cfgMaxFileSizeMb', d.logsConfig?.maxFileSizeMb ?? '');
             setVal('cfgZbKey',         d.apiConfig?.zb ?? '');
+            setVal('cfgZbHost',        d.apiConfig?.zbHost ?? '');
             setVal('cfgJVarsPath',     d.securityConfig?.jVarsPath ?? '');
 
             togglePgFields();
@@ -737,6 +742,7 @@
             },
             apiConfig: {
                 zb: document.getElementById('cfgZbKey').value,
+                zbHost: document.getElementById('cfgZbHost').value,
             }
         };
 

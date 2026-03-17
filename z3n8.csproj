@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
+        <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0-windows</TargetFramework>
         <UseWindowsForms>true</UseWindowsForms>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -42,6 +42,17 @@
 
     </ItemGroup>
 
+
+    <ItemGroup>
+        <None Update="wwwroot\**\*">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\static\fonts\JetBrainsMonoNerdFont-Regular.ttf">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+    
+
     <ItemGroup>
         <None Update="appsettings.json">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -50,52 +61,6 @@
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         
-        <None Update="wwwroot\home.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\json.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\pm.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\config.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\logs.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\text.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\scheduler.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\http.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\report.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\text.html">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\css\base.css">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\css\components.css">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\css\themes.css">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\js\theme.js">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wwwroot\js\nav.js">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-
 
         <None Update="icon.ico">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -134,8 +99,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="docs-vault\" />
       <Folder Include="scripts\" />
       <Folder Include="Tasks\py\ts\" />
+      <Folder Include="Tasks\Zenno\" />
     </ItemGroup>
 
     <ItemGroup>

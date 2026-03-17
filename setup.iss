@@ -1,6 +1,6 @@
 [Setup]
 AppName=z3n8
-AppVersion=1.0
+AppVersion=1.0.0.11
 ; По умолчанию предлагаем локальную папку, но даем ВЫБОР
 DefaultDirName={localappdata}\z3n8
 DefaultGroupName=z3n8

@@ -8,7 +8,7 @@ Program.cs
 appsettings.Development.json
 appsettings.Local.json
 *.secrets.json
-
+priv.*
 
 # .NET Core #
 bin/

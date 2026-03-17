@@ -219,7 +219,9 @@ public sealed class SchedulerService : IDisposable
         var executor   = record.GetValueOrDefault("executor", "python");
         var scriptPath = record.GetValueOrDefault("script_path", "");
         var args       = record.GetValueOrDefault("args", "");
-
+        var nowIso      = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        
+        
         // ── уникальный id прогона ──────────────────────────────────────────────
         var runId       = Guid.NewGuid().ToString("N")[..12];
         var instanceKey = $"{id}:{runId}";
@@ -228,21 +230,24 @@ public sealed class SchedulerService : IDisposable
         var payloadValues = record.GetValueOrDefault("payload_values", "");
         if (!string.IsNullOrWhiteSpace(payloadValues))
         {
-            var projectName = Path.GetFileName(scriptPath).Split('.')[0];
-            var table       = $"__{projectName}";
-            var nowIso      = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            var schema = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(
+                record.GetValueOrDefault("payload_schema", "[]"))
+                ?? new List<Dictionary<string, object>>();
 
             var payload = JsonSerializer.Deserialize<Dictionary<string, object>>(payloadValues)
-                          ?? new Dictionary<string, object>();
+                ?? new Dictionary<string, object>();
 
+            // ── выборка аккаунта из БД (общая для всех executor) ──────────────
             var condition = payload.TryGetValue("condition", out var cond) ? cond?.ToString() ?? "" : "";
-            condition     = condition.Replace("NOW", $"'{nowIso}'");
+            condition = condition.Replace("NOW", $"'{nowIso}'");
 
             if (!string.IsNullOrWhiteSpace(condition))
             {
-                var cols    = db.GetTableColumns(table);
-                var colsSql = string.Join(", ", cols.Select(c => $"\"{c}\""));
-                var rawRow  = db.Query($"SELECT {colsSql} FROM \"{table}\" WHERE {condition} LIMIT 1");
+                var projectName = Path.GetFileName(scriptPath).Split('.')[0];
+                var table       = $"__{projectName}";
+                var cols        = db.GetTableColumns(table);
+                var colsSql     = string.Join(", ", cols.Select(c => $"\"{c}\""));
+                var rawRow      = db.Query($"SELECT {colsSql} FROM \"{table}\" WHERE {condition} LIMIT 1");
 
                 if (!string.IsNullOrWhiteSpace(rawRow))
                 {
@@ -257,7 +262,36 @@ public sealed class SchedulerService : IDisposable
                 }
             }
 
-            args = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
+            // ── сборка args в зависимости от executor ─────────────────────────
+            if (executor == "internal")
+            {
+                args = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
+            }
+            else  if (executor == "ps1")
+            {
+                args = string.Join(" ", schema
+                    .Where(f => f.TryGetValue("key", out var k) && !string.IsNullOrWhiteSpace(k?.ToString()))
+                    .Select(f =>
+                    {
+                        var key = f["key"].ToString()!;
+                        var val = payload.TryGetValue(key, out var v) ? v?.ToString() ?? "" : "";
+                        if (string.IsNullOrWhiteSpace(val)) return "";
+                        return val == "true" ? $"-{key}" : $"-{key} {(val.Contains(' ') ? $"\"{val}\"" : val)}";
+                    })
+                    .Where(s => !string.IsNullOrEmpty(s)));
+            }
+            
+            else
+            {
+                args = string.Join(" ", schema
+                    .Where(f => f.TryGetValue("key", out var k) && !string.IsNullOrWhiteSpace(k?.ToString()))
+                    .Select(f =>
+                    {
+                        var key = f["key"].ToString()!;
+                        var val = payload.TryGetValue(key, out var v) ? v?.ToString() ?? "" : "";
+                        return val.Contains(' ') ? $"\"{val}\"" : val;
+                    }));
+            }
         }
         
         Action<string> broadcast = line =>
@@ -325,7 +359,7 @@ public sealed class SchedulerService : IDisposable
 
         _log?.Info($"[{name}] launch → {fileName} {Path.GetFileName(scriptPath)} run={runId}");
         UpdateStatus(db, id, "running", firedAt, "", "", runId);
-
+        _log?.Info($"[{name}] scriptPath={scriptPath} args={args} ");
         var psi = new System.Diagnostics.ProcessStartInfo
         {
             FileName               = fileName,

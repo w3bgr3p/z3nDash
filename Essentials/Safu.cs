@@ -1,7 +1,6 @@
 ﻿using System.Management;
 using System.Security.Cryptography;
 using System.Text;
-using Newtonsoft.Json;
 
 namespace z3n8;
 
@@ -9,10 +8,8 @@ public class SAFU
 {
     private static byte[]? _fileKey;
     private static readonly object _fileKeyLock = new();
-    private static readonly string KeyFilePath = Path.Combine(
-        AppContext.BaseDirectory, "safu.key");
+    private static readonly string KeyFilePath = Path.Combine(AppContext.BaseDirectory, "safu.key");
 
-    // Читает safu.key или генерирует и сохраняет 32 случайных байта
     public static byte[] LoadOrCreateFileKey()
     {
         if (_fileKey != null) return _fileKey;
@@ -34,20 +31,20 @@ public class SAFU
         }
     }
 
-    static string? GetStableHWId(bool log = false)
+    public static string? GetStableHWId()
     {
         var components = new List<string>();
         try
         {
-            using (var searcher = new ManagementObjectSearcher("SELECT ProcessorId FROM Win32_Processor"))
-                foreach (ManagementObject mo in searcher.Get())
+            using (var s = new ManagementObjectSearcher("SELECT ProcessorId FROM Win32_Processor"))
+                foreach (ManagementObject mo in s.Get())
                 {
                     var id = mo["ProcessorId"]?.ToString();
                     if (!string.IsNullOrEmpty(id)) { components.Add(id); break; }
                 }
 
-            using (var searcher = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BaseBoard"))
-                foreach (ManagementObject mo in searcher.Get())
+            using (var s = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BaseBoard"))
+                foreach (ManagementObject mo in s.Get())
                 {
                     var serial = mo["SerialNumber"]?.ToString();
                     if (!string.IsNullOrEmpty(serial)) { components.Add(serial); break; }
@@ -57,21 +54,24 @@ public class SAFU
             {
                 string sysRoot = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.System))!;
                 string driveLetter = sysRoot.Replace("\\", "");
-                using (var logDiskSearcher = new ManagementObjectSearcher($"SELECT DeviceID FROM Win32_LogicalDisk WHERE DeviceID = '{driveLetter}'"))
-                    foreach (ManagementObject logDisk in logDiskSearcher.Get())
-                        using (var partSearcher = new ManagementObjectSearcher($"ASSOCIATORS OF {{Win32_LogicalDisk.DeviceID='{logDisk["DeviceID"]}'}} WHERE AssocClass = Win32_LogicalDiskToPartition"))
-                            foreach (ManagementObject partition in partSearcher.Get())
-                                using (var driveSearcher = new ManagementObjectSearcher($"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass = Win32_DiskDriveToDiskPartition"))
-                                    foreach (ManagementObject drive in driveSearcher.Get())
-                                    {
-                                        var serial = drive["SerialNumber"]?.ToString();
-                                        if (!string.IsNullOrEmpty(serial)) { components.Add(serial); break; }
-                                    }
+                using var logDiskSearcher = new ManagementObjectSearcher(
+                    $"SELECT DeviceID FROM Win32_LogicalDisk WHERE DeviceID = '{driveLetter}'");
+                foreach (ManagementObject logDisk in logDiskSearcher.Get())
+                    using (var partSearcher = new ManagementObjectSearcher(
+                        $"ASSOCIATORS OF {{Win32_LogicalDisk.DeviceID='{logDisk["DeviceID"]}'}} WHERE AssocClass = Win32_LogicalDiskToPartition"))
+                        foreach (ManagementObject partition in partSearcher.Get())
+                            using (var driveSearcher = new ManagementObjectSearcher(
+                                $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass = Win32_DiskDriveToDiskPartition"))
+                                foreach (ManagementObject drive in driveSearcher.Get())
+                                {
+                                    var serial = drive["SerialNumber"]?.ToString();
+                                    if (!string.IsNullOrEmpty(serial)) { components.Add(serial); break; }
+                                }
             }
             catch
             {
-                using var searcher = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_DiskDrive");
-                foreach (ManagementObject mo in searcher.Get()) { components.Add(mo["SerialNumber"]?.ToString()!); break; }
+                using var s = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_DiskDrive");
+                foreach (ManagementObject mo in s.Get()) { components.Add(mo["SerialNumber"]?.ToString()!); break; }
             }
 
             if (components.Count == 0) throw new Exception("No hardware components found");
@@ -86,7 +86,6 @@ public class SAFU
         }
     }
 
-    // Соль = первые 16 байт HMAC(fileKey, "hwid")
     static byte[] DeriveSalt(string domain)
     {
         var fileKey = LoadOrCreateFileKey();
@@ -101,7 +100,6 @@ public class SAFU
     {
         if (string.IsNullOrEmpty(hardwareId)) return null!;
         if (string.IsNullOrEmpty(pin)) pin = "UNPROTECTED";
-
         var salt = DeriveSalt($"{hardwareId}:{accountId}");
         using var pbkdf2 = new Rfc2898DeriveBytes(pin, salt, 100000, HashAlgorithmName.SHA256);
         return pbkdf2.GetBytes(32);
@@ -110,7 +108,6 @@ public class SAFU
     static byte[] DeriveKeyFromHWID(string hardwareId)
     {
         if (string.IsNullOrEmpty(hardwareId)) return null!;
-
         var salt = DeriveSalt("hwid-only");
         using var pbkdf2 = new Rfc2898DeriveBytes(hardwareId, salt, 100000, HashAlgorithmName.SHA256);
         return pbkdf2.GetBytes(32);
@@ -125,14 +122,16 @@ public class SAFU
         aes.GenerateIV();
 
         using var encryptor = aes.CreateEncryptor();
-        var cipherBytes = encryptor.TransformFinalBlock(Encoding.UTF8.GetBytes(plaintext), 0, plaintext.Length);
+        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+        var cipherBytes = encryptor.TransformFinalBlock(plaintextBytes, 0, plaintextBytes.Length);
 
-        using var hmac = new HMACSHA256(key);
         var combined = new byte[aes.IV.Length + cipherBytes.Length];
         Array.Copy(aes.IV, 0, combined, 0, aes.IV.Length);
         Array.Copy(cipherBytes, 0, combined, aes.IV.Length, cipherBytes.Length);
 
+        using var hmac = new HMACSHA256(key);
         var hash = hmac.ComputeHash(combined);
+
         var final = new byte[combined.Length + hash.Length];
         Array.Copy(combined, 0, final, 0, combined.Length);
         Array.Copy(hash, 0, final, combined.Length, hash.Length);
@@ -145,9 +144,7 @@ public class SAFU
         try
         {
             var data = Convert.FromBase64String(ciphertext);
-            Console.WriteLine($"[SAFU.DBG] AesDecrypt dataLen={data.Length}");
-
-            if (data.Length < 48) { Console.WriteLine("[SAFU.DBG] too short"); return string.Empty; }
+            if (data.Length < 48) return string.Empty;
 
             var hmacSize = 32;
             var payload = new byte[data.Length - hmacSize];
@@ -159,11 +156,7 @@ public class SAFU
             {
                 var computedHmac = hmac.ComputeHash(payload);
                 for (int i = 0; i < hmacSize; i++)
-                    if (receivedHmac[i] != computedHmac[i])
-                    {
-                        Console.WriteLine($"[SAFU.DBG] HMAC mismatch at byte {i}");
-                        return string.Empty;
-                    }
+                    if (receivedHmac[i] != computedHmac[i]) return string.Empty;
             }
 
             var iv = new byte[16];
@@ -221,21 +214,27 @@ public class SAFU
         return new string(chars);
     }
 
+    // Шифрует HWID локальной машины
     public static string EncryptHWIDOnly(string plaintext)
     {
         if (string.IsNullOrEmpty(plaintext)) return string.Empty;
-        var key = DeriveKeyFromHWID(GetStableHWId() ?? throw new InvalidOperationException("HWID resolution failed"));
-        Console.WriteLine($"[SAFU.DBG] Encrypt key={Convert.ToHexString(key[..4])} fileKey={Convert.ToHexString(LoadOrCreateFileKey()[..4])}");
+        var hwId = GetStableHWId() ?? throw new InvalidOperationException("HWID resolution failed");
+        return AesEncrypt(plaintext, DeriveKeyFromHWID(hwId));
+    }
 
-        return AesEncrypt(plaintext, key);
+    // Шифрует с явным HWID (для генерации бандла клиента)
+    public static string EncryptHWIDOnly(string plaintext, string hwid)
+    {
+        if (string.IsNullOrEmpty(plaintext)) return string.Empty;
+        if (string.IsNullOrEmpty(hwid)) throw new ArgumentException("hwid cannot be empty");
+        return AesEncrypt(plaintext, DeriveKeyFromHWID(hwid));
     }
 
     public static string DecryptHWIDOnly(string ciphertext)
     {
         if (string.IsNullOrEmpty(ciphertext)) return string.Empty;
-        var key = DeriveKeyFromHWID(GetStableHWId() ?? throw new InvalidOperationException("HWID resolution failed"));
-        Console.WriteLine($"[SAFU.DBG] key={Convert.ToHexString(key[..4])} fileKey={Convert.ToHexString(LoadOrCreateFileKey()[..4])}");
-        return AesDecrypt(ciphertext, key) ?? string.Empty;
+        var hwId = GetStableHWId() ?? throw new InvalidOperationException("HWID resolution failed");
+        return AesDecrypt(ciphertext, DeriveKeyFromHWID(hwId)) ?? string.Empty;
     }
 
     public static string Encode(string toEncrypt, string pin, string acc)

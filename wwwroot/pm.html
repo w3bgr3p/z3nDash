@@ -222,6 +222,28 @@
 
         /* ── Tree / Project groups ── */
         .tree-group { border-bottom: 1px solid var(--bg2); }
+
+        /* machine-level group */
+        .machine-group { border-bottom: 2px solid var(--border); }
+        .machine-group-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 8px;
+            background: var(--bg2);
+            cursor: pointer;
+            user-select: none;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            border-bottom: 1px solid var(--border);
+        }
+        .machine-group-header:hover { background: var(--bg3); }
+        .machine-group-name { font-size: 10px; font-weight: 700; color: var(--text2); flex: 1; letter-spacing: 0.5px; text-transform: uppercase; }
+        .machine-group-count { font-size: 9px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0 5px; flex-shrink: 0; }
+        .machine-group-dots { display: flex; gap: 3px; align-items: center; flex-shrink: 0; }
+        .machine-children { display: block; }
+        .machine-children.collapsed { display: none; }
         .tree-group-header {
             display: flex;
             align-items: center;
@@ -286,6 +308,7 @@
 
         .detail-panel {
             flex: 1;
+            min-height: 0;
             border: 1px solid var(--border);
             border-radius: 6px;
             display: flex;
@@ -645,6 +668,109 @@
         .dialog-btn.primary:hover { background: var(--green-bg2); }
         .dialog-btn.danger { background: var(--red-bg); border-color: var(--red-bg); color: #fff; }
         .dialog-btn.danger:hover { background: var(--red); }
+        /* ── PM Heatmap Pane ── */
+        .pm-heatmap-pane {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .pm-heatmap-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 2px 8px;
+            flex-shrink: 0;
+        }
+        .pm-heatmap-title { font-size: 12px; font-weight: 600; color: var(--accent); }
+        .pm-heatmap-hint  { font-size: 10px; color: var(--muted); margin-left: 4px; }
+        .pm-heatmap-refresh {
+            margin-left: auto;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text2);
+            border-radius: 4px;
+            padding: 1px 7px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .pm-heatmap-refresh:hover { color: var(--accent); border-color: var(--accent); }
+        .pm-heatmap-content {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .pm-heatmap-content::-webkit-scrollbar { width: 5px; }
+        .pm-heatmap-content::-webkit-scrollbar-track { background: var(--bg); }
+        .pm-heatmap-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        .pm-heatmap-loading { color: var(--muted); font-size: 11px; padding: 20px; text-align: center; }
+
+        /* tooltip (идентично report.html) */
+        .pm-tooltip {
+            position: fixed;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            color: var(--text);
+            font-size: 12px;
+            white-space: pre-wrap;
+            pointer-events: none;
+            z-index: 9000;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            display: none;
+            max-width: 400px;
+            line-height: 1.5;
+        }
+        .pm-tooltip.show { display: block; }
+        .pm-tooltip-title { font-weight: 600; margin-bottom: 8px; color: var(--accent); font-size: 13px; }
+        .pm-tooltip-time  { color: var(--text2); font-size: 11px; margin-bottom: 8px; }
+        .pm-tooltip-ok    { color: var(--green); background: rgba(63,185,80,0.1); padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 11px; }
+        .pm-tooltip-err   { color: var(--red);   background: rgba(248,81,73,0.1);  padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 11px; }
+        .pm-tooltip-report { margin-top: 8px; color: var(--red); font-family: monospace; font-size: 11px; padding: 8px; background: rgba(248,81,73,0.05); border-radius: 4px; border-left: 3px solid var(--red); }
+
+        /* Точно как report.html */
+        .heatmap-with-stats   { display: flex; gap: 12px; align-items: stretch; }
+        .heatmap-project-card { width: 160px; flex-shrink: 0; }
+        .project-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .project-name { font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+        .progress-bar { height: 6px; background: var(--bg1); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+        .project-stats { display: flex; flex-direction: column; gap: 3px; font-size: 10px; color: var(--text2); }
+        .stat-row { display: flex; justify-content: space-between; align-items: center; }
+        .stat-good    { color: var(--green); font-weight: 600; }
+        .stat-bad     { color: var(--red);   font-weight: 600; }
+        .stat-neutral { color: var(--text2); font-weight: 600; }
+        .heatmap-content  { flex: 1; min-width: 0; }
+        .heatmap-row      { display: flex; align-items: center; }
+        .cells-container  { display: flex; flex-wrap: wrap; gap: 2px; max-width: calc((11px + 2px) * 100); }
+        .heatmap-cell {
+            width: 11px; height: 11px;
+            border-radius: 2px;
+            border: 1px solid var(--border);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .heatmap-cell.success          { background: var(--green-bg); border-color: var(--green-bg2); }
+        .heatmap-cell.error            { background: var(--red-bg);   border-color: var(--red); }
+        .heatmap-cell.success-yesterday{ background: #1a5c28; border-color: #247a35; }
+        .heatmap-cell.error-yesterday  { background: #a32a27; border-color: #c93a36; }
+        .heatmap-cell.success-2days    { background: #123819; border-color: #1a5024; }
+        .heatmap-cell.error-2days      { background: #6b1e1d; border-color: #8d2826; }
+        .heatmap-cell.success-old      { background: #0a1a0d; border-color: #112b15; }
+        .heatmap-cell.error-old        { background: #3a1210; border-color: #5a1a18; }
+        .heatmap-cell:hover { transform: scale(1.3); z-index: 10; box-shadow: 0 0 8px rgba(255,255,255,0.3); }
     </style>
 
 </head>
@@ -719,9 +845,9 @@
                 <span id="detailTaskId" style="font-size:10px;color:#484f58;margin-left:7px;"></span>
             </div>
             <div class="detail-body" id="detailBody">
-                <div class="detail-empty">← Select a task</div>
             </div>
         </div>
+        <div id="pmTooltip" class="pm-tooltip"></div>
 
         <div class="h-resizer" id="hResizerTop"></div>
 
@@ -864,14 +990,48 @@
     // Active tag filters (Set of tag strings)
     let activeTagFilters = new Set();
 
+    // ── STATE PERSISTENCE ──
+    const PM_STATE_KEY = 'pm_ui_state';
+
+    function _saveState() {
+        try {
+            localStorage.setItem(PM_STATE_KEY, JSON.stringify({
+                selectedTaskId,
+                groupCollapsed: _groupCollapsed,
+                tagFilters:     [...activeTagFilters],
+                nameFilter:     document.getElementById('nameFilter')?.value    || '',
+                statusFilter:   document.getElementById('statusFilter')?.value  || '',
+                workFilter:     document.getElementById('workFilter')?.value    || '',
+                cmdStatusFilter:document.getElementById('cmdStatusFilter')?.value || ''
+            }));
+        } catch {}
+    }
+
+    function _restoreState() {
+        try {
+            const raw = localStorage.getItem(PM_STATE_KEY);
+            if (!raw) return;
+            const s = JSON.parse(raw);
+            if (s.groupCollapsed) Object.assign(_groupCollapsed, s.groupCollapsed);
+            if (s.tagFilters)     activeTagFilters = new Set(s.tagFilters);
+            if (s.selectedTaskId) selectedTaskId   = s.selectedTaskId;
+            if (s.nameFilter)     { const el = document.getElementById('nameFilter');     if (el) el.value = s.nameFilter; }
+            if (s.statusFilter)   { const el = document.getElementById('statusFilter');   if (el) el.value = s.statusFilter; }
+            if (s.workFilter)     { const el = document.getElementById('workFilter');     if (el) el.value = s.workFilter; }
+            if (s.cmdStatusFilter){ const el = document.getElementById('cmdStatusFilter');if (el) el.value = s.cmdStatusFilter; }
+        } catch {}
+    }
+
     // ── INIT ──
     window.addEventListener('DOMContentLoaded', () => {
+        _restoreState();
         refreshTasks();
         refreshCommands();
         startAuto();
         initResizer();
         initLogsResizer();
         initHResizers();
+        _showHeatmap();
     });
 
     function startAuto() {
@@ -904,6 +1064,12 @@
             updateHeaderStats();
             updateTagFilterBar();
             applyFilters();
+            // restore selected task detail on first load
+            if (selectedTaskId && !_currentTaskId) {
+                const task = allTasks.find(t => t.Id === selectedTaskId);
+                if (task) renderDetail(task);
+                else selectedTaskId = null;
+            }
         } catch (e) {
             console.error('Tasks fetch failed:', e);
         }
@@ -972,12 +1138,14 @@
         }
         updateTagFilterBar();
         applyFilters();
+        _saveState();
     }
 
     function clearTagFilters() {
         activeTagFilters.clear();
         updateTagFilterBar();
         applyFilters();
+        _saveState();
     }
 
     // ── FILTERS ──
@@ -1003,9 +1171,11 @@
 
         renderTasks(filtered);
         document.getElementById('visibleCount').textContent = filtered.length;
+        _saveState();
     }
 
     // collapsed state per project key
+    // _groupCollapsed keys: "machine::project" for project groups, "machine::" for machine groups
     const _groupCollapsed = {};
 
     function renderTasks(tasks) {
@@ -1015,67 +1185,95 @@
             return;
         }
 
-        // Group by project (part before first ".")
-        const groups = {};
-
+        // Group by machine, then by project
+        const byMachine = {};
         tasks.forEach(t => {
-            const proj = getProject(t);
-            if (!groups[proj]) groups[proj] = [];
-            groups[proj].push(t);
+            const machine = t.machine || '—';
+            const proj    = getProject(t);
+            if (!byMachine[machine]) byMachine[machine] = {};
+            if (!byMachine[machine][proj]) byMachine[machine][proj] = [];
+            byMachine[machine][proj].push(t);
         });
 
-        const keys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+        const machines = Object.keys(byMachine).sort((a, b) => a.localeCompare(b));
 
-        container.innerHTML = keys.map(key => {
-            const items = groups[key];
-            // Folder only when group has more than 1 member
-            const useFolder = items.length > 1;
-            const isOpen = _groupCollapsed[key] !== false;
-            const workingCount = items.filter(t => t.ExecutionSettings_IsWork === 'True').length;
+        container.innerHTML = machines.map(machine => {
+            const machineKey  = 'machine::' + machine;
+            const isMachineOpen = _groupCollapsed[machineKey] !== false;
+            const machineProjects = byMachine[machine];
+            const allMachineTasks = Object.values(machineProjects).flat();
+            const machineWorking  = allMachineTasks.filter(t => t.ExecutionSettings_IsWork === 'True').length;
 
-            const rows = items.map(t => {
-                const status = t.ExecutionSettings_Status || '';
-                const stClass = status ? `st-${status}` : 'st-empty';
-                const isWork = t.ExecutionSettings_IsWork === 'True';
-                const done = t.ExecutionSettings_DoneSuccessfully || '0';
-                const total = t.ExecutionSettings_DoneAll || '0';
-                const isSelected = t.Id === selectedTaskId ? 'selected' : '';
-                const indent = useFolder ? 'indented' : '';
+            const machineDotsHtml = machineWorking > 0
+                ? `<div class="machine-group-dots">${Array.from({length: Math.min(machineWorking, 5)}, () => '<div class="tree-dot working"></div>').join('')}</div>`
+                : '';
 
-                const proj = getProject(t);
-                let displayName = t.Name;
-                let subName = '';
-                if (useFolder && proj && t.Name.startsWith(proj + '.')) {
-                    displayName = proj;
-                    subName = t.Name.substring(proj.length + 1);
-                }
+            const projKeys = Object.keys(machineProjects).sort((a, b) => {
+                const aGroup = machineProjects[a].length > 1;
+                const bGroup = machineProjects[b].length > 1;
+                if (aGroup && !bGroup) return -1;
+                if (!aGroup && bGroup) return 1;
+                return a.localeCompare(b);
+            });
 
-                return `<div class="task-row ${isSelected} ${indent}" onclick="selectTask('${t.Id}')">
-                    <div class="task-work-dot ${isWork ? 'working' : ''}"></div>
-                    <div class="task-name">${escHtml(displayName)}${subName ? `<small>${escHtml(subName)}</small>` : ''}</div>
-                    <div class="task-status ${stClass}">${status || '—'}</div>
-                    <div class="task-progress"><span class="done">${done}</span></div>
-                    <div class="task-progress">${total}</div>
+            const projectsHtml = projKeys.map(proj => {
+                const groupKey = machine + '::' + proj;
+                const items = machineProjects[proj];
+                const useFolder = items.length > 1;
+                const isOpen = _groupCollapsed[groupKey] !== false;
+                const workingCount = items.filter(t => t.ExecutionSettings_IsWork === 'True').length;
+
+                const rows = items.map(t => {
+                    const status = t.ExecutionSettings_Status || '';
+                    const stClass = status ? `st-${status}` : 'st-empty';
+                    const isWork = t.ExecutionSettings_IsWork === 'True';
+                    const done  = t.ExecutionSettings_DoneSuccessfully || '0';
+                    const total = t.ExecutionSettings_DoneAll || '0';
+                    const isSelected = t.Id === selectedTaskId ? 'selected' : '';
+                    const indent = useFolder ? 'indented' : '';
+
+                    let displayName = t.Name;
+                    let subName = '';
+                    if (useFolder && proj && t.Name.startsWith(proj + '.')) {
+                        displayName = proj;
+                        subName = t.Name.substring(proj.length + 1);
+                    }
+
+                    return `<div class="task-row ${isSelected} ${indent}" onclick="selectTask('${t.Id}')">
+                        <div class="task-work-dot ${isWork ? 'working' : ''}"></div>
+                        <div class="task-name">${escHtml(displayName)}${subName ? `<small>${escHtml(subName)}</small>` : ''}</div>
+                        <div class="task-status ${stClass}">${status || '—'}</div>
+                        <div class="task-progress"><span class="done">${done}</span></div>
+                        <div class="task-progress">${total}</div>
+                    </div>`;
+                }).join('');
+
+                if (!useFolder) return rows;
+
+                const dotsHtml = workingCount > 0
+                    ? `<div class="tree-group-dots">${Array.from({length: Math.min(workingCount, 5)}, () => '<div class="tree-dot working"></div>').join('')}</div>`
+                    : '';
+
+                return `<div class="tree-group">
+                    <div class="tree-group-header" onclick="toggleGroup(this, '${escHtml(groupKey)}')">
+                        <span class="tree-chevron ${isOpen ? 'open' : ''}">&#9658;</span>
+                        <span class="tree-project-icon">&#128193;</span>
+                        <span class="tree-group-name">${escHtml(proj)}</span>
+                        ${dotsHtml}
+                        <span class="tree-group-count">${items.length}</span>
+                    </div>
+                    <div class="tree-children ${isOpen ? 'open' : ''}">${rows}</div>
                 </div>`;
             }).join('');
 
-            if (!useFolder) return rows;
-
-            const dotsHtml = workingCount > 0
-                ? `<div class="tree-group-dots">${Array.from({length: Math.min(workingCount, 5)}, () => '<div class="tree-dot working"></div>').join('')}</div>`
-                : '';
-
-            const label = key;
-
-            return `<div class="tree-group">
-                <div class="tree-group-header" onclick="toggleGroup(this, '${escHtml(key)}')">
-                    <span class="tree-chevron ${isOpen ? 'open' : ''}">▶</span>
-                    <span class="tree-project-icon">📁</span>
-                    <span class="tree-group-name">${escHtml(label)}</span>
-                    ${dotsHtml}
-                    <span class="tree-group-count">${items.length}</span>
+            return `<div class="machine-group">
+                <div class="machine-group-header" onclick="toggleMachine(this, '${escHtml(machineKey)}')">
+                    <span class="tree-chevron ${isMachineOpen ? 'open' : ''}">&#9658;</span>
+                    <span class="machine-group-name">&#128187; ${escHtml(machine)}</span>
+                    ${machineDotsHtml}
+                    <span class="machine-group-count">${allMachineTasks.length}</span>
                 </div>
-                <div class="tree-children ${isOpen ? 'open' : ''}">${rows}</div>
+                <div class="machine-children ${isMachineOpen ? '' : 'collapsed'}">${projectsHtml}</div>
             </div>`;
         }).join('');
     }
@@ -1087,21 +1285,45 @@
         const children = header.nextElementSibling;
         chevron.classList.toggle('open', !isOpen);
         children.classList.toggle('open', !isOpen);
+        _saveState();
+    }
+
+    function toggleMachine(header, key) {
+        const isOpen = _groupCollapsed[key] !== false;
+        _groupCollapsed[key] = !isOpen;
+        const chevron  = header.querySelector('.tree-chevron');
+        const children = header.nextElementSibling;
+        chevron.classList.toggle('open', !isOpen);
+        children.classList.toggle('collapsed', isOpen);
+        _saveState();
     }
 
     function selectTask(id) {
+        if (selectedTaskId === id) {
+            selectedTaskId = null;
+            applyFilters();
+            document.getElementById('detailTaskId').textContent = '';
+            document.getElementById('logsArea').classList.remove('visible');
+            _closeSse();
+            _showHeatmap();
+            _saveState();
+            return;
+        }
         selectedTaskId = id;
         const task = allTasks.find(t => t.Id === id);
         if (!task) return;
 
-        // auto-expand project group
-        const proj = getProject(task);
-        if (_groupCollapsed[proj] === false) {
-            _groupCollapsed[proj] = true;
-        }
+        // auto-expand machine and project groups
+        const machine    = task.machine || '—';
+        const proj       = getProject(task);
+        const machineKey = 'machine::' + machine;
+        const groupKey   = machine + '::' + proj;
+        if (_groupCollapsed[machineKey] === false) _groupCollapsed[machineKey] = true;
+        if (_groupCollapsed[groupKey]   === false) _groupCollapsed[groupKey]   = true;
 
         applyFilters();
         renderDetail(task);
+        _saveState();
     }
 
     // ── TASK LOGS & HTTP ──
@@ -1264,6 +1486,14 @@
         const container  = document.getElementById('logsArea');
         if (!resizer) return;
         let active = false;
+
+        // restore
+        const savedPct = localStorage.getItem('pm_logs_pct');
+        if (savedPct) {
+            leftPanel.style.flex  = `0 0 ${savedPct}%`;
+            rightPanel.style.flex = '1 1 0';
+        }
+
         resizer.addEventListener('mousedown', e => {
             active = true;
             document.body.style.cursor = 'col-resize';
@@ -1278,19 +1508,30 @@
             rightPanel.style.flex = '1 1 0';
         });
         document.addEventListener('mouseup', () => {
-            if (active) { active = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; }
+            if (!active) return;
+            active = false;
+            document.body.style.cursor = ''; document.body.style.userSelect = '';
+            const rect = container.getBoundingClientRect();
+            const pct = (leftPanel.getBoundingClientRect().width / rect.width) * 100;
+            localStorage.setItem('pm_logs_pct', pct.toFixed(1));
         });
     }
 
     function initHResizers() {
-        const rightCol = document.querySelector('.right-col');
         const detail   = document.querySelector('.detail-panel');
         const logsArea = document.getElementById('logsArea');
         const commands = document.querySelector('.commands-panel');
 
-        function makeRowResizer(resizerId, topEl, botEl) {
+        function makeRowResizer(resizerId, topEl, botEl, saveKeyTop, saveKeyBot) {
             const r = document.getElementById(resizerId);
             if (!r) return;
+
+            // restore
+            const savedTop = localStorage.getItem(saveKeyTop);
+            const savedBot = localStorage.getItem(saveKeyBot);
+            if (savedTop) topEl.style.flex = `0 0 ${savedTop}px`;
+            if (savedBot) botEl.style.flex = `0 0 ${savedBot}px`;
+
             let active = false, startY, startTopH, startBotH;
             r.addEventListener('mousedown', e => {
                 active    = true;
@@ -1303,22 +1544,27 @@
             });
             document.addEventListener('mousemove', e => {
                 if (!active) return;
-                const dy    = e.clientY - startY;
+                const dy     = e.clientY - startY;
                 const newTop = Math.max(40, startTopH + dy);
                 const newBot = Math.max(40, startBotH - dy);
                 topEl.style.flex = `0 0 ${newTop}px`;
                 botEl.style.flex = `0 0 ${newBot}px`;
             });
             document.addEventListener('mouseup', () => {
-                if (active) { active = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; }
+                if (!active) return;
+                active = false;
+                document.body.style.cursor = ''; document.body.style.userSelect = '';
+                localStorage.setItem(saveKeyTop, topEl.getBoundingClientRect().height);
+                localStorage.setItem(saveKeyBot, botEl.getBoundingClientRect().height);
             });
         }
 
-        makeRowResizer('hResizerTop', detail, logsArea);
-        makeRowResizer('hResizerBot', logsArea, commands);
+        makeRowResizer('hResizerTop', detail, logsArea,  'pm_h_detail',   'pm_h_logs');
+        makeRowResizer('hResizerBot', logsArea, commands, 'pm_h_logs',     'pm_h_cmds');
     }
 
     function renderDetail(t) {
+        hideHeatmapPane();
         document.getElementById('detailTaskId').textContent = `#${t.Id}`;
         showLogsArea(t.Id);
 
@@ -1387,6 +1633,7 @@
         const statusFilter = document.getElementById('cmdStatusFilter').value;
         let url = `${SERVER}/zp/commands`;
         if (statusFilter) url += `?status=${statusFilter}`;
+        _saveState();
         try {
             const r = await fetch(url);
             const cmds = await r.json();
@@ -1415,10 +1662,11 @@
 
     async function sendCommand(taskId, action, payload = '') {
         try {
+            const machine = allTasks.find(t => t.Id === taskId)?.machine || '';
             const r = await fetch(`${SERVER}/zp/commands`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: taskId, action, payload })
+                body: JSON.stringify({ task_id: taskId, action, payload, machine })
             });
             const result = await r.json();
             console.log(`Command sent: ${action} → ${taskId}`, result);
@@ -1440,15 +1688,17 @@
 
     // ── SETTINGS MODAL ──
     let modalTaskId = null;
+    let modalMachine = null;
     let modalFields = [];
 
     async function openSettings(zpTaskId, taskName) {
-        modalTaskId = zpTaskId;
+        modalTaskId  = zpTaskId;
+        modalMachine = allTasks.find(t => t.Id === zpTaskId)?.machine || '';
         document.getElementById('modalTitle').textContent = `Settings: ${taskName}`;
         document.getElementById('modalBody').innerHTML = '<div class="empty-msg">Loading...</div>';
         document.getElementById('settingsModal').classList.add('open');
         try {
-            const r = await fetch(`${SERVER}/zp/settings-xml?task_id=${encodeURIComponent(zpTaskId)}`);
+            const r = await fetch(`${SERVER}/zp/settings-xml?task_id=${encodeURIComponent(zpTaskId)}&machine=${encodeURIComponent(modalMachine)}`);
             const data = await r.json();
             modalFields = data.fields || [];
             renderModalFields(modalFields);
@@ -1459,8 +1709,9 @@
 
     function closeModal() {
         document.getElementById('settingsModal').classList.remove('open');
-        modalTaskId = null;
-        modalFields = [];
+        modalTaskId  = null;
+        modalMachine = null;
+        modalFields  = [];
     }
 
     // ── PM → Scheduler payload export ──
@@ -1625,7 +1876,7 @@
             const r = await fetch(`${SERVER}/zp/settings-xml`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: modalTaskId, fields })
+                body: JSON.stringify({ task_id: modalTaskId, machine: modalMachine, fields })
             });
             const result = await r.json();
             if (result.ok) { closeModal(); refreshCommands(); }
@@ -1887,6 +2138,11 @@
         const resizer = document.getElementById('resizer');
         const panel   = document.getElementById('tasksPanel');
         let dragging = false, startX, startW;
+
+        // restore
+        const savedW = localStorage.getItem('pm_panel_w');
+        if (savedW) panel.style.width = savedW + 'px';
+
         resizer.addEventListener('mousedown', e => {
             dragging = true; startX = e.clientX; startW = panel.offsetWidth;
             document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
@@ -1896,9 +2152,247 @@
             panel.style.width = Math.max(0, startW + (e.clientX - startX)) + 'px';
         });
         document.addEventListener('mouseup', () => {
-            dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = '';
+            if (!dragging) return;
+            dragging = false;
+            document.body.style.cursor = ''; document.body.style.userSelect = '';
+            localStorage.setItem('pm_panel_w', panel.offsetWidth);
         });
     }
+
+    // ── PM HEATMAP ──
+    const PM_HEATMAP_CACHE_KEY = 'pm_heatmap_cache';
+    const PM_HEATMAP_TTL_MS    = 5 * 60 * 1000;
+
+    const _heatmapHTML = `
+        <div id="pmHeatmapPane" class="pm-heatmap-pane">
+            <div class="pm-heatmap-header">
+                <span class="pm-heatmap-title">Projects</span>
+                <span class="pm-heatmap-hint">← Select a task for details</span>
+                <button class="pm-heatmap-refresh" onclick="loadPmHeatmap(true)" title="Refresh">↺</button>
+            </div>
+            <div id="pmHeatmapContent" class="pm-heatmap-content">
+                <div class="pm-heatmap-loading">Loading...</div>
+            </div>
+        </div>`;
+
+    function _showHeatmap() {
+        const body = document.getElementById('detailBody');
+        body.innerHTML = _heatmapHTML;
+        // восстанавливаем данные из кеша если есть
+        loadPmHeatmap();
+    }
+
+    function _hideHeatmap() {
+        // ничего не делаем — renderDetail сам перепишет detailBody
+    }
+
+    // оставляем алиасы для кнопки ↺
+    function showHeatmapPane() { _showHeatmap(); }
+    function hideHeatmapPane() { _hideHeatmap(); }
+
+    async function loadPmHeatmap(forceRefresh = false) {
+        const content = document.getElementById('pmHeatmapContent');
+        if (!content) return;
+
+        if (!forceRefresh) {
+            try {
+                const cached = sessionStorage.getItem(PM_HEATMAP_CACHE_KEY);
+                if (cached) {
+                    const { ts, projects } = JSON.parse(cached);
+                    if (Date.now() - ts < PM_HEATMAP_TTL_MS) {
+                        renderPmHeatmap(projects, content);
+                        return;
+                    }
+                }
+            } catch {}
+        }
+
+        content.innerHTML = '<div class="pm-heatmap-loading">Loading...</div>';
+
+        try {
+            const r = await fetch(`${SERVER}/report/api/projects-db`);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = await r.json();
+            const projects = data.projects || {};
+            try {
+                sessionStorage.setItem(PM_HEATMAP_CACHE_KEY, JSON.stringify({ ts: Date.now(), projects }));
+            } catch {}
+            renderPmHeatmap(projects, content);
+        } catch (e) {
+            content.innerHTML = `<div class="pm-heatmap-loading" style="color:var(--red)">Failed: ${e.message}</div>`;
+        }
+    }
+
+    function renderPmHeatmap(projectsObj, container) {
+        // Преобразуем объект в массив как в report.html
+        const projects = Object.entries(projectsObj).map(([name, p]) => ({
+            name,
+            accounts: p.accounts || {}
+        }));
+
+        const active = projects.filter(p => Object.keys(p.accounts).length > 0);
+
+        if (!active.length) {
+            container.innerHTML = '<div class="pm-heatmap-loading">No project data</div>';
+            return;
+        }
+
+        // Сортировка по lastActivity (как в report.html по умолчанию)
+        active.sort((a, b) => {
+            const latest = proj => Object.values(proj.accounts)
+                .map(acc => new Date(acc.timestamp || 0))
+                .reduce((max, d) => d > max ? d : max, new Date(0));
+            return latest(b) - latest(a);
+        });
+
+        // maxAccountIndex — максимальный числовой id по всем проектам
+        let maxIdx = 0;
+        active.forEach(p => {
+            Object.keys(p.accounts).forEach(k => {
+                const n = parseInt(k);
+                if (!isNaN(n) && n > maxIdx) maxIdx = n;
+            });
+        });
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        container.innerHTML = active.map(project => pmRenderProjectBlock(project, maxIdx, today)).join('');
+    }
+
+    function pmRenderProjectBlock(project, maxIndex, today) {
+        const total   = Object.keys(project.accounts).length;
+        const success = Object.values(project.accounts).filter(a => a.status === '+').length;
+        const failed  = total - success;
+        const rate    = total > 0 ? ((success / total) * 100).toFixed(1) : '0.0';
+
+        // timing stats
+        let totalSuccessTime = 0, totalErrorTime = 0;
+        let successWithTime  = 0, errorWithTime  = 0;
+        let minST = Infinity,  maxST = 0;
+        let minET = Infinity,  maxET = 0;
+
+        Object.values(project.accounts).forEach(acc => {
+            const t = parseFloat(acc.completionSec);
+            if (!isNaN(t) && t > 0) {
+                if (acc.status === '+') {
+                    totalSuccessTime += t; successWithTime++;
+                    if (t < minST) minST = t; if (t > maxST) maxST = t;
+                } else {
+                    totalErrorTime += t; errorWithTime++;
+                    if (t < minET) minET = t; if (t > maxET) maxET = t;
+                }
+            }
+        });
+
+        const avgST = successWithTime > 0 ? (totalSuccessTime / successWithTime).toFixed(1) : 0;
+        const avgET = errorWithTime   > 0 ? (totalErrorTime   / errorWithTime  ).toFixed(1) : 0;
+
+        const cells = [];
+        for (let i = 1; i <= maxIndex; i++) {
+            cells.push(pmRenderCell(project, i, today));
+        }
+
+        return `
+        <div class="heatmap-with-stats">
+            <div class="heatmap-project-card">
+                <div class="project-card">
+                    <div class="project-name">${escHtml(project.name)}</div>
+                    <div class="progress-bar">
+                        <div style="display:flex;height:100%;width:100%;">
+                            <div style="width:${rate}%;background:#238636;"></div>
+                            <div style="width:${total>0?(failed/total*100).toFixed(1):0}%;background:#da3633;"></div>
+                        </div>
+                    </div>
+                    <div class="project-stats">
+                        <div class="stat-row"><span>✔️ Successful:</span><span class="stat-good">${success}</span></div>
+                        ${successWithTime > 0 ? `<div class="stat-row"><span>Min|Max|Avg:</span><span class="stat-neutral">${minST.toFixed(1)}|${maxST.toFixed(1)}|${avgST}s</span></div>` : ''}
+                        <div class="stat-row"><span>❌ Failed:</span><span class="stat-bad">${failed}</span></div>
+                        ${errorWithTime > 0 ? `<div class="stat-row"><span>Min|Max|Avg:</span><span class="stat-neutral">${minET.toFixed(1)}|${maxET.toFixed(1)}|${avgET}s</span></div>` : ''}
+                        <div class="stat-row"><span>[✔️/❌] Rate:</span><span class="${rate>=90?'stat-good':rate>=70?'stat-neutral':'stat-bad'}">${rate}%</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="heatmap-content">
+                <div class="heatmap-row">
+                    <div class="cells-container">${cells.join('')}</div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function pmRenderCell(project, accountId, today) {
+        const acc = project.accounts[accountId];
+
+        const safeAttr = s => s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+        if (!acc) {
+            const tip = safeAttr(`account #${accountId}||${project.name}||—||||notdone||||daily`);
+            return `<div class="heatmap-cell" data-pm-tooltip="${tip}"></div>`;
+        }
+
+        const accDate = new Date(acc.timestamp);
+        accDate.setHours(0, 0, 0, 0);
+        const daysDiff = Math.floor((today.getTime() - accDate.getTime()) / 86400000);
+
+        let ageClass = '';
+        if      (daysDiff === 0) ageClass = '';
+        else if (daysDiff === 1) ageClass = '-yesterday';
+        else if (daysDiff === 2) ageClass = '-2days';
+        else                     ageClass = '-old';
+
+        const statusClass = acc.status === '+' ? `success${ageClass}` : `error${ageClass}`;
+
+        // report может содержать кавычки, | и прочее — кодируем отдельно
+        const report = (acc.report || '').substring(0, 200).replace(/\|/g, '!');
+        const tip = safeAttr(`account #${accountId}||${project.name}||${acc.timestamp}||${acc.completionSec||''}||${acc.status==='+'?'success':'error'}||${report}||daily`);
+
+        return `<div class="heatmap-cell ${statusClass}" data-pm-tooltip="${tip}"></div>`;
+    }
+
+    // Тултипы вешаются один раз на document через делегирование
+    (function pmInitTooltips() {
+        const tip = () => document.getElementById('pmTooltip');
+
+        function positionTip(e, el) {
+            const t = tip(); if (!t) return;
+            const parts = el.getAttribute('data-pm-tooltip').split('||');
+            const [accLabel, projName, timestamp, completionSec, status, report] = parts;
+
+            let html = `<div class="pm-tooltip-title">${accLabel}</div>`;
+            html += `<div style="color:var(--text2);font-size:11px;margin-bottom:5px;">${projName}</div>`;
+            if (timestamp && timestamp !== '—') {
+                html += `<div class="pm-tooltip-time">⏱ ${timestamp}${completionSec ? ` (${completionSec}s)` : ''}</div>`;
+            }
+            if (status === 'success')    html += `<div class="pm-tooltip-ok">✓ Success</div>`;
+            else if (status === 'error') html += `<div class="pm-tooltip-err">✗ Failed</div>`;
+            else                         html += `<div style="color:var(--muted);font-size:11px;">Not touched</div>`;
+            if (report && report.trim()) html += `<div class="pm-tooltip-report">${report.substring(0, 200)}</div>`;
+
+            t.innerHTML = html;
+            t.classList.add('show');
+
+            const rect = el.getBoundingClientRect();
+            let left = rect.left + window.scrollX;
+            let top  = rect.top  + window.scrollY - t.offsetHeight - 8;
+            if (top < 4) top = rect.bottom + window.scrollY + 8;
+            if (left + 300 > window.innerWidth) left = window.innerWidth - 310;
+            t.style.left = left + 'px';
+            t.style.top  = top  + 'px';
+        }
+
+        document.addEventListener('mouseover', e => {
+            const cell = e.target.closest('[data-pm-tooltip]');
+            if (cell) positionTip(e, cell);
+        });
+        document.addEventListener('mouseout', e => {
+            const cell = e.target.closest('[data-pm-tooltip]');
+            if (cell) { const t = tip(); if (t) t.classList.remove('show'); }
+        });
+    })();
+
+    function toDateStr(d) { return d.toISOString().substring(0, 10); }
+
 </script>
 
 <!-- Universal Dialog -->

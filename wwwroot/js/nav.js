@@ -2,9 +2,6 @@
 
 
 // ── PageState — глобальный хелпер состояния страниц ───────────────
-// Доступен на всех страницах т.к. nav.js подключён везде.
-// Ключ в localStorage: 'state_<pathname><search>'
-// Пример: 'state_/logs.html', 'state_/?page=http'
 window.PageState = {
     _key() { return 'state_' + location.pathname + location.search; },
     load()  { try { return JSON.parse(localStorage.getItem(this._key())) || {}; } catch { return {}; } },
@@ -15,25 +12,11 @@ window.PageState = {
 
 (function () {
 
-    const HOTKEYS = {
-        'ctrl+shift+KeyH':   () => location.href = '/',
-        //'ctrl+shift+KeyT':   () => typeof cycleTheme === 'function' && cycleTheme(),
-        'ctrl+shift+Digit1': () => location.href = '/?page=pm',
-        'ctrl+shift+Digit2': () => location.href = '/?page=logs',
-        'ctrl+shift+Digit3': () => location.href = '/?page=http',
-        'ctrl+shift+Digit4': () => location.href = '/report',
-        'ctrl+shift+Digit5': () => location.href = '/json',
-        'ctrl+shift+Digit6': () => location.href = '/?page=config',
-        'ctrl+shift+Digit7': () => location.href = '/scheduler.html',
-        'ctrl+shift+KeyT': () => location.href = '/text.html',
-        'ctrl+shift+KeyO':   () => openOtpModal(),
-        'ctrl+shift+KeyU': () => openUnlockModal(),
-
-    };
+    const HOTKEYS = {};
 
     document.addEventListener('keydown', function (e) {
         if (!e.code) return;
-        const key = [e.ctrlKey?'ctrl':'', e.shiftKey?'shift':'', e.code]
+        const key = [e.altKey?'alt':'', e.ctrlKey?'ctrl':'', e.shiftKey?'shift':'', e.code]
             .filter(Boolean).join('+');
         if (HOTKEYS[key]) { e.preventDefault(); HOTKEYS[key](); }
     });
@@ -51,32 +34,32 @@ window.PageState = {
         return 'home';
     }
 
-    // Inline SVG — no CDN, no font dependency, works offline, consistent cross-OS rendering
-    const SVG = {
-        home:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>`,
-        pm:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>`,
-        logs:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>`,
-        http:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M15 7l5 5-5 5"/><path d="M9 7L4 12l5 5" opacity="0.4"/></svg>`,
-        report:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`,
-        json:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg>`,
-        config:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
-        scheduler: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 15.5"/></svg>`,
-        theme:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" stroke-opacity="0.35"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" opacity="0.2" stroke="none"/></svg>`,
-    };
+    function _loadScript(src, cb) {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = cb;
+        document.head.appendChild(s);
+    }
 
-    const ITEMS = [
-        { id: 'home',      label: 'Home',      svg: SVG.home,      href: '/',               hotkey: 'H' },
-        { id: 'pm',        label: 'PM',         svg: SVG.pm,        href: '/?page=pm',       hotkey: '1' },
-        { id: 'logs',      label: 'Logs',       svg: SVG.logs,      href: '/?page=logs',     hotkey: '2' },
-        { id: 'http',      label: 'HTTP',       svg: SVG.http,      href: '/?page=http',     hotkey: '3' },
-        { id: 'report',    label: 'Report',     svg: SVG.report,    href: '/report',         hotkey: '4' },
-        { id: 'json',      label: 'JSON',       svg: SVG.json,      href: '/json',           hotkey: '5' },
-        { id: 'config',    label: 'Config',     svg: SVG.config,    href: '/?page=config',   hotkey: '6' },
-        { id: 'scheduler', label: 'Scheduler',  svg: SVG.scheduler, href: '/scheduler.html', hotkey: '7' },
-    ];
+    function _loadIcons(cb) {
+        if (window.ICONS && window.NAV_CONFIG) { cb(); return; }
+        if (window.ICONS) { _loadScript('/js/navpath.js', cb); return; }
+        _loadScript('/js/icons.js', () => _loadScript('/js/navpath.js', cb));
+    }
 
     function inject() {
+        // NAV_CONFIG и ICONS уже загружены — заполняем хоткеи
+        Object.entries(NAV_CONFIG.hotkeys).forEach(([k, url]) => {
+            HOTKEYS[k] = () => location.href = url;
+        });
+        HOTKEYS['ctrl+shift+KeyX'] = () => openOtpModal();
+
         if (document.getElementById('zp-dock')) return;
+
+        const ITEMS = NAV_CONFIG.items.map(item => ({
+            ...item,
+            svg: ICONS[item.id] || '',
+        }));
 
         const current = activePage();
 
@@ -237,14 +220,12 @@ window.PageState = {
             el.innerHTML = `
                 <div class="zp-di-icon">${item.svg}</div>
                 <div class="zp-di-label">${item.label}</div>
-                <div class="zp-di-tip">${item.label} <span style="color:#484f58">⌃⇧${item.hotkey}</span></div>
+                <div class="zp-di-tip">${item.label} <span style="color:#484f58">&#x2303;&#x21E7;${item.hotkey}</span></div>
                 <div class="zp-di-dot"></div>
             `;
             dock.appendChild(el);
         });
 
-        // theme on home
-        //if (current === 'home') {
         const sep = document.createElement('div');
         sep.className = 'zp-dock-sep';
         dock.appendChild(sep);
@@ -252,14 +233,13 @@ window.PageState = {
         const th = document.createElement('div');
         th.className = 'zp-di';
         th.innerHTML = `
-                <div class="zp-di-icon">${SVG.theme}</div>
-                <div class="zp-di-label">Theme</div>
-                <div class="zp-di-tip">Theme <span style="color:#484f58">⌃⇧T</span></div>
-                <div class="zp-di-dot"></div>
-            `;
+            <div class="zp-di-icon">${ICONS.theme}</div>
+            <div class="zp-di-label">Theme</div>
+            <div class="zp-di-tip">Theme <span style="color:#484f58">&#x2303;&#x21E7;T</span></div>
+            <div class="zp-di-dot"></div>
+        `;
         th.onclick = () => typeof cycleTheme === 'function' && cycleTheme();
         dock.appendChild(th);
-        //}
 
         wrap.appendChild(dock);
         document.body.appendChild(zone);
@@ -275,13 +255,11 @@ window.PageState = {
             hideTimer = setTimeout(() => dock.classList.remove('visible'), 400);
         }
 
-        // trigger zone — 6px strip at very bottom
         zone.addEventListener('mouseenter', showDock);
         zone.addEventListener('mouseleave', schedulehide);
         dock.addEventListener('mouseenter', showDock);
         dock.addEventListener('mouseleave', schedulehide);
 
-        // fallback: mouse within 2px of bottom edge
         document.addEventListener('mousemove', function(e) {
             if (window.innerHeight - e.clientY <= 2) showDock();
         });
@@ -332,10 +310,10 @@ window.PageState = {
         overlay.innerHTML = `
             <div id="zp-otp-box">
                 <div class="zp-otp-hdr">
-                    <span>🔐</span><h3>OTP Generator</h3>
-                    <button id="zp-otp-close" title="Close (Esc)">✕</button>
+                    <span>&#x1F510;</span><h3>OTP Generator</h3>
+                    <button id="zp-otp-close" title="Close (Esc)">&#x2715;</button>
                 </div>
-                <input id="zp-otp-key" type="text" placeholder="Base32 secret key…" autocomplete="off" spellcheck="false">
+                <input id="zp-otp-key" type="text" placeholder="Base32 secret key..." autocomplete="off" spellcheck="false">
                 <div id="zp-otp-status"></div>
                 <div id="zp-otp-result">
                     <div id="zp-otp-code">------</div>
@@ -429,12 +407,12 @@ window.PageState = {
         if (!key) { status.className = 'err'; status.textContent = 'Enter a Base32 secret key'; return; }
 
         genBtn.disabled = true;
-        status.textContent = 'Generating…';
+        status.textContent = 'Generating...';
 
         try {
             let { code, remaining } = await _totp(key);
             if (remaining <= 5) {
-                status.textContent = `Waiting ${remaining}s for fresh code…`;
+                status.textContent = 'Waiting ' + remaining + 's for fresh code...';
                 await new Promise(r => setTimeout(r, remaining * 1000 + 500));
                 ({ code, remaining } = await _totp(key));
             }
@@ -461,11 +439,9 @@ window.PageState = {
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', inject);
+        document.addEventListener('DOMContentLoaded', () => _loadIcons(inject));
     } else {
-        inject();
+        _loadIcons(inject);
     }
-
-
 
 })();
