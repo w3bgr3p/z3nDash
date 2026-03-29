@@ -5,17 +5,20 @@ using System.Text.Json;
 namespace z3n8;
 
 /// <summary>
-/// Обработчик ZP-роутов. Подключается к EmbeddedServer через HandleRequest().
+/// Обработчик ZP-роутов.
+///
+/// Схема id: "{machine}|{guid}" — TEXT PRIMARY KEY во всех трёх таблицах.
+/// Фильтрация по машине: WHERE "id" LIKE '{machine}|%'
+/// Извлечение guid: id.Split('|')[1]
 ///
 /// Роуты:
-///   GET  /zp                  — dashboard HTML
 ///   GET  /zp/tasks            — список задач из _tasks
-///   GET  /zp/settings         — настройки из _settings (опц. ?task_id=)
-///   GET  /zp/commands         — очередь команд (опц. ?status=&amp;task_id=)
-///   POST /zp/commands         — создать команду { task_id, action, payload }
+///   GET  /zp/settings         — настройки из _settings (опц. ?task_id=&amp;machine=)
+///   GET  /zp/commands         — очередь команд (опц. ?status=&amp;task_id=&amp;machine=)
+///   POST /zp/commands         — создать команду { task_id, machine, action, payload }
 ///   POST /zp/commands/done    — отметить выполненной { id, result, status }
 ///   POST /zp/commands/clear   — очистить команды { scope: "done"|"all" }
-///   GET  /zp/settings-xml     — InputSettings поля для UI (?task_id=)
+///   GET  /zp/settings-xml     — InputSettings поля для UI (?task_id=&amp;machine=)
 ///   POST /zp/settings-xml     — сохранить поля и создать update_settings команду
 /// </summary>
 public class ZpOrchestratorHandler : IScriptHandler
@@ -24,28 +27,18 @@ public class ZpOrchestratorHandler : IScriptHandler
 
     private readonly DbConnectionService _dbService;
     
-    private static readonly Dictionary<string, string> CommandsSchema = new()
-    {
-        { "id",         "TEXT PRIMARY KEY" },
-        { "name",       "TEXT DEFAULT ''" },  // ← добавить
-        { "task_id",    "TEXT DEFAULT ''" },
-        { "action",     "TEXT DEFAULT ''" },
-        { "payload",    "TEXT DEFAULT ''" },
-        { "status",     "TEXT DEFAULT 'pending'" },
-        { "result",     "TEXT DEFAULT ''" },
-        { "created_at", "TEXT DEFAULT ''" }
-    };
 
     public ZpOrchestratorHandler(DbConnectionService dbService)
     {
         _dbService = dbService;
     }
 
-    /// <summary>Инициализация таблицы команд. Вызывать при старте сервера.</summary>
     public void Init()
     {
         if (!_dbService.TryGetDb(out var db) || db == null) return;
-        db.PrepareTable(CommandsSchema, DbSchema.Commands);
+        db.PrepareTable(DbSchema.Settings.Columns,  DbSchema.Settings.Name);
+        db.PrepareTable(DbSchema.Tasks.Columns,     DbSchema.Tasks.Name);
+        db.PrepareTable(DbSchema.Commands.Columns,  DbSchema.Commands.Name);
     }
 
     public async Task<bool> HandleRequest(HttpListenerContext context)
@@ -85,25 +78,32 @@ public class ZpOrchestratorHandler : IScriptHandler
 
     private async Task GetTasks(HttpListenerContext ctx, Db db)
     {
-        var rows = db.GetLines("_id,name,machine,_json_b64", DbSchema.Tasks, where: "\"_id\" IS NOT NULL");
-        if (rows.Count == 0) { await WriteJson(ctx.Response, new List<object>()); return; }
+        var machine = ctx.Request.QueryString["machine"] ?? "";
+        var where   = string.IsNullOrEmpty(machine)
+            ? "1=1"
+            : $"\"id\" LIKE '{machine}|%'";
 
+        var rows   = db.GetLines("id,name,_json_b64", DbSchema.Tasks.Name, where: where);
         var result = new List<Dictionary<string, object>>();
+
         foreach (var row in rows)
         {
             var parts   = row.Split('¦');
-            var taskId  = parts.Length > 0 ? parts[0] : "";
+            var id      = parts.Length > 0 ? parts[0] : "";
             var name    = parts.Length > 1 ? parts[1] : "";
-            var machine = parts.Length > 2 ? parts[2] : "";
-            var jsonB64 = parts.Length > 3 ? parts[3] : "";
-            
-            if (string.IsNullOrEmpty(taskId)) continue;
+            var jsonB64 = parts.Length > 2 ? parts[2] : "";
+            if (string.IsNullOrEmpty(id)) continue;
+
+            var idParts  = id.Split('|');
+            var taskGuid = idParts.Length > 1 ? idParts[1] : id;
+            var machine_ = idParts.Length > 1 ? idParts[0] : "";
 
             var dict = new Dictionary<string, object>
             {
-                { "Id",      taskId },
-                { "name",    name },
-                { "machine", machine }  
+                { "id",      id       },
+                { "guid",    taskGuid },
+                { "machine", machine_ },
+                { "name",    name     },
             };
 
             if (!string.IsNullOrEmpty(jsonB64))
@@ -123,56 +123,33 @@ public class ZpOrchestratorHandler : IScriptHandler
         await WriteJson(ctx.Response, result);
     }
 
-    /// <summary>
-    /// Разворачивает вложенный JsonElement в плоский словарь с _ как разделителем.
-    /// {"ExecutionSettings":{"Status":"Stop"}} → {"ExecutionSettings_Status":"Stop"}
-    /// </summary>
-    private static void FlattenJson(JsonElement el, string prefix, Dictionary<string, object> result)
-    {
-        if (el.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var prop in el.EnumerateObject())
-            {
-                var key = string.IsNullOrEmpty(prefix) ? prop.Name : $"{prefix}_{prop.Name}";
-                FlattenJson(prop.Value, key, result);
-            }
-        }
-        else
-        {
-            result[prefix] = el.ValueKind == JsonValueKind.String
-                ? el.GetString() ?? ""
-                : el.ToString();
-        }
-    }
     private async Task GetSettings(HttpListenerContext ctx, Db db)
     {
         var taskId  = ctx.Request.QueryString["task_id"] ?? "";
-        var columns = db.GetTableColumns(DbSchema.Settings);
-        if (columns.Count == 0)
-        {
-            await WriteJson(ctx.Response, new object());
-            return;
-        }
+        var machine = ctx.Request.QueryString["machine"]  ?? "";
 
-        var where = string.IsNullOrEmpty(taskId)
-            ? "\"_id\" != ''"
-            : $"\"_id\" = '{taskId}'";
+        var where = BuildIdFilter(taskId, machine);
 
-        var rows = db.GetLines(string.Join(",", columns), DbSchema.Settings, where: where);
+        var columns = db.GetTableColumns(DbSchema.Settings.Name);
+        if (columns.Count == 0) { await WriteJson(ctx.Response, new object()); return; }
+
+        var rows = db.GetLines(string.Join(",", columns), DbSchema.Settings.Name, where: where);
         await WriteJson(ctx.Response, RowsToJson(rows, columns));
     }
 
     private async Task GetCommands(HttpListenerContext ctx, Db db)
     {
-        var status = ctx.Request.QueryString["status"] ?? "";
-        var taskId = ctx.Request.QueryString["task_id"] ?? "";
+        var status  = ctx.Request.QueryString["status"]  ?? "";
+        var taskId  = ctx.Request.QueryString["task_id"] ?? "";
+        var machine = ctx.Request.QueryString["machine"] ?? "";
 
-        var conditions = new List<string> { "\"id\" != ''" };
-        if (!string.IsNullOrEmpty(status)) conditions.Add($"\"status\" = '{status}'");
-        if (!string.IsNullOrEmpty(taskId)) conditions.Add($"\"task_id\" = '{taskId}'");
+        var conditions = new List<string> { "1=1" };
+        if (!string.IsNullOrEmpty(status))  conditions.Add($"\"status\" = '{status}'");
+        if (!string.IsNullOrEmpty(taskId))  conditions.Add($"\"task_id\" = '{taskId}'");
+        if (!string.IsNullOrEmpty(machine)) conditions.Add($"\"id\" LIKE '{machine}|%'");
 
-        var columns = new List<string> { "id", "name","task_id", "action", "payload", "status", "result", "created_at" };
-        var rows    = db.GetLines(string.Join(",", columns), DbSchema.Commands, where: string.Join(" AND ", conditions));
+        var columns = new List<string> { "id", "task_id", "action", "payload", "status", "result", "created_at" };
+        var rows    = db.GetLines(string.Join(",", columns), DbSchema.Commands.Name, where: string.Join(" AND ", conditions));
         await WriteJson(ctx.Response, RowsToJson(rows, columns));
     }
 
@@ -181,30 +158,22 @@ public class ZpOrchestratorHandler : IScriptHandler
         var json = await ReadJson(ctx.Request);
         if (json == null) { await WriteError(ctx.Response, 400, "Invalid JSON"); return; }
 
-        var id      = Guid.NewGuid().ToString();
         var taskId  = json.Value.TryGetProperty("task_id", out var t) ? t.GetString() ?? "" : "";
         var action  = json.Value.TryGetProperty("action",  out var a) ? a.GetString() ?? "" : "";
         var payload = json.Value.TryGetProperty("payload", out var p) ? p.GetString() ?? "" : "";
         var machine = json.Value.TryGetProperty("machine", out var m) ? m.GetString() ?? "" : "";
-        var name = json.Value.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-        if (string.IsNullOrEmpty(name))
-            name = db.Get("name", DbSchema.Tasks, where: $"\"_id\" = '{taskId}'") ?? "";
+        if (string.IsNullOrEmpty(machine)) { await WriteError(ctx.Response, 400, "machine required"); return; }
 
+        var cmdId = $"{machine}|{Guid.NewGuid()}";
 
-        db.InsertDic(new Dictionary<string, string>
-        {
-            { "id",         id },
-            { "name",       name },
-            { "task_id",    taskId },
-            { "action",     action },
-            { "payload",    payload },
-            { "machine",    machine },
-            { "status",     "pending" },
-            { "result",     "" },
-            { "created_at", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
-        }, DbSchema.Commands);
+        db.Query($"INSERT INTO \"{DbSchema.Commands.Name}\" " +
+                 $"(\"id\", \"task_id\", \"action\", \"payload\", \"status\", \"result\", \"created_at\") VALUES " +
+                 $"('{cmdId}', '{taskId}', '{action}', '{payload.Replace("'", "''")}', 'pending', '', '{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}') " +
+                 $"ON CONFLICT (\"id\") DO UPDATE SET " +
+                 $"\"task_id\" = EXCLUDED.\"task_id\", \"action\" = EXCLUDED.\"action\", \"payload\" = EXCLUDED.\"payload\", " +
+                 $"\"status\" = EXCLUDED.\"status\", \"result\" = EXCLUDED.\"result\", \"created_at\" = EXCLUDED.\"created_at\"");
 
-        await WriteJson(ctx.Response, new { id, status = "pending" });
+        await WriteJson(ctx.Response, new { id = cmdId, status = "pending" });
     }
 
     private async Task MarkCommandDone(HttpListenerContext ctx, Db db)
@@ -215,11 +184,10 @@ public class ZpOrchestratorHandler : IScriptHandler
         var id     = json.Value.TryGetProperty("id",     out var i) ? i.GetString() ?? "" : "";
         var result = json.Value.TryGetProperty("result", out var r) ? r.GetString() ?? "" : "";
         var status = json.Value.TryGetProperty("status", out var s) ? s.GetString() ?? "done" : "done";
-
         if (string.IsNullOrEmpty(id)) { await WriteError(ctx.Response, 400, "id required"); return; }
 
         db.Upd($"status = '{status}', result = '{result.Replace("'", "''")}'",
-               DbSchema.Commands, where: $"\"id\" = '{id}'");
+               DbSchema.Commands.Name, where: $"\"id\" = '{id}'");
 
         await WriteJson(ctx.Response, new { ok = true });
     }
@@ -229,23 +197,25 @@ public class ZpOrchestratorHandler : IScriptHandler
         var json = await ReadJson(ctx.Request);
         if (json == null) { await WriteError(ctx.Response, 400, "Invalid JSON"); return; }
 
-        var scope = json.Value.TryGetProperty("scope", out var s) ? s.GetString() ?? "done" : "done";
-        var where = scope == "all" ? "\"id\" != ''" : "\"status\" = 'done'";
+        var scope   = json.Value.TryGetProperty("scope",   out var s) ? s.GetString() ?? "done" : "done";
+        var machine = json.Value.TryGetProperty("machine", out var m) ? m.GetString() ?? ""     : "";
 
-        db.Del(DbSchema.Commands, where: where);
+        var conditions = new List<string>();
+        conditions.Add(scope == "all" ? "1=1" : "\"status\" = 'done'");
+        if (!string.IsNullOrEmpty(machine)) conditions.Add($"\"id\" LIKE '{machine}|%'");
+
+        db.Del(DbSchema.Commands.Name, where: string.Join(" AND ", conditions));
         await WriteJson(ctx.Response, new { ok = true, scope });
     }
+
     private async Task GetSettingsXml(HttpListenerContext ctx, Db db)
     {
         var taskId  = ctx.Request.QueryString["task_id"] ?? "";
-        var machine = ctx.Request.QueryString["machine"]  ?? "";
+        var machine = ctx.Request.QueryString["machine"] ?? "";
         if (string.IsNullOrEmpty(taskId)) { await WriteError(ctx.Response, 400, "task_id required"); return; }
 
-        var where = string.IsNullOrEmpty(machine)
-            ? $"\"_id\" = '{taskId}'"
-            : $"\"_id\" = '{taskId}' AND \"machine\" = '{machine}'";
-
-        var row    = db.Get("_xml_b64,_json_b64", DbSchema.Settings, where: where);
+        var where  = BuildIdFilter(taskId, machine);
+        var row    = db.Get("_xml_b64,_json_b64", DbSchema.Settings.Name, where: where);
         var parts  = row?.Split('¦');
         var xmlB64 = parts?.Length > 0 ? parts[0] : "";
 
@@ -259,25 +229,19 @@ public class ZpOrchestratorHandler : IScriptHandler
         try   { xml = Encoding.UTF8.GetString(Convert.FromBase64String(xmlB64)); }
         catch { await WriteError(ctx.Response, 500, "Failed to decode _xml_b64"); return; }
 
-        // Текущие значения берём из _json_b64
-        var jsonB64 = parts?.Length > 1 ? parts[1] : "";
         Dictionary<string, string> currentValues = new();
+        var jsonB64 = parts?.Length > 1 ? parts[1] : "";
         if (!string.IsNullOrEmpty(jsonB64))
         {
             try
             {
-                var json = Encoding.UTF8.GetString(Convert.FromBase64String(jsonB64));
-                currentValues = JsonSerializer.Deserialize<Dictionary<string, string>>(json)
-                                ?? new Dictionary<string, string>();
+                var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(jsonB64));
+                currentValues = JsonSerializer.Deserialize<Dictionary<string, string>>(decoded) ?? new();
             }
             catch { }
         }
 
-        await WriteJson(ctx.Response, new
-        {
-            task_id = taskId,
-            fields  = ParseInputSettingsXml(xml, currentValues)
-        });
+        await WriteJson(ctx.Response, new { task_id = taskId, fields = ParseInputSettingsXml(xml, currentValues) });
     }
 
     private async Task PostSettingsXml(HttpListenerContext ctx, Db db)
@@ -288,60 +252,80 @@ public class ZpOrchestratorHandler : IScriptHandler
         var taskId  = json.Value.TryGetProperty("task_id", out var t) ? t.GetString() ?? "" : "";
         var machine = json.Value.TryGetProperty("machine", out var m) ? m.GetString() ?? "" : "";
         if (string.IsNullOrEmpty(taskId)) { await WriteError(ctx.Response, 400, "task_id required"); return; }
+        if (string.IsNullOrEmpty(machine)) { await WriteError(ctx.Response, 400, "machine required"); return; }
 
         if (!json.Value.TryGetProperty("fields", out var fieldsEl))
         { await WriteError(ctx.Response, 400, "fields required"); return; }
 
-        var where = string.IsNullOrEmpty(machine)
-            ? $"\"_id\" = '{taskId}'"
-            : $"\"_id\" = '{taskId}' AND \"machine\" = '{machine}'";
+        var where = BuildIdFilter(taskId, machine);
 
-        // Читаем текущий _json_b64
-        var existing = db.Get("_json_b64", DbSchema.Settings, where: where) ?? "";
+        var existing = db.Get("_json_b64", DbSchema.Settings.Name, where: where) ?? "";
         Dictionary<string, string> currentDict = new();
         if (!string.IsNullOrEmpty(existing))
         {
             try
             {
                 var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(existing));
-                currentDict = JsonSerializer.Deserialize<Dictionary<string, string>>(decoded)
-                              ?? new Dictionary<string, string>();
+                currentDict = JsonSerializer.Deserialize<Dictionary<string, string>>(decoded) ?? new();
             }
             catch { }
         }
 
-        // Патчим значениями из fields
         foreach (var prop in fieldsEl.EnumerateObject())
             currentDict[prop.Name] = prop.Value.GetString() ?? "";
 
-        // Пишем обратно
-        var newJson   = JsonSerializer.Serialize(currentDict);
-        var newJsonB64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(newJson))
-                               .Replace("'", "''");
+        var newJsonB64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(currentDict)))
+                                .Replace("'", "''");
 
         db.Query($"UPDATE \"{DbSchema.Settings}\" SET \"_json_b64\" = '{newJsonB64}' WHERE {where}");
-        var taskName = db.Get("name", DbSchema.Tasks, where: $"\"_id\" = '{taskId}'") ?? "";
 
-        // Команда на клиент — подтянуть настройки из БД
-        var cmdId = Guid.NewGuid().ToString();
-        db.InsertDic(new Dictionary<string, string>
-        {
-            { "id",         cmdId },
-            { "name",       taskName },
-            { "task_id",    taskId },
-            { "action",     "update_settings" },
-            { "payload",    "" },
-            { "machine",    machine },
-            { "status",     "pending" },
-            { "result",     "" },
-            { "created_at", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") }
-        }, DbSchema.Commands);
+        var cmdId = $"{machine}|{Guid.NewGuid()}";
+// PostSettingsXml — строки 305–307
+        db.Query($"INSERT INTO \"{DbSchema.Commands.Name}\" " +
+                 $"(\"id\", \"task_id\", \"action\", \"payload\", \"status\", \"result\", \"created_at\") VALUES " +
+                 $"('{cmdId}', '{taskId}', 'update_settings', '', 'pending', '', '{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}') " +
+                 $"ON CONFLICT (\"id\") DO UPDATE SET " +
+                 $"\"task_id\" = EXCLUDED.\"task_id\", \"action\" = EXCLUDED.\"action\", \"payload\" = EXCLUDED.\"payload\", " +
+                 $"\"status\" = EXCLUDED.\"status\", \"result\" = EXCLUDED.\"result\", \"created_at\" = EXCLUDED.\"created_at\"");
 
         await WriteJson(ctx.Response, new { ok = true, command_id = cmdId });
     }
 
-    private static List<object> ParseInputSettingsXml(string xml,
-        Dictionary<string, string>? currentValues = null)
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// Строит WHERE-фильтр по task_id и/или machine.
+    /// task_id — чистый guid, machine — имя машины.
+    /// Если оба заданы: точное совпадение по PK.
+    /// Если только task_id: LIKE '%|{task_id}' — ищет по всем машинам.
+    /// Если только machine: LIKE '{machine}|%' — все задачи машины.
+    private static string BuildIdFilter(string taskId, string machine)
+    {
+        if (!string.IsNullOrEmpty(machine) && !string.IsNullOrEmpty(taskId))
+            return $"\"id\" = '{machine}|{taskId}'";
+        if (!string.IsNullOrEmpty(taskId))
+            return $"\"id\" LIKE '%|{taskId}'";
+        if (!string.IsNullOrEmpty(machine))
+            return $"\"id\" LIKE '{machine}|%'";
+        return "1=1";
+    }
+
+    private static void FlattenJson(JsonElement el, string prefix, Dictionary<string, object> result)
+    {
+        if (el.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var prop in el.EnumerateObject())
+            {
+                var key = string.IsNullOrEmpty(prefix) ? prop.Name : $"{prefix}_{prop.Name}";
+                FlattenJson(prop.Value, key, result);
+            }
+        }
+        else
+        {
+            result[prefix] = el.ValueKind == JsonValueKind.String ? el.GetString() ?? "" : el.ToString();
+        }
+    }
+
+    private static List<object> ParseInputSettingsXml(string xml, Dictionary<string, string>? currentValues = null)
     {
         var result = new List<object>();
         try
@@ -357,12 +341,7 @@ public class ZpOrchestratorHandler : IScriptHandler
                 var key       = outputVar.Replace("{-Variable.", "").Replace("-}", "").Trim();
                 var label     = System.Text.RegularExpressions.Regex
                     .Replace(System.Net.WebUtility.HtmlDecode(name), "<[^>]+>", "").Trim();
-
-                // Берём актуальное значение из JSON если есть, иначе из XML
-                var value = (currentValues != null && currentValues.TryGetValue(key, out var cv))
-                    ? cv
-                    : xmlValue;
-
+                var value     = currentValues != null && currentValues.TryGetValue(key, out var cv) ? cv : xmlValue;
                 result.Add(new { type, key, label, value, outputVar, help });
             }
         }
@@ -370,17 +349,6 @@ public class ZpOrchestratorHandler : IScriptHandler
         return result;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private static async Task<JsonElement?> ReadJson(HttpListenerRequest request)
-    {
-        using var reader = new StreamReader(request.InputStream);
-        var body = await reader.ReadToEndAsync();
-        try { return JsonSerializer.Deserialize<JsonElement>(body); }
-        catch { return null; }
-    }
-
-    /// <summary>Конвертирует строки из Db.GetLines (разделители · и ¦) в List&lt;Dictionary&gt;.</summary>
     private static List<Dictionary<string, string>> RowsToJson(List<string> rows, List<string> columns)
     {
         var result = new List<Dictionary<string, string>>();
@@ -394,6 +362,14 @@ public class ZpOrchestratorHandler : IScriptHandler
             result.Add(dict);
         }
         return result;
+    }
+
+    private static async Task<JsonElement?> ReadJson(HttpListenerRequest request)
+    {
+        using var reader = new StreamReader(request.InputStream);
+        var body = await reader.ReadToEndAsync();
+        try { return JsonSerializer.Deserialize<JsonElement>(body); }
+        catch { return null; }
     }
 
     private static async Task WriteJson(HttpListenerResponse response, object data)

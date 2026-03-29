@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z3n8 | Cliplates</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Header ── */
+        .main-header {
+            background: var(--bg1, var(--surface));
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .main-header h1 { font-size: 14px; font-weight: 700; color: var(--accent); }
+        .header-sub { font-size: 10px; color: var(--text-dim, var(--text2)); }
+
+        /* ── Layout: tree left, editor right ── */
+        .layout {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            overflow: hidden;
+            height: calc(100vh - 37px);
+        }
+
+        /* ── Tree pane ── */
+        .tree-pane {
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tree-toolbar {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .tree-search {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 11px;
+            padding: 4px 8px;
+            outline: none;
+        }
+        .tree-search:focus { border-color: var(--accent); }
+
+        .tree-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 0;
+        }
+
+        /* ── Tree nodes ── */
+        .tree-node { user-select: none; }
+
+        .tree-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            margin: 1px 4px;
+            transition: background 0.08s;
+        }
+        .tree-row:hover { background: var(--bg2, var(--surface2, #21262d)); }
+        .tree-row.selected { background: var(--accent-dim, rgba(88,166,255,0.15)); color: var(--accent); }
+        .tree-row.leaf:hover .copy-hint { opacity: 1; }
+
+        .toggle-icon {
+            font-size: 9px;
+            color: var(--text-dim, var(--text2));
+            width: 10px;
+            flex-shrink: 0;
+            text-align: center;
+        }
+        .node-icon { font-size: 11px; flex-shrink: 0; }
+        .node-label {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 11px;
+        }
+        .copy-hint {
+            font-size: 9px;
+            color: var(--text-dim, var(--text2));
+            opacity: 0;
+            transition: opacity 0.1s;
+            flex-shrink: 0;
+        }
+        .tree-children { display: none; }
+        .tree-children.open { display: block; }
+
+        /* ── Editor pane ── */
+        .editor-pane {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-toolbar {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .editor-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-hi, var(--accent));
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .editor-title.placeholder { color: var(--text-dim, var(--text2)); font-weight: 400; }
+
+        .editor-body {
+            flex: 1;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+
+        /* ── Form ── */
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        .field-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim, var(--text2));
+        }
+
+        .field-row { display: flex; gap: 8px; }
+        .field-row .field-group { flex: 1; }
+
+        input[type=text], textarea {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 11px;
+            padding: 6px 8px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.1s;
+        }
+        input[type=text]:focus, textarea:focus { border-color: var(--accent); }
+
+        textarea#fContent {
+            min-height:500px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            padding: 4px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            background: var(--bg2, var(--surface2, #21262d));
+            color: var(--text);
+            transition: background 0.1s, border-color 0.1s;
+            white-space: nowrap;
+        }
+        .btn:hover { border-color: var(--text-dim, var(--text2)); }
+        .btn:disabled { opacity: 0.4; cursor: default; }
+        .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+        .btn.primary:hover { opacity: 0.85; }
+        .btn.danger { border-color: var(--red, #f85149); color: var(--red, #f85149); }
+        .btn.danger:hover { background: rgba(248,81,73,0.1); }
+        .btn.sm { padding: 2px 8px; font-size: 10px; }
+
+        .action-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        /* ── Empty state ── */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: var(--text-dim, var(--text2));
+        }
+        .empty-state .icon { font-size: 32px; opacity: 0.3; }
+        .empty-state p { font-size: 11px; }
+
+        /* ── Toast ── */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--surface, #161b22);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-size: 11px;
+            color: var(--text);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 9999;
+        }
+        #toast.show { opacity: 1; }
+        #toast.ok { border-color: var(--green, #3fb950); color: var(--green, #3fb950); }
+        #toast.err { border-color: var(--red, #f85149); color: var(--red, #f85149); }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* ── Depth indent ── */
+        .depth-0 .tree-row { padding-left: 8px; }
+        .depth-1 .tree-row { padding-left: 22px; }
+        .depth-2 .tree-row { padding-left: 36px; }
+        .depth-3 .tree-row { padding-left: 50px; }
+        .depth-4 .tree-row { padding-left: 64px; }
+    </style>
+</head>
+<body>
+
+<div class="main-header">
+    <h1>Cliplates</h1>
+    <span class="header-sub">Clipboard templates</span>
+    <button class="btn sm" style="margin-left:auto" onclick="openNew()">+ New</button>
+</div>
+
+<div class="layout">
+
+    <!-- ── Tree ── -->
+    <div class="tree-pane">
+        <div class="tree-toolbar">
+            <input class="tree-search" id="treeSearch" type="text" placeholder="Filter…" oninput="filterTree(this.value)">
+        </div>
+        <div class="tree-scroll" id="treeRoot"></div>
+    </div>
+
+    <!-- ── Editor ── -->
+    <div class="editor-pane">
+        <div class="editor-toolbar">
+            <span class="editor-title placeholder" id="editorTitle">Select or create a template</span>
+            <button class="btn sm danger" id="btnDelete" style="display:none" onclick="deleteSelected()">Delete</button>
+        </div>
+        <div class="editor-body" id="editorBody">
+            <div class="empty-state" id="emptyState">
+                <div class="icon">📋</div>
+                <p>No template selected</p>
+                <p>Click a leaf in the tree to view · Click + New to create</p>
+            </div>
+            <div id="editorForm" style="display:none; flex-direction:column; gap:10px;">
+                <div class="field-row">
+                    <div class="field-group">
+                        <div class="field-label">Path</div>
+                        <input type="text" id="fPath" placeholder="/Category/Subcategory">
+                    </div>
+                    <div class="field-group" style="max-width:180px;">
+                        <div class="field-label">Title</div>
+                        <input type="text" id="fTitle" placeholder="Template name">
+                    </div>
+                </div>
+                <div class="field-group">
+                    <div class="field-label">Content</div>
+                    <textarea id="fContent" placeholder="Template content…"></textarea>
+                </div>
+                <div class="action-row">
+                    <button class="btn primary" onclick="saveItem()">Save</button>
+                    <button class="btn" onclick="cancelEdit()">Cancel</button>
+                    <span id="saveStatus" style="font-size:10px;color:var(--text-dim,var(--text2));margin-left:4px;"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+    // ── State ────────────────────────────────────────────────────────────────
+    var _items   = [];   // raw records from server
+    var _editId  = null; // id of item being edited (null = new)
+    var _openPaths = {}; // collapsed state by virtual path key
+
+    // ── Boot ─────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', loadAll);
+
+    // ── API ──────────────────────────────────────────────────────────────────
+    async function loadAll() {
+        try {
+            var res  = await fetch('/clips');
+            var data = await res.json();
+            _items = data;
+            renderTree(_items);
+        } catch (e) {
+            toast('Load failed: ' + e.message, 'err');
+        }
+    }
+
+    async function apiCreate(payload) {
+        var res  = await fetch('/clips', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        return res.json();
+    }
+
+    async function apiUpdate(id, payload) {
+        var res = await fetch('/clips/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        return res.json();
+    }
+
+    async function apiDelete(id) {
+        var res = await fetch('/clips/' + id, { method: 'DELETE' });
+        return res.json();
+    }
+
+    // ── Tree build ───────────────────────────────────────────────────────────
+    // Items have: id, path (/A/B), title, content, created_at
+    // Virtual tree: path segments become folder nodes; leaves = items
+
+    function buildTree(items) {
+        var root = {};
+
+        items.forEach(function(item) {
+            var segments = (item.path || '').split('/').filter(Boolean);
+            var node = root;
+            segments.forEach(function(seg) {
+                if (!node[seg]) node[seg] = { _children: {}, _items: [] };
+                node = node[seg]._children;
+            });
+            // attach leaf to parent folder
+            var parent = root;
+            segments.forEach(function(seg) { parent = parent[seg]._children; });
+            // go back one level to place item
+            var leafParent = root;
+            segments.slice(0, -1).forEach(function(seg) { leafParent = leafParent[seg]._children; });
+            var lastSeg = segments[segments.length - 1];
+            if (lastSeg) {
+                if (!leafParent[lastSeg]) leafParent[lastSeg] = { _children: {}, _items: [] };
+                leafParent[lastSeg]._items.push(item);
+            } else {
+                // root-level items (no path)
+                if (!root['_root_items']) root['_root_items'] = [];
+                root['_root_items'].push(item);
+            }
+        });
+
+        return root;
+    }
+
+    function renderTree(items) {
+        var root = buildTree(items);
+        var container = document.getElementById('treeRoot');
+        container.innerHTML = '';
+
+        // root-level items (path = '' or '/')
+        if (root['_root_items']) {
+            root['_root_items'].forEach(function(item) {
+                container.appendChild(makeLeaf(item, 0));
+            });
+        }
+
+        renderFolders(root, container, 0, '');
+    }
+
+    function renderFolders(node, container, depth, pathPrefix) {
+        Object.keys(node).forEach(function(key) {
+            if (key === '_root_items') return;
+            var folder = node[key];
+            var fullPath = pathPrefix + '/' + key;
+            var folderEl = makeFolder(key, fullPath, depth);
+            container.appendChild(folderEl);
+
+            var childrenEl = folderEl.querySelector('.tree-children');
+
+            // items inside this folder
+            (folder._items || []).forEach(function(item) {
+                childrenEl.appendChild(makeLeaf(item, depth + 1));
+            });
+
+            // sub-folders
+            renderFolders(folder._children, childrenEl, depth + 1, fullPath);
+        });
+    }
+
+    function makeFolder(label, fullPath, depth) {
+        var isOpen = _openPaths[fullPath] !== false; // default open
+
+        var wrap = document.createElement('div');
+        wrap.className = 'tree-node depth-' + depth;
+
+        var row = document.createElement('div');
+        row.className = 'tree-row';
+        row.innerHTML =
+            '<span class="toggle-icon">' + (isOpen ? '▾' : '▸') + '</span>' +
+            '<span class="node-icon">📁</span>' +
+            '<span class="node-label">' + esc(label) + '</span>';
+
+        var children = document.createElement('div');
+        children.className = 'tree-children' + (isOpen ? ' open' : '');
+
+        row.onclick = function() {
+            var open = children.classList.toggle('open');
+            row.querySelector('.toggle-icon').textContent = open ? '▾' : '▸';
+            _openPaths[fullPath] = open;
+        };
+
+        wrap.appendChild(row);
+        wrap.appendChild(children);
+        return wrap;
+    }
+
+    function makeLeaf(item, depth) {
+        var wrap = document.createElement('div');
+        wrap.className = 'tree-node depth-' + depth;
+        wrap.dataset.id = item.id;
+
+        var row = document.createElement('div');
+        row.className = 'tree-row leaf';
+        row.innerHTML =
+            '<span class="toggle-icon"></span>' +
+            '<span class="node-icon">📄</span>' +
+            '<span class="node-label">' + esc(item.title) + '</span>' +
+            '<span class="copy-hint">copy</span>';
+
+        row.onclick = function(e) {
+            copyContent(item, row);
+        };
+
+        row.ondblclick = function(e) {
+            e.stopPropagation();
+            openEdit(item);
+        };
+
+        // right-click = edit
+        row.oncontextmenu = function(e) {
+            e.preventDefault();
+            openEdit(item);
+        };
+
+        wrap.appendChild(row);
+        return wrap;
+    }
+
+    // ── Copy ─────────────────────────────────────────────────────────────────
+    function copyContent(item, row) {
+        if (!item.content) { toast('No content', 'err'); return; }
+        navigator.clipboard.writeText(item.content).then(function() {
+            // flash selected
+            document.querySelectorAll('.tree-row.selected').forEach(function(el) {
+                el.classList.remove('selected');
+            });
+            row.classList.add('selected');
+            toast('✓ Copied: ' + item.title, 'ok');
+            setTimeout(function() { row.classList.remove('selected'); }, 1200);
+        }).catch(function() {
+            toast('Clipboard access denied', 'err');
+        });
+    }
+
+    // ── Editor ───────────────────────────────────────────────────────────────
+    function showEditor() {
+        document.getElementById('emptyState').style.display  = 'none';
+        document.getElementById('editorForm').style.display  = 'flex';
+    }
+
+    function hideEditor() {
+        document.getElementById('emptyState').style.display  = '';
+        document.getElementById('editorForm').style.display  = 'none';
+        document.getElementById('btnDelete').style.display   = 'none';
+        document.getElementById('editorTitle').textContent   = 'Select or create a template';
+        document.getElementById('editorTitle').className     = 'editor-title placeholder';
+        document.getElementById('saveStatus').textContent    = '';
+        _editId = null;
+    }
+
+    function openNew() {
+        _editId = null;
+        document.getElementById('fPath').value    = '';
+        document.getElementById('fTitle').value   = '';
+        document.getElementById('fContent').value = '';
+        document.getElementById('editorTitle').textContent = 'New template';
+        document.getElementById('editorTitle').className  = 'editor-title';
+        document.getElementById('btnDelete').style.display = 'none';
+        document.getElementById('saveStatus').textContent = '';
+        showEditor();
+        document.getElementById('fPath').focus();
+    }
+
+    function openEdit(item) {
+        _editId = item.id;
+        document.getElementById('fPath').value    = item.path    || '';
+        document.getElementById('fTitle').value   = item.title   || '';
+        document.getElementById('fContent').value = item.content || '';
+        document.getElementById('editorTitle').textContent = item.path + '/' + item.title;
+        document.getElementById('editorTitle').className  = 'editor-title';
+        document.getElementById('btnDelete').style.display = '';
+        document.getElementById('saveStatus').textContent = '';
+        showEditor();
+        document.getElementById('fContent').focus();
+    }
+
+    function cancelEdit() {
+        hideEditor();
+    }
+
+    async function saveItem() {
+        var path    = document.getElementById('fPath').value.trim();
+        var title   = document.getElementById('fTitle').value.trim();
+        var content = document.getElementById('fContent').value;
+
+        if (!title) { toast('Title is required', 'err'); return; }
+
+        var payload = { path: path, title: title, content: content };
+        var status  = document.getElementById('saveStatus');
+        status.textContent = 'Saving…';
+
+        try {
+            var data;
+            if (_editId === null) {
+                data = await apiCreate(payload);
+            } else {
+                data = await apiUpdate(_editId, payload);
+            }
+
+            if (data && data.ok === false) {
+                toast('Error: ' + data.error, 'err');
+                status.textContent = '';
+                return;
+            }
+
+            toast('✓ Saved', 'ok');
+            status.textContent = '';
+            hideEditor();
+            await loadAll();
+        } catch (e) {
+            toast('Request failed: ' + e.message, 'err');
+            status.textContent = '';
+        }
+    }
+
+    async function deleteSelected() {
+        if (_editId === null) return;
+        if (!await Dialog.confirm('Delete this template?')) return;
+
+        try {
+            var data = await apiDelete(_editId);
+            if (data && data.ok === false) {
+                toast('Error: ' + data.error, 'err');
+                return;
+            }
+            toast('Deleted', 'ok');
+            hideEditor();
+            await loadAll();
+        } catch (e) {
+            toast('Request failed: ' + e.message, 'err');
+        }
+    }
+
+    // ── Filter ───────────────────────────────────────────────────────────────
+    function filterTree(query) {
+        query = query.toLowerCase().trim();
+        if (!query) {
+            renderTree(_items);
+            return;
+        }
+        var filtered = _items.filter(function(item) {
+            return (item.title   || '').toLowerCase().includes(query)
+                || (item.path    || '').toLowerCase().includes(query)
+                || (item.content || '').toLowerCase().includes(query);
+        });
+        renderTree(filtered);
+        // expand all when filtering
+        document.querySelectorAll('.tree-children').forEach(function(el) {
+            el.classList.add('open');
+        });
+    }
+
+    // ── Utils ────────────────────────────────────────────────────────────────
+    function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    var _toastTimer = null;
+    function toast(msg, type) {
+        var el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className   = 'show' + (type ? ' ' + type : '');
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(function() { el.className = ''; }, 2200);
+    }
+</script>
+</body>
+</html>

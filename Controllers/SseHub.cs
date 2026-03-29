@@ -49,7 +49,7 @@ internal static class SseHub
 
     public static void BroadcastOutput(string line, string scheduleId)
     {
-        Console.WriteLine($"[SSE-OUT] broadcast scheduleId={scheduleId} subscribers={_output.Count} data={line[..Math.Min(50,line.Length)]}");
+        //Console.WriteLine($"[SSE-OUT] broadcast scheduleId={scheduleId} subscribers={_output.Count} data={line[..Math.Min(50,line.Length)]}");
         Broadcast(_output, line, scheduleId, isOutput: true);
     }
 

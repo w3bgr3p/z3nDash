@@ -118,7 +118,6 @@
     <div class="stat-card"><div class="stat-label">Profiles</div><div class="stat-value" id="statProfiles">—</div><div class="stat-sub">total</div></div>
     <div class="stat-card"><div class="stat-label">Proxies</div><div class="stat-value" id="statProxies">—</div><div class="stat-sub">configured</div></div>
     <div class="stat-card warn"><div class="stat-label">Threads</div><div class="stat-value" id="statThreads">—</div><div class="stat-sub">active</div></div>
-    <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value uptime" id="statUptime">—</div><div class="stat-sub">since connect</div></div>
 </div>
 
 <div class="tabs">
@@ -289,7 +288,7 @@
         if (!_connected) return;
         const ids = [...document.querySelectorAll('#instancesTbody tr[data-profileid]')].map(r => r.dataset.profileid).filter(Boolean);
         if (!ids.length) { toast('No running instances'); return; }
-        if (!confirm(`Stop ${ids.length} instance(s)?`)) return;
+        if (!await Dialog.confirm(`Stop ${ids.length} instance(s)?`)) return;
         try { await zbDelete('/browser_instances/delete_bulk?workspaceId=-1', ids); toast(`Stopped ${ids.length}`, 'ok'); await loadInstances(); }
         catch (e) { toast('Error: ' + e.message, 'err'); }
     });
@@ -345,7 +344,7 @@
         catch (e) { toast('Stop failed: ' + e.message, 'err'); btn.disabled = false; }
     }
     async function killInstance(pid, profileId, btn) {
-        if (!confirm(`Force kill PID ${pid}?\nZB API не используется — прямой Process.Kill.`)) return;
+        if (!await Dialog.confirm(`Force kill PID ${pid}?\nZB API не используется — прямой Process.Kill.`)) return;
         btn.disabled = true;
         try {
             const res = await serverKill(pid);
@@ -481,7 +480,7 @@
         if (!_connected) return;
         const tokens = [...document.querySelectorAll('#threadsTbody tr[data-token]')].map(r=>r.dataset.token).filter(Boolean);
         if (!tokens.length) { toast('No threads'); return; }
-        if (!confirm(`Free ${tokens.length} thread(s)?`)) return;
+        if (!await Dialog.confirm(`Free ${tokens.length} thread(s)?`)) return;
         try { await zbDelete('/threads/delete_bulk?workspaceId=-1', tokens); toast(`Freed ${tokens.length}`,'ok'); await loadThreads(); }
         catch (e) { toast('Error: '+e.message,'err'); }
     });
@@ -503,7 +502,11 @@
                 <td><button class="btn sm red" onclick="freeThread('${t.threadToken}',this)">Free</button></td>
             </tr>`;
             }).join('');
-        } catch (e) { tbody.innerHTML = `<tr><td colspan="4" class="empty">Error: ${e.message}</td></tr>`; }
+        } catch (e) {
+            document.getElementById('statThreads').textContent  = '?';
+            document.getElementById('threadsCount').textContent = '?';
+            tbody.innerHTML = `<tr><td colspan="4" class="empty">Error: ${e.message}</td></tr>`;
+        }
     }
     async function freeThread(token, btn) {
         btn.disabled = true;

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <title>z3n8 | Treasury</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'Iosevka', 'Consolas', monospace;
+            font-size: 11px; overflow: hidden; height: 100vh;
+            display: flex; flex-direction: column;
+        }
+        #app { width: 100%; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        /* ── Header ── */
+        .main-header {
+            background: var(--bg1); padding: 6px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+        }
+        .main-header h1 { font-size: 13px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+        .header-stats { display: flex; gap: 14px; font-size: 10px; color: var(--text2); margin-left: 8px; }
+        .stat-item { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+        .stat-label { color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; }
+        .stat-val   { color: var(--accent); font-weight: 600; }
+        .header-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+        /* ── Toolbar ── */
+        .toolbar {
+            background: var(--bg1); padding: 4px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        }
+        .toolbar-label { font-size: 10px; color: var(--text2); white-space: nowrap; }
+        .toolbar input[type=number], .toolbar select {
+            padding: 2px 5px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 3px; color: var(--text); font-size: 10px; font-family: inherit;
+        }
+        .toolbar input[type=number] { width: 60px; }
+        .toolbar input[type=number]:focus, .toolbar select:focus { outline: none; border-color: var(--accent); }
+        .toolbar-sep { width: 1px; height: 14px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+        .toolbar input[type=checkbox] { cursor: pointer; }
+
+        /* ── Buttons ── */
+        .btn { padding: 3px 9px; border-radius: 3px; border: 1px solid var(--border); cursor: pointer; font-size: 10px; background: var(--bg2); color: var(--text); font-family: inherit; white-space: nowrap; }
+        .btn:hover { background: var(--bg3, #30363d); }
+        .btn.danger  { background: transparent; color: var(--red, #f85149); border-color: var(--red, #f85149); }
+        .btn.danger:hover { background: rgba(248,81,73,0.1); }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { opacity: 0.85; }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── Multiselect ── */
+        .multiselect { position: relative; font-size: 10px; }
+        .ms-box {
+            padding: 2px 8px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 3px; cursor: pointer; display: flex; align-items: center; gap: 5px;
+            white-space: nowrap; color: var(--text); font-size: 10px; font-family: inherit;
+        }
+        .ms-box:hover { border-color: var(--accent); }
+        .ms-arrow { font-size: 7px; color: var(--text2); }
+        .ms-dropdown {
+            display: none; position: absolute; top: calc(100% + 2px); left: 0;
+            background: var(--bg1); border: 1px solid var(--border); border-radius: 4px;
+            padding: 4px; z-index: 300; max-height: 220px; overflow-y: auto; min-width: 120px;
+        }
+        .multiselect.open .ms-dropdown { display: block; }
+        .ms-dropdown label {
+            display: flex; align-items: center; gap: 5px;
+            padding: 2px 4px; cursor: pointer; color: var(--text); white-space: nowrap;
+            border-radius: 3px; font-size: 10px;
+        }
+        .ms-dropdown label:hover { background: var(--bg2); }
+        .ms-sep { border-bottom: 1px solid var(--border); margin: 3px 0; }
+
+        /* ── Main layout: table + sidebar ── */
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── Table ── */
+        .table-wrapper { flex: 1; overflow: auto; position: relative; }
+        .table-container { display: inline-block; min-width: 100%; padding: 4px 8px; }
+
+        table { border-collapse: separate; border-spacing: 0; font-size: 9px; }
+        th, td { border: 1px solid var(--border, #21262d); padding: 0; text-align: center; }
+
+        th {
+            background: var(--bg1); color: var(--text2); font-weight: 600;
+            position: sticky; top: 0; z-index: 10;
+            padding: 3px 4px; text-transform: uppercase; letter-spacing: 0.3px;
+            font-size: 8px; white-space: nowrap;
+        }
+        th.id-col      { position: sticky; left: 0; z-index: 11; width: 35px; }
+        th.address-col { position: sticky; left: 35px; z-index: 11; min-width: 150px; text-align: left; }
+
+        td.id-cell {
+            position: sticky; left: 0; z-index: 5;
+            background: var(--bg); font-weight: 600; color: var(--accent);
+            padding: 4px; border-right: 2px solid var(--border); width: 35px; font-size: 9px;
+        }
+        td.address-cell {
+            position: sticky; left: 35px; z-index: 5;
+            background: var(--bg); font-family: 'Courier New', monospace;
+            font-size: 9px; padding: 4px 6px; text-align: left; color: var(--text);
+            border-right: 2px solid var(--border); white-space: nowrap; min-width: 150px;
+        }
+        .address-link { color: var(--text); text-decoration: none; }
+        .address-link:hover { color: var(--accent); text-decoration: underline; }
+
+        /* ── Chain icon in header ── */
+        .chain-icon { width: 14px; height: 14px; display: block; margin: 0 auto; }
+
+        /* ── Heatmap cells ── */
+        .cell-wrapper { padding: 2px; }
+        .heatmap-cell {
+            width: 14px; height: 14px;
+            cursor: pointer; border-radius: 2px;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; margin: 0 auto;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .heatmap-cell:hover { transform: scale(1.4); z-index: 100; box-shadow: 0 0 10px rgba(88,166,255,0.6); }
+        .heatmap-cell.empty { background: transparent; border: none; }
+        .heatmap-cell.level-1 { background: #0e4429; border: 1px solid #0e4429; width: auto; min-width: 14px; padding: 0 3px; }
+        .heatmap-cell.level-2 { background: #006d32; border: 1px solid #006d32; width: auto; min-width: 14px; padding: 0 3px; }
+        .heatmap-cell.level-3 { background: #26a641; border: 1px solid #26a641; width: auto; min-width: 14px; padding: 0 3px; }
+        .heatmap-cell.level-4 { background: #39d353; border: 1px solid #39d353; width: auto; min-width: 14px; padding: 0 3px; }
+        .cell-value {
+            font-size: 8px; color: #fff; font-weight: 700;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.9); line-height: 1; pointer-events: none; white-space: nowrap;
+        }
+
+        /* ── Action buttons in rows ── */
+        .swap-btn, .bridge-btn {
+            width: 18px; height: 18px; border-radius: 2px; border: 1px solid var(--border);
+            background: var(--bg2); color: var(--text2); cursor: pointer;
+            font-size: 10px; display: flex; align-items: center; justify-content: center;
+            margin: 0 auto; font-family: inherit;
+        }
+        .swap-btn:hover   { background: rgba(63,185,80,0.2); color: var(--green,#3fb950); border-color: var(--green,#3fb950); }
+        .bridge-btn:hover { background: rgba(56,139,253,0.2); color: var(--accent); border-color: var(--accent); }
+        td.action-col { background: var(--bg); border-left: 2px solid var(--border); padding: 2px; }
+
+        /* ── Sidebar resizer ── */
+        .sidebar-resizer {
+            width: 4px; flex-shrink: 0; cursor: col-resize;
+            background: transparent; transition: background 0.15s;
+        }
+        .sidebar-resizer:hover { background: var(--accent); opacity: 0.5; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 220px; flex-shrink: 0;
+            border-left: 1px solid var(--border);
+            background: var(--bg1);
+            display: flex; flex-direction: column;
+            overflow-y: auto; font-size: 10px;
+        }
+        .sidebar-section { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+        .sidebar-title {
+            font-size: 9px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--accent); margin-bottom: 6px;
+        }
+
+        /* Top tokens */
+        .token-row { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; }
+        .token-info { display: flex; flex-direction: column; gap: 1px; }
+        .token-sym  { color: var(--text); font-weight: 600; font-size: 10px; }
+        .token-accs { color: var(--text2); font-size: 8px; }
+        .token-vals { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+        .token-usd  { color: var(--text); font-weight: 600; font-size: 10px; }
+        .token-pct  { color: var(--text2); font-size: 8px; }
+        .progress-bar { height: 2px; background: var(--bg2); border-radius: 1px; margin-bottom: 3px; }
+        .progress-fill { height: 100%; background: var(--accent); border-radius: 1px; }
+
+        /* Chain stats */
+        .chain-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+        .chain-stat-left { display: flex; align-items: center; gap: 5px; }
+        .chain-stat-icon { width: 12px; height: 12px; flex-shrink: 0; }
+        .chain-stat-name { color: var(--text2); font-size: 9px; }
+        .chain-stat-val  { color: var(--text); font-weight: 600; font-size: 9px; }
+
+        /* Portfolio summary */
+        .summary-row { display: flex; justify-content: space-between; padding: 2px 0; }
+        .summary-key { color: var(--text2); }
+        .summary-val { color: var(--accent); font-weight: 600; }
+        .summary-val.yellow { color: var(--yellow, #e3b341); }
+
+        /* ── AI Report section ── */
+        .ai-controls { display: flex; flex-direction: column; gap: 5px; }
+        .ai-model-row { display: flex; gap: 4px; align-items: center; }
+        .ai-model-row select {
+            flex: 1; padding: 2px 4px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 3px; color: var(--text); font-size: 9px; font-family: inherit; outline: none;
+        }
+        .ai-model-row select:focus { border-color: var(--accent); }
+        .ai-btn-row { display: flex; gap: 4px; }
+        .ai-btn-row .btn { flex: 1; font-size: 9px; padding: 3px 4px; }
+        .ai-result {
+            margin-top: 6px; padding: 6px; background: var(--bg);
+            border: 1px solid var(--border); border-radius: 3px;
+            font-size: 9px; line-height: 1.55; color: var(--text);
+            white-space: pre-wrap; max-height: 300px; overflow-y: auto;
+            display: none;
+        }
+        .ai-result.show { display: block; }
+        .ai-result.loading { color: var(--text2); font-style: italic; }
+        .ai-result.error   { color: var(--red, #f85149); }
+        .ai-meta {
+            margin-top: 4px; font-size: 8px; color: var(--text2);
+            display: flex; justify-content: space-between; display: none;
+        }
+        .ai-meta.show { display: flex; }
+        .spinner-inline {
+            display: inline-block; width: 8px; height: 8px;
+            border: 1px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Legend ── */
+        .legend {
+            padding: 4px 14px; background: var(--bg1); border-top: 1px solid var(--border);
+            display: flex; gap: 10px; align-items: center; font-size: 9px; color: var(--text2); flex-shrink: 0;
+        }
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .legend-box  { width: 10px; height: 10px; border-radius: 2px; }
+
+        /* ── Tooltip ── */
+        .tooltip {
+            position: fixed; background: #1c2128; border: 2px solid var(--accent, #58a6ff);
+            border-radius: 6px; padding: 10px; max-width: 350px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.7); z-index: 1000;
+            pointer-events: none; opacity: 0; transition: opacity 0.12s; font-size: 10px;
+        }
+        .tooltip.show { opacity: 1; }
+        .tooltip-header { font-weight: 600; color: var(--accent,#58a6ff); margin-bottom: 6px; font-size: 11px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+        .tooltip-address { font-size: 9px; color: var(--text2); font-family: 'Courier New', monospace; margin-bottom: 8px; }
+        .tooltip-content { max-height: 250px; overflow-y: auto; }
+        .token-item { display: flex; justify-content: space-between; padding: 3px 5px; margin: 2px 0; background: rgba(48,54,61,0.4); border-radius: 3px; border-left: 2px solid #238636; font-size: 9px; }
+        .token-left { display: flex; flex-direction: column; gap: 1px; }
+        .token-symbol { font-weight: 600; color: #7ee787; font-size: 9px; }
+        .token-amount { color: var(--text2); font-size: 8px; font-family: 'Courier New', monospace; }
+        .token-value  { color: #ffd700; font-weight: 600; font-size: 9px; white-space: nowrap; }
+        .total-value  { margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--border); font-weight: 600; color: #ffd700; text-align: right; }
+
+        /* ── Update status ── */
+        .upd-status { font-size: 9px; padding: 2px 7px; border-radius: 3px; background: rgba(63,185,80,0.15); color: var(--green,#3fb950); display: none; }
+        .upd-status.active { display: inline-block; animation: blink 1.2s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        /* ── Loading ── */
+        .loading-overlay { position: fixed; inset: 0; background: rgba(13,17,23,0.7); display: flex; align-items: center; justify-content: center; z-index: 500; font-size: 12px; color: var(--accent); }
+        .loading-overlay.hidden { display: none; }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border,#30363d); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text2,#484f58); }
+    </style>
+</head>
+<body>
+<div id="app">
+
+    <div id="loadingOverlay" class="loading-overlay">Loading treasury...</div>
+
+    <!-- Header -->
+    <div class="main-header">
+        <h1>Treasury</h1>
+        <div class="header-stats">
+            <div class="stat-item"><span class="stat-label">Accounts:</span><span class="stat-val" id="sAccounts">-</span></div>
+            <div class="stat-item"><span class="stat-label">Active:</span><span class="stat-val" id="sActive">-</span></div>
+            <div class="stat-item"><span class="stat-label">Chains:</span><span class="stat-val" id="sChains">-</span></div>
+            <div class="stat-item"><span class="stat-label">Total:</span><span class="stat-val" id="sTotal">$0</span></div>
+        </div>
+        <div class="header-right">
+            <span class="upd-status" id="updStatus">Updating...</span>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button class="btn" onclick="refreshData()">Refresh</button>
+        <button class="btn" id="autoBtn" onclick="toggleAuto()">Auto: <span id="autoTxt">OFF</span></button>
+        <div class="toolbar-sep"></div>
+        <span class="toolbar-label">Max ID</span>
+        <input type="number" id="maxId" value="100" min="1" max="10000">
+        <div class="toolbar-sep"></div>
+        <button class="btn danger" onclick="startUpdate()">Update Balances</button>
+        <span class="toolbar-label">Concurrency</span>
+        <input type="number" id="concurrency" value="5" min="1" max="20" style="width:44px">
+        <div class="toolbar-sep"></div>
+        <div class="multiselect" id="ms">
+            <div class="ms-box" onclick="toggleMs()">
+                <span id="msLabel">All Chains</span>
+                <span class="ms-arrow">v</span>
+            </div>
+            <div class="ms-dropdown" id="msDropdown"></div>
+        </div>
+        <div class="toolbar-sep"></div>
+        <span class="toolbar-label">Bridge to:</span>
+        <select id="bridgeDest" style="width:80px"></select>
+        <span class="toolbar-label">Threshold:</span>
+        <input type="number" id="threshold" value="0.1" min="0" step="0.01" style="width:55px">
+        <label style="display:flex;align-items:center;gap:4px;color:var(--text2);font-size:10px;">
+            <input type="checkbox" id="exStables"> Excl. Stables
+        </label>
+    </div>
+
+    <!-- Main: table + sidebar -->
+    <div class="main-content">
+        <div class="table-wrapper">
+            <div class="table-container" id="tableContainer"></div>
+        </div>
+
+        <!-- Sidebar resizer -->
+        <div class="sidebar-resizer" id="sidebarResizer"></div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebarPanel">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Top Tokens</div>
+                <div id="topTokens"></div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-title">Chains Distribution</div>
+                <div id="chainStats"></div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-title">Portfolio Summary</div>
+                <div id="portfolioSummary"></div>
+            </div>
+
+            <!-- AI Report -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">AI Report</div>
+                <div class="ai-controls">
+                    <div class="ai-model-row">
+                        <select id="aiModel"><option value="">-- loading --</option></select>
+                    </div>
+                    <div class="ai-btn-row">
+                        <button class="btn primary" id="aiBtnRun" onclick="aiAnalyze()">Analyze</button>
+                        <button class="btn danger"  id="aiBtnClear" onclick="aiClearCache()" style="display:none">Clear</button>
+                    </div>
+                    <div class="ai-result"  id="aiResult"></div>
+                    <div class="ai-meta"    id="aiMeta">
+                        <span id="aiMetaModel"></span>
+                        <span id="aiMetaTs"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+        <span>Less</span>
+        <div class="legend-item"><div class="legend-box" style="background:var(--bg1);border:1px dashed var(--border);"></div></div>
+        <div class="legend-item"><div class="legend-box" style="background:#0e4429;"></div></div>
+        <div class="legend-item"><div class="legend-box" style="background:#006d32;"></div></div>
+        <div class="legend-item"><div class="legend-box" style="background:#26a641;"></div></div>
+        <div class="legend-item"><div class="legend-box" style="background:#39d353;"></div></div>
+        <span>More</span>
+    </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip">
+    <div class="tooltip-header"  id="tipHeader"></div>
+    <div class="tooltip-address" id="tipAddr"></div>
+    <div class="tooltip-content" id="tipContent"></div>
+</div>
+
+<script>
+    const API = window.location.origin;
+
+    const DEBANK_ICONS = {
+        monad:'fd667522b8e0d6504ca07696f4d5c064', plasma:'baafefce3b9d43b12b0c016f30aff140',
+        bera:'89db55160bb8bbb19464cabf17e465bc', ape:'290d3884861ae5e09394c913f788168d',
+        blast:'15132294afd38ce980639a381ee30149', flr:'9ee03d5d7036ad9024e81d55596bb4dc',
+        core:'ccc02f660e5dd410b23ca3250ae7c060', ron:'6e0f509804bc83bf042ef4d674c1c5ee',
+        nova:'06eb2b7add8ba443d5b219c04089c326', klay:'4182ee077031d843a57e42746c30c072',
+        mobm:'fcfe3dee0e55171580545cf4d4940257', metis:'7485c0a61c1e05fdf707113b6b6ac917',
+        celo:'faae2c36714d55db1d7a36aba5868f6a', xdai:'43c1e09e93e68c9f0f3b132976394529',
+        uni:'7e9011cb7bd0d19deb7727280aa5c8b1', soneium:'35014ebaa414b336a105ff2115ba2116',
+        ink:'af5b553a5675342e28bdb794328e8727', gravity:'fa9a1d29f671b85a653f293893fa27e3',
+        cyber:'3a3c0c5da5fa8876c8c338afae0db478', taiko:'7723fbdb38ef181cd07a8b8691671e6b',
+        bob:'4e0029be99877775664327213a8da60e', itze:'ce3a511dc511053b1b35bb48166a5d39',
+        zeta:'d0e1b5e519d99c452a30e83a1263d1d0', opbnb:'07e2e686e363a842d0982493638e1285',
+        scrl:'1fa5c7e0bfd353ed0a97c1476c9c42d2', manta:'0e25a60b96a29d6a5b9e524be7565845',
+        mnt:'0af11a52431d60ded59655c7ca7e1475', linea:'32d4ff2cf92c766ace975559c232179c',
+        base:'ccc1513e4f390542c4fb2f4b88ce9579', zora:'de39f62c4489a2359d5e1198a8e02ef1',
+        era:'2cfcd0c8436b05d811b03935f6c1d7da', arb:'854f629937ce94bebeb2cd38fb336de7',
+        op:'68bef0c9f75488f4e302805ef9c8fc84', avax:'4d1649e8a0c7dec9de3491b81807d402',
+        ftm:'14133435f89637157a4405e954e1b1b2', matic:'52ca152c08831e4765506c9bd75767e8',
+        bsc:'bc73fa84b7fc5337905e527dadcbc854', eth:'42ba589cd077e7bdd97db6480b0ff61d',
+    };
+    function chainIconUrl(key) {
+        const h = DEBANK_ICONS[key.toLowerCase()];
+        if (!h) return '';
+        return `https://static.debank.com/image/chain/logo_url/${key.toLowerCase()}/${h}.png`;
+    }
+
+    let data        = [];
+    let knownChains = [];
+    let pollTimer   = null;
+    let autoTimer   = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initSidebarResizer();
+        refreshData();
+        aiLoadModels();
+        aiLoadCache();
+    });
+
+    function initSidebarResizer() {
+        const resizer = document.getElementById('sidebarResizer');
+        const sidebar = document.getElementById('sidebarPanel');
+        let dragging = false, startX, startW;
+        resizer.addEventListener('mousedown', function(e) {
+            dragging = true; startX = e.clientX; startW = sidebar.offsetWidth;
+            document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('mousemove', function(e) {
+            if (!dragging) return;
+            sidebar.style.width = Math.max(160, startW - (e.clientX - startX)) + 'px';
+        });
+        document.addEventListener('mouseup', function() {
+            if (dragging) {
+                dragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+    }
+
+    // ── Data ──────────────────────────────────────────────────────────────────────
+    async function refreshData() {
+        loading(true);
+        try {
+            const r = await fetch(`${API}/treasury/data?maxId=${maxId()}`);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            data = await r.json();
+            render();
+        } catch(e) {
+            document.getElementById('tableContainer').textContent = 'Error: ' + e.message;
+        } finally {
+            loading(false);
+        }
+    }
+
+    async function startUpdate() {
+        const r = await fetch(`${API}/treasury/update?maxId=${maxId()}&concurrency=${conc()}`, { method:'POST' });
+        if (!r.ok) return;
+        document.getElementById('updStatus').classList.add('active');
+        clearInterval(pollTimer);
+        pollTimer = setInterval(async () => {
+            const s = await fetch(`${API}/treasury/status`).then(r=>r.json()).catch(()=>null);
+            if (!s) return;
+            document.getElementById('sAccounts').textContent = s.running ? `${s.processed}/${s.total}` : s.processed;
+            if (!s.running) {
+                clearInterval(pollTimer);
+                document.getElementById('updStatus').classList.remove('active');
+                await refreshData();
+            }
+        }, 1500);
+    }
+
+    function toggleAuto() {
+        if (autoTimer) {
+            clearInterval(autoTimer); autoTimer = null;
+            document.getElementById('autoTxt').textContent = 'OFF';
+        } else {
+            autoTimer = setInterval(refreshData, 5000);
+            document.getElementById('autoTxt').textContent = 'ON';
+        }
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────────
+    function render() {
+        const allChains = [...new Set(data.flatMap(a => Object.keys(a.chainData||{})))].sort();
+        const sel       = getSelected();
+        const chains    = sel.length ? allChains.filter(c=>sel.includes(c)) : allChains;
+
+        if (allChains.join() !== knownChains.join()) {
+            knownChains = allChains;
+            buildDropdown(allChains);
+            buildBridgeDest(allChains);
+        }
+
+        const active   = data.filter(a=>Object.keys(a.chainData||{}).length>0).length;
+        const totalVal = data.reduce((s,a)=>s+(a.totalUsd||0),0);
+        document.getElementById('sAccounts').textContent = data.length;
+        document.getElementById('sActive').textContent   = active;
+        document.getElementById('sChains').textContent   = chains.length;
+        document.getElementById('sTotal').textContent    = fmtUSD(totalVal);
+
+        function lvl(v) {
+            if (!v) return 'empty';
+            if (v>=100) return 'level-4';
+            if (v>=10)  return 'level-3';
+            if (v>=1)   return 'level-2';
+            return 'level-1';
+        }
+
+        let h = '<table><thead><tr>';
+        h += '<th class="id-col">ID</th>';
+        h += '<th class="address-col">Address</th>';
+        chains.forEach(c => {
+            const icon = chainIconUrl(c);
+            h += `<th title="${c}"><img src="${icon}" alt="${c}" class="chain-icon" onerror="this.style.display='none';this.parentElement.textContent='${c.substring(0,3)}'"></th>`;
+        });
+        h += `<th style="border-left:2px solid var(--border);">TTL</th>`;
+        h += `<th style="border-left:2px solid var(--border);">SWP</th>`;
+        h += `<th>BRG</th>`;
+        h += '</tr></thead><tbody>';
+
+        data.forEach(a => {
+            h += '<tr>';
+            h += `<td class="id-cell">${a.id}</td>`;
+            h += `<td class="address-cell" title="${a.address}"><a href="https://debank.com/profile/${a.address}" target="_blank" class="address-link">${a.address}</a></td>`;
+
+            chains.forEach(c => {
+                const tokens = a.chainData?.[c]||[];
+                const v      = tot(tokens);
+                const lbl    = v>=1 ? fmtC(v) : '';
+                const tj     = tokens.length ? JSON.stringify(tokens).replace(/'/g,"&#39;") : '[]';
+                h += `<td><div class="cell-wrapper"><div class="heatmap-cell ${lvl(v)}"
+                data-id="${a.id}" data-addr="${a.address}" data-chain="${c}" data-tokens='${tj}'>`;
+                if (lbl) h += `<span class="cell-value">${lbl}</span>`;
+                h += `</div></div></td>`;
+            });
+
+            const atot = Object.values(a.chainData||{}).reduce((s,t)=>s+tot(t),0);
+            h += `<td class="action-col"><div class="cell-wrapper"><div class="heatmap-cell ${lvl(atot)}">${atot>=1?'<span class="cell-value" style="font-weight:700;">'+fmtC(atot)+'</span>':''}</div></div></td>`;
+            h += `<td class="action-col"><button class="swap-btn" onclick="swapAll(${a.id})">S</button></td>`;
+            h += `<td class="action-col"><button class="bridge-btn" onclick="bridgeTo(${a.id})">B</button></td>`;
+            h += '</tr>';
+        });
+
+        h += '</tbody></table>';
+        document.getElementById('tableContainer').innerHTML = h;
+        bindTooltips();
+        updateSidebar(data);
+    }
+
+    // ── Sidebar ───────────────────────────────────────────────────────────────────
+    function updateSidebar(data) {
+        const tagg = {}; let totVal = 0;
+        data.forEach(a => Object.values(a.chainData||{}).forEach(tokens => tokens.forEach(t => {
+            const sym = t.symbol??t.Symbol??'';
+            const v   = t.valueUsd??t.ValueUsd??0;
+            if (!tagg[sym]) tagg[sym] = { sym, val:0, accs: new Set() };
+            tagg[sym].val += v;
+            tagg[sym].accs.add(a.id);
+            totVal += v;
+        })));
+        const topToks = Object.values(tagg).sort((a,b)=>b.val-a.val).slice(0,15);
+        document.getElementById('topTokens').innerHTML = topToks.map(t => {
+            const pct = totVal ? ((t.val/totVal)*100).toFixed(1) : 0;
+            return `<div class="token-row">
+            <div class="token-info"><span class="token-sym">${t.sym}</span><span class="token-accs">${t.accs.size} accounts</span></div>
+            <div class="token-vals"><span class="token-usd">${fmtUSD(t.val)}</span><span class="token-pct">${pct}%</span></div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`;
+        }).join('');
+
+        const cagg = {};
+        data.forEach(a => Object.entries(a.chainData||{}).forEach(([c,tokens]) => {
+            if (!cagg[c]) cagg[c] = { name:c, val:0, accs:0 };
+            cagg[c].val += tot(tokens);
+            cagg[c].accs++;
+        }));
+        const topChains = Object.values(cagg).sort((a,b)=>b.val-a.val).slice(0,10);
+        document.getElementById('chainStats').innerHTML = topChains.map(c => {
+            const icon = chainIconUrl(c.name);
+            return `<div class="chain-stat-row">
+            <div class="chain-stat-left">
+                <img src="${icon}" class="chain-stat-icon" onerror="this.style.display='none'">
+                <span class="chain-stat-name">${c.name}</span>
+            </div>
+            <span class="chain-stat-val">${fmtUSD(c.val)}</span>
+        </div>`;
+        }).join('');
+
+        const uToks   = new Set(Object.values(tagg).map(t=>t.sym));
+        const uChains = new Set(Object.keys(cagg));
+        const actAcc  = data.filter(a=>Object.keys(a.chainData||{}).length>0).length;
+        document.getElementById('portfolioSummary').innerHTML = `
+        <div class="summary-row"><span class="summary-key">Total Value:</span><span class="summary-val yellow">${fmtUSD(totVal)}</span></div>
+        <div class="summary-row"><span class="summary-key">Unique Tokens:</span><span class="summary-val">${uToks.size}</span></div>
+        <div class="summary-row"><span class="summary-key">Unique Chains:</span><span class="summary-val">${uChains.size}</span></div>
+        <div class="summary-row"><span class="summary-key">Active Accounts:</span><span class="summary-val">${actAcc}</span></div>`;
+    }
+
+    // ── Actions ───────────────────────────────────────────────────────────────────
+    async function swapAll(id) {
+        const chains = getSelected();
+        const r = await fetch(`${API}/treasury/swap-chains`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ id, chains, threshold: parseFloat(document.getElementById('threshold').value)||0.1,
+                excludeStables: document.getElementById('exStables').checked })
+        });
+        console.log('[treasury] swap', id, r.status);
+    }
+
+    async function bridgeTo(id) {
+        const dest = document.getElementById('bridgeDest').value;
+        if (!dest) return;
+        const chains = getSelected();
+        const r = await fetch(`${API}/treasury/bridge-chains`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ id, chains, destination: dest, threshold: parseFloat(document.getElementById('threshold').value)||0.1 })
+        });
+        console.log('[treasury] bridge', id, dest, r.status);
+    }
+
+    // ── AI Report ─────────────────────────────────────────────────────────────────
+
+    async function aiLoadModels() {
+        try {
+            const r    = await fetch(`${API}/ai-report/api/models`);
+            const body = await r.json();
+            const sel  = document.getElementById('aiModel');
+            if (body.models && body.models.length) {
+                sel.innerHTML = body.models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+            } else {
+                sel.innerHTML = '<option value="">No models</option>';
+            }
+        } catch(e) {
+            document.getElementById('aiModel').innerHTML = `<option value="">Error</option>`;
+        }
+    }
+
+    async function aiLoadCache() {
+        try {
+            const r    = await fetch(`${API}/treasury/ai-cache`);
+            const body = await r.json();
+            if (body.entry) aiShowResult(body.entry.analysis, body.entry.model, body.entry.ts, true);
+        } catch(e) {}
+    }
+
+    async function aiAnalyze() {
+        if (!data.length) return;
+
+        const model = document.getElementById('aiModel').value;
+        const btn   = document.getElementById('aiBtnRun');
+
+        btn.disabled = true;
+        aiSetLoading();
+
+        try {
+            const r = await fetch(`${API}/treasury/ai-analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model, data })
+            });
+            const body = await r.json();
+            if (body.error) {
+                aiSetError(body.error);
+            } else {
+                aiShowResult(body.analysis, body.model, body.ts, false);
+            }
+        } catch(e) {
+            aiSetError(e.message);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function aiClearCache() {
+        try {
+            await fetch(`${API}/treasury/ai-cache`, { method: 'DELETE' });
+        } catch(e) {}
+        const res  = document.getElementById('aiResult');
+        const meta = document.getElementById('aiMeta');
+        const btn  = document.getElementById('aiBtnClear');
+        res.classList.remove('show');
+        meta.classList.remove('show');
+        btn.style.display = 'none';
+    }
+
+    function aiSetLoading() {
+        const res = document.getElementById('aiResult');
+        res.className   = 'ai-result show loading';
+        res.innerHTML   = '<span class="spinner-inline"></span> Analyzing...';
+        document.getElementById('aiMeta').classList.remove('show');
+        document.getElementById('aiBtnClear').style.display = 'none';
+    }
+
+    function aiSetError(msg) {
+        const res = document.getElementById('aiResult');
+        res.className   = 'ai-result show error';
+        res.textContent = msg;
+    }
+
+    function aiShowResult(analysis, model, ts, cached) {
+        const res  = document.getElementById('aiResult');
+        const meta = document.getElementById('aiMeta');
+        const btn  = document.getElementById('aiBtnClear');
+
+        res.className   = 'ai-result show';
+        res.textContent = analysis;
+
+        document.getElementById('aiMetaModel').textContent = model ? model.split('/').pop() : '';
+        document.getElementById('aiMetaTs').textContent    = ts ? ts.substring(0,16).replace('T',' ') : '';
+        meta.classList.add('show');
+
+        btn.style.display = 'inline-block';
+    }
+
+    // ── Tooltip ───────────────────────────────────────────────────────────────────
+    function bindTooltips() {
+        const tip = document.getElementById('tooltip');
+        document.querySelectorAll('.heatmap-cell').forEach(cell => {
+            cell.addEventListener('mouseenter', e => {
+                const c      = e.currentTarget;
+                const tokens = JSON.parse(c.dataset.tokens||'[]');
+                if (!tokens.length || !c.dataset.chain) return;
+                document.getElementById('tipHeader').textContent = `#${c.dataset.id} - ${c.dataset.chain}`;
+                document.getElementById('tipAddr').textContent   = c.dataset.addr||'';
+                const total = tot(tokens);
+                document.getElementById('tipContent').innerHTML = tokens.map(t => {
+                    const sym = t.symbol??t.Symbol??'';
+                    const v   = t.valueUsd??t.ValueUsd??0;
+                    const raw = t.amount??t.Amount??0;
+                    const dec = t.decimals??t.Decimals??18;
+                    const amt = typeof raw==='number' ? raw.toFixed(4) : (parseFloat(raw)/Math.pow(10,dec)).toFixed(4);
+                    return `<div class="token-item">
+                    <div class="token-left"><span class="token-symbol">${sym}</span><span class="token-amount">${amt}</span></div>
+                    <span class="token-value">${fmtUSD(v)}</span>
+                </div>`;
+                }).join('') + `<div class="total-value">Total: ${fmtUSD(total)}</div>`;
+                moveTip(e); tip.classList.add('show');
+            });
+            cell.addEventListener('mouseleave', ()=>tip.classList.remove('show'));
+            cell.addEventListener('mousemove', moveTip);
+        });
+    }
+
+    function moveTip(e) {
+        const tip=document.getElementById('tooltip'), off=12;
+        let x=e.clientX+off, y=e.clientY+off;
+        const r=tip.getBoundingClientRect();
+        if(x+r.width>window.innerWidth)   x=e.clientX-r.width-off;
+        if(y+r.height>window.innerHeight)  y=e.clientY-r.height-off;
+        tip.style.left=x+'px'; tip.style.top=y+'px';
+    }
+
+    // ── Chain filter ──────────────────────────────────────────────────────────────
+    function buildDropdown(chains) {
+        document.getElementById('msDropdown').innerHTML =
+            `<label><input type="checkbox" id="msAll" onchange="toggleAll(this)"> <strong>All</strong></label>
+         <div class="ms-sep"></div>` +
+            chains.map(c=>`<label><input type="checkbox" class="ms-cb" value="${c}" onchange="onCbChange()"> ${c}</label>`).join('');
+    }
+    function buildBridgeDest(chains) {
+        document.getElementById('bridgeDest').innerHTML = chains.map(c=>`<option value="${c}">${c}</option>`).join('');
+    }
+    function toggleMs()  { document.getElementById('ms').classList.toggle('open'); }
+    window.addEventListener('click', e=>{ if(!e.target.closest('#ms')) document.getElementById('ms').classList.remove('open'); });
+    function getSelected() { return [...document.querySelectorAll('.ms-cb:checked')].map(c=>c.value); }
+    function toggleAll(src) { document.querySelectorAll('.ms-cb').forEach(c=>c.checked=src.checked); onCbChange(); }
+    function onCbChange() {
+        const sel=getSelected(), sa=document.getElementById('msAll');
+        if(sa) sa.checked=sel.length===document.querySelectorAll('.ms-cb').length;
+        document.getElementById('msLabel').textContent=sel.length?`Selected: ${sel.length}`:'All Chains';
+        render();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────────
+    const tot     = t  => (t||[]).reduce((s,x)=>s+(x.valueUsd??x.ValueUsd??0),0);
+    const maxId   = () => +document.getElementById('maxId').value||100;
+    const conc    = () => +document.getElementById('concurrency').value||5;
+    const loading = v  => document.getElementById('loadingOverlay').classList.toggle('hidden',!v);
+    function fmtUSD(v) { return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(v); }
+    function fmtC(v) {
+        if(v>=1000) return (v/1000).toFixed(1)+'k';
+        if(v>=100)  return v.toFixed(0);
+        if(v>=10)   return v.toFixed(1);
+        if(v>=1)    return v.toFixed(2);
+        return v.toFixed(3);
+    }
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+</script>
+</body>
+</html>

@@ -16,30 +16,37 @@
         <RuntimeIdentifier>win-x64</RuntimeIdentifier>
         <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
         <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
-    </PropertyGroup>
-    
-    
-
-    <ItemGroup>
-        <PackageReference Include="Microsoft.Playwright" Version="1.58.0" />
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-        <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3800.47" />
-        
-        <PackageReference Include="Npgsql" Version="10.0.1" />
-        <PackageReference Include="System.Data.Odbc" Version="10.0.2" />
-        <PackageReference Include="System.Management" Version="10.0.0-rc.2.25502.107" />
-
-        <PackageReference Include="Nethereum.ABI" Version="4.29.0.0" />
-        <PackageReference Include="Nethereum.HdWallet" Version="4.29.0.0" />
-        <PackageReference Include="Nethereum.Web3" Version="4.29.0.0" />
-
-        <PackageReference Include="Otp.NET" Version="1.4.0" />
-        <PackageReference Include="Cronos" Version="0.8.*" />
-        <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.*" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.*" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.*" />   <!-- для Bind -->
+        <!--   <ApplicationManifest>app.manifest</ApplicationManifest> -->
+      </PropertyGroup>
+  
+      
+  
+  
+      <ItemGroup>
+          <PackageReference Include="Microsoft.Playwright" Version="1.58.0" />
+          <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+          <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3800.47" />
+          
+          <PackageReference Include="Npgsql" Version="10.0.1" />
+          <PackageReference Include="System.Data.Odbc" Version="10.0.2" />
+          <PackageReference Include="System.Management" Version="10.0.0-rc.2.25502.107" />
+  
+          <PackageReference Include="Nethereum.ABI" Version="4.29.0.0" />
+          <PackageReference Include="Nethereum.HdWallet" Version="4.29.0.0" />
+          <PackageReference Include="Nethereum.Web3" Version="4.29.0.0" />
+  
+          <PackageReference Include="Otp.NET" Version="1.4.0" />
+          <PackageReference Include="Cronos" Version="0.8.*" />
+          <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.*" />
+          <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.*" />
+          <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.*" />   <!-- для Bind -->
         <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.*" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.13.0" />
+          <PackageReference Include="System.ServiceProcess.ServiceController" Version="6.0.0" />
 
+
+          <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
+        <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
     </ItemGroup>
 
 
@@ -47,13 +54,25 @@
         <None Update="wwwroot\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Update="templates\**\*">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        
         <None Update="wwwroot\static\fonts\JetBrainsMonoNerdFont-Regular.ttf">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="wwwroot\docs\favcon.ico">
           <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
     </ItemGroup>
     
 
     <ItemGroup>
+        <None Update="Prompts\**\*">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        
+
         <None Update="appsettings.json">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
@@ -96,13 +115,13 @@
       <Compile Remove="z3nLib\**" />
       <Compile Remove="z3n7\**" />
       <Compile Remove="Controllers\Handlers\TrafficHandler.cs" />
+      <Compile Remove="Tasks\csx\Chedraui.cs" />
+
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="docs-vault\" />
       <Folder Include="scripts\" />
-      <Folder Include="Tasks\py\ts\" />
-      <Folder Include="Tasks\Zenno\" />
     </ItemGroup>
 
     <ItemGroup>

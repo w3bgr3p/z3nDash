@@ -1,0 +1,593 @@
+﻿// SystemSnapshotHandler.cs
+//
+// Endpoints:
+//   POST   /system-snapshot/capture        → native C# collection, returns { raw }
+//   POST   /system-snapshot/save           { raw } → { id }
+//   POST   /system-snapshot/read-file      { path } → { raw }
+//   GET    /system-snapshot/list           → { snapshots: [{id, ts, host}] }
+//   GET    /system-snapshot/get?id=N       → { id, ts, host, raw }
+//   DELETE /system-snapshot/delete?id=N   → { ok }
+//   POST   /system-snapshot/ai-audit       { model, raw } → { analysis, model, ts }
+//   GET    /system-snapshot/ai-cache       → { entry } | { entry: null }
+//   DELETE /system-snapshot/ai-cache       → { ok }
+
+using System.Diagnostics;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Text;
+using System.Text.Json;
+
+namespace z3n8;
+
+internal sealed class SystemSnapshotHandler
+{
+    private readonly DbConnectionService _dbService;
+
+    private const string SnapshotTable = "_system_snapshots";
+    private const string AiCacheTable  = "_system_snapshot_ai_cache";
+    private const string AiioUrl       = "https://api.intelligence.io.solutions/api/v1/chat/completions";
+    private const string Lang          = "russian";
+
+    public SystemSnapshotHandler(DbConnectionService dbService, string _ = "")
+        => _dbService = dbService;
+
+    public bool Matches(string path) => path.StartsWith("/system-snapshot");
+
+    public async Task Handle(HttpListenerContext ctx)
+    {
+        var path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
+        var method = ctx.Request.HttpMethod;
+
+        if (method == "POST"   && path == "/system-snapshot/capture")        { await Capture(ctx);       return; }
+        if (method == "POST"   && path == "/system-snapshot/save")           { await Save(ctx);          return; }
+        if (method == "POST"   && path == "/system-snapshot/read-file")      { await ReadFile(ctx);      return; }
+        if (method == "GET"    && path == "/system-snapshot/list")           { await List(ctx);          return; }
+        if (method == "GET"    && path == "/system-snapshot/get")            { await Get(ctx);           return; }
+        if (method == "DELETE" && path == "/system-snapshot/delete")         { await Delete(ctx);        return; }
+        if (method == "POST"   && path == "/system-snapshot/ai-audit")       { await AiAudit(ctx);       return; }
+        if (method == "GET"    && path == "/system-snapshot/ai-cache")       { await AiCacheGet(ctx);    return; }
+        if (method == "DELETE" && path == "/system-snapshot/ai-cache")       { await AiCacheDelete(ctx); return; }
+
+        ctx.Response.StatusCode = 404;
+        await HttpHelpers.WriteJson(ctx.Response, new { error = "Not found" });
+    }
+
+    // ── POST /system-snapshot/capture ─────────────────────────────────────────
+
+    private async Task Capture(HttpListenerContext ctx)
+    {
+        try
+        {
+            var raw = await Task.Run(CollectSnapshot);
+            await HttpHelpers.WriteJson(ctx.Response, new { raw });
+        }
+        catch (Exception ex)
+        {
+            ctx.Response.StatusCode = 500;
+            await HttpHelpers.WriteJson(ctx.Response, new { error = ex.Message });
+        }
+    }
+
+    // ── Snapshot collector ────────────────────────────────────────────────────
+
+    private static string CollectSnapshot()
+    {
+        var sb = new StringBuilder(1 << 20);
+        var ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var hr = new string('=', 72);
+
+        void Line(string s)    => sb.AppendLine(s);
+        void Section(string t) { Line(""); Line(hr); Line($"## {t}"); Line(hr); }
+
+        // ── COLLECT ONCE ──────────────────────────────────────────────────────
+        var allProcs = Process.GetProcesses();
+
+        var pidName = new Dictionary<int, string>(allProcs.Length);
+        foreach (var p in allProcs)
+            pidName[p.Id] = p.ProcessName;
+
+        var tcpRows    = GetTcpRowsWithPid();
+        var connByPid  = new Dictionary<int, int>();
+        foreach (var r in tcpRows) { connByPid.TryGetValue(r.Pid, out var c); connByPid[r.Pid] = c + 1; }
+
+        System.Net.IPEndPoint[] udpListeners;
+        try   { udpListeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveUdpListeners(); }
+        catch { udpListeners = Array.Empty<System.Net.IPEndPoint>(); }
+
+        // ── HEADER ────────────────────────────────────────────────────────────
+        var uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
+        Line("SYSTEM SNAPSHOT FOR LLM ANALYSIS");
+        Line($"Captured : {ts}");
+        Line($"Hostname : {Environment.MachineName}");
+        Line($"OS       : {System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
+        Line($"Uptime   : {uptime.Days}d {uptime.Hours}h {uptime.Minutes}m");
+
+        // ── MEMORY ────────────────────────────────────────────────────────────
+        Section("SYSTEM MEMORY SUMMARY");
+        var memStatus = new NativeMethods.MEMORYSTATUSEX { dwLength = 64 };
+        if (NativeMethods.GlobalMemoryStatusEx(ref memStatus))
+        {
+            var totalGB = Math.Round(memStatus.ullTotalPhys / 1073741824.0, 2);
+            var freeGB  = Math.Round(memStatus.ullAvailPhys / 1073741824.0, 2);
+            var usedGB  = Math.Round(totalGB - freeGB, 2);
+            Line($"Total    : {totalGB} GB");
+            Line($"Used     : {usedGB} GB  ({Math.Round(usedGB / totalGB * 100, 1)}%)");
+            Line($"Free     : {freeGB} GB");
+        }
+
+        // ── CPU ───────────────────────────────────────────────────────────────
+        Section("CPU SUMMARY");
+        Line($"Logical CPUs : {Environment.ProcessorCount}");
+        try
+        {
+            using var c = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+            c.NextValue();
+            System.Threading.Thread.Sleep(400);
+            Line($"Load         : {Math.Round(c.NextValue(), 1)}%");
+        }
+        catch { Line("Load         : n/a"); }
+
+        // ── PROCESS AGGREGATION ───────────────────────────────────────────────
+        Section("PROCESS AGGREGATION BY NAME (ALL INSTANCES SUMMED)");
+        Line($"{"NAME",-35} {"TOTAL_MEM_MB",-12} {"INSTANCES",-10} {"TCP_CONNS",-12} AVG_MEM_MB");
+        Line(new string('-', 80));
+
+        foreach (var g in allProcs.GroupBy(p => p.ProcessName)
+            .Select(g => {
+                long mem = 0;
+                foreach (var p in g) try { mem += p.WorkingSet64; } catch { }
+                var totalMB = Math.Round(mem / 1048576.0, 1);
+                var tcp     = g.Sum(p => connByPid.TryGetValue(p.Id, out var c) ? c : 0);
+                return (Name: g.Key, TotalMB: totalMB, Count: g.Count(), Tcp: tcp, AvgMB: Math.Round(totalMB / g.Count(), 1));
+            })
+            .OrderByDescending(x => x.TotalMB))
+        {
+            var name = g.Name.Length > 35 ? g.Name[..35] : g.Name;
+            Line($"{name,-35} {g.TotalMB,-12} {g.Count,-10} {g.Tcp,-12} {g.AvgMB}");
+        }
+
+        // ── ALL PROCESSES ─────────────────────────────────────────────────────
+        Section("ALL PROCESSES (PID | NAME | MEM_MB | CPU_SEC | THREADS | START_TIME)");
+        Line($"{"PID",-8} {"NAME",-35} {"MEM_MB",-10} {"CPU_SEC",-12} {"THREADS",-8} STARTED");
+        Line(new string('-', 90));
+
+        foreach (var p in allProcs.OrderBy(p => p.ProcessName))
+        {
+            var mem = 0.0; var cpu = 0.0; var thr = 0; var started = "n/a";
+            try { mem     = Math.Round(p.WorkingSet64 / 1048576.0, 1); }             catch { }
+            try { cpu     = Math.Round(p.TotalProcessorTime.TotalSeconds, 1); }      catch { }
+            try { thr     = p.Threads.Count; }                                        catch { }
+            try { started = p.StartTime.ToString("HH:mm:ss"); }                       catch { }
+            var name = p.ProcessName.Length > 35 ? p.ProcessName[..35] : p.ProcessName;
+            Line($"{p.Id,-8} {name,-35} {mem,-10} {cpu,-12} {thr,-8} {started}");
+        }
+
+        // ── ACTIVE CONNECTIONS ────────────────────────────────────────────────
+        Section("ACTIVE NETWORK CONNECTIONS (TCP + UDP)");
+        Line($"{"PID",-10} {"PROTO",-7} {"LOCAL",-26} {"REMOTE",-26} {"STATE",-14} PROCESS");
+        Line(new string('-', 100));
+
+        foreach (var r in tcpRows.OrderBy(r => r.LocalPort))
+        {
+            var proc   = pidName.TryGetValue(r.Pid, out var pn) ? pn : "?";
+            var local  = $"{r.LocalAddr}:{r.LocalPort}";
+            var remote = r.RemotePort > 0 ? $"{r.RemoteAddr}:{r.RemotePort}" : "-";
+            Line($"{r.Pid,-10} {"TCP",-7} {local,-26} {remote,-26} {r.State,-14} {proc}");
+        }
+        foreach (var ep in udpListeners.OrderBy(e => e.Port))
+            Line($"{"?",-10} {"UDP",-7} {ep.Address}:{ep.Port,-20} {"-",-26} {"LISTEN",-14} ?");
+
+        // ── LISTENING ─────────────────────────────────────────────────────────
+        Section("LISTENING PORTS SUMMARY (TCP)");
+        Line($"{"PID",-8} {"PORT",-8} {"BIND_ADDR",-20} PROCESS");
+        Line(new string('-', 55));
+        foreach (var r in tcpRows.Where(r => r.State == "Listen").OrderBy(r => r.LocalPort))
+            Line($"{r.Pid,-8} {r.LocalPort,-8} {r.LocalAddr,-20} {(pidName.TryGetValue(r.Pid, out var pn) ? pn : "?")}");
+
+        // ── ESTABLISHED ───────────────────────────────────────────────────────
+        Section("ESTABLISHED TCP CONNECTIONS");
+        Line($"{"PID",-10} {"LOCAL",-26} {"REMOTE",-26} PROCESS");
+        Line(new string('-', 80));
+        foreach (var r in tcpRows.Where(r => r.State == "Established").OrderBy(r => r.Pid))
+            Line($"{r.Pid,-10} {r.LocalAddr}:{r.LocalPort,-20} {r.RemoteAddr}:{r.RemotePort,-20} {(pidName.TryGetValue(r.Pid, out var pn) ? pn : "?")}");
+
+        // ── SERVICES ──────────────────────────────────────────────────────────
+        Section("RUNNING WINDOWS SERVICES");
+        Line($"{"NAME",-50} {"STATUS",-12} DISPLAY");
+        Line(new string('-', 100));
+        try
+        {
+            foreach (var s in System.ServiceProcess.ServiceController.GetServices()
+                .Where(s => s.Status == System.ServiceProcess.ServiceControllerStatus.Running)
+                .OrderBy(s => s.ServiceName))
+            {
+                var name    = s.ServiceName.Length > 50 ? s.ServiceName[..50] : s.ServiceName;
+                var display = s.DisplayName.Length  > 60 ? s.DisplayName[..60]  : s.DisplayName;
+                Line($"{name,-50} {"Running",-12} {display}");
+            }
+        }
+        catch (Exception ex) { Line($"Error: {ex.Message}"); }
+
+        // ── DISK ──────────────────────────────────────────────────────────────
+        Section("DISK USAGE");
+        Line($"{"DRIVE",-6} {"TOTAL_GB",-12} {"USED_GB",-12} {"FREE_GB",-12} PCT_USED");
+        Line(new string('-', 55));
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            try
+            {
+                if (drive.DriveType != DriveType.Fixed && drive.DriveType != DriveType.Network) continue;
+                if (!drive.IsReady) continue;
+                var total = Math.Round(drive.TotalSize      / 1073741824.0, 1);
+                var free  = Math.Round(drive.TotalFreeSpace / 1073741824.0, 1);
+                var used  = Math.Round(total - free, 1);
+                Line($"{drive.Name.TrimEnd('\\'),-6} {total,-12} {used,-12} {free,-12} {(total > 0 ? Math.Round(used / total * 100, 1) : 0)}%");
+            }
+            catch { }
+        }
+
+        // ── ENVIRONMENT ───────────────────────────────────────────────────────
+        Section("ENVIRONMENT MARKERS");
+        Line($"USERNAME    : {Environment.UserName}");
+        Line($"USERPROFILE : {Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}");
+        Line($"TEMP        : {Path.GetTempPath()}");
+        Line($"CLR ver     : {Environment.Version}");
+        Line($"OS 64-bit   : {Environment.Is64BitOperatingSystem}");
+
+        // ── PATH ──────────────────────────────────────────────────────────────
+        Section("PATH ENTRIES");
+        Line($"{"IDX",-5} PATH");
+        Line(new string('-', 80));
+        var pathEntries = (Environment.GetEnvironmentVariable("PATH") ?? "")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < pathEntries.Length; i++)
+            Line($"{i + 1,-5} {pathEntries[i]}");
+        Line($"\nTotal entries: {pathEntries.Length}");
+
+        // ── FOOTER ────────────────────────────────────────────────────────────
+        Line(""); Line(hr); Line("END OF SNAPSHOT"); Line(hr);
+
+        return sb.ToString();
+    }
+
+    // ── P/Invoke: GetExtendedTcpTable ─────────────────────────────────────────
+
+    private record TcpRow(int Pid, string LocalAddr, int LocalPort, string RemoteAddr, int RemotePort, string State);
+
+    private static List<TcpRow> GetTcpRowsWithPid()
+    {
+        var rows = new List<TcpRow>();
+        try
+        {
+            int size = 0;
+            NativeMethods.GetExtendedTcpTable(IntPtr.Zero, ref size, false, 2, 4, 0);
+            var buf = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
+            try
+            {
+                if (NativeMethods.GetExtendedTcpTable(buf, ref size, false, 2, 4, 0) != 0) return rows;
+                int count   = System.Runtime.InteropServices.Marshal.ReadInt32(buf);
+                const int rowSize = 24; // MIB_TCPROW_OWNER_PID
+                for (int i = 0; i < count; i++)
+                {
+                    var ptr   = IntPtr.Add(buf, 4 + i * rowSize);
+                    var state = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 0);
+                    var lAddr = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 4);
+                    var lPort = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 8);
+                    var rAddr = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 12);
+                    var rPort = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 16);
+                    var pid   = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 20);
+                    rows.Add(new TcpRow(pid, Ip(lAddr), Ntohs(lPort), Ip(rAddr), Ntohs(rPort), TcpState(state)));
+                }
+            }
+            finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(buf); }
+        }
+        catch { }
+        return rows;
+    }
+
+    private static string Ip(int raw)
+    {
+        var b = BitConverter.GetBytes(raw);
+        return $"{b[0]}.{b[1]}.{b[2]}.{b[3]}";
+    }
+
+    private static int Ntohs(int raw)
+    {
+        var b = BitConverter.GetBytes(raw);
+        return (b[2] << 8) | b[3];
+    }
+
+    private static string TcpState(int s) => s switch
+    {
+        1 => "Closed", 2 => "Listen", 3 => "SynSent", 4 => "SynReceived",
+        5 => "Established", 6 => "FinWait1", 7 => "FinWait2", 8 => "CloseWait",
+        9 => "Closing", 10 => "LastAck", 11 => "TimeWait", 12 => "DeleteTcb",
+        _ => "Unknown"
+    };
+
+    // ── POST /system-snapshot/save ────────────────────────────────────────────
+
+    private async Task Save(HttpListenerContext ctx)
+    {
+        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
+
+        string raw;
+        try
+        {
+            using var reader = new StreamReader(ctx.Request.InputStream);
+            var json = JsonSerializer.Deserialize<JsonElement>(await reader.ReadToEndAsync());
+            raw = json.TryGetProperty("raw", out var rp) ? rp.GetString() ?? "" : "";
+        }
+        catch { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "invalid body" }); return; }
+
+        if (string.IsNullOrWhiteSpace(raw)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "empty raw" }); return; }
+
+        EnsureSnapshotTable(db!);
+        var ts   = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
+        var host = ExtractField(raw, "Hostname");
+        db!.Query($"INSERT INTO \"{SnapshotTable}\" (\"ts\", \"host\", \"raw\") VALUES ('{Esc(ts)}', '{Esc(host)}', '{Esc(raw)}')");
+        db.Query($"DELETE FROM \"{SnapshotTable}\" WHERE id NOT IN (SELECT id FROM \"{SnapshotTable}\" ORDER BY id DESC LIMIT 20)");
+
+        var idRow = db.GetLines("id", tableName: SnapshotTable, where: $"ts = '{Esc(ts)}'").FirstOrDefault() ?? "0";
+        _ = int.TryParse(idRow.Trim(), out var newId);
+        await HttpHelpers.WriteJson(ctx.Response, new { id = newId });
+    }
+
+    // ── POST /system-snapshot/read-file ───────────────────────────────────────
+
+    private async Task ReadFile(HttpListenerContext ctx)
+    {
+        string path;
+        try
+        {
+            using var reader = new StreamReader(ctx.Request.InputStream);
+            var json = JsonSerializer.Deserialize<JsonElement>(await reader.ReadToEndAsync());
+            path = json.TryGetProperty("path", out var pp) ? pp.GetString() ?? "" : "";
+        }
+        catch { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "invalid body" }); return; }
+
+        if (string.IsNullOrWhiteSpace(path)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "path required" }); return; }
+        if (!File.Exists(path))              { ctx.Response.StatusCode = 404; await HttpHelpers.WriteJson(ctx.Response, new { error = $"file not found: {path}" }); return; }
+
+        try { await HttpHelpers.WriteJson(ctx.Response, new { raw = await File.ReadAllTextAsync(path, Encoding.UTF8) }); }
+        catch (Exception ex) { ctx.Response.StatusCode = 500; await HttpHelpers.WriteJson(ctx.Response, new { error = ex.Message }); }
+    }
+
+    // ── GET /system-snapshot/list ─────────────────────────────────────────────
+
+    private async Task List(HttpListenerContext ctx)
+    {
+        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
+        EnsureSnapshotTable(db!);
+
+        var snapshots = db!.GetLines("id, ts, host", tableName: SnapshotTable, where: "1=1")
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .Select(l => { var c = l.Split('|');
+                return new { id = int.TryParse(c.ElementAtOrDefault(0)?.Trim(), out var i) ? i : 0,
+                             ts = c.ElementAtOrDefault(1)?.Trim() ?? "", host = c.ElementAtOrDefault(2)?.Trim() ?? "" }; })
+            .Where(s => s.id > 0).OrderByDescending(s => s.id).ToList();
+
+        await HttpHelpers.WriteJson(ctx.Response, new { snapshots });
+    }
+
+    // ── GET /system-snapshot/get?id=N ─────────────────────────────────────────
+
+    private async Task Get(HttpListenerContext ctx)
+    {
+        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
+        if (!int.TryParse(ctx.Request.QueryString["id"], out var id)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "id required" }); return; }
+
+        EnsureSnapshotTable(db!);
+        var line = db!.GetLines("id, ts, host, raw", tableName: SnapshotTable, where: $"id = {id}")
+            .FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
+        if (line == null) { ctx.Response.StatusCode = 404; await HttpHelpers.WriteJson(ctx.Response, new { error = "not found" }); return; }
+
+        var i1 = line.IndexOf('|'); var i2 = i1 >= 0 ? line.IndexOf('|', i1+1) : -1; var i3 = i2 >= 0 ? line.IndexOf('|', i2+1) : -1;
+        await HttpHelpers.WriteJson(ctx.Response, new {
+            id   = i1 > 0 ? int.TryParse(line[..i1].Trim(), out var si) ? si : 0 : 0,
+            ts   = i1 >= 0 && i2 > i1 ? line[(i1+1)..i2].Trim() : "",
+            host = i2 >= 0 && i3 > i2 ? line[(i2+1)..i3].Trim() : "",
+            raw  = i3 >= 0 ? line[(i3+1)..] : ""
+        });
+    }
+
+    // ── DELETE /system-snapshot/delete?id=N ───────────────────────────────────
+
+    private async Task Delete(HttpListenerContext ctx)
+    {
+        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
+        if (!int.TryParse(ctx.Request.QueryString["id"], out var id)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "id required" }); return; }
+        EnsureSnapshotTable(db!);
+        db!.Del(tableName: SnapshotTable, where: $"id = {id}");
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
+    }
+
+    // ── POST /system-snapshot/ai-audit ────────────────────────────────────────
+
+    private async Task AiAudit(HttpListenerContext ctx)
+    {
+        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
+        var apiKey = GetApiKey(db!);
+        if (string.IsNullOrEmpty(apiKey)) { ctx.Response.StatusCode = 500; await HttpHelpers.WriteJson(ctx.Response, new { error = "aiio key not found" }); return; }
+
+        string model, raw;
+        try
+        {
+            using var reader = new StreamReader(ctx.Request.InputStream);
+            var json = JsonSerializer.Deserialize<JsonElement>(await reader.ReadToEndAsync());
+            model = json.TryGetProperty("model", out var mp) ? mp.GetString() ?? "" : "";
+            raw   = json.TryGetProperty("raw",   out var rp) ? rp.GetString() ?? "" : "";
+        }
+        catch { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "invalid body" }); return; }
+
+        if (string.IsNullOrWhiteSpace(raw)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "empty raw" }); return; }
+        if (string.IsNullOrEmpty(model)) model = "deepseek-ai/DeepSeek-V3.2";
+
+        string result;
+        try   { result = await CallAiio(apiKey, model, BuildAuditPrompt(raw)); }
+        catch (Exception ex) { await HttpHelpers.WriteJson(ctx.Response, new { error = ex.Message }); return; }
+
+        var ts = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        SaveAiCache(db!, model, result, ts);
+        await HttpHelpers.WriteJson(ctx.Response, new { analysis = result, model, ts });
+    }
+
+    // ── GET /system-snapshot/ai-cache ─────────────────────────────────────────
+
+    private async Task AiCacheGet(HttpListenerContext ctx)
+    {
+        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
+        EnsureAiCacheTable(db!);
+        foreach (var line in db!.GetLines("model, ts, report", tableName: AiCacheTable, where: "1=1"))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var cols = line.Split('|');
+            if (cols.Length < 3) continue;
+            await HttpHelpers.WriteJson(ctx.Response, new
+            {
+                entry = new { model = cols[0].Trim(), ts = cols[1].Trim(), analysis = cols[2].Trim() }
+            });
+            return;
+        }
+        await HttpHelpers.WriteJson(ctx.Response, new { entry = (object?)null });
+    }
+
+    // ── DELETE /system-snapshot/ai-cache ──────────────────────────────────────
+
+    private async Task AiCacheDelete(HttpListenerContext ctx)
+    {
+        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
+        EnsureAiCacheTable(db!);
+        db!.Del(tableName: AiCacheTable, where: "1=1");
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
+    }
+
+    // ── Prompt ────────────────────────────────────────────────────────────────
+
+    private static string BuildAuditPrompt(string raw)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"System audit snapshot. Host: {ExtractField(raw, "Hostname")}, Captured: {ExtractField(raw, "Captured")}, Uptime: {ExtractField(raw, "Uptime")}");
+        sb.AppendLine();
+        foreach (var s in new[] { "SYSTEM MEMORY SUMMARY", "CPU SUMMARY", "PROCESS AGGREGATION BY NAME",
+                                   "LISTENING PORTS SUMMARY", "ESTABLISHED TCP CONNECTIONS", "DISK USAGE", "ENVIRONMENT MARKERS" })
+            AppendSection(sb, raw, s);
+        return sb.ToString();
+    }
+
+    private static void AppendSection(StringBuilder sb, string raw, string title)
+    {
+        var start = raw.IndexOf($"## {title}", StringComparison.OrdinalIgnoreCase);
+        if (start < 0) return;
+        var end     = raw.IndexOf("\n## ", start + 4, StringComparison.OrdinalIgnoreCase);
+        var section = end > 0 ? raw[start..end] : raw[start..];
+        sb.AppendLine(string.Join('\n', section.Split('\n').Take(120)));
+        sb.AppendLine();
+    }
+
+    // ── AI call ───────────────────────────────────────────────────────────────
+
+    private static async Task<string> CallAiio(string apiKey, string model, string prompt)
+    {
+        var systemPrompt =
+            "You are a Windows system auditor. Analyze the provided system snapshot and identify: " +
+            "1) Memory pressure — which processes or process groups consume the most RAM (total, not just per-instance). " +
+            "2) Network anomalies — unusually high connection counts per process, suspicious listening ports, unexpected established connections. " +
+            "3) Disk pressure — drives above 80% utilization. " +
+            "4) CPU load assessment relative to process count. " +
+            "5) Top 3 actionable recommendations based solely on the data. " +
+            $"Use exact numbers. State 'none found' for empty sections. Max 1200 words. Language: {Lang}.";
+
+        var body = JsonSerializer.Serialize(new
+        {
+            model,
+            messages    = new[] { new { role = "system", content = systemPrompt }, new { role = "user", content = prompt } },
+            temperature = 0.2,
+            top_p       = 0.9,
+            stream      = false,
+            max_tokens  = 4000
+        });
+
+        using var http    = new HttpClient { Timeout = TimeSpan.FromSeconds(300) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, AiioUrl);
+        request.Headers.Add("Authorization", $"Bearer {apiKey}");
+        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+
+        using var response = await http.SendAsync(request);
+        var responseRaw = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"HTTP {(int)response.StatusCode}\n{responseRaw}");
+
+        try
+        {
+            var json = JsonSerializer.Deserialize<JsonElement>(responseRaw);
+            return json.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "No response";
+        }
+        catch (Exception ex) { throw new Exception($"{ex.Message}\nRAW:\n{responseRaw}"); }
+    }
+
+    // ── DB helpers ────────────────────────────────────────────────────────────
+
+    private static void EnsureSnapshotTable(Db db) =>
+        db.CreateTable(new Dictionary<string, string>
+            { ["id"] = "INTEGER PRIMARY KEY", ["ts"] = "TEXT", ["host"] = "TEXT", ["raw"] = "TEXT" }, SnapshotTable);
+
+    private static void EnsureAiCacheTable(Db db) =>
+        db.CreateTable(new Dictionary<string, string>
+            { ["id"] = "INTEGER PRIMARY KEY", ["model"] = "TEXT", ["ts"] = "TEXT", ["report"] = "TEXT" }, AiCacheTable);
+
+    private static void SaveAiCache(Db db, string model, string analysis, string ts)
+    {
+        EnsureAiCacheTable(db);
+        db.Del(tableName: AiCacheTable, where: "1=1");
+        db.Query($"INSERT INTO \"{AiCacheTable}\" (\"model\", \"ts\", \"report\") VALUES ('{Esc(model)}', '{Esc(ts)}', '{Esc(analysis)}')");
+    }
+
+    private static string? GetApiKey(Db db)
+    {
+        var now  = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        var keys = db.GetLines("api", tableName: "__aiio",
+                       where: $"(\"expire\" = '' OR \"expire\" IS NULL OR \"expire\" > '{now}')")
+                     .Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        return keys.Count == 0 ? null : keys[new Random().Next(keys.Count)].Trim();
+    }
+
+    private static string ExtractField(string raw, string label)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(raw, $@"{label}\s*:\s*(.+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return m.Success ? m.Groups[1].Value.Trim() : "";
+    }
+
+    private static string Esc(string s) => s.Replace("'", "''");
+}
+
+// ── P/Invoke ──────────────────────────────────────────────────────────────────
+
+internal static class NativeMethods
+{
+    [System.Runtime.InteropServices.DllImport("iphlpapi.dll", SetLastError = true)]
+    public static extern int GetExtendedTcpTable(IntPtr pTcpTable, ref int dwSize, bool sort,
+        int ipVersion, int tableClass, int reserved);
+
+    [System.Runtime.InteropServices.DllImport("iphlpapi.dll", SetLastError = true)]
+    public static extern int GetExtendedUdpTable(IntPtr pUdpTable, ref int dwSize, bool sort,
+        int ipVersion, int tableClass, int reserved);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    public struct MEMORYSTATUSEX
+    {
+        public uint  dwLength;
+        public uint  dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+}

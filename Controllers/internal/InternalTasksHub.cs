@@ -7,46 +7,7 @@ namespace z3n8;
 
 public static partial class InternalTasks
 {
-    private static readonly bool _migrationRegistered = RegisterSelf(
-        (scheduler, dbService, logsConfig) => RegisterMigration(scheduler, dbService, logsConfig)
-    );
-
-    private static void RegisterMigration(SchedulerService scheduler, DbConnectionService dbService, LogsConfig logsConfig)
-    {
-        scheduler.RegisterTask("SafuMigrate", async (payload, ct, log) =>
-        {
-            using var _ = new ConsoleSink(log);
-
-            if (!dbService.TryGetDb(out var db) || db == null)
-                throw new Exception("DB not connected");
-
-            var hwId = SafuMigrate.LegacyGetHWIdPublic();
-            Console.WriteLine($"[SafuMigrate] hwId={hwId?[..Math.Min(20, hwId?.Length ?? 0)]}");
-
-            if (string.IsNullOrEmpty(hwId))
-                throw new Exception("SafuMigrate: HWID resolution failed");
-
-            var jVarsJson = SafuMigrate.LegacyDecodeHWIDPublic(_jVars, hwId);
-            Console.WriteLine($"[SafuMigrate] jVarsJson length={jVarsJson?.Length}");
-
-            if (string.IsNullOrEmpty(jVarsJson))
-                throw new Exception("SafuMigrate: legacy DecryptHWIDOnly failed");
-
-            var json = jVarsJson.TrimStart().StartsWith("{") ? jVarsJson : jVarsJson.FromBase64();
-            var vars = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json)!;
-            var pin  = vars.GetValueOrDefault("cfgPin", "");
-            Console.WriteLine($"[SafuMigrate] pin resolved, length={pin.Length}");
-
-            var newJVars = SafuMigrate.Run(db, pin, _jVars);
-
-            File.WriteAllText(_jVarsPath + ".bak", _jVars);
-            File.WriteAllText(_jVarsPath, newJVars);
-            _jVars = newJVars;
-
-            Console.WriteLine("[SafuMigrate] jVars file updated.");
-            return "migration complete";
-        });
-    }
+    
 }
 
 

@@ -22,8 +22,9 @@ internal sealed class ConfigHandler
     }
 
     public bool Matches(string path, string method) =>
-        (method == "GET"  && path is "/config" or "/config/status" or "/config/storage") ||
-        (method == "POST" && path is "/config" or "/config/jvars" or "/clear-all-logs");
+        (method == "GET"  && path is "/config" or "/config/status" or "/config/storage" or "/config/ui") ||
+        (method == "POST" && path is "/config" or "/config/jvars" or "/clear-all-logs" or "/config/ui");
+
 
     public async Task Handle(HttpListenerContext ctx)
     {
@@ -36,6 +37,9 @@ internal sealed class ConfigHandler
         if (method == "GET"  && path == "/config/status")   { await GetStatus(ctx.Response);    return; }
         if (method == "GET"  && path == "/config/storage")  { await GetStorage(ctx.Response);   return; }
         if (method == "POST" && path == "/clear-all-logs")  { await ClearAllLogs(ctx.Response); return; }
+        
+        if (method == "GET"  && path == "/config/ui") { await GetUiState(ctx.Response);  return; }
+        if (method == "POST" && path == "/config/ui") { using var r = new StreamReader(ctx.Request.InputStream); await SaveUiState(ctx.Response, await r.ReadToEndAsync()); return; }
     }
 
     private static async Task GetConfig(HttpListenerResponse response)
@@ -241,4 +245,33 @@ internal sealed class ConfigHandler
 
         await HttpHelpers.WriteJson(response, new { ok = errors.Count == 0, deleted, errors });
     }
+    
+    private static string UiStatePath => Path.Combine(AppContext.BaseDirectory, "ui-state.json");
+
+    private static async Task GetUiState(HttpListenerResponse response)
+    {
+        if (!File.Exists(UiStatePath))
+        {
+            await HttpHelpers.WriteJson(response, new { theme = "dark" });
+            return;
+        }
+        var raw = await File.ReadAllTextAsync(UiStatePath, Encoding.UTF8);
+        await HttpHelpers.WriteRawJson(response, raw);
+    }
+
+    private static async Task SaveUiState(HttpListenerResponse response, string body)
+    {
+        try
+        {
+            JsonSerializer.Deserialize<JsonElement>(body); // валидация
+            await File.WriteAllTextAsync(UiStatePath, body, Encoding.UTF8);
+            await HttpHelpers.WriteJson(response, new { ok = true });
+        }
+        catch (Exception ex)
+        {
+            response.StatusCode = 400;
+            await HttpHelpers.WriteJson(response, new { ok = false, error = ex.Message });
+        }
+    }
+    
 }

@@ -1,14 +1,127 @@
 // Inline SVG — no CDN, no font dependency, works offline, consistent cross-OS rendering
 window.ICONS = {
-    home:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>`,
-    pm:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>`,
-    logs:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>`,
-    http:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M15 7l5 5-5 5"/><path d="M9 7L4 12l5 5" opacity="0.4"/></svg>`,
-    report:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`,
-    json:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg>`,
-    config:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
-    scheduler: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 15.5"/></svg>`,
-    theme:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" stroke-opacity="0.35"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" opacity="0.2" stroke="none"/></svg>`,
+    scheduler:  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 350">
+                  <defs>
+                    <linearGradient id="sched-grad-b" x1="-537.183" x2="-416.602" y1="-136.622" y2="-136.622" gradientTransform="matrix(.91142 0 0 1.09719 566.38 241.245)" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#00ffb3"/>
+                      <stop offset="100%" stop-color="#00a3ff"/>
+                    </linearGradient>
+                    <linearGradient id="sched-grad-a" x1="-363.619" x2="-268.455" y1="-63.074" y2="-63.074" gradientTransform="matrix(1.49112 0 0 .67064 566.38 241.245)" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#1a0000"/>
+                      <stop offset="40%" stop-color="#8b0000"/>
+                      <stop offset="100%" stop-color="#d70301"/>
+                    </linearGradient>
+                  </defs>
+                  <path fill="url(#sched-grad-a)" d="M81.38 262.545a86 86 0 0 1-46.4-18.4l-3.1-2.5-3.9-3.8-3.8-3.8.7-.2.6-.3 10.6-10.7 10.5-10.8 3.5 3.4 3.4 3.5 3.1 2.3 3.1 2.4 4.3 2 4.2 2.2 2.8.9 2.8.9 4.2.7 4.3.8h10.6l3.7-.8c2-.4 5.1-1.3 6.9-1.8l3.1-1 4-2 3.8-1.9 4.2-2.8a142 142 0 0 0 22.7-19.2l2.6-2.7h.4c1.6 0 21.8 19.7 21.8 21.3v.4l-6.8 6.5c-28.1 27-51 37.3-77.9 35.4"
+                   style="color:#fff;font-weight:400;font-size:16px;font-family:&quot;Anthropic Sans&quot;,&quot;-apple-system&quot;,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:url(#sched-grad-a);stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter"/>
+                  <path fill="url(#sched-grad-b)" d="M78.38 91.645c-.4.2-1.5-.2-1.4.5l-.2 30.7 5.3-1h54q0 1.1-1 1.8c-14.2 14.7-28.9 29-43.1 43.8q-1 .8.3.7 9.5.6 18.9 2.3l7.5 2q2.8.7 5.4 1.8 12 4.5 22.7 12a153 153 0 0 1 19.3 16.4q6.8 7.1 13.4 14.4l6.9 6.6v-43.6l-1.4-1.4a119 119 0 0 0-24.9-19.9c-3.3-2-6.9-3.6-10.2-5.7q-.7-.5-.6-1.2 9.9-8.9 19-18.5a154 154 0 0 0 15.2-20q1.4-2.5 3.2-4.5l-.1-17.5h-105Z" 
+                  style="color:#fff;font-weight:400;font-size:16px;font-family:&quot;Anthropic Sans&quot;,&quot;-apple-system&quot;,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:url(#sched-grad-b);stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter"/>
+                  <path fill="#111" d="M256.88 262.245a121 121 0 0 1-13-2.1l-3.6-.9-5.1-1.8-5-1.7-5.5-2.7-5.4-2.7-5.9-4a172 172 0 0 1-22.4-17.8l-4-3.7v-22.1l-.1-22.2h.3c.2 0 2.8 2.8 5.8 6.1l5.4 6 7 7 7.1 6.9 4.4 3.7c5.8 4.9 9.9 8 14.4 11l3.8 2.4 3.9 2 3.9 1.8 3.7 1.3c2 .6 5.1 1.5 6.9 1.8l3 .6h12.8l3-.6c4-.9 8.7-2.5 12.2-4.2l2.9-1.3 3.1-2.1 3.1-2 2.8-2.6q5.5-4.8 9.4-10.8l2.2-3.2 1.9-3.8 1.9-4 1.2-4.2 1.2-4.2.6-4.4.6-4.3-.2-5-.2-5-.8-3.5-.7-3.5-1.4-4.4-1.5-4.3-2.3-4-2.2-4-2.4-3a72 72 0 0 0-5.2-5.7l-2.9-2.8-3-2.2-3.2-2.3-3.8-2-3.7-1.8-3.3-1.1c-1.7-.6-4.6-1.4-6.3-1.8l-3-.7-5.5-.2-5.5-.2-3 .4a48 48 0 0 0-23.2 9.5l-2.6 2-3.3 3.3a83 83 0 0 0-14.8 21.1l-8.1 13.5-3.3 5h-.4c-.2 0-3.6-3.2-7.5-7.1l-7.1-7.2-2.8-2.3-4-3.3-1.3-1.1 3-5.1a127 127 0 0 0 7.8-13.6l3-4.5a122 122 0 0 1 11.1-14.6l3-3.3 3.6-3c8.8-7.8 18-13.1 29-16.7l4.2-1.4 4.3-.9c2.4-.5 5.8-1 7.5-1.2l3.2-.4h10.6l4.5.6 4.6.5 4 .9 4 .9 4 1.4a86 86 0 0 1 25.6 13.8l3.3 2.6 4 3.8a85 85 0 0 1 25.2 57.8l.3 4.2-.4 4.8-1.1 9.2-.8 4.4-1.2 4.2a82 82 0 0 1-6 15.2l-2.3 4.6-3 4.4-3 4.4-3 3.6-3 3.5-3.4 3.3-3.4 3.2-3.9 3a86 86 0 0 1-20.9 11.6l-4 1.6-4 1-8.1 1.8-4.3.8h-14.1m-235.2-31.7-5-6.6-2.2-3.3-2.1-4.3a86 86 0 0 1-9.3-30.1l-.5-3.4v-12l.5-3.9c.2-2 .8-5.7 1.3-8l.9-4.3 1.7-5.2 1.7-5.3 2.5-5 2.4-5 2.2-3.6c1.3-1.9 3.3-4.8 4.6-6.4l2.3-3 4-4.2a84 84 0 0 1 49.5-25.3h.3l-.1 15.8-.1 15.7-2.5.6c-5.2 1.4-11 4-16 7.4l-3 2-2.7 2.5c-3.1 2.8-5 4.9-7.8 8.6l-2 2.6-2.3 4.4-2.2 4.5-1 2.8a56 56 0 0 0-2.5 11l-.5 3.8v6.4l.4 3a55 55 0 0 0 10.8 27.2l1.6 2-2.8 3-10.7 10.9-8 8h-.8z" 
+                  style="color:#fff;font-weight:400;font-size:16px;font-family:&quot;Anthropic Sans&quot;,&quot;-apple-system&quot;,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:#111;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter"/>
+                </svg>`,
+    zp7:        `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="M128 108a60 60 0 0 0-59.4-7.3 60 60 0 0 0 36 46.6A60 60 0 0 1 128 108m-23.4 39.3A60 60 0 0 0 128 204a60 60 0 0 0 23.4-56.7 60 60 0 0 1-46.8 0m82.8-46.6A60 60 0 0 0 128 108a60 60 0 0 1 23.4 39.3 60 60 0 0 0 36-46.6" opacity=".2"/>
+                  <circle cx="128" cy="92" r="60" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="164" cy="156" r="60" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="92" cy="156" r="60" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                </svg>`,
+    zb:         `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <circle cx="128" cy="128" r="96" opacity=".2"/>
+                  <circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M168 128c0 64-40 96-40 96s-40-32-40-96 40-96 40-96 40 32 40 96M37.5 96h181m-181 64h181"/>
+                </svg>`,
+    logs:      `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="m105 192 16 28a8 8 0 0 0 14 0l16-28h65a8 8 0 0 0 8-8V56a8 8 0 0 0-8-8H40a8 8 0 0 0-8 8v128a8 8 0 0 0 8 8Z" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M96 104h64m-64 32h64m-55 56 16 28a8 8 0 0 0 14 0l16-28h65a8 8 0 0 0 8-8V56a8 8 0 0 0-8-8H40a8 8 0 0 0-8 8v128a8 8 0 0 0 8 8Z"/>
+                </svg>`,
+    http:      `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <circle cx="56" cy="64" r="24" opacity=".2"/>
+                  <circle cx="200" cy="192" r="24" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M200 168v-57.4a16 16 0 0 0-4.7-11.3L144 48"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M144 96V48h48M56 88v57.4a16 16 0 0 0 4.7 11.3L112 208"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M112 160v48H64"/>
+                  <circle cx="56" cy="64" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="200" cy="192" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                </svg>`,
+                    
+    json:      `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="M176 216c64 0 0-88 64-88-64 0 0-88-64-88H80c-64 0 0 88-64 88 64 0 0 88 64 88Z" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M80 40c-64 0 0 88-64 88 64 0 0 88 64 88m96-176c64 0 0 88 64 88-64 0 0 88-64 88"/>
+                </svg>`,
+    text:      `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="m192 168 48-40-48-40H64l-48 40 48 40z" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m64 88-48 40 48 40m128-80 48 40-48 40M160 40 96 216"/>
+                </svg>`,
+    clips:     `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="M160 40a40 40 0 0 1 8 24v8H88v-8a40 40 0 0 1 8-24H56a8 8 0 0 0-8 8v168a8 8 0 0 0 8 8h144a8 8 0 0 0 8-8V48a8 8 0 0 0-8-8Z" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M96 152h64m-64-32h64m0-80h40a8 8 0 0 1 8 8v168a8 8 0 0 1-8 8H56a8 8 0 0 1-8-8V48a8 8 0 0 1 8-8h40"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M88 72v-8a40 40 0 0 1 80 0v8Z"/>
+                </svg>`,
+    ai:     `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="M51.5 148.5a48 48 0 0 1-10.4-8 48 48 0 0 0 66.4 64l44.5-25.7v-37l-56 32.4Z" opacity=".2"/>
+                  <path d="M204.5 107.5 160 81.8l-32 18.5 56 32.3V184a48 48 0 0 1-1.8 13 48 48 0 0 0 22.3-89.5" opacity=".2"/>
+                  <path d="M104 141.9V77.2l44.5-25.7a48 48 0 0 1 12.2-5A48 48 0 0 0 72 72v51.4z" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M104 141.9V77.2l44.5-25.7a48 48 0 0 1 66.4 64"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m128 155.7-56-32.3V72a48 48 0 0 1 88.7-25.5"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m152 141.9-56 32.3-44.5-25.7A48 48 0 0 1 73.8 59"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M152 114.1v64.7l-44.5 25.7a48 48 0 0 1-66.4-64"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m128 100.3 56 32.3V184a48 48 0 0 1-88.7 25.5"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m104 114.1 56-32.3 44.5 25.7a48 48 0 0 1-22.3 89.6"/>
+            </svg>`,
+    treasury: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="m40 128 88 112 88-112-88 40z" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M128 16v224M216 128l-88 40-88-40"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m128 16 88 112-88 112-88-112z"/>
+                </svg>`,
+    
+    config:    `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="m230.1 108.8-31.8-18.2-2-3.4-.2-36A105 105 0 0 0 162 32l-32 17.9h-4L94 32a105 105 0 0 0-34.1 19.3l-.2 36-2 3.4-31.8 18a99 99 0 0 0 0 38.5l31.8 18.2 2 3.4.2 36A105 105 0 0 0 94 224l32-17.9h4l32 17.9a105 105 0 0 0 34-19.2l.2-36 2-3.5 31.9-18a99 99 0 0 0 0-38.5M128 168a40 40 0 1 1 40-40 40 40 0 0 1-40 40" opacity=".2"/>
+                  <circle cx="128" cy="128" r="40" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M130 206.1h-4L94 224a105 105 0 0 1-34.1-19.2l-.1-36-2-3.4-31.9-18.2a99 99 0 0 1 0-38.4l31.8-18.1 2-3.4.2-36A105 105 0 0 1 94 32l32 17.9h4L162 32a105 105 0 0 1 34.1 19.2l.1 36 2 3.4 31.9 18.2a99 99 0 0 1 0 38.4l-31.9 18.1-2 3.4-.1 36A105 105 0 0 1 162 224Z"/>
+                </svg>`,
+    docs:    `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <circle cx="128" cy="128" r="24" opacity=".2"/>
+                  <circle cx="128" cy="128" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="96" cy="56" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="200" cy="104" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="200" cy="184" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="56" cy="192" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                </svg>`,
+    help:   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+              <path fill="none" d="M0 0h256v256H0z"/>
+              <path d="M176 32v96l-32-24-32 24V32H72a24 24 0 0 0-24 24v160a24 24 0 0 1 24-24h136V32Z" opacity=".2"/>
+              <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M48 216v8h144M176 32v96l-32.01-24L112 128V32"/>
+              <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M48 216a24 24 0 0 1 24-24h136V32H72a24 24 0 0 0-24 24Z"/>
+            </svg>`,
+    
+    theme:     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="M208 48a24 24 0 0 0-24 24H72a24 24 0 0 0-48 0v80a64 64 0 0 0 64 64h80a64 64 0 0 0 64-64V72a24 24 0 0 0-24-24m-8 104a32 32 0 0 1-32 32H88a32 32 0 0 1-32-32v-8a32 32 0 0 1 32-32h80a32 32 0 0 1 32 32Z" opacity=".2"/>
+                  <rect width="144" height="72" x="56" y="112" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" rx="32"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M24 72a24 24 0 0 1 48 0h112a24 24 0 0 1 48 0v80a64 64 0 0 1-64 64H88a64 64 0 0 1-64-64Z"/>
+                  <circle cx="92" cy="148" r="12"/>
+                  <circle cx="164" cy="148" r="12"/>
+                </svg>`,
+    system: `<svg viewBox="0 0 256 256">
+                    <path fill="none" d="M0 0h256v256H0z"/>
+                    <path d="M208 40H48a8 8 0 0 0-8 8v160a8 8 0 0 0 8 8h160a8 8 0 0 0 8-8V48a8 8 0 0 0-8-8M88 184a16 16 0 1 1 16-16 16 16 0 0 1-16 16m80-64a16 16 0 1 1 16-16 16 16 0 0 1-16 16" opacity=".2"/>
+                    <circle cx="168" cy="104" r="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                    <circle cx="88" cy="168" r="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M152 216v-56L88 96V40M88 152V96"/>
+                    <rect width="176" height="176" x="40" y="40" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" rx="8"/>
+                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M136 40v32l20.69 20.69"/>
+                </svg>`
 };
 
 
@@ -26,10 +139,17 @@ window.EXEC_ICONS = {
     'bat':
         '<svg viewBox="0 0 128 128"><path d="M1.846 0A1.841 1.841 0 000 1.846v18.463c0 1.022.823 1.845 1.846 1.845h20.308A1.841 1.841 0 0024 20.31V1.846A1.841 1.841 0 0022.154 0H1.846zm0 .924h20.308c.512 0 .922.41.922.922v18.463c0 .511-.41.921-.922.921H1.846a.919.919 0 01-.922-.921V1.846c0-.512.41-.922.922-.922zm0 .922v18.463h20.308V1.846H1.846zm1.845 2.14l3.235 1.758v.836L3.69 8.477V7.385l2.243-1.207v-.033L3.69 5.076v-1.09zM7.846 9.23h3.693v.924H7.846V9.23zM0 21.736v.418C0 23.177.823 24 1.846 24h20.308A1.841 1.841 0 0024 22.154v-.418a2.334 2.334 0 01-1.846.918H1.846A2.334 2.334 0 010 21.736Z"/></svg>',
     'csx':
-        '<svg viewBox="0 0 128 128"><path fill="#9B4F96" d="M115.4 30.7L67.1 2.9c-.8-.5-1.9-.7-3.1-.7-1.2 0-2.3.3-3.1.7l-48 27.9c-1.7 1-2.9 3.5-2.9 5.4v55.7c0 1.1.2 2.4 1 3.5l106.8-62c-.6-1.2-1.5-2.1-2.4-2.7z"></path><path fill="#68217A" d="M10.7 95.3c.5.8 1.2 1.5 1.9 1.9l48.2 27.9c.8.5 1.9.7 3.1.7 1.2 0 2.3-.3 3.1-.7l48-27.9c1.7-1 2.9-3.5 2.9-5.4V36.1c0-.9-.1-1.9-.6-2.8l-106.6 62z"></path><path fill="#fff" d="M85.3 76.1C81.1 83.5 73.1 88.5 64 88.5c-13.5 0-24.5-11-24.5-24.5s11-24.5 24.5-24.5c9.1 0 17.1 5 21.3 12.5l13-7.5c-6.8-11.9-19.6-20-34.3-20-21.8 0-39.5 17.7-39.5 39.5s17.7 39.5 39.5 39.5c14.6 0 27.4-8 34.2-19.8l-12.9-7.6zM97 66.2l.9-4.3h-4.2v-4.7h5.1L100 51h4.9l-1.2 6.1h3.8l1.2-6.1h4.8l-1.2 6.1h2.4v4.7h-3.3l-.9 4.3h4.2v4.7h-5.1l-1.2 6h-4.9l1.2-6h-3.8l-1.2 6h-4.8l1.2-6h-2.4v-4.7H97zm4.8 0h3.8l.9-4.3h-3.8l-.9 4.3z"></path></svg>',
+        '<svg viewBox="0 0 256 266">\n' +
+        '  <path fill="none" d="M0 0h256v256H0z" style="fill:none;stroke:none;color:#fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>\n' +
+        '  <path fill="currentColor" d="M152 32v56h56z" opacity=".2" style="fill:#fff;stroke:none;color:#fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:.2;font-family:&quot;Anthropic Sans&quot;,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>\n' +
+        '  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M48 112V40a8 8 0 0 1 8-8h96l56 56v24" style="fill:none;stroke:#fff;color:#fff;stroke-width:16px;stroke-linecap:round;stroke-linejoin:round;opacity:1;font-family:&quot;Anthropic Sans&quot;,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>\n' +
+        '  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M152 32v56h56m-72.1 65.6s-29.4-7.8-31.8 11 38.4 10.1 35.8 30.7c-2.5 19.2-31.8 11-31.8 11m96-56-40 56m0-56 40 56M74 156a24 24 0 1 0 0 48" style="fill:none;stroke:#fff;color:#fff;stroke-width:16px;stroke-linecap:round;stroke-linejoin:round;opacity:1;font-family:&quot;Anthropic Sans&quot;,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>\n' +
+        '</svg>',
     'exe':
         '<svg viewBox="0 0 128 128"><path fill="#0078d4" d="M67.328 67.331h60.669V128H67.328zm-67.325 0h60.669V128H.003zM67.328 0h60.669v60.669H67.328zM.003 0h60.669v60.669H.003z"></path>            </svg>          ',
     'internal':
+        '<svg viewBox="0 0 128 128"><defs><linearGradient id="a" x1="48" x2="48" y1="97.75" y2="2.25" gradientTransform="matrix(1 0 0 -1 0 97.75)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs><path fill="#52218a" d="M14.39 26.295a5.333 5.333 0 0 0-1.417.373l-9.694 4A5.333 5.333 0 0 0 0 35.561v56.88a5.333 5.333 0 0 0 3.28 4.893l9.693 4.066a5.333 5.333 0 0 0 5.521-.865l2.172-1.867a2.947 2.947 0 0 1-4.666-2.4V31.734a2.947 2.947 0 0 1 4.666-2.4l-2.172-1.799a5.333 5.333 0 0 0-4.103-1.24z"></path><path fill="#6c33af" d="M94.75.416A8 8 0 0 0 88 2.668l-82.666 91.4A3.08 3.08 0 0 1 0 92.002v.44a5.333 5.333 0 0 0 3.28 4.892l9.693 4.066a5.333 5.333 0 0 0 5.521-.865l2.172-1.867 99.08-81.24A5.053 5.053 0 0 1 128 21.334v-.307a8 8 0 0 0-4.533-7.213L97.094 1.121A8 8 0 0 0 94.75.416Z"></path><path fill="#854cc7" d="M14.871 26.238a5.333 5.333 0 0 0-1.898.43l-9.694 4A5.333 5.333 0 0 0 0 35.561v.441a3.08 3.08 0 0 1 5.334-2.066L88 125.334a8 8 0 0 0 9.094 1.547l26.373-12.694a8 8 0 0 0 4.533-7.212v-.307a5.053 5.053 0 0 1-8.254 3.906l-99.08-81.24-2.172-1.865a5.333 5.333 0 0 0-3.623-1.23z"></path><path fill="#b179f1" d="M94.75.416a8 8 0 0 0-5.674 1.469A4.693 4.693 0 0 1 96 6.015v116a4.693 4.693 0 0 1-8 3.319 8 8 0 0 0 9.094 1.547l26.373-12.68a8 8 0 0 0 4.533-7.213V21.016a8 8 0 0 0-4.533-7.215L97.094 1.12A8 8 0 0 0 94.75.416Zm-5.674 1.469A4.693 4.693 0 0 0 88 2.668a8 8 0 0 1 1.076-.783Z"></path><path fill="url(#a)" fill-rule="evenodd" d="M94.145.348a8 8 0 0 0-3.026.386A8 8 0 0 0 88 2.668L45.494 49.682 20.666 29.334l-2.172-1.865a5.333 5.333 0 0 0-4.814-1.108 3.4 3.4 0 0 0-.707.24l-9.694 4.067A5.333 5.333 0 0 0 0 35.162v57.679a5.333 5.333 0 0 0 3.28 4.493l9.693 4a3.4 3.4 0 0 0 .707.24 5.333 5.333 0 0 0 4.814-1.105l2.172-1.801 24.828-20.346L88 125.334a8 8 0 0 0 3.854 2.135 8 8 0 0 0 5.24-.588l26.373-12.68a8 8 0 0 0 4.533-7.213V21.016a8 8 0 0 0-4.533-7.215L97.094 1.12a8 8 0 0 0-2.95-.773ZM96 36.908v54.186L62.947 64.002Zm-80 8.787 16.547 18.307L16 82.309Z" opacity=".25"></path></svg>',
+    'internal-csx':
         '<svg viewBox="0 0 128 128"><defs><linearGradient id="a" x1="48" x2="48" y1="97.75" y2="2.25" gradientTransform="matrix(1 0 0 -1 0 97.75)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs><path fill="#52218a" d="M14.39 26.295a5.333 5.333 0 0 0-1.417.373l-9.694 4A5.333 5.333 0 0 0 0 35.561v56.88a5.333 5.333 0 0 0 3.28 4.893l9.693 4.066a5.333 5.333 0 0 0 5.521-.865l2.172-1.867a2.947 2.947 0 0 1-4.666-2.4V31.734a2.947 2.947 0 0 1 4.666-2.4l-2.172-1.799a5.333 5.333 0 0 0-4.103-1.24z"></path><path fill="#6c33af" d="M94.75.416A8 8 0 0 0 88 2.668l-82.666 91.4A3.08 3.08 0 0 1 0 92.002v.44a5.333 5.333 0 0 0 3.28 4.892l9.693 4.066a5.333 5.333 0 0 0 5.521-.865l2.172-1.867 99.08-81.24A5.053 5.053 0 0 1 128 21.334v-.307a8 8 0 0 0-4.533-7.213L97.094 1.121A8 8 0 0 0 94.75.416Z"></path><path fill="#854cc7" d="M14.871 26.238a5.333 5.333 0 0 0-1.898.43l-9.694 4A5.333 5.333 0 0 0 0 35.561v.441a3.08 3.08 0 0 1 5.334-2.066L88 125.334a8 8 0 0 0 9.094 1.547l26.373-12.694a8 8 0 0 0 4.533-7.212v-.307a5.053 5.053 0 0 1-8.254 3.906l-99.08-81.24-2.172-1.865a5.333 5.333 0 0 0-3.623-1.23z"></path><path fill="#b179f1" d="M94.75.416a8 8 0 0 0-5.674 1.469A4.693 4.693 0 0 1 96 6.015v116a4.693 4.693 0 0 1-8 3.319 8 8 0 0 0 9.094 1.547l26.373-12.68a8 8 0 0 0 4.533-7.213V21.016a8 8 0 0 0-4.533-7.215L97.094 1.12A8 8 0 0 0 94.75.416Zm-5.674 1.469A4.693 4.693 0 0 0 88 2.668a8 8 0 0 1 1.076-.783Z"></path><path fill="url(#a)" fill-rule="evenodd" d="M94.145.348a8 8 0 0 0-3.026.386A8 8 0 0 0 88 2.668L45.494 49.682 20.666 29.334l-2.172-1.865a5.333 5.333 0 0 0-4.814-1.108 3.4 3.4 0 0 0-.707.24l-9.694 4.067A5.333 5.333 0 0 0 0 35.162v57.679a5.333 5.333 0 0 0 3.28 4.493l9.693 4a3.4 3.4 0 0 0 .707.24 5.333 5.333 0 0 0 4.814-1.105l2.172-1.801 24.828-20.346L88 125.334a8 8 0 0 0 3.854 2.135 8 8 0 0 0 5.24-.588l26.373-12.68a8 8 0 0 0 4.533-7.213V21.016a8 8 0 0 0-4.533-7.215L97.094 1.12a8 8 0 0 0-2.95-.773ZM96 36.908v54.186L62.947 64.002Zm-80 8.787 16.547 18.307L16 82.309Z" opacity=".25"></path></svg>',
 
 };

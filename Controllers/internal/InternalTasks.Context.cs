@@ -6,7 +6,7 @@ namespace z3n8;
 
 public static partial class InternalTasks
 {
-    private sealed record TaskContext(
+    internal sealed record TaskContext(
         StubProject                    Project,
         Logger                         Logger,
         Action<string>                 Release
@@ -34,7 +34,7 @@ public static partial class InternalTasks
     private static List<List<string>> ParseRangeGroups(string rangeStr) =>
         rangeStr.Split(':').Select(ParseSingleRange).ToList();
 
-    private static async Task<TaskContext?> PrepareTaskContext(
+    internal static async Task<TaskContext?> PrepareTaskContext(
         SchedulerService               scheduler,
         DbConnectionService            dbService,
         LogsConfig                     logsConfig,

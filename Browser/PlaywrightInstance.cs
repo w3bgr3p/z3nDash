@@ -9,7 +9,7 @@ using z3n8.Browser;
 
 namespace z3n8.Browser
 {
-    public sealed class PlaywrightInstance : IBrowserInstance
+    public sealed partial class PlaywrightInstance : IBrowserInstance
     {
         private readonly IBrowserContext _context;
         private IPage _activePage;
@@ -151,9 +151,10 @@ namespace z3n8.Browser
         private readonly IPage _page;
         public PlaywrightTab(IPage page) => _page = page;
 
-        public string    URL     => _page.Url;
-        public bool      IsBusy  => false;
+        public string    URL          => _page.Url;
+        public bool      IsBusy       => false;
         public IDocument MainDocument => new PlaywrightDocument(_page);
+        public ITouch    Touch        => new PlaywrightTouch(_page);
 
         public void Navigate(string url, string referer = "")
             => Sync(_page.GotoAsync(url, new PageGotoOptions { Referer = referer == "" ? null : referer }));
@@ -168,6 +169,18 @@ namespace z3n8.Browser
             => Sync(_page.Mouse.WheelAsync(x, y));
 
         public void Close() => Sync(_page.CloseAsync());
+
+        /// <summary>ZP-совместимость: RiseEvent("click", new Rectangle(x,y,1,1), "Left")</summary>
+        public void RiseEvent(string eventName, System.Drawing.Rectangle area, string button)
+        {
+            int x = area.X + area.Width  / 2;
+            int y = area.Y + area.Height / 2;
+            if (eventName == "click")
+                Sync(_page.Mouse.ClickAsync(x, y));
+            else
+                Sync(_page.EvaluateAsync(
+                    $"document.elementFromPoint({x},{y})?.dispatchEvent(new MouseEvent('{eventName}',{{bubbles:true,clientX:{x},clientY:{y}}}))"));
+        }
 
         public IHeElement FindElementById(string id)
             => new PlaywrightElement(_page.Locator($"#{id}"));

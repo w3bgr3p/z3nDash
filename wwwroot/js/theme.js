@@ -48,26 +48,46 @@ function setTheme(name) {
     localStorage.setItem(THEME_KEY, name);
     document.documentElement.setAttribute('data-theme', name);
 
-    // Обновить все select-ы на странице
     document.querySelectorAll('.theme-select').forEach(sel => {
         if (sel.value !== name) sel.value = name;
     });
 
-    // Обновить кнопку если есть (legacy)
     const btn = document.getElementById('themeBtn');
     if (btn) btn.textContent = 'THEME: ' + name.toUpperCase();
 
     document.dispatchEvent(new CustomEvent('themechange', { detail: { theme: name } }));
+
+    // Persist to backend (fire-and-forget)
+    fetch('/config/ui', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: name })
+    }).catch(() => {});
 }
 
+
 function cycleTheme() {
-    const cur = getTheme();
+    const cur  = getTheme();
     const next = THEME_IDS[(THEME_IDS.indexOf(cur) + 1) % THEME_IDS.length];
     setTheme(next);
 }
 
 function initTheme() {
+    // Применяем сразу из localStorage — без мигания
     setTheme(getTheme());
+
+    // Затем синхронизируем с бэкендом
+    fetch('/config/ui')
+        .then(r => r.json())
+        .then(data => {
+            if (data.theme)        setTheme(data.theme);
+            if (data.dockPosition) {
+                localStorage.setItem('zp-dock-pos', data.dockPosition);
+                setDockPosition(data.dockPosition);
+            }
+        })
+        .catch(() => {});
+
 }
 
 /**
@@ -81,7 +101,6 @@ function createThemeSelect(container) {
     const sel = document.createElement('select');
     sel.className = 'theme-select';
 
-    // Группы
     const groups = [
         { label: 'Base',       ids: ['dark', 'light', 'hyper'] },
         { label: 'Editor',     ids: ['tokyo', 'gruvbox', 'nord', 'amber', 'amoled'] },
@@ -105,7 +124,6 @@ function createThemeSelect(container) {
     sel.value = getTheme();
     sel.addEventListener('change', () => setTheme(sel.value));
 
-    // Стили — инлайн чтобы работало до загрузки CSS
     sel.style.cssText = [
         'background: var(--bg2, #21262d)',
         'color: var(--text, #c9d1d9)',
@@ -124,7 +142,6 @@ function createThemeSelect(container) {
             : container;
         if (el) el.appendChild(sel);
     } else {
-        // Заменяем legacy #themeBtn если есть
         const btn = document.getElementById('themeBtn');
         if (btn) btn.replaceWith(sel);
     }

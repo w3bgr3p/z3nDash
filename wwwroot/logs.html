@@ -683,7 +683,7 @@
     }
 
     async function clearServer() {
-        if (!confirm('Delete all logs?')) return;
+        if (!await Dialog.confirm('Delete all logs?')) return;
         try {
             await fetch(`${SERVER}/clear`, { method: 'POST' });
             refresh();

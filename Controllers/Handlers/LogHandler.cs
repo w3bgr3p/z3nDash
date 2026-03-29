@@ -7,7 +7,7 @@ internal sealed class LogHandler
 {
     private readonly string _logPath;
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private bool _debug = true;
+    private bool _debug = false;
 
     public LogHandler(string logPath)
     {

@@ -29,6 +29,9 @@ Source: "publish-new\z3n8.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish-new\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish-new\wwwroot\*"; DestDir: "{app}\wwwroot"; Flags: ignoreversion recursesubdirs
 Source: "publish-new\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "Tasks\ps1\*"; DestDir: "{app}\Tasks\ps1"; Flags: ignoreversion
+Source: "Tasks\examples\*"; DestDir: "{app}\Tasks\examples"; Flags: ignoreversion
+Source: "z3n7dll\*"; DestDir: "{app}\z3n7dll"; Flags: ignoreversion
 
 
 [Icons]
@@ -36,4 +39,6 @@ Name: "{group}\z3n8"; Filename: "{app}\z3n8.exe"
 Name: "{autodesktop}\z3n8"; Filename: "{app}\z3n8.exe"
 
 [Run]
+Filename: "netsh"; Parameters: "http add urlacl url=http://*:38109/ user=Everyone"; Flags: runhidden; StatusMsg: "Registering port 38109..."
+Filename: "netsh"; Parameters: "http add urlacl url=http://*:38110/ user=Everyone"; Flags: runhidden; StatusMsg: "Registering port 38110..."
 Filename: "{app}\z3n8.exe"; Description: "Запустить z3n8"; Flags: postinstall nowait skipifsilent

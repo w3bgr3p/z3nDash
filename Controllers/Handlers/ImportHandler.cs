@@ -354,22 +354,28 @@ public sealed class ImportHandler : IScriptHandler
 
     static async Task<ImportResult> ImportStructure(Db db)
     {
-        const string url = "https://raw.githubusercontent.com/z3nFarm/z3n/refs/heads/master/templates/db_template.json";
+        //const string url = "https://raw.githubusercontent.com/z3nFarm/z3n/refs/heads/master/templates/db_template.json";
 
         Console.WriteLine($"[ImportStructure] downloading template...");
 
-        string json;
-        using var http = new System.Net.Http.HttpClient();
-        http.DefaultRequestHeaders.Add("User-Agent", "z3n8");
-        try   { json = await http.GetStringAsync(url); }
-        catch (Exception ex) { return new(0, $"Download failed: {ex.Message}"); }
-
+        //string json;
+        //using var http = new System.Net.Http.HttpClient();
+        //http.DefaultRequestHeaders.Add("User-Agent", "z3n8");
+        //try   { json = await http.GetStringAsync(url); }
+        //catch (Exception ex) { return new(0, $"Download failed: {ex.Message}"); }
+        
+        string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "templates", "db_template.json");
+        string json = await File.ReadAllTextAsync(templatePath);
+        
         Console.WriteLine($"[ImportStructure] downloaded {json.Length} chars");
 
         Dictionary<string, List<string>>? template;
         try   { template = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(json); }
         catch (Exception ex) { return new(0, $"Parse failed: {ex.Message}"); }
 
+
+        
+        
         if (template == null || template.Count == 0)
             return new(0, "Template is empty");
 

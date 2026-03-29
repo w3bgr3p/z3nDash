@@ -1,5 +1,12 @@
 ﻿namespace z3n8
 {
+    
+    public class TableSchema
+    {
+        public string Name   { get; set; }
+        public Dictionary<string, string> Columns { get; set; }
+    }
+    
     /// <summary>
     /// Централизованное хранилище имён таблиц с дефолтными значениями.
     ///
@@ -15,19 +22,37 @@
         /// InputSettings каждой задачи (переменные + _xml в base64).
         /// TaskManager._settingsTable
         /// </summary>
-        public static string Settings  { get; set; } = "_settings";
+        public static readonly TableSchema Settings = new()
+        {
+            Name = "_settings",
+            Columns = new()
+            {
+                { "id",        "TEXT PRIMARY KEY" },
+                { "name",      "TEXT DEFAULT ''"  },
+                { "_xml_b64",  "TEXT DEFAULT ''"  },
+                { "_json_b64", "TEXT DEFAULT ''"  },
+            }
+        };
 
         /// <summary>
         /// Список задач ZennoPoster (JsonToDb из ZennoPoster.TasksList).
         /// TaskManager._tasksTable
         /// </summary>
-        public static string Tasks     { get; set; } = "_tasks";
-
+        public static readonly TableSchema Tasks = new()
+        {
+            Name = "_tasks",
+            Columns = new()
+            {
+                { "id",        "TEXT PRIMARY KEY" },
+                { "name",      "TEXT DEFAULT ''"  },
+                { "_json_b64", "TEXT DEFAULT ''"  },
+            }
+        };
         /// <summary>
         /// Очередь команд для выполнения (status: pending → done/error).
         /// TaskManager._commandsTable
         /// </summary>
-        public static string Commands  { get; set; } = "_commands";
+        //public static string Commands  { get; set; } = "_commands";
 
         // ── DbExtencions ──────────────────────────────────────────────────────
 
@@ -36,5 +61,39 @@
         /// DbExtencions.cs:150 — хардкод "_wlt"
         /// </summary>
         public static string Wlt { get; set; } = "_wlt";
+        
+        
+        public static readonly TableSchema Commands = new()
+        {
+            Name = "_commands",
+            Columns = new()
+            {
+                { "id",         "TEXT PRIMARY KEY"       },
+                { "task_id",    "TEXT DEFAULT ''"        },
+                { "action",     "TEXT DEFAULT ''"        },
+                { "payload",    "TEXT DEFAULT ''"        },
+                { "status",     "TEXT DEFAULT 'pending'" },
+                { "result",     "TEXT DEFAULT ''"        },
+                { "created_at", "TEXT DEFAULT ''"        },
+            }
+        };
+        
+        
+        
+        public static readonly TableSchema Process = new()
+        {
+            Name = "_processes",
+            Columns = new()
+            {
+                { "id",           "TEXT PRIMARY KEY" },
+                { "machine",      "TEXT DEFAULT ''"  },
+                { "name",         "TEXT DEFAULT ''"  },
+                { "ram",          "TEXT DEFAULT ''"  },
+                { "uptime",       "TEXT DEFAULT ''"  },
+                { "command_line", "TEXT DEFAULT ''"  },
+                { "updated_at",   "TEXT DEFAULT ''"  },
+            }
+        };
+        
     }
 }

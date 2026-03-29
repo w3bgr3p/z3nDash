@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Cronos;
+using NBitcoin.Protocol;
 using z3n8;
 
 namespace z3n8;
@@ -11,7 +12,7 @@ public sealed class SchedulerService : IDisposable
 {
     private readonly DbConnectionService _dbService;
     private readonly System.Threading.Timer _timer;
-    private readonly ConcurrentDictionary<string, RunningProcess> _running = new();
+    internal readonly ConcurrentDictionary<string, RunningProcess> _running = new();
     private readonly Logger? _log;
     private readonly ConcurrentDictionary<string, Func<Dictionary<string, string>, CancellationToken, Action<string>, Task<string>>> _internalTasks = new();
     public void RegisterTask(string name, Func<Dictionary<string, string>, CancellationToken, Action<string>, Task<string>> handler)
@@ -23,7 +24,7 @@ public sealed class SchedulerService : IDisposable
     {
         { "id",               "TEXT PRIMARY KEY" },
         { "name",             "TEXT DEFAULT ''" },
-        { "executor",         "TEXT DEFAULT 'python'" },
+        { "executor",         "TEXT DEFAULT 'internal'" },
         { "script_path",      "TEXT DEFAULT ''" },
         { "args",             "TEXT DEFAULT ''" },
         { "enabled",          "TEXT DEFAULT 'true'" },
@@ -69,10 +70,64 @@ public sealed class SchedulerService : IDisposable
         if (!_dbService.TryGetDb(out var db) || db == null) return;
         db.PrepareTable(Schema, Table);
         db.PrepareTable(QueueSchema, QueueTable);
-        db.Query($"UPDATE \"{Table}\" SET \"status\" = 'idle' WHERE \"status\" = 'running'");
-        db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'error' WHERE \"status\" = 'running'");
+        SeedDefaults(db);
     }
 
+private static void SeedDefaults(Db db)
+{
+    var baseDir = AppContext.BaseDirectory;
+
+    var rows = new[]
+    {
+        (
+            id:             "0d1d2d4e-d033-4661-8198-f85ad1e8d906",
+            name:           "internal.0. env-check",
+            executor:       "ps1",
+            scriptPath:     Path.Combine(baseDir, "Tasks", "ps1", "check-env.ps1"),
+            payloadSchema:  ""
+        ),
+        (
+            id:             "4d8ead14-37ab-4081-97bf-9785929e055e",
+            name:           "internal.1.env-set",
+            executor:       "ps1",
+            scriptPath:     Path.Combine(baseDir, "Tasks", "ps1", "setup-env.ps1"),
+            payloadSchema:  ""
+        ),
+        (
+            id:             "ab7cfd05-43ae-49b2-a102-b832fb5572b2",
+            name:           "internal.GenerateClientBundle",
+            executor:       "internal",
+            scriptPath:     "GenerateClientBundle",
+            payloadSchema:  "[{\"key\":\"clientHwid\",\"label\":\"hwID\",\"type\":\"text\",\"options\":\"\"},{\"key\":\"clientName\",\"label\":\"Roman001\",\"type\":\"text\",\"options\":\"\"},{\"key\":\"outputFolder\",\"label\":\"output\",\"type\":\"text\",\"options\":\"\"}]"
+        ),
+        (
+            id:             "8b02699c-8198-4f19-ae8d-17ae17e8f850",
+            name:           "example.csx.sysinfo",
+            executor:       "csx",
+            scriptPath:     Path.Combine(baseDir, "Tasks", "examples", "sysinfo.csx"),
+            payloadSchema:  ""
+        ),
+        (
+            id:             "bfd48f48-26f8-4e88-8a87-b4dbcce5e49d",
+            name:           "example.zp_csx.rabby_zb",
+            executor:       "csx-internal",
+            scriptPath:     Path.Combine(baseDir, "Tasks", "examples", "rabby.csx"),
+            payloadSchema:  ""
+        ),
+    };
+
+    foreach (var r in rows)
+    {
+        var path   = r.scriptPath.Replace("'", "''");
+        var schema = r.payloadSchema.Replace("'", "''");
+        db.Query($"""
+            INSERT OR IGNORE INTO "_schedules"
+                ("id","name","executor","script_path","enabled","on_overlap","status","payload_schema")
+            VALUES
+                ('{r.id}','{r.name}','{r.executor}','{path}','true','skip','idle','{schema}')
+            """);
+    }
+}
     private void Tick(object? _)
     {
         if (!_dbService.TryGetDb(out var db) || db == null) return;
@@ -219,9 +274,22 @@ public sealed class SchedulerService : IDisposable
         var executor   = record.GetValueOrDefault("executor", "python");
         var scriptPath = record.GetValueOrDefault("script_path", "");
         var args       = record.GetValueOrDefault("args", "");
-        var nowIso      = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+
+
+        if (executor != "internal" && !File.Exists(scriptPath))
+        {
+            var errMsg = $"[ERR] no script file found at {scriptPath}";
+            _log.Error(errMsg);
+            SseHub.BroadcastOutput(
+                JsonSerializer.Serialize(new { line = errMsg, level = "ERROR" }), id);
+            db.Upd(
+                $"last_output = '{errMsg.Replace("'","''")}', last_exit = '1', last_run = '{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}'",
+                SchedulerService.Table,
+                where: $"\"id\" = '{id}'");
+            return;
+        }
         
-        
+
         // ── уникальный id прогона ──────────────────────────────────────────────
         var runId       = Guid.NewGuid().ToString("N")[..12];
         var instanceKey = $"{id}:{runId}";
@@ -230,24 +298,21 @@ public sealed class SchedulerService : IDisposable
         var payloadValues = record.GetValueOrDefault("payload_values", "");
         if (!string.IsNullOrWhiteSpace(payloadValues))
         {
-            var schema = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(
-                record.GetValueOrDefault("payload_schema", "[]"))
-                ?? new List<Dictionary<string, object>>();
+            var projectName = Path.GetFileName(scriptPath).Split('.')[0];
+            var table       = $"__{projectName}";
+            var nowIso      = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
 
             var payload = JsonSerializer.Deserialize<Dictionary<string, object>>(payloadValues)
-                ?? new Dictionary<string, object>();
+                          ?? new Dictionary<string, object>();
 
-            // ── выборка аккаунта из БД (общая для всех executor) ──────────────
             var condition = payload.TryGetValue("condition", out var cond) ? cond?.ToString() ?? "" : "";
-            condition = condition.Replace("NOW", $"'{nowIso}'");
+            condition     = condition.Replace("NOW", $"'{nowIso}'");
 
             if (!string.IsNullOrWhiteSpace(condition))
             {
-                var projectName = Path.GetFileName(scriptPath).Split('.')[0];
-                var table       = $"__{projectName}";
-                var cols        = db.GetTableColumns(table);
-                var colsSql     = string.Join(", ", cols.Select(c => $"\"{c}\""));
-                var rawRow      = db.Query($"SELECT {colsSql} FROM \"{table}\" WHERE {condition} LIMIT 1");
+                var cols    = db.GetTableColumns(table);
+                var colsSql = string.Join(", ", cols.Select(c => $"\"{c}\""));
+                var rawRow  = db.Query($"SELECT {colsSql} FROM \"{table}\" WHERE {condition} LIMIT 1");
 
                 if (!string.IsNullOrWhiteSpace(rawRow))
                 {
@@ -262,36 +327,7 @@ public sealed class SchedulerService : IDisposable
                 }
             }
 
-            // ── сборка args в зависимости от executor ─────────────────────────
-            if (executor == "internal")
-            {
-                args = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
-            }
-            else  if (executor == "ps1")
-            {
-                args = string.Join(" ", schema
-                    .Where(f => f.TryGetValue("key", out var k) && !string.IsNullOrWhiteSpace(k?.ToString()))
-                    .Select(f =>
-                    {
-                        var key = f["key"].ToString()!;
-                        var val = payload.TryGetValue(key, out var v) ? v?.ToString() ?? "" : "";
-                        if (string.IsNullOrWhiteSpace(val)) return "";
-                        return val == "true" ? $"-{key}" : $"-{key} {(val.Contains(' ') ? $"\"{val}\"" : val)}";
-                    })
-                    .Where(s => !string.IsNullOrEmpty(s)));
-            }
-            
-            else
-            {
-                args = string.Join(" ", schema
-                    .Where(f => f.TryGetValue("key", out var k) && !string.IsNullOrWhiteSpace(k?.ToString()))
-                    .Select(f =>
-                    {
-                        var key = f["key"].ToString()!;
-                        var val = payload.TryGetValue(key, out var v) ? v?.ToString() ?? "" : "";
-                        return val.Contains(' ') ? $"\"{val}\"" : val;
-                    }));
-            }
+            args = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
         }
         
         Action<string> broadcast = line =>
@@ -355,11 +391,132 @@ public sealed class SchedulerService : IDisposable
             return;
         }
 
+        if (executor == "csx-internal")
+        {
+            if (!File.Exists(scriptPath))
+            {
+                _log?.Error($"[{name}] csx script not found: {scriptPath}");
+                UpdateStatus(db, id, "error", firedAt, "-1", $"script not found: {scriptPath}", runId);
+                return;
+            }
+
+            UpdateStatus(db, id, "running", firedAt, "", "", runId);
+            var cts = new CancellationTokenSource();
+            var rp  = new RunningProcess(null, firedAt, cts, broadcast);
+            _running[instanceKey] = rp;
+
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine($"[LIVE] csx task started id={id} name={name} run={runId} script={Path.GetFileName(scriptPath)}");
+            Console.ResetColor();
+
+            InternalTasks.TaskContext? ctx = null;
+            ZB? zb                        = null;
+            Microsoft.Playwright.IPlaywright? pw = null;
+            var released = false;
+            var zbId     = "";
+
+            try
+            {
+                var payload = string.IsNullOrWhiteSpace(args)
+                    ? record
+                    : JsonSerializer.Deserialize<Dictionary<string, string>>(
+                        Encoding.UTF8.GetString(Convert.FromBase64String(args))) ?? record;
+
+                payload["__taskName"]    = name;
+                payload["__runId"]       = runId;
+                payload["__scheduleTag"] = scheduleTag;
+
+                var accountTable = payload.GetValueOrDefault("accountTable",
+                    "__" + name.Split('.')[0]);
+
+                ctx = await InternalTasks.PrepareTaskContext(this, _dbService, Config.LogsConfig, payload, accountTable, rp.AddLine);
+
+                if (ctx == null)
+                {
+                    rp.AddLine("no account available");
+                    _running.TryRemove(instanceKey, out _);
+                    UpdateStatus(db, id, "idle", DateTime.UtcNow, "0", "no account available", runId);
+                    FinishQueueEntry(db, queueUuid, "done", runId);
+                    return;
+                }
+
+                var needsBrowser = payload.GetValueOrDefault("browser", "false") == "true";
+                zbId = ctx.Project.Variables["zb_id"].Value;
+                zb = needsBrowser && !string.IsNullOrWhiteSpace(zbId)
+                    ? new ZB(Config.ApiConfig.ZB)
+                    : null;
+
+                z3n8.Browser.PlaywrightInstance? instance = null;
+
+                if (zb != null)
+                {
+                    var wsEndpoint = await zb.RunProfile(zbId);
+                    if (!string.IsNullOrWhiteSpace(wsEndpoint))
+                    {
+                        pw          = await Microsoft.Playwright.Playwright.CreateAsync();
+                        var browser = await pw.Chromium.ConnectOverCDPAsync(wsEndpoint);
+                        var context = browser.Contexts[0];
+                        var page    = context.Pages.FirstOrDefault()
+                                      ?? await context.NewPageAsync();
+                        instance    = new z3n8.Browser.PlaywrightInstance(page);
+                    }
+                }
+
+
+                var globals = new CsxGlobals
+                {
+                    project  = ctx.Project,
+                    instance = instance!,
+                    log      = ctx.Logger,
+                };
+
+                await CsxExecutor.RunAsync(scriptPath, globals, cts.Token);
+
+                ctx.Release("idle");
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                rp.Result = "ok";
+                RunLogger(scheduleTag, runId)?.Info($"[{name}] csx done run={runId}");
+                _running.TryRemove(instanceKey, out _);
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
+                FinishQueueEntry(db, queueUuid, "done", runId);
+                released = true;
+            }
+            catch (Exception ex)
+            {
+                var scriptFrames = ex.StackTrace?
+                    .Split(" at ", StringSplitOptions.RemoveEmptyEntries)
+                    .Where(f => f.Contains("Submission#0") || f.Contains("InternalTasks") || f.Contains("SchedulerService"))
+                    .Select(f => "at " + f.Trim());
+
+                rp.AddLine("[ERR] " + ex.Message);
+                rp.AddLine("[ERR] " + ex.StackTrace);  
+                foreach (var frame in scriptFrames ?? Enumerable.Empty<string>())
+                    rp.AddLine("[ERR] " + frame);
+
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                RunLogger(scheduleTag, runId)?.Error($"[{name}] csx failed: {ex.Message}");
+                rp.Result = ex.Message;
+                _running.TryRemove(instanceKey, out _);
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
+                FinishQueueEntry(db, queueUuid, "error", runId);
+            }
+            finally
+            {
+                try { if (zb != null) await zb.ProfileDown(zbId); } catch { }
+                try { pw?.Dispose(); } catch { }
+                if (!released) try { ctx?.Release("fail"); } catch { }
+                cts.Dispose();
+                TryDrainOne(db, id);
+            }
+
+            return;
+        }
+
         var (fileName, arguments) = BuildCommand(executor, scriptPath, args);
 
         _log?.Info($"[{name}] launch → {fileName} {Path.GetFileName(scriptPath)} run={runId}");
         UpdateStatus(db, id, "running", firedAt, "", "", runId);
-        _log?.Info($"[{name}] scriptPath={scriptPath} args={args} ");
+
         var psi = new System.Diagnostics.ProcessStartInfo
         {
             FileName               = fileName,
@@ -369,16 +526,13 @@ public sealed class SchedulerService : IDisposable
                                         : Environment.CurrentDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError  = true,
-            RedirectStandardInput  = true,
             UseShellExecute        = false,
             CreateNoWindow         = true,
         };
+        psi.Environment["PYTHONIOENCODING"] = "utf-8";
 
         var process = new System.Diagnostics.Process { StartInfo = psi, EnableRaisingEvents = true };
         var rp2     = new RunningProcess(process, firedAt, null, broadcast);
-
-        process.OutputDataReceived += (_, e) => { if (e.Data != null) rp2.AddLine(e.Data); };
-        process.ErrorDataReceived  += (_, e) => { if (e.Data != null) rp2.AddLine("[ERR] " + e.Data); };
 
         Console.ForegroundColor = ConsoleColor.Magenta;
         Console.WriteLine($"[LIVE] process task starting id={id} name={name} run={runId} key={instanceKey} exe={fileName}");
@@ -387,13 +541,14 @@ public sealed class SchedulerService : IDisposable
         try
         {
             process.Start();
-            process.StandardInput.Close();  
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
 
             _running[instanceKey] = rp2;
 
-            await process.WaitForExitAsync();
+            var stdoutTask = ReadStreamAsync(process.StandardOutput.BaseStream, rp2, prefix: "");
+            var stderrTask = ReadStreamAsync(process.StandardError.BaseStream,  rp2, prefix: "[ERR] ");
+
+            await Task.WhenAll(stdoutTask, stderrTask, process.WaitForExitAsync());
+
             SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
 
             string output = rp2.Snapshot();
@@ -414,6 +569,31 @@ public sealed class SchedulerService : IDisposable
             process.Dispose();
             TryDrainOne(db, id);
         }
+    }
+
+    private static async Task ReadStreamAsync(Stream stream, RunningProcess rp, string prefix)
+    {
+        var buffer = new byte[1024];
+        var sb     = new StringBuilder();
+        int bytesRead;
+
+        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+
+            int idx;
+            while ((idx = sb.ToString().IndexOfAny(['\n', '\r'])) >= 0)
+            {
+                var line = sb.ToString(0, idx).Trim();
+                sb.Remove(0, idx + 1);
+                if (line.Length > 0)
+                    rp.AddLine(prefix + line);
+            }
+        }
+
+        var tail = sb.ToString().Trim();
+        if (tail.Length > 0)
+            rp.AddLine(prefix + tail);
     }
 
     // ── schedule_tag: имя задачи без пробелов, lowercase ─────────────────────
@@ -516,7 +696,7 @@ public sealed class SchedulerService : IDisposable
         return "bash"; // PATH fallback
     }
 
-        private static (string fileName, string arguments) BuildCommand(string executor, string scriptPath, string args)
+    private static (string fileName, string arguments) BuildCommand(string executor, string scriptPath, string args)
     {
         static string TsNodeArgs(string path, string extraArgs)
         {
@@ -534,7 +714,7 @@ public sealed class SchedulerService : IDisposable
             "csx"     => ("cmd.exe",  $"/c dotnet-script \"{scriptPath}\" {args}".Trim()),
             "exe"     => (scriptPath, args),
             "bat"     => ("cmd.exe",  $"/c \"{scriptPath}\" {args}".Trim()),
-            "bash" => (ResolveGitBash(), $"--login -i \"{scriptPath}\" {args}".Trim()),
+            "bash" => (ResolveGitBash(), $"\"{scriptPath}\" {args}".Trim()),
             "ps1" => ("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" {args}".Trim()),
             _         => ("python",   $"\"{scriptPath}\" {args}".Trim()),
         };
@@ -627,9 +807,14 @@ public sealed class SchedulerService : IDisposable
         try
         {
             var cols    = db.GetTableColumns(table);
+            if (cols.Count == 0)
+            {
+                LoggerExt.Debug($"table not found: {table}");
+                return null;
+            }
             var colsSql = string.Join(", ", cols.Select(c => $"\"{c}\""));
             var query   = $"SELECT {colsSql} FROM \"{table}\" WHERE ({condition}) AND \"status\" != 'busy' LIMIT 1";
-            var rawRow  = db.Query(query, thrw: true);
+            var rawRow  = db.Query(query, thrw: false);
 
             if (string.IsNullOrWhiteSpace(rawRow))
             {
@@ -652,12 +837,13 @@ public sealed class SchedulerService : IDisposable
             record["__keyCol"]   = keyCol;
             record["__table"]    = table;
             record["__lockedAt"] = DateTime.UtcNow.ToString("o");  // ISO timestamp
-            
-            
-            var countRaw  = db.Query($"SELECT COUNT(*) FROM \"{table}\" WHERE ({condition})");
-            var total     = int.TryParse(countRaw?.Trim(), out var n) ? n : 0;
-            log?.Info($"account {id} locked by condition {condition} from  table {table}  remaining={total - 1}");
-            
+        
+            // ── логируем какой аккаунт залочен ────────────────────────
+            var acctLabel = record.GetValueOrDefault("address",
+                record.GetValueOrDefault("login",
+                    record.GetValueOrDefault("name", id)));
+            log?.Info($"account locked  table={table} id={id} label={acctLabel}");
+        
             return record;
         }
         finally
@@ -737,7 +923,7 @@ public sealed class SchedulerService : IDisposable
 
     // ── RunningProcess ────────────────────────────────────────────────────────
 
-    private sealed class RunningProcess
+    internal sealed class RunningProcess
     {
         private readonly System.Diagnostics.Process? _process;
         private readonly CancellationTokenSource?    _cts;

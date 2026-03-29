@@ -650,7 +650,7 @@
 
     async function clearLogs(type) {
         const { url, label } = CLEAR_MAP[type];
-        if (!confirm(`Clear ${label}? This cannot be undone.`)) return;
+        if (!await Dialog.confirm(`Clear ${label}? This cannot be undone.`)) return;
 
         const btnId = { logs:'clearLogsBtn', http:'clearHttpBtn', traffic:'clearTrafficBtn', all:'clearAllBtn' }[type];
         const btn = document.getElementById(btnId);

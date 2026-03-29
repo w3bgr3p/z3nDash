@@ -144,8 +144,8 @@ namespace z3n8
             string body   = BuildBody(toLog?.ToString() ?? "null", cut);
             string header = _fWrap ? BuildHeader(fullCaller) : string.Empty;
             string full   = header + body;
-
-            WriteConsole(fullCaller, body, level);
+            
+            WriteConsole(fullCaller, body, level, full);
 
             if (_http)
                 HttpSink.Send(_logHost, _timezone, level, body, fullCaller, this);
@@ -181,12 +181,12 @@ namespace z3n8
         // ── Helpers ───────────────────────────────────────────────────────────
         #region Helpers
 
-        private string BuildHeader(string fullCaller)
+        private string BuildHeader(string fullCaller, bool caller = true)
         {
             var sb = new StringBuilder();
             if (_fAcc  && !string.IsNullOrEmpty(Acc)) sb.Append($"  🤖 [{Acc}]");
             if (_fTime && _stopwatch != null)          sb.Append($"  ⏱️ [{_stopwatch.Elapsed:hh\\:mm\\:ss}]");
-            if (_fCaller)                              sb.Append($"  🔲 [{fullCaller}]");
+            if (_fCaller && caller)                              sb.Append($"  🔲 [{fullCaller}]");
             return sb.ToString();
         }
 
@@ -198,7 +198,7 @@ namespace z3n8
             return $"{prefix}{text.Trim()}";
         }
 
-        private void WriteConsole(string fullCaller, string body, LogLevel level)
+        private void WriteConsole(string fullCaller, string body, LogLevel level, string sink)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             Console.Write($"{fullCaller}.");
@@ -214,7 +214,7 @@ namespace z3n8
             Console.Write($"{body}\n");
             Console.ResetColor();
 
-            _sink?.Invoke($"[{level.ToString().ToUpper()}] [{fullCaller}] {body.Trim()}");
+            _sink?.Invoke($"[{level.ToString().ToUpper()}] {sink} ");
         }
 
         #endregion

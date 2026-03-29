@@ -25,7 +25,7 @@ window.PageState = {
         const p = location.pathname;
         const q = location.search;
         if (p.includes('scheduler')) return 'scheduler';
-        if (q.includes('page=pm'))     return 'pm';
+        if (q.includes('page=zp7'))     return 'zp7';
         if (q.includes('page=logs'))   return 'logs';
         if (q.includes('page=http'))   return 'http';
         if (q.includes('page=config')) return 'config';
@@ -47,12 +47,77 @@ window.PageState = {
         _loadScript('/js/icons.js', () => _loadScript('/js/navpath.js', cb));
     }
 
+    const DOCK_POSITIONS = ['bottom', 'top', 'left', 'right'];
+
+    function getDockPosition() {
+        return localStorage.getItem('zp-dock-pos') || 'bottom';
+    }
+
+    function cycleDockPosition() {
+        const cur  = getDockPosition();
+        const next = DOCK_POSITIONS[(DOCK_POSITIONS.indexOf(cur) + 1) % DOCK_POSITIONS.length];
+        setDockPosition(next);
+        fetch('/config/ui', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme: getTheme(), dockPosition: next })
+        }).catch(() => {});
+    }
+
+    function setDockPosition(pos) {
+        if (!DOCK_POSITIONS.includes(pos)) pos = 'bottom';
+        localStorage.setItem('zp-dock-pos', pos);
+
+        const zone = document.getElementById('zp-dock-zone');
+        const wrap = document.getElementById('zp-dock-wrap');
+        const dock = document.getElementById('zp-dock');
+        if (!zone || !wrap || !dock) return;
+
+        // Сбросить все позиционные стили
+        zone.removeAttribute('style');
+        wrap.removeAttribute('style');
+        dock.removeAttribute('style');
+
+        const zoneBase  = 'position:fixed;z-index:9999;pointer-events:auto;';
+        const wrapBase  = 'position:fixed;z-index:9999;pointer-events:none;display:flex;';
+        const isVertical = pos === 'left' || pos === 'right';
+
+        dock.style.flexDirection = isVertical ? 'column' : 'row';
+
+        if (pos === 'bottom') {
+            zone.style.cssText = zoneBase + 'bottom:0;left:0;right:0;height:6px;';
+            wrap.style.cssText = wrapBase + 'bottom:0;left:0;right:0;align-items:flex-end;justify-content:center;';
+        } else if (pos === 'top') {
+            zone.style.cssText = zoneBase + 'top:0;left:0;right:0;height:6px;';
+            wrap.style.cssText = wrapBase + 'top:0;left:0;right:0;align-items:flex-start;justify-content:center;';
+            dock.style.borderRadius = '0 0 16px 16px';
+            dock.style.borderTop    = 'none';
+        } else if (pos === 'left') {
+            zone.style.cssText = zoneBase + 'top:0;left:0;bottom:0;width:6px;';
+            wrap.style.cssText = wrapBase + 'top:0;left:0;bottom:0;align-items:flex-start;justify-content:center;flex-direction:column;';
+            dock.style.borderRadius = '0 16px 16px 0';
+            dock.style.borderLeft   = 'none';
+            dock.style.padding      = '16px 12px 16px 10px';
+        } else if (pos === 'right') {
+            zone.style.cssText = zoneBase + 'top:0;right:0;bottom:0;width:6px;';
+            wrap.style.cssText = wrapBase + 'top:0;right:0;bottom:0;align-items:flex-end;justify-content:center;flex-direction:column;';
+            dock.style.borderRadius = '16px 0 0 16px';
+            dock.style.borderRight  = 'none';
+            dock.style.padding      = '16px 10px 16px 12px';
+        }
+    }
+    
+    
+
     function inject() {
         // NAV_CONFIG и ICONS уже загружены — заполняем хоткеи
         Object.entries(NAV_CONFIG.hotkeys).forEach(([k, url]) => {
             HOTKEYS[k] = () => location.href = url;
         });
-        HOTKEYS['ctrl+shift+KeyX'] = () => openOtpModal();
+
+        HOTKEYS['alt+KeyX'] = () => openOtpModal();
+
+
 
         if (document.getElementById('zp-dock')) return;
 
@@ -204,7 +269,12 @@ window.PageState = {
 
         const dock = document.createElement('div');
         dock.id = 'zp-dock';
-
+        
+        const urlToHotkey = {};
+        Object.entries(NAV_CONFIG.hotkeys).forEach(([k, url]) => {
+            urlToHotkey[url] = k;
+        });
+        
         ITEMS.forEach((item) => {
             if (item.id === 'otp') {
                 const sep = document.createElement('div');
@@ -217,10 +287,14 @@ window.PageState = {
             if (item.href) el.href = item.href;
             if (item.onclick) el.addEventListener('click', e => { e.preventDefault(); item.onclick(); });
 
+          
+            const hk = item.href ? (urlToHotkey[item.href] || '') : '';
+            const hkLabel = hk ? hk.replace('alt+Key', 'Alt+').replace('alt+', 'Alt+') : '';
+
             el.innerHTML = `
                 <div class="zp-di-icon">${item.svg}</div>
                 <div class="zp-di-label">${item.label}</div>
-                <div class="zp-di-tip">${item.label} <span style="color:#484f58">&#x2303;&#x21E7;${item.hotkey}</span></div>
+                <div class="zp-di-tip">${item.label}${hkLabel ? ` <span style="color:#484f58">${hkLabel}</span>` : ''}</div>
                 <div class="zp-di-dot"></div>
             `;
             dock.appendChild(el);
@@ -235,10 +309,12 @@ window.PageState = {
         th.innerHTML = `
             <div class="zp-di-icon">${ICONS.theme}</div>
             <div class="zp-di-label">Theme</div>
-            <div class="zp-di-tip">Theme <span style="color:#484f58">&#x2303;&#x21E7;T</span></div>
+            <div class="zp-di-tip">Theme <span style="color:#484f58">Alt+T</span></div>
             <div class="zp-di-dot"></div>
         `;
         th.onclick = () => typeof cycleTheme === 'function' && cycleTheme();
+        HOTKEYS['alt+KeyT'] = () => typeof cycleTheme === 'function' && cycleTheme();
+
         dock.appendChild(th);
 
         wrap.appendChild(dock);
@@ -251,6 +327,11 @@ window.PageState = {
             clearTimeout(hideTimer);
             dock.classList.add('visible');
         }
+        
+        setDockPosition(getDockPosition());
+        HOTKEYS['alt+KeyP'] = () => cycleDockPosition();
+
+
         function schedulehide() {
             hideTimer = setTimeout(() => dock.classList.remove('visible'), 400);
         }
@@ -260,11 +341,20 @@ window.PageState = {
         dock.addEventListener('mouseenter', showDock);
         dock.addEventListener('mouseleave', schedulehide);
 
+        function isNearEdge(e, pos) {
+            if (pos === 'bottom') return window.innerHeight - e.clientY <= 6;
+            if (pos === 'top')    return e.clientY <= 6;
+            if (pos === 'left')   return e.clientX <= 6;
+            if (pos === 'right')  return window.innerWidth - e.clientX <= 6;
+            return false;
+        }
+
         document.addEventListener('mousemove', function(e) {
-            if (window.innerHeight - e.clientY <= 2) showDock();
+            if (isNearEdge(e, getDockPosition())) showDock();
         });
 
         injectOtp();
+        injectDialog();
     }
 
     // ── OTP Modal ─────────────────────────────────────────────────────────────
@@ -338,6 +428,11 @@ window.PageState = {
         overlay.addEventListener('mousedown', e => { if (e.target === overlay) closeOtpModal(); });
     }
 
+    
+    
+    
+    
+    
     let _otpTimer = null;
 
     function openOtpModal() {
@@ -437,6 +532,127 @@ window.PageState = {
             genBtn.disabled = false;
         }
     }
+
+    // ── Universal Dialog ──────────────────────────────────────────────────────
+
+    function injectDialog() {
+        if (document.getElementById('dialogOverlay')) return;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            #dialogOverlay {
+                display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+                z-index: 10002; align-items: center; justify-content: center;
+            }
+            #dialogOverlay.open { display: flex; }
+            #dialogBox {
+                background: var(--bg1, #161b22); border: 1px solid var(--border, #30363d);
+                border-radius: 8px; width: 340px; padding: 18px;
+                display: flex; flex-direction: column; gap: 12px;
+            }
+            #dialogIcon { font-size: 20px; }
+            #dialogTitle { font-size: 13px; font-weight: 600; color: var(--text-hi, #e6edf3); }
+            #dialogMsg { font-size: 12px; color: var(--text2, #8b949e); line-height: 1.5; white-space: pre-wrap; }
+            #dialogInput {
+                background: var(--bg, #0d1117); border: 1px solid var(--border, #30363d);
+                border-radius: 4px; color: var(--text, #c9d1d9); padding: 5px 9px;
+                font-size: 12px; width: 100%; box-sizing: border-box; display: none;
+                font-family: inherit;
+            }
+            #dialogInput:focus { outline: none; border-color: var(--accent, #388bfd); }
+            #dialogButtons { display: flex; gap: 7px; justify-content: flex-end; }
+            .dialog-btn {
+                padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border, #30363d);
+                font-size: 11px; cursor: pointer; background: var(--bg2, #21262d);
+                color: var(--text, #c9d1d9); font-family: inherit;
+            }
+            .dialog-btn:hover { background: var(--border, #30363d); }
+            .dialog-btn.primary { background: var(--green-bg, #238636); border-color: var(--green-bg, #238636); color: #fff; }
+            .dialog-btn.primary:hover { background: var(--green-bg2, #2ea043); }
+            .dialog-btn.danger { background: var(--red-bg, #da3633); border-color: var(--red-bg, #da3633); color: #fff; }
+            .dialog-btn.danger:hover { background: var(--red, #f85149); }
+        `;
+        document.head.appendChild(style);
+
+        const overlay = document.createElement('div');
+        overlay.id = 'dialogOverlay';
+        overlay.innerHTML = `
+            <div id="dialogBox">
+                <div style="display:flex;align-items:center;gap:9px;">
+                    <span id="dialogIcon">ℹ️</span>
+                    <span id="dialogTitle"></span>
+                </div>
+                <div id="dialogMsg"></div>
+                <input id="dialogInput" type="text" autocomplete="off">
+                <div id="dialogButtons"></div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    window.Dialog = {
+        _resolve: null,
+        _open(icon, title, msg, mode, defaultVal) {
+            document.getElementById('dialogIcon').textContent  = icon;
+            document.getElementById('dialogTitle').textContent = title;
+            document.getElementById('dialogMsg').textContent   = msg;
+            const inp = document.getElementById('dialogInput');
+            inp.style.display = mode === 'prompt' ? 'block' : 'none';
+            inp.value = defaultVal || '';
+            document.getElementById('dialogOverlay').classList.add('open');
+            if (mode === 'prompt') setTimeout(() => inp.focus(), 50);
+            return new Promise(res => { this._resolve = res; });
+        },
+        _close(val) {
+            document.getElementById('dialogOverlay').classList.remove('open');
+            document.getElementById('dialogButtons').innerHTML = '';
+            if (this._resolve) { this._resolve(val); this._resolve = null; }
+        },
+        _buttons(btns) {
+            const container = document.getElementById('dialogButtons');
+            container.innerHTML = '';
+            btns.forEach(({ label, cls, val }) => {
+                const b = document.createElement('button');
+                b.className = 'dialog-btn ' + (cls || '');
+                b.textContent = label;
+                b.onclick = () => {
+                    const v = val === '__INPUT__'
+                        ? document.getElementById('dialogInput').value.trim()
+                        : val;
+                    this._close(v);
+                };
+                container.appendChild(b);
+            });
+        },
+        alert(msg, title = 'Info', icon = 'ℹ️') {
+            this._buttons([{ label: 'OK', cls: 'primary', val: true }]);
+            return this._open(icon, title, msg, 'alert');
+        },
+        confirm(msg, title = 'Confirm', danger = false) {
+            this._buttons([
+                { label: 'Cancel',  cls: '',                    val: false },
+                { label: 'Confirm', cls: danger ? 'danger' : 'primary', val: true }
+            ]);
+            return this._open('⚠️', title, msg, 'confirm');
+        },
+        prompt(msg, title = 'Input', defaultVal = '') {
+            const inp = document.getElementById('dialogInput');
+            this._buttons([
+                { label: 'Cancel', cls: '',        val: null         },
+                { label: 'OK',     cls: 'primary', val: '__INPUT__'  }
+            ]);
+            const p = this._open('✏️', title, msg, 'prompt', defaultVal);
+            const handler = (e) => {
+                if (e.key === 'Enter')  { inp.removeEventListener('keydown', handler); this._close(inp.value.trim()); }
+                if (e.key === 'Escape') { inp.removeEventListener('keydown', handler); this._close(null); }
+            };
+            inp.addEventListener('keydown', handler);
+            return p;
+        },
+        error(msg, title = 'Error') { return this.alert(msg, title, '❌'); }
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => _loadIcons(inject));

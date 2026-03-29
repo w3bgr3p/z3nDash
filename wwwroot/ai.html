@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>z3n8 | AI Report</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Iosevka', 'Consolas', monospace;
+            font-size: 12px;
+            padding: 12px;
+        }
+
+        .header {
+            background: var(--bg1);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header h1 { font-size: 15px; color: var(--accent); }
+        .header-sub { font-size: 10px; color: var(--text2); margin-left: auto; }
+
+        .controls {
+            background: var(--bg1);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        select, button {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            cursor: pointer;
+            outline: none;
+            font-family: inherit;
+        }
+        select:focus, button:focus { border-color: var(--accent); }
+
+        button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+        button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.secondary { background: var(--bg2); border-color: var(--border); }
+        button.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.danger { color: var(--red, #f85149); border-color: transparent; background: transparent; padding: 2px 6px; font-size: 10px; }
+        button.danger:hover { border-color: var(--red, #f85149); }
+
+        label { font-size: 11px; color: var(--text2); }
+
+        .results { display: flex; flex-direction: column; gap: 10px; }
+
+        .result-card {
+            background: var(--bg1);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .result-card.loading { border-color: var(--blue-border, #388bfd44); }
+        .result-card.done    { border-color: var(--green-bg, #238636); }
+        .result-card.error   { border-color: var(--red-bg, #da3633); }
+        .result-card.cached  { border-color: var(--border); opacity: 0.85; }
+
+        .card-header {
+            background: var(--bg2);
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .card-project { font-weight: 600; color: var(--text-hi, var(--text)); font-size: 12px; }
+        .card-model   { font-size: 10px; color: var(--text2); }
+        .card-ts      { font-size: 10px; color: var(--muted); margin-left: auto; }
+        .card-status  { font-size: 10px; padding: 1px 6px; border-radius: 3px; }
+        .card-status.loading { background: var(--blue-tint,  rgba(56,139,253,.12)); color: var(--accent); }
+        .card-status.done    { background: var(--green-tint, rgba(35,134,54,.15));  color: var(--green, #3fb950); }
+        .card-status.error   { background: var(--red-tint,   rgba(218,54,51,.15));  color: var(--red,   #f85149); }
+        .card-status.cached  { background: var(--bg2); color: var(--text2); }
+
+        .card-body {
+            padding: 10px 14px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: 12px;
+            color: var(--text);
+        }
+        .card-body.muted      { color: var(--text2); }
+        .card-body.error-body { color: var(--red, #f85149); font-size: 11px; overflow-x: auto; }
+
+        .spinner {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>AI Report</h1>
+    <span class="header-sub">per-project LLM analysis</span>
+</div>
+
+<div class="controls">
+    <label>Project</label>
+    <select id="projectSelect"><option value="">— loading —</option></select>
+    <label>Model</label>
+    <select id="modelSelect" style="width:260px;"><option value="">— loading —</option></select>
+    <button class="primary"   id="btnRun" onclick="runOne()">Analyze</button>
+    <button class="secondary" id="btnSummary" onclick="runSummary()">Summary</button>
+    <label id="statusLabel" style="margin-left:4px;"></label>
+</div>
+
+<div class="results" id="results"></div>
+
+<script>
+    const SERVER = '';
+
+    // ── init ──────────────────────────────────────────────────────────────────
+
+    loadProjects();
+    loadModels();
+    loadCache();
+
+    async function loadProjects() {
+        try {
+            const r    = await fetch(`${SERVER}/report/api/projects-db`);
+            const data = await r.json();
+            const names = Object.keys(data.projects || {})
+                .filter(n => Object.keys((data.projects[n].accounts || {})).length > 0);
+            const sel = document.getElementById('projectSelect');
+            if (names.length) {
+                sel.innerHTML =
+                    '<option value="__all__">— All Projects —</option>' +
+                    names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+            } else {
+                sel.innerHTML = '<option value="">No projects</option>';
+            }
+        } catch (e) {
+            document.getElementById('projectSelect').innerHTML = '<option value="">Error loading</option>';
+        }
+    }
+
+    async function loadModels() {
+        try {
+            const r   = await fetch(`${SERVER}/ai-report/api/models`);
+            const raw = await r.text();
+            const sel = document.getElementById('modelSelect');
+            let data;
+            try { data = JSON.parse(raw); } catch(e) {
+                sel.innerHTML = `<option value="">Parse error: ${esc(raw.substring(0,80))}</option>`;
+                return;
+            }
+            if (data.error) {
+                sel.innerHTML = `<option value="">Error: ${esc(String(data.error).substring(0,80))}</option>`;
+                return;
+            }
+            if (data.models && data.models.length) {
+                sel.innerHTML = data.models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+            } else {
+                sel.innerHTML = `<option value="">Empty: ${esc(raw.substring(0,120))}</option>`;
+            }
+        } catch (e) {
+            document.getElementById('modelSelect').innerHTML = `<option value="">Fetch error: ${esc(e.message)}</option>`;
+        }
+    }
+
+    async function loadCache() {
+        try {
+            const r    = await fetch(`${SERVER}/ai-report/api/cache`);
+            const data = await r.json();
+            for (const entry of (data.entries || [])) {
+                renderCached(entry);
+            }
+        } catch (e) {}
+    }
+
+    // ── actions ───────────────────────────────────────────────────────────────
+
+    async function runOne() {
+        const name = document.getElementById('projectSelect').value;
+        if (!name) return;
+        if (name === '__all__') {
+            await runAllSequential();
+        } else {
+            await analyzeProject(name);
+        }
+    }
+
+    async function runAllSequential() {
+        const sel   = document.getElementById('projectSelect');
+        const names = Array.from(sel.options).map(o => o.value).filter(v => v && v !== '__all__');
+        if (!names.length) return;
+
+        setBtns(true);
+        for (let i = 0; i < names.length; i++) {
+            document.getElementById('statusLabel').textContent = `${i + 1}/${names.length}`;
+            await analyzeProject(names[i]);
+        }
+        document.getElementById('statusLabel').textContent = 'done';
+        setBtns(false);
+    }
+
+    async function runSummary() {
+        setBtns(true);
+        const cardId = 'card___all__';
+        let card = document.getElementById(cardId);
+        if (!card) { card = createCard(cardId, 'All Projects — Summary'); document.getElementById('results').prepend(card); }
+
+        setCardState(card, 'loading', 'analyzing…', 'All Projects — Summary', '');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        try {
+            const r    = await fetch(`${SERVER}/ai-report/api/analyze-all`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: selectedModel() })
+            });
+            const data = await r.json();
+            if (data.error) {
+                setCardState(card, 'error', 'error', 'All Projects — Summary', data.error);
+            } else {
+                setCardState(card, 'done', 'done', 'All Projects — Summary', data.analysis, data.model);
+            }
+        } catch (e) {
+            setCardState(card, 'error', 'error', 'All Projects — Summary', e.message);
+        }
+
+        setBtns(false);
+    }
+
+    async function analyzeProject(projectName) {
+        setBtns(true);
+        const cardId = 'card_' + projectName.replace(/\W/g, '_');
+        let card = document.getElementById(cardId);
+        if (!card) { card = createCard(cardId, projectName); document.getElementById('results').prepend(card); }
+
+        setCardState(card, 'loading', 'analyzing…', projectName, '');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        try {
+            const r    = await fetch(`${SERVER}/ai-report/api/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ project: projectName, model: selectedModel() })
+            });
+            const data = await r.json();
+            if (data.error) {
+                setCardState(card, 'error', 'error', projectName, data.error);
+            } else {
+                setCardState(card, 'done', 'done', projectName, data.analysis, data.model);
+            }
+        } catch (e) {
+            setCardState(card, 'error', 'error', projectName, e.message);
+        }
+
+        setBtns(false);
+    }
+
+    async function deleteCache(project, cardId) {
+        try {
+            await fetch(`${SERVER}/ai-report/api/cache?project=${encodeURIComponent(project)}`, { method: 'DELETE' });
+            const card = document.getElementById(cardId);
+            if (card) card.remove();
+        } catch(e) {}
+    }
+
+    // ── render ────────────────────────────────────────────────────────────────
+
+    function renderCached(entry) {
+        const cardId = entry.project === '__all__'
+            ? 'card___all__'
+            : 'card_' + entry.project.replace(/\W/g, '_');
+
+        if (document.getElementById(cardId)) return; // already live
+
+        const label = entry.project === '__all__' ? 'All Projects — Summary' : entry.project;
+        const card  = createCard(cardId, label);
+        card.className = 'result-card cached';
+
+        const statusEl = card.querySelector('.card-status');
+        statusEl.className   = 'card-status cached';
+        statusEl.textContent = 'cached';
+
+        card.querySelector('.card-model').textContent = entry.model ? entry.model.split('/').pop() : '';
+        card.querySelector('.card-ts').textContent    = entry.ts ? entry.ts.substring(0, 16).replace('T', ' ') : '';
+
+        const bodyEl = card.querySelector('.card-body');
+        bodyEl.textContent = entry.analysis;
+        bodyEl.className   = 'card-body';
+
+        // add delete button to header
+        const delBtn = document.createElement('button');
+        delBtn.className   = 'danger';
+        delBtn.textContent = '✕ clear';
+        delBtn.onclick     = () => deleteCache(entry.project, cardId);
+        card.querySelector('.card-header').appendChild(delBtn);
+
+        document.getElementById('results').appendChild(card);
+    }
+
+    function createCard(id, name) {
+        const div = document.createElement('div');
+        div.className = 'result-card';
+        div.id = id;
+        div.innerHTML = `
+            <div class="card-header">
+                <span class="card-project">${esc(name)}</span>
+                <span class="card-status"></span>
+                <span class="card-model"></span>
+                <span class="card-ts"></span>
+            </div>
+            <div class="card-body muted"></div>`;
+        return div;
+    }
+
+    function setCardState(card, state, statusText, name, body, model) {
+        card.className = `result-card ${state}`;
+
+        const statusEl = card.querySelector('.card-status');
+        statusEl.className   = `card-status ${state}`;
+        statusEl.textContent = statusText;
+
+        card.querySelector('.card-model').textContent = model ? model.split('/').pop() : '';
+        card.querySelector('.card-ts').textContent    = '';
+
+        const bodyEl = card.querySelector('.card-body');
+        if (state === 'loading') {
+            bodyEl.innerHTML = '<span class="spinner"></span> Waiting for LLM…';
+            bodyEl.className = 'card-body muted';
+        } else if (state === 'error') {
+            bodyEl.textContent = body;
+            bodyEl.className   = 'card-body error-body';
+        } else {
+            bodyEl.textContent = body;
+            bodyEl.className   = 'card-body';
+        }
+    }
+
+    // ── util ──────────────────────────────────────────────────────────────────
+
+    function setBtns(busy) {
+        document.getElementById('btnRun').disabled     = busy;
+        document.getElementById('btnSummary').disabled = busy;
+    }
+
+    function selectedModel() {
+        return document.getElementById('modelSelect').value || '';
+    }
+
+    function esc(s) {
+        return String(s)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+</script>
+</body>
+</html>

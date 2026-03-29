@@ -1,0 +1,798 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>z3n8 | System Snapshot</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'Iosevka', 'Consolas', monospace;
+            font-size: 11px; height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        #app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        /* ── Header ── */
+        .main-header {
+            background: var(--bg1); padding: 6px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+        }
+        .main-header h1 { font-size: 13px; font-weight: 700; color: var(--accent); }
+        .header-stats { display: flex; gap: 14px; font-size: 10px; color: var(--text2); margin-left: 8px; }
+        .stat-item { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+        .stat-label { color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; }
+        .stat-val   { color: var(--accent); font-weight: 600; }
+        .header-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+        /* ── Toolbar ── */
+        .toolbar {
+            background: var(--bg1); padding: 4px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        }
+        .toolbar-label { font-size: 10px; color: var(--text2); white-space: nowrap; }
+        .toolbar-sep { width: 1px; height: 14px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+
+        /* ── Buttons ── */
+        .btn { padding: 3px 9px; border-radius: 3px; border: 1px solid var(--border); cursor: pointer; font-size: 10px; background: var(--bg2); color: var(--text); font-family: inherit; white-space: nowrap; }
+        .btn:hover { background: var(--bg3, #30363d); }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { opacity: 0.85; }
+        .btn.danger { background: transparent; color: var(--red, #f85149); border-color: var(--red, #f85149); }
+        .btn.danger:hover { background: rgba(248,81,73,0.1); }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── Main layout ── */
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── Section nav (left) ── */
+        .section-nav {
+            width: 200px; flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            background: var(--bg1);
+            overflow-y: auto; padding: 6px 0;
+        }
+        .nav-item {
+            padding: 4px 12px; cursor: pointer; font-size: 10px;
+            color: var(--text2); white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; border-left: 2px solid transparent;
+        }
+        .nav-item:hover { background: var(--bg2); color: var(--text); }
+        .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg2); }
+        .nav-ts { font-size: 9px; color: var(--text2); padding: 4px 12px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+
+        /* ── Content area ── */
+        .content-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* ── Section panel ── */
+        .section-panel { flex: 1; overflow: auto; padding: 10px 14px; display: none; }
+        .section-panel.active { display: block; }
+
+        /* ── Raw text section ── */
+        .raw-text {
+            font-size: 10px; line-height: 1.55; white-space: pre;
+            color: var(--text); background: var(--bg1);
+            border: 1px solid var(--border); border-radius: 4px;
+            padding: 10px 12px; overflow-x: auto;
+        }
+
+        /* ── Data table ── */
+        .data-table-wrap { overflow-x: auto; }
+        .data-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 10px; }
+        .data-table th {
+            background: var(--bg2); color: var(--text2); font-weight: 600;
+            padding: 4px 8px; text-align: left; position: sticky; top: 0; z-index: 2;
+            border-bottom: 1px solid var(--border); white-space: nowrap;
+            cursor: pointer; user-select: none; font-size: 9px;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .data-table th:hover { color: var(--text); }
+        .data-table th.sort-asc::after  { content: ' ↑'; color: var(--accent); }
+        .data-table th.sort-desc::after { content: ' ↓'; color: var(--accent); }
+        .data-table td {
+            padding: 3px 8px; border-bottom: 1px solid var(--border);
+            white-space: nowrap; color: var(--text);
+        }
+        .data-table tr:hover td { background: var(--bg2); }
+        .data-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .data-table td.accent { color: var(--accent); font-weight: 600; }
+        .data-table td.warn   { color: var(--yellow, #e3b341); }
+        .data-table td.red    { color: var(--red, #f85149); }
+        .data-table td.green  { color: var(--green, #3fb950); }
+
+        /* ── Search in section ── */
+        .section-search {
+            display: flex; gap: 6px; align-items: center; margin-bottom: 8px;
+        }
+        .section-search input {
+            flex: 1; max-width: 300px; padding: 3px 7px;
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 3px; color: var(--text); font-size: 10px; font-family: inherit;
+            outline: none;
+        }
+        .section-search input:focus { border-color: var(--accent); }
+        .section-row-count { font-size: 9px; color: var(--text2); }
+
+        /* ── KV grid (header/env sections) ── */
+        .kv-grid { display: grid; grid-template-columns: 160px 1fr; gap: 2px 12px; }
+        .kv-key { color: var(--text2); font-size: 10px; padding: 2px 0; }
+        .kv-val { color: var(--text); font-size: 10px; padding: 2px 0; font-weight: 600; }
+
+        /* ── No data ── */
+        .no-data { color: var(--text2); font-size: 10px; padding: 20px 0; text-align: center; }
+
+        /* ── Sidebar (AI) ── */
+        .sidebar-resizer {
+            width: 4px; flex-shrink: 0; cursor: col-resize;
+            background: transparent; transition: background 0.15s;
+        }
+        .sidebar-resizer:hover { background: var(--accent); opacity: 0.5; }
+        .sidebar {
+            width: 240px; flex-shrink: 0;
+            border-left: 1px solid var(--border);
+            background: var(--bg1);
+            display: flex; flex-direction: column;
+            overflow-y: auto;
+        }
+        .sidebar-section { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+        .sidebar-title {
+            font-size: 9px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--accent); margin-bottom: 6px;
+        }
+
+        /* ── AI panel ── */
+        .ai-controls { display: flex; flex-direction: column; gap: 5px; }
+        .ai-model-row { display: flex; gap: 4px; align-items: center; }
+        .ai-model-row select {
+            flex: 1; padding: 2px 4px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 3px; color: var(--text); font-size: 9px; font-family: inherit; outline: none;
+        }
+        .ai-model-row select:focus { border-color: var(--accent); }
+        .ai-btn-row { display: flex; gap: 4px; }
+        .ai-btn-row .btn { flex: 1; font-size: 9px; padding: 3px 4px; }
+        .ai-result {
+            margin-top: 6px; padding: 6px; background: var(--bg);
+            border: 1px solid var(--border); border-radius: 3px;
+            font-size: 10px; line-height: 1.55; color: var(--text);
+            white-space: pre-wrap; max-height: none; overflow-y: visible;
+            display: none;
+        }
+        .ai-result.show    { display: block; }
+        .ai-result.loading { color: var(--text2); font-style: italic; }
+        .ai-result.error   { color: var(--red, #f85149); }
+        .ai-meta {
+            margin-top: 4px; font-size: 8px; color: var(--text2);
+            justify-content: space-between; display: none;
+        }
+        .ai-meta.show { display: flex; }
+
+        /* ── Snapshot list in sidebar ── */
+        .snap-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 3px 4px; border-radius: 3px; cursor: pointer;
+            border: 1px solid transparent; gap: 4px;
+        }
+        .snap-item:hover { background: var(--bg2); }
+        .snap-item.active { background: var(--bg2); border-color: var(--accent); }
+        .snap-ts   { font-size: 9px; color: var(--text); }
+        .snap-host { font-size: 8px; color: var(--text2); }
+        .snap-del  { font-size: 9px; color: var(--text2); cursor: pointer; padding: 0 2px; flex-shrink: 0; }
+        .snap-del:hover { color: var(--red, #f85149); }
+
+        /* ── Upload drop area ── */
+        .drop-area {
+            border: 1px dashed var(--border); border-radius: 4px;
+            padding: 10px; text-align: center; color: var(--text2);
+            font-size: 10px; cursor: pointer; margin-bottom: 6px;
+            transition: border-color 0.15s;
+        }
+        .drop-area:hover, .drop-area.drag { border-color: var(--accent); color: var(--text); }
+
+        /* ── Spinners ── */
+        .spinner-inline {
+            display: inline-block; width: 8px; height: 8px;
+            border: 1px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Empty state ── */
+        .empty-state {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: var(--text2); gap: 8px;
+        }
+        .empty-state-title { font-size: 12px; color: var(--text); }
+        .empty-state-sub   { font-size: 10px; }
+
+        /* ── Process bar sparkline ── */
+        .mem-bar { display: inline-block; height: 6px; background: var(--accent); border-radius: 1px; opacity: 0.6; vertical-align: middle; margin-right: 4px; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+    </style>
+</head>
+<body>
+<div id="app">
+
+    <!-- Header -->
+    <div class="main-header">
+        <h1>System Snapshot</h1>
+        <div class="header-stats">
+            <div class="stat-item"><span class="stat-label">Host:</span><span class="stat-val" id="sHost">—</span></div>
+            <div class="stat-item"><span class="stat-label">RAM Used:</span><span class="stat-val" id="sRam">—</span></div>
+            <div class="stat-item"><span class="stat-label">CPU:</span><span class="stat-val" id="sCpu">—</span></div>
+            <div class="stat-item"><span class="stat-label">Processes:</span><span class="stat-val" id="sProcs">—</span></div>
+            <div class="stat-item"><span class="stat-label">TCP Conns:</span><span class="stat-val" id="sTcp">—</span></div>
+        </div>
+        <div class="header-right">
+            <button class="btn" onclick="captureNow()">▶ Capture Now</button>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <span class="toolbar-label">Load:</span>
+        <button class="btn" onclick="document.getElementById('fileInput').click()">From File (.txt)</button>
+        <input type="file" id="fileInput" accept=".txt,.log" style="display:none" onchange="loadFile(this)">
+        <div class="toolbar-sep"></div>
+        <span class="toolbar-label">Last output:</span>
+        <input type="text" id="snapFilePath" placeholder="C:\path\to\system_snapshot_last.txt"
+               style="width:320px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:10px;font-family:inherit;outline:none;">
+        <button class="btn" onclick="loadLastOutput()">Load</button>
+        <div class="toolbar-sep"></div>
+        <span class="toolbar-label">Filter:</span>
+        <input type="text" id="globalFilter" placeholder="process / port / address…"
+               style="width:180px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:10px;font-family:inherit;outline:none;"
+               oninput="applyGlobalFilter(this.value)">
+        <div class="toolbar-sep"></div>
+        <span id="captureStatus" style="font-size:10px;color:var(--text2);"></span>
+    </div>
+
+    <!-- Main -->
+    <div class="main-content">
+
+        <!-- Section nav -->
+        <div class="section-nav" id="sectionNav">
+            <div id="snapTs" class="nav-ts">No snapshot loaded</div>
+            <div class="no-data" style="padding:20px 0;text-align:center;">—</div>
+        </div>
+
+        <!-- Content area + sidebar -->
+        <div class="content-area" id="contentArea">
+            <div class="empty-state" id="emptyState">
+                <div class="empty-state-title">No snapshot loaded</div>
+                <div class="empty-state-sub">Capture now or load a .txt file from a PS1 run</div>
+            </div>
+        </div>
+
+        <!-- Resizer -->
+        <div class="sidebar-resizer" id="sidebarResizer"></div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebarPanel">
+
+            <!-- Saved snapshots -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">Saved Snapshots</div>
+                <div id="snapList"><div class="no-data">None</div></div>
+            </div>
+
+            <!-- AI Audit -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">AI Audit</div>
+                <div class="ai-controls">
+                    <div class="ai-model-row">
+                        <select id="aiModel"><option value="">— loading —</option></select>
+                    </div>
+                    <div class="ai-btn-row">
+                        <button class="btn primary" id="aiBtnRun" onclick="aiAudit()" disabled>Audit</button>
+                        <button class="btn danger"  id="aiBtnClear" onclick="aiClearCache()" style="display:none">Clear</button>
+                    </div>
+                    <div class="ai-result" id="aiResult"></div>
+                    <div class="ai-meta"   id="aiMeta">
+                        <span id="aiMetaModel"></span>
+                        <span id="aiMetaTs"></span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    const API = window.location.origin;
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let currentRaw    = '';   // raw text of loaded snapshot
+    let currentSections = []; // [{title, raw, type, rows, headers}]
+    let currentSnapId = null; // id of snapshot in DB (if saved)
+    let sortState     = {};   // sectionTitle -> {col, asc}
+    let globalFilter  = '';
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    loadModels();
+    loadSnapList();
+    loadAiCache();
+    initResizer();
+
+    // ── File load ─────────────────────────────────────────────────────────────
+    function loadFile(input) {
+        const f = input.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = e => ingestRaw(e.target.result, f.name);
+        r.readAsText(f, 'utf-8');
+        input.value = '';
+    }
+
+    async function loadLastOutput() {
+        const path = document.getElementById('snapFilePath').value.trim();
+        if (!path) { document.getElementById('captureStatus').textContent = 'Enter file path first'; return; }
+        document.getElementById('captureStatus').textContent = 'Loading…';
+        try {
+            const r = await fetch(`${API}/system-snapshot/read-file`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path })
+            });
+            if (!r.ok) { document.getElementById('captureStatus').textContent = `Error: ${await r.text()}`; return; }
+            const d = await r.json();
+            if (d.error) { document.getElementById('captureStatus').textContent = 'Error: ' + d.error; return; }
+            ingestRaw(d.raw, path);
+            document.getElementById('captureStatus').textContent = 'Loaded';
+        } catch(e) {
+            document.getElementById('captureStatus').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    async function captureNow() {
+        document.getElementById('captureStatus').textContent = 'Capturing…';
+        try {
+            const r = await fetch(`${API}/system-snapshot/capture`, { method: 'POST' });
+            const d = await r.json();
+            if (d.error) { document.getElementById('captureStatus').textContent = 'Error: ' + d.error; return; }
+            ingestRaw(d.raw, 'live');
+            await saveSnapshot(d.raw);
+            document.getElementById('captureStatus').textContent = 'Done';
+        } catch(e) {
+            document.getElementById('captureStatus').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    // ── Ingest & parse ────────────────────────────────────────────────────────
+    function ingestRaw(raw, label) {
+        currentRaw = raw;
+        currentSnapId = null;
+        currentSections = parseSnapshot(raw);
+        renderNav();
+        renderAllSections();
+        populateHeaderStats();
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('aiBtnRun').disabled = false;
+        aiClearDisplay();
+    }
+
+    function parseSnapshot(raw) {
+        const lines    = raw.split(/\r?\n/);
+        const sections = [];
+        let cur        = null;
+
+        for (const line of lines) {
+            if (line.startsWith('## ')) {
+                if (cur) sections.push(cur);
+                cur = { title: line.slice(3).trim(), lines: [] };
+            } else if (cur) {
+                cur.lines.push(line);
+            }
+        }
+        if (cur) sections.push(cur);
+
+        // Parse each section into typed structure
+        return sections.map(s => parseSection(s));
+    }
+
+    function parseSection({ title, lines }) {
+        // Skip header/separator lines (===)
+        const content = lines.filter(l => !l.match(/^[=\-]{4,}$/));
+
+        // Detect KV-style (single-colon lines, no table)
+        const kvLines = content.filter(l => /^\w[\w ]+\s+:\s+/.test(l));
+        if (kvLines.length >= 3 && kvLines.length === content.filter(l=>l.trim()).length) {
+            const pairs = kvLines.map(l => {
+                const m = l.match(/^(.+?)\s{2,}:\s{1,}(.*)$/);
+                return m ? { k: m[1].trim(), v: m[2].trim() } : null;
+            }).filter(Boolean);
+            return { title, type: 'kv', pairs };
+        }
+
+        // Detect table: first non-empty line is headers with multiple spaces
+        const nonEmpty = content.filter(l => l.trim());
+        if (nonEmpty.length >= 2) {
+            const headerLine = nonEmpty[0];
+            // Column positions from header
+            const cols = parseColumns(headerLine);
+            if (cols.length >= 2) {
+                const rows = nonEmpty.slice(1)
+                    .filter(l => !l.match(/^[-\s]+$/))
+                    .map(l => splitRow(l, cols));
+                return { title, type: 'table', headers: cols.map(c => c.name), rows };
+            }
+        }
+
+        return { title, type: 'raw', raw: content.join('\n') };
+    }
+
+    function parseColumns(headerLine) {
+        // Find column start positions by word boundaries
+        const cols = [];
+        const rx   = /\S+/g;
+        let m;
+        while ((m = rx.exec(headerLine)) !== null) {
+            cols.push({ name: m[0], start: m.index });
+        }
+        return cols;
+    }
+
+    function splitRow(line, cols) {
+        return cols.map((col, i) => {
+            const end = i + 1 < cols.length ? cols[i + 1].start : undefined;
+            return (line.slice(col.start, end) || '').trim();
+        });
+    }
+
+    // ── Render nav ────────────────────────────────────────────────────────────
+    function renderNav() {
+        const nav = document.getElementById('sectionNav');
+        // Extract timestamp from raw
+        const tsMatch = currentRaw.match(/Captured\s*:\s*(.+)/);
+        const hostMatch = currentRaw.match(/Hostname\s*:\s*(.+)/);
+        document.getElementById('snapTs').textContent =
+            (tsMatch ? tsMatch[1].trim() : '') +
+            (hostMatch ? ' · ' + hostMatch[1].trim() : '');
+
+        nav.innerHTML = '';
+        const tsEl = document.createElement('div');
+        tsEl.className = 'nav-ts';
+        tsEl.textContent = tsMatch ? tsMatch[1].trim() : 'Loaded';
+        nav.appendChild(tsEl);
+
+        currentSections.forEach((s, i) => {
+            const el = document.createElement('div');
+            el.className   = 'nav-item' + (i === 0 ? ' active' : '');
+            el.textContent = s.title;
+            el.dataset.idx = i;
+            el.onclick     = () => activateSection(i);
+            nav.appendChild(el);
+        });
+    }
+
+    function activateSection(idx) {
+        document.querySelectorAll('.nav-item').forEach((el, i) => {
+            el.classList.toggle('active', i === idx);
+        });
+        document.querySelectorAll('.section-panel').forEach((el, i) => {
+            el.classList.toggle('active', i === idx);
+        });
+    }
+
+    // ── Render all sections ───────────────────────────────────────────────────
+    function renderAllSections() {
+        const area = document.getElementById('contentArea');
+        // Remove old panels (keep emptyState)
+        area.querySelectorAll('.section-panel').forEach(el => el.remove());
+
+        currentSections.forEach((s, i) => {
+            const panel = document.createElement('div');
+            panel.className = 'section-panel' + (i === 0 ? ' active' : '');
+            panel.id        = 'panel_' + i;
+
+            if (s.type === 'kv') {
+                panel.innerHTML = renderKV(s);
+            } else if (s.type === 'table') {
+                panel.innerHTML = renderTableHtml(s, i);
+            } else {
+                panel.innerHTML = `<div class="raw-text">${esc(s.raw)}</div>`;
+            }
+
+            area.appendChild(panel);
+        });
+    }
+
+    function renderKV({ pairs }) {
+        const html = pairs.map(p =>
+            `<div class="kv-key">${esc(p.k)}</div><div class="kv-val">${esc(p.v)}</div>`
+        ).join('');
+        return `<div class="kv-grid">${html}</div>`;
+    }
+
+    function renderTableHtml(s, idx, filterStr) {
+        const filter = (filterStr || globalFilter || '').toLowerCase();
+        const rows   = filter
+            ? s.rows.filter(r => r.some(c => c.toLowerCase().includes(filter)))
+            : s.rows;
+
+        const st      = sortState[s.title];
+        const sorted  = st ? sortRows(rows, s.headers, st) : rows;
+
+        // Compute max for numeric columns (for mem-bar)
+        const maxVals = s.headers.map((h, ci) => {
+            const nums = sorted.map(r => parseFloat(r[ci])).filter(n => !isNaN(n));
+            return nums.length ? Math.max(...nums) : 0;
+        });
+
+        const ths = s.headers.map((h, ci) => {
+            let cls = '';
+            if (st && st.col === ci) cls = st.asc ? 'sort-asc' : 'sort-desc';
+            return `<th class="${cls}" onclick="sortSection(${idx}, ${ci})">${esc(h)}</th>`;
+        }).join('');
+
+        const tds = sorted.map(row => {
+            const cells = row.map((cell, ci) => {
+                const num = parseFloat(cell);
+                const isNum = !isNaN(num) && cell.trim() !== '';
+                let cls = isNum ? 'num' : '';
+
+                // Color coding
+                const colName = (s.headers[ci] || '').toUpperCase();
+                if (colName.includes('STATE') && cell === 'Established') cls += ' green';
+                if (colName.includes('STATE') && cell === 'Listen')      cls += ' accent';
+                if (colName === 'STATUS' && cell === 'Running') cls += ' green';
+                if (colName.includes('PCT_USED') && num > 85)  cls += ' red';
+                if (colName.includes('PCT_USED') && num > 60)  cls += ' warn';
+
+                // Inline bar for TOTAL_MEM_MB / MEM_MB
+                let bar = '';
+                if ((colName.includes('MEM') || colName.includes('TOTAL_MEM')) && isNum && maxVals[ci] > 0) {
+                    const pct = Math.min(100, num / maxVals[ci] * 100);
+                    bar = `<span class="mem-bar" style="width:${pct.toFixed(0)}px;max-width:80px;"></span>`;
+                }
+
+                return `<td class="${cls.trim()}">${bar}${esc(cell)}</td>`;
+            }).join('');
+            return `<tr>${cells}</tr>`;
+        }).join('');
+
+        return `
+        <div class="section-search">
+            <input type="text" placeholder="Filter rows…" value="${esc(filter)}"
+                   oninput="filterSection(${idx}, this.value)">
+            <span class="section-row-count">${sorted.length} / ${s.rows.length} rows</span>
+        </div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+            <thead><tr>${ths}</tr></thead>
+            <tbody>${tds}</tbody>
+        </table>
+        </div>`;
+    }
+
+    function sortSection(sectionIdx, colIdx) {
+        const s = currentSections[sectionIdx];
+        const prev = sortState[s.title];
+        sortState[s.title] = prev && prev.col === colIdx
+            ? { col: colIdx, asc: !prev.asc }
+            : { col: colIdx, asc: false };
+        const panel = document.getElementById('panel_' + sectionIdx);
+        const filter = panel.querySelector('input')?.value || '';
+        panel.innerHTML = renderTableHtml(s, sectionIdx, filter);
+    }
+
+    function filterSection(sectionIdx, val) {
+        const s = currentSections[sectionIdx];
+        const panel = document.getElementById('panel_' + sectionIdx);
+        panel.innerHTML = renderTableHtml(s, sectionIdx, val);
+    }
+
+    function sortRows(rows, headers, { col, asc }) {
+        return [...rows].sort((a, b) => {
+            const av = a[col] || '', bv = b[col] || '';
+            const an = parseFloat(av), bn = parseFloat(bv);
+            const cmp = (!isNaN(an) && !isNaN(bn))
+                ? an - bn
+                : av.localeCompare(bv);
+            return asc ? cmp : -cmp;
+        });
+    }
+
+    function applyGlobalFilter(val) {
+        globalFilter = val;
+        currentSections.forEach((s, i) => {
+            if (s.type === 'table') {
+                const panel = document.getElementById('panel_' + i);
+                if (panel) panel.innerHTML = renderTableHtml(s, i);
+            }
+        });
+    }
+
+    // ── Header stats ──────────────────────────────────────────────────────────
+    function populateHeaderStats() {
+        const raw = currentRaw;
+
+        const host = raw.match(/Hostname\s*:\s*(.+)/);
+        document.getElementById('sHost').textContent = host ? host[1].trim() : '—';
+
+        const ram = raw.match(/Used\s*:\s*([\d.]+\s*GB\s*\([\d.]+%\))/);
+        document.getElementById('sRam').textContent = ram ? ram[1].trim() : '—';
+
+        const cpu = raw.match(/Load\s*:\s*(\d+%)/);
+        document.getElementById('sCpu').textContent = cpu ? cpu[1].trim() : '—';
+
+        // Count processes from ALL PROCESSES section
+        const allProcSection = currentSections.find(s => s.title.startsWith('ALL PROCESSES'));
+        if (allProcSection?.rows) {
+            document.getElementById('sProcs').textContent = allProcSection.rows.length;
+        }
+
+        // Count established connections
+        const estSection = currentSections.find(s => s.title.startsWith('ESTABLISHED'));
+        if (estSection?.rows) {
+            document.getElementById('sTcp').textContent = estSection.rows.length;
+        }
+    }
+
+    // ── Snapshot persistence ──────────────────────────────────────────────────
+    async function saveSnapshot(raw) {
+        try {
+            const r = await fetch(`${API}/system-snapshot/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ raw })
+            });
+            const d = await r.json();
+            if (d.id) { currentSnapId = d.id; await loadSnapList(); }
+        } catch(e) {}
+    }
+
+    async function loadSnapList() {
+        try {
+            const r = await fetch(`${API}/system-snapshot/list`);
+            const d = await r.json();
+            const list = document.getElementById('snapList');
+            if (!d.snapshots?.length) { list.innerHTML = '<div class="no-data">None</div>'; return; }
+            list.innerHTML = d.snapshots.map(s => `
+                <div class="snap-item ${s.id === currentSnapId ? 'active' : ''}" onclick="loadSnap(${s.id})">
+                    <div>
+                        <div class="snap-ts">${esc(s.ts)}</div>
+                        <div class="snap-host">${esc(s.host || '?')}</div>
+                    </div>
+                    <span class="snap-del" onclick="event.stopPropagation();deleteSnap(${s.id})">✕</span>
+                </div>`).join('');
+        } catch(e) {}
+    }
+
+    async function loadSnap(id) {
+        try {
+            const r = await fetch(`${API}/system-snapshot/get?id=${id}`);
+            const d = await r.json();
+            if (d.raw) { ingestRaw(d.raw, d.ts); currentSnapId = id; await loadSnapList(); }
+        } catch(e) {}
+    }
+
+    async function deleteSnap(id) {
+        try {
+            await fetch(`${API}/system-snapshot/delete?id=${id}`, { method: 'DELETE' });
+            if (currentSnapId === id) {
+                currentRaw = '';
+                currentSections = [];
+                document.getElementById('contentArea').querySelectorAll('.section-panel').forEach(el=>el.remove());
+                document.getElementById('emptyState').style.display = '';
+                document.getElementById('sectionNav').innerHTML =
+                    '<div class="nav-ts">No snapshot loaded</div><div class="no-data" style="padding:20px 0;text-align:center;">—</div>';
+                document.getElementById('aiBtnRun').disabled = true;
+            }
+            await loadSnapList();
+        } catch(e) {}
+    }
+
+    // ── AI Audit ──────────────────────────────────────────────────────────────
+    async function loadModels() {
+        try {
+            const r   = await fetch(`${API}/ai-report/api/models`);
+            const d   = await r.json();
+            const sel = document.getElementById('aiModel');
+            if (d.models?.length) {
+                sel.innerHTML = d.models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+            }
+        } catch(e) {}
+    }
+
+    async function loadAiCache() {
+        try {
+            const r = await fetch(`${API}/system-snapshot/ai-cache`);
+            const d = await r.json();
+            if (d.entry) aiShowResult(d.entry.analysis, d.entry.model, d.entry.ts, true);
+        } catch(e) {}
+    }
+
+    async function aiAudit() {
+        if (!currentRaw) return;
+        const model = document.getElementById('aiModel').value;
+        document.getElementById('aiBtnRun').disabled = true;
+        aiSetLoading();
+        try {
+            const r = await fetch(`${API}/system-snapshot/ai-audit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model, raw: currentRaw })
+            });
+            if (!r.ok) { aiSetError(`HTTP ${r.status}: ${await r.text()}`); return; }
+            const d = await r.json();
+            if (d.error) aiSetError(d.error);
+            else         aiShowResult(d.analysis, d.model, d.ts, false);
+        } catch(e) {
+            aiSetError(e.message);
+        } finally {
+            document.getElementById('aiBtnRun').disabled = false;
+        }
+    }
+
+    async function aiClearCache() {
+        try { await fetch(`${API}/system-snapshot/ai-cache`, { method: 'DELETE' }); } catch(e) {}
+        aiClearDisplay();
+    }
+
+    function aiClearDisplay() {
+        const res = document.getElementById('aiResult');
+        res.className = 'ai-result';
+        res.innerHTML = '';
+        document.getElementById('aiMeta').classList.remove('show');
+        document.getElementById('aiBtnClear').style.display = 'none';
+    }
+
+    function aiSetLoading() {
+        const res = document.getElementById('aiResult');
+        res.className = 'ai-result show loading';
+        res.innerHTML = '<span class="spinner-inline"></span> Analyzing…';
+        document.getElementById('aiMeta').classList.remove('show');
+        document.getElementById('aiBtnClear').style.display = 'none';
+    }
+
+    function aiSetError(msg) {
+        const res = document.getElementById('aiResult');
+        res.className   = 'ai-result show error';
+        res.textContent = msg;
+    }
+
+    function aiShowResult(analysis, model, ts, cached) {
+        const res  = document.getElementById('aiResult');
+        const meta = document.getElementById('aiMeta');
+        res.className   = 'ai-result show';
+        res.textContent = analysis;
+        document.getElementById('aiMetaModel').textContent = model ? model.split('/').pop() : '';
+        document.getElementById('aiMetaTs').textContent    = ts ? ts.substring(0,16).replace('T',' ') : '';
+        meta.classList.add('show');
+        document.getElementById('aiBtnClear').style.display = 'inline-block';
+    }
+
+    // ── Sidebar resizer ───────────────────────────────────────────────────────
+    function initResizer() {
+        const resizer = document.getElementById('sidebarResizer');
+        const sidebar = document.getElementById('sidebarPanel');
+        let startX, startW;
+        resizer.addEventListener('mousedown', e => {
+            startX = e.clientX; startW = sidebar.offsetWidth;
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', () => document.removeEventListener('mousemove', onDrag), { once: true });
+        });
+        function onDrag(e) {
+            const w = Math.max(160, Math.min(800, startW - (e.clientX - startX)));
+            sidebar.style.width = w + 'px';
+        }
+    }
+
+    // ── Util ──────────────────────────────────────────────────────────────────
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+</script>
+</body>
+</html>

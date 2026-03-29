@@ -12,6 +12,8 @@ public class SAFU
 
     public static byte[] LoadOrCreateFileKey()
     {
+        
+
         if (_fileKey != null) return _fileKey;
         lock (_fileKeyLock)
         {
@@ -156,7 +158,10 @@ public class SAFU
             {
                 var computedHmac = hmac.ComputeHash(payload);
                 for (int i = 0; i < hmacSize; i++)
-                    if (receivedHmac[i] != computedHmac[i]) return string.Empty;
+                    if (receivedHmac[i] != computedHmac[i])
+                    {
+                        return string.Empty;
+                    }
             }
 
             var iv = new byte[16];
@@ -230,11 +235,21 @@ public class SAFU
         return AesEncrypt(plaintext, DeriveKeyFromHWID(hwid));
     }
 
-    public static string DecryptHWIDOnly(string ciphertext)
+    public static string DecryptHWIDOnly_(string ciphertext)
     {
         if (string.IsNullOrEmpty(ciphertext)) return string.Empty;
         var hwId = GetStableHWId() ?? throw new InvalidOperationException("HWID resolution failed");
         return AesDecrypt(ciphertext, DeriveKeyFromHWID(hwId)) ?? string.Empty;
+    }
+    public static string DecryptHWIDOnly(string ciphertext)
+    {
+        if (string.IsNullOrEmpty(ciphertext)) return string.Empty;
+        var hwId = GetStableHWId() ?? throw new InvalidOperationException("HWID resolution failed");
+        var key  = DeriveKeyFromHWID(hwId);
+    
+    
+        var result = AesDecrypt(ciphertext, key);
+        return result ?? string.Empty;
     }
 
     public static string Encode(string toEncrypt, string pin, string acc)

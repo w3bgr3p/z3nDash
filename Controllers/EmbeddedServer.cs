@@ -20,6 +20,10 @@ public class EmbeddedServer
     private readonly HttpReplayHandler _replayHandler;
     private readonly ConfigHandler     _configHandler; 
     private readonly ZbHandler _zbHandler;
+    private readonly AiReportHandler _aiReportHandler;
+    private readonly TreasuryHandler _treasuryHandler;
+    private readonly SystemSnapshotHandler _snapshotHandler;
+    private readonly JsonAnalyzerHandler _jsonAnalyzerHandler;
 
     private const int DefaultPort = 10993;
 
@@ -43,6 +47,24 @@ public class EmbeddedServer
                 listeningPorts.Add(port);
             }
             catch { Console.WriteLine($"Port {port} already in use, skipping"); }
+        }
+
+        if (listeningPorts.Count == 0)
+        {
+            // fallback: найти любой свободный порт
+            for (int fallback = 10993; fallback < 11100; fallback++)
+            {
+                try
+                {
+                    var test = new HttpListener();
+                    test.Prefixes.Add($"http://*:{fallback}/");
+                    test.Start(); test.Stop(); test.Close();
+                    _listener.Prefixes.Add($"http://*:{fallback}/");
+                    listeningPorts.Add(fallback);
+                    break;
+                }
+                catch { }
+            }
         }
 
         if (listeningPorts.Count == 0)
@@ -70,7 +92,13 @@ public class EmbeddedServer
         _zbHandler = new ZbHandler();
         _replayHandler  = new HttpReplayHandler();
         _configHandler  = new ConfigHandler(logPath, _listener, _port, dbService);
+        _aiReportHandler = new AiReportHandler(dbService);
+        _treasuryHandler = new TreasuryHandler(dbService);
+        _snapshotHandler = new SystemSnapshotHandler(dbService, "");
+        _jsonAnalyzerHandler = new JsonAnalyzerHandler(dbService);
 
+        
+        
         int replayPort = int.TryParse(config.ReplayPort, out var rp) ? rp : _port + 1;
         try
         {
@@ -325,6 +353,29 @@ public class EmbeddedServer
                  await _zbHandler.Handle(context);
                  return;
             }
+            if (_aiReportHandler.Matches(path))
+            {
+                await _aiReportHandler.Handle(context);
+                return;
+            }
+            if (path.StartsWith("/treasury"))
+            {
+                await _treasuryHandler.Handle(context);
+                return;
+            }
+
+            if (_snapshotHandler.Matches(path))
+            {
+                await _snapshotHandler.Handle(context); 
+                return;
+            }
+            if (_jsonAnalyzerHandler.Matches(path))
+            {
+                await _jsonAnalyzerHandler.Handle(context);
+                return;
+            }
+            
+            
 // Static (wwwroot)
             if (method == "GET")
             {

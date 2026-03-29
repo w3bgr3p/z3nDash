@@ -6,13 +6,13 @@ namespace z3n8;
 
 public class CliplatesHandler : IScriptHandler
 {
-    public string PathPrefix => "/cliplates";
+    public string PathPrefix => "/clips";
 
     private readonly DbConnectionService _dbService;
 
     public CliplatesHandler(DbConnectionService dbService) => _dbService = dbService;
 
-    private const string Table = "_cliplates";
+    private const string Table = "_clips";
 
     private static readonly Dictionary<string, string> Schema = new()
     {
@@ -34,8 +34,8 @@ public class CliplatesHandler : IScriptHandler
         string path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
         string method = ctx.Request.HttpMethod;
 
-        if (!path.StartsWith("/cliplates")) return false;
-        if (path == "/cliplates.html") return false;
+        if (!path.StartsWith("/clips")) return false;
+        if (path == "/clips.html") return false;
 
         if (!_dbService.TryGetDb(out var db) || db == null)
         {
@@ -45,10 +45,10 @@ public class CliplatesHandler : IScriptHandler
 
         try
         {
-            if ((path == "/cliplates" || path == "/cliplates/") && method == "GET")
+            if ((path == "/clips" || path == "/clips/") && method == "GET")
             { await GetAll(ctx.Response, db); return true; }
 
-            if ((path == "/cliplates" || path == "/cliplates/") && method == "POST")
+            if ((path == "/clips" || path == "/clips/") && method == "POST")
             { await Create(ctx, db); return true; }
 
             if (method == "PUT" && TryParseId(path, out string putId))

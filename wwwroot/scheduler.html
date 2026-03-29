@@ -36,7 +36,7 @@
 
         /* ── Layout ── */
         .content { display: flex; flex: 1; overflow: hidden; gap: 5px; padding: 5px; }
-        .list-panel {
+        .tasks-panel {
             width: 340px; flex-shrink: 0; display: flex; flex-direction: column;
             border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
             background: var(--bg);
@@ -129,7 +129,7 @@
         .detail-actions { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
         .action-group { display: flex; gap: 2px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg2); }
 
-        /* ── Panel header (pm-style) ── */
+        /* ── Panel header (zp7-style) ── */
         .panel-header {
             background: var(--bg1); padding: 6px 10px;
             border-bottom: 1px solid var(--border);
@@ -306,6 +306,8 @@
         .log-level.INFO  { color: var(--accent); }
         .log-level.WARN  { color: var(--yellow, #d29922); }
         .log-level.ERROR { color: var(--red, #f85149); }
+        .log-acc     { width: 10px; flex-shrink: 0; color: var(--green, #3fb950); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .log-caller  { width: 200px; flex-shrink: 0; color: var(--text2); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .log-msg     { flex: 1; color: var(--text); word-break: break-all; line-height: 1.5; }
         .http-row { display: flex; gap: 6px; padding: 2px 8px; border-bottom: 1px solid var(--border); align-items: baseline; }
         .http-row:hover { background: var(--bg2); }
@@ -395,7 +397,7 @@
 
     <div class="content">
         <!-- LIST -->
-        <div class="list-panel" id="listPanel">
+        <div class="tasks-panel" id="tasksPanel">
             <div class="panel-header">
                 <span class="panel-title">Schedules</span>
                 <span class="count-badge" id="listCount">0</span>
@@ -605,17 +607,19 @@
         if (!el) return;
         var empty = el.querySelector('.log-empty');
         if (empty) empty.remove();
-        var lvl  = (row.level || 'INFO').toUpperCase();
-        var cls  = lvl === 'WARNING' ? 'WARN' : lvl;
-        var time = (row.timestamp || '').slice(11, 19);
-        var msg  = row.message || '';
-        var sess = row.session && row.session !== '-'
-            ? '<span style="color:var(--text2);font-size:9px;margin-left:4px">[' + escHtml(row.session.slice(0,8)) + ']</span>' : '';
+        var lvl    = (row.level || 'INFO').toUpperCase();
+        var cls    = lvl === 'WARNING' ? 'WARN' : lvl;
+        var time   = (row.timestamp || '').slice(11, 19);
+        var msg    = row.message || '';
+        var acc    = (row.account && row.account !== '-') ? row.account : '';
+        var caller = (row.caller  && row.caller  !== '-') ? row.caller  : '';
         el.insertAdjacentHTML('beforeend',
             '<div class="log-row">'
             + '<span class="log-time">' + escHtml(time) + '</span>'
             + '<span class="log-level ' + cls + '">' + lvl.slice(0,4) + '</span>'
-            + '<span class="log-msg">' + escHtml(msg) + sess + '</span>'
+            + '<span class="log-acc"  title="' + escHtml(acc)    + '">' + escHtml(acc)    + '</span>'
+            + '<span class="log-caller" title="' + escHtml(caller) + '">' + escHtml(caller) + '</span>'
+            + '<span class="log-msg">' + escHtml(msg) + '</span>'
             + '</div>');
         el.scrollTop = el.scrollHeight;
     }
@@ -725,7 +729,7 @@
 
     /* ── List rendering with grouping ── */
     var collapsedGroups = new Set();
-
+    var _groupsInitialized = false;
     function toggleGroup(grp) {
         if (collapsedGroups.has(grp)) collapsedGroups.delete(grp);
         else collapsedGroups.add(grp);
@@ -773,7 +777,14 @@
             if (showA && showB) return ga < gb ? -1 : ga > gb ? 1 : 0;
             return 0;
         });
-
+        
+        if (!_groupsInitialized) {
+            _groupsInitialized = true;
+            Object.keys(groupCounts).forEach(function(g) {
+                if (groupCounts[g] > 1) collapsedGroups.add(g);
+            });
+        }
+        
         var html     = '';
         var lastGrp  = null;
         var firstUngrouped = true;
@@ -861,11 +872,11 @@
 
     var NAV_PAGES = [
         { icon: '&#x23F1;',         title: 'z3n8',       desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)',          url: '/scheduler.html',  color: '#e3b341' },
-        { icon: '&#x2699;&#xFE0F;', title: 'ZP7',         desc: 'Управление ZP7', url: '/?page=pm',        color: '#58a6ff' },
+        { icon: '&#x2699;&#xFE0F;', title: 'ZP7',         desc: 'Управление ZP7', url: '/?page=zp7',        color: '#58a6ff' },
         { icon: '&#x1F4CB;',        title: 'Logs',       desc: 'Логи приложения с фильтрацией по уровню, машине, проекту, аккаунту.',                 url: '/?page=logs',      color: '#3fb950' },
         { icon: '&#x1F310;',        title: 'HTTP',       desc: 'Перехваченные HTTP-запросы и ответы из ZP-задач. Replay запросов.',                   url: '/?page=http',      color: '#d29922' },
         { icon: '&#x1F50D;',        title: 'JSON',       desc: 'Интерактивный JSON-tree с определением auth/captcha и replay запросов.',              url: '/json',            color: '#4e9eff' },
-        { icon: '&#x1F4C4;',        title: 'Clips',  desc: 'Copy-paste шаблоны, организованные в дерево. Клик по листу - копирует содержимое.',   url: '/?page=cliplates', color: '#f0883e' },
+        { icon: '&#x1F4C4;',        title: 'Clips',  desc: 'Copy-paste шаблоны, организованные в дерево. Клик по листу - копирует содержимое.',   url: '/?page=clips', color: '#f0883e' },
         { icon: '&#x1F4DD;',        title: 'Text Tools', desc: 'URL encode/decode, C# escaper, Base64, JSON escape.',                                 url: '/text.html',       color: '#a371f7' },
         { icon: '&#x2699;&#xFE0F;', title: 'Config',     desc: 'Статус сервера, редактор конфигурации, управление хранилищем логов.',                 url: '/?page=config',    color: '#f78166' },
     ];
@@ -927,10 +938,12 @@
             + '<button class="btn primary sm" onclick="runNow(\'' + id + '\')">▶ Run</button>'
             + '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled||'true') + '\')">' + pauseLabel + '</button>'
             + '<button class="btn stop sm" onclick="stopNow(\'' + id + '\')">■ Interrupt</button>'
+            + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">🗑</button>'
             + '</div>'
             + '<div class="action-group">'
             + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">⚙ Set</button>'
-            + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">🔧 Build</button>'
+            + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">🔧 Build Settings</button>'
+            + (s.executor === 'csx-internal' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Prebuild</button>' : '')
             + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📥 Import</button>'
             + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📤 Export</button>'
             + '</div>';
@@ -1108,7 +1121,7 @@
 
             + '<div class="form-label">Executor</div>'
             + '<select class="form-input" id="f_executor">'
-            + ['python','node','ts-node','csx','exe','bat','bash','ps1','internal'].map(function(e) {
+            + ['python','node','ts-node','csx','exe','bat','bash','ps1','internal','csx-internal'].map(function(e) {
                 return '<option ' + (s.executor === e ? 'selected' : '') + '>' + e + '</option>';
             }).join('') + '</select>'
 
@@ -1324,8 +1337,18 @@
                 if (empty) empty.remove();
                 var level = (d.level || 'INFO').toUpperCase();
                 var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-                box.insertAdjacentHTML('beforeend',
-                    '<div class="out-line ' + level + '">' + escHtml(d.line || '') + '</div>');
+                var line = d.line || '';
+                var last = box.lastElementChild;
+                function progressPrefix(s) { return s.replace(/[\d%\[\]]+.*$/, '').trim(); }
+                if (last && last.classList.contains('out-line') && !last.classList.contains('empty')
+                    && progressPrefix(line).length > 3
+                    && progressPrefix(line) === progressPrefix(last.textContent)) {
+                    last.className = 'out-line ' + level;
+                    last.textContent = line;
+                } else {
+                    box.insertAdjacentHTML('beforeend',
+                        '<div class="out-line ' + level + '">' + escHtml(line) + '</div>');
+                }
                 if (atBottom) box.scrollTop = box.scrollHeight;
                 if (badge) badge.style.display = 'inline-block';
             } catch(err) {}
@@ -1351,7 +1374,7 @@
 
     async function clearLogsPanel() {
         if (!curTaskId) return;
-        if (!confirm('Clear ALL logs? (no per-task filter available)')) return;
+        if (!await Dialog.confirm('Clear ALL logs? (no per-task filter available)')) return;
         try {
             await fetch('/clear', {
                 method: 'POST',
@@ -1374,7 +1397,7 @@
 
     async function clearHttpPanel() {
         if (!curTaskId) return;
-        if (!confirm('Clear HTTP logs for task: ' + curTaskId + '?')) return;
+        if (!await Dialog.confirm('Clear HTTP logs for task: ' + curTaskId + '?')) return;
         try {
             await fetch('/clear-http-logs-by-task', {
                 method: 'POST',
@@ -1402,15 +1425,18 @@
             var el   = document.getElementById('logsScroll');
             if (!data.length) { await showOutputFallback(el); return; }
             el.innerHTML = data.slice().reverse().map(function(row) {
-                var lvl  = (row.level || 'INFO').toUpperCase();
-                var cls  = lvl === 'WARNING' ? 'WARN' : lvl;
-                var time = (row.timestamp || '').slice(11, 19);
-                var msg  = row.message || '';
-                var sess = row.session && row.session !== '-' ? '<span style="color:var(--text2);font-size:9px;margin-left:4px">[' + escHtml(row.session.slice(0,8)) + ']</span>' : '';
+                var lvl    = (row.level || 'INFO').toUpperCase();
+                var cls    = lvl === 'WARNING' ? 'WARN' : lvl;
+                var time   = (row.timestamp || '').slice(11, 19);
+                var msg    = row.message || '';
+                var acc    = (row.account && row.account !== '-') ? row.account : '';
+                var caller = (row.caller  && row.caller  !== '-') ? row.caller  : '';
                 return '<div class="log-row">'
                     + '<span class="log-time">' + escHtml(time) + '</span>'
                     + '<span class="log-level ' + cls + '">' + lvl.slice(0,4) + '</span>'
-                    + '<span class="log-msg">' + escHtml(msg) + sess + '</span>'
+                    + '<span class="log-acc"   title="' + escHtml(acc)    + '">' + escHtml(acc)    + '</span>'
+                    + '<span class="log-caller" title="' + escHtml(caller) + '">' + escHtml(caller) + '</span>'
+                    + '<span class="log-msg">' + escHtml(msg) + '</span>'
                     + '</div>';
             }).join('');
             el.scrollTop = el.scrollHeight;
@@ -1546,7 +1572,34 @@
             if (s) renderOutput(s);
         }
     }
-
+    async function buildCsx(id) {
+        var btn = event.target;
+        btn.disabled = true;
+        btn.textContent = '⏳...';
+        try {
+            var res  = await fetch('/scheduler/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+            var data = await res.json();
+            if (data.ok) {
+                btn.textContent = '✅ OK';
+                btn.style.borderColor = '#3fb950';
+                btn.style.color = '#3fb950';
+            } else {
+                btn.textContent = '❌ Err';
+                btn.style.borderColor = '#f85149';
+                btn.style.color = '#f85149';
+                await Dialog.alert(data.errors.join('\n'), '🔨 Check errors');
+            }
+        } catch(e) {
+            btn.textContent = '❌';
+        } finally {
+            setTimeout(function() {
+                btn.disabled = false;
+                btn.textContent = '🔨 Check';
+                btn.style.borderColor = '#a371f7';
+                btn.style.color = '#a371f7';
+            }, 3000);
+        }
+    }
     async function stopNow(id) {
         var res       = await fetch('/scheduler/instances?id=' + encodeURIComponent(id));
         var instances = await res.json().catch(function() { return []; });
@@ -1629,7 +1682,7 @@
     function restoreLayout() {
         var st = PageState.load();
         if (st.listW) {
-            document.getElementById('listPanel').style.width = st.listW + 'px';
+            document.getElementById('tasksPanel').style.width = st.listW + 'px';
         }
         if (st.detailH && st.bottomH) {
             var topPanel    = document.getElementById('detailPanel');
@@ -1652,7 +1705,7 @@
 
     function initResizer() {
         var resizer = document.getElementById('resizer');
-        var panel   = document.getElementById('listPanel');
+        var panel   = document.getElementById('tasksPanel');
         var dragging = false, startX, startW;
         resizer.addEventListener('mousedown', function(e) {
             dragging = true; startX = e.clientX; startW = panel.offsetWidth;

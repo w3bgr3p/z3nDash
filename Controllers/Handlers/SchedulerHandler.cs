@@ -75,6 +75,7 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/scheduler/queue"         && method == "GET")  { await QueueItems(context, db); return true; }
             if (path == "/scheduler/clear-queue"   && method == "POST") { await ClearQueue(context, db); return true; }
             if (path == "/scheduler/output/stream" && method == "GET") { await SseHub.SubscribeOutput(context.Response, context.Request.QueryString["id"] ?? "", GetDisconnectToken(context)); return true; }
+            if (path == "/scheduler/build"         && method == "POST") { await Build(context, db); return true; }
 
         }
         catch (Exception ex)
@@ -352,5 +353,31 @@ public sealed class SchedulerHandler : IScriptHandler
         for (int i = 0; i < columns.Count && i < values.Length; i++)
             dict[columns[i]] = values[i];
         return dict;
+    }
+
+    private async Task Build(HttpListenerContext ctx, Db db)
+    {
+        var json = await ReadJson(ctx.Request);
+        if (json == null) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "Invalid JSON" }); return; }
+
+        if (!json.Value.TryGetProperty("id", out var idProp))
+        { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "id required" }); return; }
+
+        var id         = idProp.GetString() ?? "";
+        var scriptPath = db.Get("script_path", Table, where: $"\"id\" = '{id}'");
+        var executor   = db.Get("executor",    Table, where: $"\"id\" = '{id}'");
+
+        if (executor != "csx-internal")
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, errors = Array.Empty<string>(), message = "not a csx-internal task" });
+            return;
+        }
+
+        var errors = await CsxExecutor.CompileAsync(scriptPath);
+
+        if (errors.Count == 0)
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, errors = Array.Empty<string>() });
+        else
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, errors });
     }
 }
