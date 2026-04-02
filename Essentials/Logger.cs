@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace z3n8
+namespace z3nIO
 {
     public enum LogLevel
     {
@@ -79,9 +79,9 @@ namespace z3n8
         private readonly int             _timezone;
         private readonly string          _logHost;
         private readonly bool            _fAcc, _fTime, _fCaller, _fWrap, _fForce;
-        private readonly Stopwatch       _stopwatch;
+        internal readonly Stopwatch       _stopwatch;
         private readonly Action<string>? _sink;
-        private readonly string _source = "z3n8";
+        private readonly string _source = "z3nIO";
         #endregion
 
         // ── Constructor ───────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ namespace z3n8
             string          acc            = "",
             string          taskId         = "",
             string          session        = "",
-            string          project        = "z3n8",
+            string          project        = "z3nIO",
             string          cfgLog         = "caller,wrap,acc,stopwatch",
             Action<string>? sink           = null)
         {
@@ -247,7 +247,7 @@ namespace z3n8
         private static object BuildPayload(int timezone, LogLevel level, string body, string caller, Logger ctx) => new
         {
             machine  = Environment.MachineName,
-            project  = !string.IsNullOrEmpty(ctx.Project) ? ctx.Project : "z3n8",
+            project  = !string.IsNullOrEmpty(ctx.Project) ? ctx.Project : "z3nIO",
             timestamp = DateTime.UtcNow.AddHours(timezone).ToString("yyyy-MM-dd HH:mm:ss"),
             level    = level.ToString().ToUpper(),
             account  = !string.IsNullOrEmpty(ctx.Acc)     ? ctx.Acc     : "-",
@@ -257,7 +257,8 @@ namespace z3n8
             task_id  = !string.IsNullOrEmpty(ctx.TaskId)  ? ctx.TaskId  : "-",
             caller,
             message  = body.Trim(),
-            origin = "z3n8"
+            origin = "z3nIO",
+            elapsed_ms = ctx._stopwatch?.ElapsedMilliseconds ?? -1,
         };
     }
 

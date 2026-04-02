@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text;
-using z3n8;
+using z3nIO;
 
 public class EmbeddedServer
 {
@@ -20,6 +20,7 @@ public class EmbeddedServer
     private readonly HttpReplayHandler _replayHandler;
     private readonly ConfigHandler     _configHandler; 
     private readonly ZbHandler _zbHandler;
+    private readonly AiClient _aiClient;
     private readonly AiReportHandler _aiReportHandler;
     private readonly TreasuryHandler _treasuryHandler;
     private readonly SystemSnapshotHandler _snapshotHandler;
@@ -91,11 +92,12 @@ public class EmbeddedServer
         _reportHandler = new ReportHandler(reportsPath, _wwwrootPath, dbService);
         _zbHandler = new ZbHandler();
         _replayHandler  = new HttpReplayHandler();
-        _configHandler  = new ConfigHandler(logPath, _listener, _port, dbService);
-        _aiReportHandler = new AiReportHandler(dbService);
-        _treasuryHandler = new TreasuryHandler(dbService);
-        _snapshotHandler = new SystemSnapshotHandler(dbService, "");
-        _jsonAnalyzerHandler = new JsonAnalyzerHandler(dbService);
+        _aiClient            = new AiClient(dbService);
+        _configHandler       = new ConfigHandler(logPath, _listener, _port, dbService, _aiClient);
+        _aiReportHandler     = new AiReportHandler(dbService, _aiClient);
+        _treasuryHandler     = new TreasuryHandler(dbService, _aiClient);
+        _snapshotHandler     = new SystemSnapshotHandler(dbService, _aiClient);
+        _jsonAnalyzerHandler = new JsonAnalyzerHandler(dbService, _aiClient);
 
         
         

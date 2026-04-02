@@ -1,4 +1,4 @@
-﻿namespace z3n8;
+﻿namespace z3nIO;
 
 /// <summary>
 /// Редиректит Console.Out в log sink на время блока using.

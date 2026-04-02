@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using z3n8;
+using z3nIO;
 
-namespace z3n8;
+namespace z3nIO;
 
 /// <summary>
 /// Маршруты:
@@ -76,6 +76,8 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/scheduler/clear-queue"   && method == "POST") { await ClearQueue(context, db); return true; }
             if (path == "/scheduler/output/stream" && method == "GET") { await SseHub.SubscribeOutput(context.Response, context.Request.QueryString["id"] ?? "", GetDisconnectToken(context)); return true; }
             if (path == "/scheduler/build"         && method == "POST") { await Build(context, db); return true; }
+            if (path == "/scheduler/open-file" && method == "GET") { await OpenFile(context); return true; }
+
 
         }
         catch (Exception ex)
@@ -379,5 +381,23 @@ public sealed class SchedulerHandler : IScriptHandler
             await HttpHelpers.WriteJson(ctx.Response, new { ok = true, errors = Array.Empty<string>() });
         else
             await HttpHelpers.WriteJson(ctx.Response, new { ok = false, errors });
+    }
+    
+    private async Task OpenFile(HttpListenerContext ctx)
+    {
+        var filePath = ctx.Request.QueryString["path"] ?? "";
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = "File not found: " + filePath });
+            return;
+        }
+
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName        = filePath,
+            UseShellExecute = true
+        });
+
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
     }
 }

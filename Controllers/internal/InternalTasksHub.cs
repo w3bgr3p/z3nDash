@@ -3,7 +3,7 @@
 
 using Newtonsoft.Json;
 
-namespace z3n8;
+namespace z3nIO;
 
 public static partial class InternalTasks
 {
@@ -32,7 +32,7 @@ public static partial class InternalTasks
             
             
             //string outDir = Path.Combine(AppContext.BaseDirectory, "templates");
-            string outDir = Path.Combine("W:\\code_hard\\.net\\z3n8", "templates");
+            string outDir = Path.Combine("W:\\code_hard\\.net\\z3nIO", "templates");
             Directory.CreateDirectory(outDir);
 
             // ── db_template.json ─────────────────────────────────────────────

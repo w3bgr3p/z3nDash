@@ -4,6 +4,6 @@
         <TargetFramework>net8.0-windows</TargetFramework>
     </PropertyGroup>
     <ItemGroup>
-        <ProjectReference Include="..\z3nStub\z3n8.Stub.csproj" />
+        <ProjectReference Include="..\z3nStub\z3nIO.Stub.csproj" />
     </ItemGroup>
 </Project>

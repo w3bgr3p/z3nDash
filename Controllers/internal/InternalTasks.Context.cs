@@ -2,7 +2,7 @@
 
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3n8;
+namespace z3nIO;
 
 public static partial class InternalTasks
 {
@@ -63,15 +63,14 @@ public static partial class InternalTasks
             {
                 var inClause  = string.Join(",", group);
                 var fullCond  = $"{condition} AND \"id\" IN ({inClause})";
-                account = await scheduler.ReserveAccount(db, accountTable, fullCond);
+                account = await scheduler.ReserveAccount(db, accountTable, fullCond, logger);
                 if (account != null) break;
             }
         }
         else
         {
             
-            account = await scheduler.ReserveAccount(db, accountTable, condition);
-        }
+            account = await scheduler.ReserveAccount(db, accountTable, condition, logger);        }
 
         if (account == null)
         {

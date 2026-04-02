@@ -5,7 +5,7 @@
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
-    <title>z3n8 | Scheduler</title>
+    <title>z3nIO | Scheduler</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -388,7 +388,7 @@
 <body>
 <div id="app">
     <div class="main-header">
-        <h1>z3n8 Tasker</h1>
+        <h1>z3nIO Tasker</h1>
         <div class="header-stats" id="headerStats"></div>
         <div class="header-right">
             <button class="btn sm" onclick="loadList()">↺</button>
@@ -777,14 +777,14 @@
             if (showA && showB) return ga < gb ? -1 : ga > gb ? 1 : 0;
             return 0;
         });
-        
+
         if (!_groupsInitialized) {
             _groupsInitialized = true;
             Object.keys(groupCounts).forEach(function(g) {
                 if (groupCounts[g] > 1) collapsedGroups.add(g);
             });
         }
-        
+
         var html     = '';
         var lastGrp  = null;
         var firstUngrouped = true;
@@ -871,7 +871,7 @@
     }
 
     var NAV_PAGES = [
-        { icon: '&#x23F1;',         title: 'z3n8',       desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)',          url: '/scheduler.html',  color: '#e3b341' },
+        { icon: '&#x23F1;',         title: 'z3nIO',       desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)',          url: '/scheduler.html',  color: '#e3b341' },
         { icon: '&#x2699;&#xFE0F;', title: 'ZP7',         desc: 'Управление ZP7', url: '/?page=zp7',        color: '#58a6ff' },
         { icon: '&#x1F4CB;',        title: 'Logs',       desc: 'Логи приложения с фильтрацией по уровню, машине, проекту, аккаунту.',                 url: '/?page=logs',      color: '#3fb950' },
         { icon: '&#x1F310;',        title: 'HTTP',       desc: 'Перехваченные HTTP-запросы и ответы из ZP-задач. Replay запросов.',                   url: '/?page=http',      color: '#d29922' },
@@ -946,6 +946,8 @@
             + (s.executor === 'csx-internal' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Prebuild</button>' : '')
             + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📥 Import</button>'
             + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📤 Export</button>'
+            + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFile(this.dataset.fp)" title="' + escHtml(s.script_path) + '" style="border-color:#3fb950;color:#3fb950;">📄 Open File</button>' : '')
+            + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFolder(this.dataset.fp)" title="Open folder: ' + escHtml(s.script_path) + '" style="border-color:#3fb950;color:#3fb950;">📁 Open Folder</button>' : '')
             + '</div>';
     }
 
@@ -1552,6 +1554,22 @@
             var json = JSON.stringify({ schema: data.schema, values: data.values }, null, 2);
             await navigator.clipboard.writeText(json);
             Dialog.alert('Payload JSON copied to clipboard.', 'Exported');
+        } catch(e) { Dialog.error(e.message); }
+    }
+
+    async function openScriptFile(filePath) {
+        try {
+            var res  = await fetch('/scheduler/open-file?path=' + encodeURIComponent(filePath));
+            var data = await res.json();
+            if (!data.ok) Dialog.error(data.error || 'Cannot open file');
+        } catch(e) { Dialog.error(e.message); }
+    }
+
+    async function openScriptFolder(filePath) {
+        try {
+            var res  = await fetch('/scheduler/open-folder?path=' + encodeURIComponent(filePath));
+            var data = await res.json();
+            if (!data.ok) Dialog.error(data.error || 'Cannot open folder');
         } catch(e) { Dialog.error(e.message); }
     }
 

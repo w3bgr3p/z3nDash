@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 
-namespace z3n8;
+namespace z3nIO;
 
 public class Config
 {
@@ -13,6 +13,7 @@ public class Config
     public static ApiConfig ApiConfig { get; private set; } = new();
     
     public static SecurityConfig SecurityConfig { get; private set; } = new();
+    public static AiConfig       AiConfig       { get; private set; } = new();
 
     public static Dictionary<string, CrxItem> Crx { get; private set; } = new();
     public static void Init()
@@ -33,6 +34,7 @@ public class Config
         LogsConfig = config.GetSection("LogsConfig").Get<LogsConfig>() ?? new();
         ApiConfig = config.GetSection("ApiConfig").Get<ApiConfig>() ?? new();
         SecurityConfig = config.GetSection("SecurityConfig").Get<SecurityConfig>() ?? new();
+        AiConfig       = config.GetSection("AiConfig").Get<AiConfig>()             ?? new();
 
         Crx = config.GetSection("Crx").Get<Dictionary<string, CrxItem>>() ?? new();
         IsConfigured = true;

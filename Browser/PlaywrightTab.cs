@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 
-namespace z3n8;
+namespace z3nIO;
 
 // ── PlaywrightElement — аналог HtmlElement ────────────────────────────────────
 

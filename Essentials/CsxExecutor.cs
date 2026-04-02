@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3n8;
+namespace z3nIO;
 
 public static class CsxExecutor
 {
@@ -37,7 +37,7 @@ public static class CsxExecutor
                 "System.Threading.Tasks",
                 "Newtonsoft.Json",
                 "Newtonsoft.Json.Linq",
-                "z3n8",
+                "z3nIO",
                 "ZennoLab.InterfacesLibrary.ProjectModel",
                 "ZennoLab.CommandCenter"
             );
@@ -80,7 +80,7 @@ public static class CsxExecutor
         }
     }
 
-    public static async Task RunAsync(string scriptPath, CsxGlobals globals, CancellationToken ct)
+    public static async Task<ScriptRunResult> RunAsync(string scriptPath, CsxGlobals globals, CancellationToken ct)
     {
         if (!File.Exists(scriptPath))
             throw new FileNotFoundException($"CSX script not found: {scriptPath}");
@@ -89,9 +89,59 @@ public static class CsxExecutor
         var hash   = ComputeCompositeHash(scriptPath, code);
         var script = GetOrCompile(scriptPath, code, hash);
 
-        await script.RunAsync(globals: globals, catchException: null, cancellationToken: ct);
+        try
+        {
+            await script.RunAsync(globals: globals, catchException: null, cancellationToken: ct);
+            return ScriptRunResult.Ok();
+        }
+        catch (Exception ex)
+        {
+            var snippet = ExtractSourceSnippet(ex);
+            return ScriptRunResult.Fail(ex, snippet);
+        }
+    }
+    private static SourceSnippet? ExtractSourceSnippet(Exception ex)
+    {
+        var trace = new System.Diagnostics.StackTrace(ex, true);
+        foreach (var frame in trace.GetFrames() ?? [])
+        {
+            var file = frame.GetFileName();
+            var line = frame.GetFileLineNumber();
+            if (string.IsNullOrEmpty(file) || line <= 0) continue;
+            if (!File.Exists(file)) continue;
+
+            var lines   = File.ReadAllLines(file);
+            var from    = Math.Max(0, line - 10);
+            var to      = Math.Min(lines.Length - 1, line + 10);
+            var snippet = lines[from..(to + 1)];
+
+            return new SourceSnippet(file, line, from + 1, snippet);
+        }
+        return null;
+    }
+    
+    public record SourceSnippet(string File, int ErrorLine, int StartLine, string[] Lines)
+    {
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"File: {File}");
+            for (int i = 0; i < Lines.Length; i++)
+            {
+                int lineNo = StartLine + i;
+                string marker = lineNo == ErrorLine ? ">>>" : "   ";
+                sb.AppendLine($"{marker} {lineNo,4}: {Lines[i]}");
+            }
+            return sb.ToString();
+        }
     }
 
+    public record ScriptRunResult(bool Success, Exception? Exception, SourceSnippet? Snippet)
+    {
+        public static ScriptRunResult Ok()                                    => new(true,  null, null);
+        public static ScriptRunResult Fail(Exception ex, SourceSnippet? s)   => new(false, ex,   s);
+    }
+    
     // ── Cache ─────────────────────────────────────────────────────────────────
 
     private static Script<object> GetOrCompile(string path, string code, string hash)

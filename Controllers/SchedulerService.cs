@@ -4,9 +4,9 @@ using System.Text;
 using System.Text.Json;
 using Cronos;
 using NBitcoin.Protocol;
-using z3n8;
+using z3nIO;
 
-namespace z3n8;
+namespace z3nIO;
 
 public sealed class SchedulerService : IDisposable
 {
@@ -446,7 +446,7 @@ private static void SeedDefaults(Db db)
                     ? new ZB(Config.ApiConfig.ZB)
                     : null;
 
-                z3n8.Browser.PlaywrightInstance? instance = null;
+                z3nIO.Browser.PlaywrightInstance? instance = null;
 
                 if (zb != null)
                 {
@@ -458,7 +458,7 @@ private static void SeedDefaults(Db db)
                         var context = browser.Contexts[0];
                         var page    = context.Pages.FirstOrDefault()
                                       ?? await context.NewPageAsync();
-                        instance    = new z3n8.Browser.PlaywrightInstance(page);
+                        instance    = new z3nIO.Browser.PlaywrightInstance(page);
                     }
                 }
 
@@ -813,7 +813,7 @@ private static void SeedDefaults(Db db)
                 return null;
             }
             var colsSql = string.Join(", ", cols.Select(c => $"\"{c}\""));
-            var query   = $"SELECT {colsSql} FROM \"{table}\" WHERE ({condition}) AND \"status\" != 'busy' LIMIT 1";
+            var query   = $"SELECT {colsSql}, COUNT(*) OVER() AS __total FROM \"{table}\" WHERE ({condition}) AND \"status\" != 'busy' ORDER BY RANDOM() LIMIT 1";
             var rawRow  = db.Query(query, thrw: false);
 
             if (string.IsNullOrWhiteSpace(rawRow))
@@ -823,6 +823,10 @@ private static void SeedDefaults(Db db)
             }
 
             var values = rawRow.Split('¦');
+
+            // __total — последнее поле, за пределами cols
+            var total = values.Length > cols.Count ? values[cols.Count].Trim() : "?";
+
             var record = new Dictionary<string, string>();
             for (int i = 0; i < cols.Count && i < values.Length; i++)
                 record[cols[i]] = values[i];
@@ -842,7 +846,7 @@ private static void SeedDefaults(Db db)
             var acctLabel = record.GetValueOrDefault("address",
                 record.GetValueOrDefault("login",
                     record.GetValueOrDefault("name", id)));
-            log?.Info($"account locked  table={table} id={id} label={acctLabel}");
+            log?.Info($"account locked  table={table} id={id} label={acctLabel} queue={total}");
         
             return record;
         }

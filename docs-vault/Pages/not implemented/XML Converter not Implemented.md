@@ -1,6 +1,6 @@
 # XML Converter
 
-Конвертер XML-формата `InputSettings` (ZennoPoster) в JSON payload для [[shift + ctrl + 1.    z3n8 (Scheduler)]] и [[shift + ctrl + 2.    ZP7]].
+Конвертер XML-формата `InputSettings` (ZennoPoster) в JSON payload для [[shift + ctrl + 1.    z3nIO (Scheduler)]] и [[shift + ctrl + 2.    ZP7]].
 
 Путь: `/xml.html`
 
@@ -52,7 +52,7 @@ ZP-шаблоны хранят настройки в XML-блоке `InputSettin
 
 ### Combined
 
-Schema и Values в одном объекте — готовый payload для импорта в [[shift + ctrl + 1.    z3n8 (Scheduler)]] через **📥 Import**.
+Schema и Values в одном объекте — готовый payload для импорта в [[shift + ctrl + 1.    z3nIO (Scheduler)]] через **📥 Import**.
 
 ```json
 {
@@ -99,5 +99,5 @@ Schema и Values в одном объекте — готовый payload для 
 
 ## Связанные страницы
 
-- [[shift + ctrl + 1.    z3n8 (Scheduler)]] — вставь Combined через **📥 Import** чтобы передать настройки задаче
+- [[shift + ctrl + 1.    z3nIO (Scheduler)]] — вставь Combined через **📥 Import** чтобы передать настройки задаче
 - [[shift + ctrl + 2.    ZP7]] — кнопка **⚙ Settings** использует аналогичный механизм для редактирования InputSettings напрямую

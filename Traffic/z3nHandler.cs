@@ -5,7 +5,7 @@ using System.Diagnostics;
 using Newtonsoft.Json;
 
 
-namespace z3n8
+namespace z3nIO
 {
     public class HttpCallDiagnostics
     {
@@ -105,7 +105,7 @@ namespace z3n8
         private static readonly HttpClient _logClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         private readonly string _taskId;
         private readonly string _account;
-        private readonly string _source = "z3n8";
+        private readonly string _source = "z3nIO";
         public HttpDebugHandler(string projectName, 
             string logHost = "http://localhost:38109/http-log", 
             string trafficHost = "http://localhost:38109/traffic",

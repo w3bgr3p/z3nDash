@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
 
-namespace z3n8;
+namespace z3nIO;
 
 internal sealed class ConfigHandler
 {
@@ -11,33 +11,35 @@ internal sealed class ConfigHandler
     private readonly HttpListener _listener;
     private readonly int _port;
     private readonly DbConnectionService _dbService;
+    private readonly AiClient _aiClient;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    public ConfigHandler(string logPath, HttpListener listener, int port, DbConnectionService dbService)
+    public ConfigHandler(string logPath, HttpListener listener, int port, DbConnectionService dbService, AiClient aiClient)
     {
         _logPath   = logPath;
         _listener  = listener;
         _port      = port;
         _dbService = dbService;
+        _aiClient  = aiClient;
     }
 
     public bool Matches(string path, string method) =>
         (method == "GET"  && path is "/config" or "/config/status" or "/config/storage" or "/config/ui") ||
-        (method == "POST" && path is "/config" or "/config/jvars" or "/clear-all-logs" or "/config/ui");
-
+        (method == "POST" && path is "/config" or "/config/jvars" or "/config/ai-validate" or "/clear-all-logs" or "/config/ui");
 
     public async Task Handle(HttpListenerContext ctx)
     {
         var path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
         var method = ctx.Request.HttpMethod;
 
-        if (method == "GET"  && path == "/config")          { await GetConfig(ctx.Response);    return; }
-        if (method == "POST" && path == "/config")          { using var r = new StreamReader(ctx.Request.InputStream); await SaveConfig(ctx.Response, await r.ReadToEndAsync()); return; }
-        if (method == "POST" && path == "/config/jvars")    { using var r = new StreamReader(ctx.Request.InputStream); await SaveJVars(ctx.Response, await r.ReadToEndAsync()); return; }
-        if (method == "GET"  && path == "/config/status")   { await GetStatus(ctx.Response);    return; }
-        if (method == "GET"  && path == "/config/storage")  { await GetStorage(ctx.Response);   return; }
-        if (method == "POST" && path == "/clear-all-logs")  { await ClearAllLogs(ctx.Response); return; }
-        
+        if (method == "GET"  && path == "/config")               { await GetConfig(ctx.Response);    return; }
+        if (method == "POST" && path == "/config")               { using var r = new StreamReader(ctx.Request.InputStream); await SaveConfig(ctx.Response, await r.ReadToEndAsync()); return; }
+        if (method == "POST" && path == "/config/jvars")         { using var r = new StreamReader(ctx.Request.InputStream); await SaveJVars(ctx.Response, await r.ReadToEndAsync()); return; }
+        if (method == "POST" && path == "/config/ai-validate")   { using var r = new StreamReader(ctx.Request.InputStream); await ValidateAiConfig(ctx.Response, await r.ReadToEndAsync()); return; }
+        if (method == "GET"  && path == "/config/status")        { await GetStatus(ctx.Response);    return; }
+        if (method == "GET"  && path == "/config/storage")       { await GetStorage(ctx.Response);   return; }
+        if (method == "POST" && path == "/clear-all-logs")       { await ClearAllLogs(ctx.Response); return; }
+
         if (method == "GET"  && path == "/config/ui") { await GetUiState(ctx.Response);  return; }
         if (method == "POST" && path == "/config/ui") { using var r = new StreamReader(ctx.Request.InputStream); await SaveUiState(ctx.Response, await r.ReadToEndAsync()); return; }
     }
@@ -47,7 +49,6 @@ internal sealed class ConfigHandler
         string cfgPath = Path.Combine(AppContext.BaseDirectory, "appsettings.secrets.json");
         if (!File.Exists(cfgPath)) { response.StatusCode = 404; await HttpHelpers.WriteText(response, "Config file not found"); return; }
 
-        // Inject securityConfig.jVarsPath into response without exposing PIN
         var raw  = await File.ReadAllTextAsync(cfgPath, Encoding.UTF8);
         var json = JsonSerializer.Deserialize<JsonElement>(raw);
 
@@ -105,8 +106,69 @@ internal sealed class ConfigHandler
         }
     }
 
+    // ── POST /config/ai-validate ───────────────────────────────────────────────
+    // Body: { provider: "aiio"|"omniroute"|"", omniRouteHost: "http://..." }
+    // Validates the chosen provider, saves effective result (may downgrade to "").
+
+    private async Task ValidateAiConfig(HttpListenerResponse response, string body)
+    {
+        string cfgPath = Path.Combine(AppContext.BaseDirectory, "appsettings.secrets.json");
+        try
+        {
+            var doc          = JsonSerializer.Deserialize<JsonElement>(body);
+            var provider     = doc.TryGetProperty("provider",      out var pv) ? pv.GetString() ?? "" : "";
+            var omniRouteHost = doc.TryGetProperty("omniRouteHost", out var oh) ? oh.GetString() ?? "http://localhost:20128" : "http://localhost:20128";
+
+            string effectiveProvider = provider;
+            string? reason           = null;
+
+            if (provider == "aiio")
+            {
+                if (!_aiClient.HasAiioKey())
+                {
+                    effectiveProvider = "";
+                    reason = "No valid key found in __aiio table";
+                }
+            }
+            else if (provider == "omniroute")
+            {
+                var reachable = await AiClient.CheckOmniRouteAsync(omniRouteHost);
+                if (!reachable)
+                {
+                    effectiveProvider = "";
+                    reason = $"OmniRoute not reachable at {omniRouteHost}";
+                }
+            }
+
+            // Persist
+            var existing = new Dictionary<string, JsonElement>();
+            if (File.Exists(cfgPath))
+            {
+                var existingDoc = JsonSerializer.Deserialize<JsonElement>(await File.ReadAllTextAsync(cfgPath, Encoding.UTF8));
+                if (existingDoc.ValueKind == JsonValueKind.Object)
+                    foreach (var prop in existingDoc.EnumerateObject())
+                        existing[prop.Name] = prop.Value;
+            }
+
+            existing["AiConfig"] = JsonSerializer.Deserialize<JsonElement>(
+                JsonSerializer.Serialize(new { Provider = effectiveProvider, OmniRouteHost = omniRouteHost }));
+
+            if (File.Exists(cfgPath)) File.Copy(cfgPath, cfgPath + ".bak", overwrite: true);
+            await File.WriteAllTextAsync(cfgPath, JsonSerializer.Serialize(existing, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+
+            Config.Init();
+            AiClient.InvalidateModelsCache();
+
+            await HttpHelpers.WriteJson(response, new { ok = true, provider = effectiveProvider, reason });
+        }
+        catch (Exception ex)
+        {
+            response.StatusCode = 400;
+            await HttpHelpers.WriteJson(response, new { ok = false, error = ex.Message });
+        }
+    }
+
     // Принимает Base64(JSON{pin, jVarsPath})
-    // Шифрует и сохраняет jVars файл, записывает jVarsPath в конфиг
     private static async Task SaveJVars(HttpListenerResponse response, string body)
     {
         try
@@ -120,7 +182,6 @@ internal sealed class ConfigHandler
             if (string.IsNullOrWhiteSpace(pin))      { response.StatusCode = 400; await HttpHelpers.WriteText(response, "pin is required");       return; }
             if (string.IsNullOrWhiteSpace(jVarsPath)) { response.StatusCode = 400; await HttpHelpers.WriteText(response, "jVarsPath is required"); return; }
 
-            // Строим jVars JSON — только pin, остальное в конфиге
             var vars      = new Dictionary<string, string> { ["cfgPin"] = pin };
             if (doc.TryGetProperty("localVars", out var localVarsEl) && localVarsEl.ValueKind == JsonValueKind.Object)
                 foreach (var prop in localVarsEl.EnumerateObject())
@@ -128,12 +189,7 @@ internal sealed class ConfigHandler
             var plaintext = System.Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(vars)));
             var encrypted = SAFU.EncryptHWIDOnly(plaintext);
 
-            if (string.IsNullOrEmpty(encrypted))
-            {
-                response.StatusCode = 500;
-                await HttpHelpers.WriteText(response, "Encryption failed");
-                return;
-            }
+            if (string.IsNullOrEmpty(encrypted)) { response.StatusCode = 500; await HttpHelpers.WriteText(response, "Encryption failed"); return; }
 
             var dir = Path.GetDirectoryName(jVarsPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -141,7 +197,6 @@ internal sealed class ConfigHandler
 
             await File.WriteAllTextAsync(jVarsPath, encrypted, Encoding.UTF8);
 
-            // Сохраняем jVarsPath в конфиг
             string cfgPath = Path.Combine(AppContext.BaseDirectory, "appsettings.secrets.json");
             var existing   = new Dictionary<string, JsonElement>();
             if (File.Exists(cfgPath))
@@ -245,16 +300,12 @@ internal sealed class ConfigHandler
 
         await HttpHelpers.WriteJson(response, new { ok = errors.Count == 0, deleted, errors });
     }
-    
+
     private static string UiStatePath => Path.Combine(AppContext.BaseDirectory, "ui-state.json");
 
     private static async Task GetUiState(HttpListenerResponse response)
     {
-        if (!File.Exists(UiStatePath))
-        {
-            await HttpHelpers.WriteJson(response, new { theme = "dark" });
-            return;
-        }
+        if (!File.Exists(UiStatePath)) { await HttpHelpers.WriteJson(response, new { theme = "dark" }); return; }
         var raw = await File.ReadAllTextAsync(UiStatePath, Encoding.UTF8);
         await HttpHelpers.WriteRawJson(response, raw);
     }
@@ -263,7 +314,7 @@ internal sealed class ConfigHandler
     {
         try
         {
-            JsonSerializer.Deserialize<JsonElement>(body); // валидация
+            JsonSerializer.Deserialize<JsonElement>(body);
             await File.WriteAllTextAsync(UiStatePath, body, Encoding.UTF8);
             await HttpHelpers.WriteJson(response, new { ok = true });
         }
@@ -273,5 +324,4 @@ internal sealed class ConfigHandler
             await HttpHelpers.WriteJson(response, new { ok = false, error = ex.Message });
         }
     }
-    
 }

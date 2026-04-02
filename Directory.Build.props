@@ -3,7 +3,7 @@
         <Version>1.0.0.8</Version>
 
         <AssemblyTitle>$(MSBuildProjectName)</AssemblyTitle>
-        <Product>z3n8</Product>
+        <Product>z3nIO</Product>
         <Copyright>Copyright © w3bgr3p 2026</Copyright>
         <Company>w3bgr3p</Company>
         <Authors>w3bgr3p</Authors>

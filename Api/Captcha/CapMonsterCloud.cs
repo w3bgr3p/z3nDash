@@ -2,7 +2,7 @@
 using System.Text.RegularExpressions;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3n8.Api.Captcha;
+namespace z3nIO.Api.Captcha;
 
 
 public class CapMonsterSolver
@@ -99,7 +99,9 @@ public class CapMonsterSolver
                 ("CheckResult: " + getResponse).Debug();
                 if (getResponse.Contains(@"""status"":""ready"""))
                 {
-                    token = Regex.Match(getResponse, @"""token"":""([^""]+)""").Groups[1].Value;
+                    token = Regex.Match(getResponse, @"""gRecaptchaResponse"":""([^""]+)""").Groups[1].Value;
+                    if (string.IsNullOrEmpty(token))
+                        token = Regex.Match(getResponse, @"""token"":""([^""]+)""").Groups[1].Value;
                     break;
                 }
             }
@@ -116,6 +118,3 @@ public class CapMonsterSolver
         }
     }
 }
-
-
-

@@ -2,19 +2,20 @@
 using System.Text;
 using System.Text.Json;
 
-namespace z3n8;
+namespace z3nIO;
 
 internal sealed class AiReportHandler
 {
     private readonly DbConnectionService _dbService;
-
-    private static List<string>? _modelsCache;
+    private readonly AiClient _aiClient;
 
     private const string CacheTable = "_ai_reports";
-    private const string Lang = "russian";
-    public AiReportHandler(DbConnectionService dbService)
+    private const string Lang       = "russian";
+
+    public AiReportHandler(DbConnectionService dbService, AiClient aiClient)
     {
         _dbService = dbService;
+        _aiClient  = aiClient;
     }
 
     public bool Matches(string path) => path.StartsWith("/ai-report");
@@ -24,29 +25,14 @@ internal sealed class AiReportHandler
         var path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
         var method = ctx.Request.HttpMethod;
 
-        if (path == "/ai-report/api/models" && method == "GET")       { await HandleModels(ctx);      return; }
-        if (path == "/ai-report/api/analyze" && method == "POST")     { await HandleAnalyze(ctx);     return; }
-        if (path == "/ai-report/api/analyze-all" && method == "POST") { await HandleAnalyzeAll(ctx);  return; }
-        if (path == "/ai-report/api/cache" && method == "GET")        { await HandleCacheGet(ctx);    return; }
-        if (path == "/ai-report/api/cache" && method == "DELETE")     { await HandleCacheDelete(ctx); return; }
+        if (path == "/ai-report/api/models"      && method == "GET")  { await HandleModels(ctx);     return; }
+        if (path == "/ai-report/api/analyze"      && method == "POST") { await HandleAnalyze(ctx);    return; }
+        if (path == "/ai-report/api/analyze-all"  && method == "POST") { await HandleAnalyzeAll(ctx); return; }
+        if (path == "/ai-report/api/cache"         && method == "GET") { await HandleCacheGet(ctx);   return; }
+        if (path == "/ai-report/api/cache"      && method == "DELETE") { await HandleCacheDelete(ctx); return; }
 
         ctx.Response.StatusCode = 404;
         ctx.Response.Close();
-    }
-
-    // ── api key ────────────────────────────────────────────────────────────────
-
-    private static string? GetApiKey(Db db)
-    {
-        var now  = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-        var lines = db.GetLines(
-            "api",
-            tableName: "__aiio",
-            where: $"(\"expire\" = '' OR \"expire\" IS NULL OR \"expire\" > '{now}')"
-        );
-        var keys = lines.Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
-        if (keys.Count == 0) return null;
-        return keys[new Random().Next(keys.Count)].Trim();
     }
 
     // ── cache table ────────────────────────────────────────────────────────────
@@ -70,7 +56,6 @@ internal sealed class AiReportHandler
         var mEsc    = model.Replace("'", "''");
         var pEsc    = project.Replace("'", "''");
 
-        // upsert
         db.Query(
             $"INSERT INTO \"{CacheTable}\" (\"project\", \"report\", \"ts\", \"model\") " +
             $"VALUES ('{pEsc}', '{escaped}', '{ts}', '{mEsc}') " +
@@ -86,7 +71,7 @@ internal sealed class AiReportHandler
 
         EnsureCacheTable(db!);
 
-        var lines = db!.GetLines("project, model, ts, report", tableName: CacheTable, where: "1=1");
+        var lines   = db!.GetLines("project, model, ts, report", tableName: CacheTable, where: "1=1");
         var entries = new List<object>();
 
         foreach (var line in lines)
@@ -94,13 +79,7 @@ internal sealed class AiReportHandler
             if (string.IsNullOrWhiteSpace(line)) continue;
             var cols = line.Split('¦');
             if (cols.Length < 4) continue;
-            entries.Add(new
-            {
-                project  = cols[0].Trim(),
-                model    = cols[1].Trim(),
-                ts       = cols[2].Trim(),
-                analysis = cols[3].Trim()
-            });
+            entries.Add(new { project = cols[0].Trim(), model = cols[1].Trim(), ts = cols[2].Trim(), analysis = cols[3].Trim() });
         }
 
         await HttpHelpers.WriteJson(ctx.Response, new { entries });
@@ -120,39 +99,15 @@ internal sealed class AiReportHandler
         await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
     }
 
-    // ── models ─────────────────────────────────────────────────────────────────
+    // ── GET /ai-report/api/models ──────────────────────────────────────────────
 
     private async Task HandleModels(HttpListenerContext ctx)
     {
-        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
-
-        if (_modelsCache != null) { await HttpHelpers.WriteJson(ctx.Response, new { models = _modelsCache }); return; }
-
-        string? apiKey = GetApiKey(db!);
-        if (string.IsNullOrEmpty(apiKey)) { ctx.Response.StatusCode = 500; await HttpHelpers.WriteJson(ctx.Response, new { error = "aiio key not found" }); return; }
+        if (!_aiClient.IsEnabled) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "ai disabled" }); return; }
 
         try
         {
-            using var http    = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-            using var request = new HttpRequestMessage(HttpMethod.Get,
-                "https://api.intelligence.io.solutions/api/v1/models?page=1&page_size=200");
-            request.Headers.Add("Authorization", $"Bearer {apiKey}");
-
-            using var response = await http.SendAsync(request);
-            var raw  = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-                throw new Exception($"HTTP {(int)response.StatusCode}\n{raw}");
-
-            var json   = JsonSerializer.Deserialize<JsonElement>(raw);
-            var models = json.GetProperty("data")
-                .EnumerateArray()
-                .Select(m => m.GetProperty("id").GetString() ?? "")
-                .Where(id => !string.IsNullOrEmpty(id))
-                .OrderBy(id => id)
-                .ToList();
-
-            _modelsCache = models;
+            var models = await _aiClient.GetModelsAsync();
             await HttpHelpers.WriteJson(ctx.Response, new { models });
         }
         catch (Exception ex)
@@ -162,14 +117,12 @@ internal sealed class AiReportHandler
         }
     }
 
-    // ── single project ─────────────────────────────────────────────────────────
+    // ── POST /ai-report/api/analyze ───────────────────────────────────────────
 
     private async Task HandleAnalyze(HttpListenerContext ctx)
     {
         if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
-
-        string? apiKey = GetApiKey(db!);
-        if (string.IsNullOrEmpty(apiKey)) { ctx.Response.StatusCode = 500; await HttpHelpers.WriteJson(ctx.Response, new { error = "aiio key not found" }); return; }
+        if (!_aiClient.IsEnabled)             { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "ai disabled" }); return; }
 
         string projectName, model;
         try
@@ -183,27 +136,30 @@ internal sealed class AiReportHandler
         catch { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "invalid body" }); return; }
 
         if (string.IsNullOrEmpty(projectName)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "project required" }); return; }
-        if (string.IsNullOrEmpty(model)) model = _modelsCache?.FirstOrDefault() ?? "deepseek-ai/DeepSeek-V3.2";
+        if (string.IsNullOrEmpty(model)) model = "deepseek-ai/DeepSeek-V3.2";
 
         var accounts = ReadAccounts(db!, $"__{projectName}");
         if (accounts.Count == 0) { await HttpHelpers.WriteJson(ctx.Response, new { project = projectName, analysis = "No data." }); return; }
 
+        var systemPrompt =
+            "You are a concise automation analyst. Analyze the provided account farm run report. " +
+            "Output: 1) status summary 2) key issues from failed accounts 3) performance notes. " +
+            $"Be specific. Max 300 words. Response language: {Lang}";
+
         string result;
-        try   { result = await CallAiio(apiKey, model, BuildPrompt(projectName, accounts)); }
+        try   { result = await _aiClient.CompleteAsync(model, systemPrompt, BuildPrompt(projectName, accounts)); }
         catch (Exception ex) { await HttpHelpers.WriteJson(ctx.Response, new { project = projectName, model, error = ex.Message }); return; }
 
         SaveCache(db!, projectName, model, result);
         await HttpHelpers.WriteJson(ctx.Response, new { project = projectName, model, analysis = result });
     }
 
-    // ── cross-project summary ──────────────────────────────────────────────────
+    // ── POST /ai-report/api/analyze-all ──────────────────────────────────────
 
     private async Task HandleAnalyzeAll(HttpListenerContext ctx)
     {
         if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
-
-        string? apiKey = GetApiKey(db!);
-        if (string.IsNullOrEmpty(apiKey)) { ctx.Response.StatusCode = 500; await HttpHelpers.WriteJson(ctx.Response, new { error = "aiio key not found" }); return; }
+        if (!_aiClient.IsEnabled)             { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "ai disabled" }); return; }
 
         string model;
         try
@@ -215,7 +171,7 @@ internal sealed class AiReportHandler
         }
         catch { model = ""; }
 
-        if (string.IsNullOrEmpty(model)) model = _modelsCache?.FirstOrDefault() ?? "deepseek-ai/DeepSeek-V3.2";
+        if (string.IsNullOrEmpty(model)) model = "deepseek-ai/DeepSeek-V3.2";
 
         var projectTables = db!.GetTables()
             .Where(t => t.StartsWith("__") && !t.StartsWith("__|") && t != CacheTable)
@@ -244,19 +200,17 @@ internal sealed class AiReportHandler
 
         if (perProject.Count == 0) { await HttpHelpers.WriteJson(ctx.Response, new { project = "__all__", analysis = "No data." }); return; }
 
+        var systemPrompt =
+            "You are a concise automation analyst. You receive a cross-project account farm report. " +
+            "Each account failure entry includes the project's own failRate. " +
+            "IMPORTANT DISTINCTION: " +
+            "- If an account fails across projects where ALL those projects have high failRate (>70%) — this is a PROJECT-LEVEL issue (maintenance, ban wave, infra), not the account. " +
+            "- Account-level issue (proxy, linked resource, ban) is only likely when the account fails in a project that has a LOW failRate (<30%). " +
+            "Tasks: 1) overall health summary 2) identify project-level failure clusters 3) identify genuine account-level suspects with justification 4) recurring error patterns. " +
+            $"Name specific account IDs, project names, error types. Max 400 words. Response language: {Lang}";
+
         string result;
-        try
-        {
-            result = await CallAiio(apiKey, model, BuildCrossPrompt(perProject, byAccount), systemPrompt:
-                "You are a concise automation analyst. You receive a cross-project account farm report. " +
-                "Each account failure entry includes the project's own failRate. " +
-                "IMPORTANT DISTINCTION: " +
-                "- If an account fails across projects where ALL those projects have high failRate (>70%) — this is a PROJECT-LEVEL issue (maintenance, ban wave, infra), not the account. " +
-                "- Account-level issue (proxy, linked resource, ban) is only likely when the account fails in a project that has a LOW failRate (<30%). " +
-                "Tasks: 1) overall health summary 2) identify project-level failure clusters 3) identify genuine account-level suspects with justification 4) recurring error patterns. " +
-                "Name specific account IDs, project names, error types. Max 400 words." +
-                $"Response language: {Lang}");
-        }
+        try   { result = await _aiClient.CompleteAsync(model, systemPrompt, BuildCrossPrompt(perProject, byAccount)); }
         catch (Exception ex) { await HttpHelpers.WriteJson(ctx.Response, new { project = "__all__", model, error = ex.Message }); return; }
 
         SaveCache(db!, "__all__", model, result);
@@ -407,49 +361,6 @@ internal sealed class AiReportHandler
         }
 
         return sb.ToString();
-    }
-
-    // ── aiio ───────────────────────────────────────────────────────────────────
-
-    private const string AiioUrl = "https://api.intelligence.io.solutions/api/v1/chat/completions";
-
-    private static async Task<string> CallAiio(string apiKey, string model, string prompt,
-        string systemPrompt =
-            "You are a concise automation analyst. Analyze the provided account farm run report. " +
-            "Output: 1) status summary 2) key issues from failed accounts 3) performance notes. " +
-            "Be specific. Max 300 words." +
-            $"Response language: {Lang}")
-    {
-        var body = JsonSerializer.Serialize(new
-        {
-            model,
-            messages   = new[] { new { role = "system", content = systemPrompt }, new { role = "user", content = prompt } },
-            temperature = 0.3,
-            top_p       = 0.9,
-            stream      = false,
-            max_tokens  = 800
-        });
-
-        using var http    = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
-        using var request = new HttpRequestMessage(HttpMethod.Post, AiioUrl);
-        request.Headers.Add("Authorization", $"Bearer {apiKey}");
-        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-
-        using var response = await http.SendAsync(request);
-        var raw = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-            throw new Exception($"HTTP {(int)response.StatusCode}\n{raw}");
-
-        try
-        {
-            var json = JsonSerializer.Deserialize<JsonElement>(raw);
-            return json.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "No response";
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"{ex.Message}\nRAW:\n{raw}");
-        }
     }
 
     private record AccountEntry(string Status, string Timestamp, double Sec, string Report);

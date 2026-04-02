@@ -16,7 +16,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using z3n8;
+using z3nIO;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZennoLab.InterfacesLibrary.Enums
@@ -360,7 +360,7 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
 // FunctionStorage  —  stub
 // ─────────────────────────────────────────────────────────────────────────────
 
-namespace z3n8
+namespace z3nIO
 {
     public static class FunctionStorage
     {
@@ -374,7 +374,7 @@ namespace z3n8
 // Эмулируют публичный API из Vars.cs, Rqst.cs, DbExtencions.cs
 // ─────────────────────────────────────────────────────────────────────────────
 
-namespace z3n8
+namespace z3nIO
 {
     using System.Globalization;
     using System.Net.Http;
@@ -766,7 +766,7 @@ namespace z3n8
 
 
     // ── Db extensions — делегируют в StubProject.Db ──────────────────────────
-    // Воспроизводят API из DbExtencions.cs (z3nCore) поверх класса Db (z3n8)
+    // Воспроизводят API из DbExtencions.cs (z3nCore) поверх класса Db (z3nIO)
 
     public static partial class ProjectExtensions
     {

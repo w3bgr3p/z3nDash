@@ -26,7 +26,7 @@ Hover на иконку — всплывает подпись. Клик — пе
 | JSON      | [[shift + ctrl + 6.    JSON]]             |
 | Cliplates | [[shift + ctrl + 8.    Clips]]            |
 | Text      | [[shift + ctrl + 7.    Text Tools]]       |
-| Scheduler | [[shift + ctrl + 1.    z3n8 (Scheduler)]] |
+| Scheduler | [[shift + ctrl + 1.    z3nIO (Scheduler)]] |
 | Config    | [[shift + ctrl + 0.    Config]]           |
 
 ---

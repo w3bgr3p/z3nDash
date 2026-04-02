@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>z3n8 | Config</title>
+    <title>z3nIO | Config</title>
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
@@ -451,6 +451,26 @@
                 <button class="btn primary" onclick="saveConfig()">💾 Save Config</button>
             </div>
 
+            <div class="section-label" style="margin-top:8px;">AI Provider</div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Provider</label>
+                    <select id="cfgAiProvider" onchange="toggleAiFields()">
+                        <option value="">Disabled</option>
+                        <option value="aiio">aiio (intelligence.io)</option>
+                        <option value="omniroute">OmniRoute (local)</option>
+                    </select>
+                </div>
+                <div class="field" id="cfgOmniRouteHostWrap" style="display:none;">
+                    <label>OmniRoute Host</label>
+                    <input id="cfgOmniRouteHost" type="text" placeholder="http://localhost:20128">
+                </div>
+            </div>
+            <div class="btn-row" style="margin-top:6px; align-items:center; gap:10px;">
+                <button class="btn primary" onclick="saveAiConfig()">✓ Validate &amp; Save AI</button>
+                <span id="aiProviderStatus" style="font-size:11px; color:var(--text-dim);"></span>
+            </div>
+
             <div class="section-label" style="margin-top:8px;">Security · jVars</div>
             <div class="field-row">
                 <div class="field">
@@ -701,6 +721,15 @@
             setVal('cfgZbHost',        d.apiConfig?.zbHost ?? '');
             setVal('cfgJVarsPath',     d.securityConfig?.jVarsPath ?? '');
 
+            // AI
+            const aiProvider = d.aiConfig?.provider ?? d.AiConfig?.provider ?? '';
+            const aiHost     = d.aiConfig?.omniRouteHost ?? d.AiConfig?.omniRouteHost ?? 'http://localhost:20128';
+            document.getElementById('cfgAiProvider').value = aiProvider;
+            setVal('cfgOmniRouteHost', aiHost);
+            toggleAiFields();
+            document.getElementById('aiProviderStatus').textContent =
+                aiProvider ? '● active: ' + aiProvider : '○ disabled';
+
             togglePgFields();
         } catch(e) {
             toast('Config error: ' + e.message, 'err');
@@ -718,6 +747,44 @@
         document.querySelectorAll('#pgFields input').forEach(i => i.disabled = !isPg);
     }
     document.getElementById('cfgDbType').addEventListener('change', togglePgFields);
+
+    // ── AI Provider ───────────────────────────────────────────────────
+    function toggleAiFields() {
+        const isOmni = document.getElementById('cfgAiProvider').value === 'omniroute';
+        document.getElementById('cfgOmniRouteHostWrap').style.display = isOmni ? '' : 'none';
+    }
+
+    async function saveAiConfig() {
+        const provider      = document.getElementById('cfgAiProvider').value;
+        const omniRouteHost = document.getElementById('cfgOmniRouteHost').value || 'http://localhost:20128';
+        const statusEl      = document.getElementById('aiProviderStatus');
+        statusEl.textContent = '…';
+        try {
+            const r = await fetch('/config/ai-validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, omniRouteHost })
+            });
+            const d = await r.json();
+            if (d.ok) {
+                document.getElementById('cfgAiProvider').value = d.provider;
+                toggleAiFields();
+                if (d.provider) {
+                    statusEl.textContent = '● active: ' + d.provider;
+                    toast('✓ AI provider saved: ' + d.provider, 'ok');
+                } else {
+                    statusEl.textContent = '○ disabled' + (d.reason ? ' — ' + d.reason : '');
+                    toast('AI disabled: ' + (d.reason ?? 'validation failed'), 'err');
+                }
+            } else {
+                statusEl.textContent = '✕ error';
+                toast('AI save error: ' + (d.error ?? 'unknown'), 'err');
+            }
+        } catch(e) {
+            statusEl.textContent = '✕ error';
+            toast('AI save error: ' + e.message, 'err');
+        }
+    }
 
     // ── Save Config ───────────────────────────────────────────────────
     async function saveConfig() {

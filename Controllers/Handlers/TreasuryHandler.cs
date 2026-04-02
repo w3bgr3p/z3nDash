@@ -8,22 +8,18 @@
 //   POST /treasury/ai-analyze   { model, data: [...] }  -> { analysis, model, ts }
 //   GET  /treasury/ai-cache                             -> { entry } | { entry: null }
 //   DELETE /treasury/ai-cache                           -> { ok }
-//
-// Регистрация в EmbeddedServer:
-//   Добавить поле: private readonly TreasuryHandler _treasuryHandler;
-//   В конструкторе:  _treasuryHandler = new TreasuryHandler(dbService);
-//   В ProcessRequest: if (path.StartsWith("/treasury")) { await _treasuryHandler.Handle(ctx); return; }
 
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace z3n8;
+namespace z3nIO;
 
 internal sealed class TreasuryHandler
 {
     private readonly DbConnectionService _dbService;
+    private readonly AiClient _aiClient;
 
     private volatile bool   _running;
     private volatile int    _processed;
@@ -31,12 +27,12 @@ internal sealed class TreasuryHandler
     private volatile string _lastError = "";
 
     private const string AiCacheTable = "_treasury_ai_cache";
-    private const string AiioUrl      = "https://api.intelligence.io.solutions/api/v1/chat/completions";
-    private const string Lang          = "russian";
+    private const string Lang         = "russian";
 
-    public TreasuryHandler(DbConnectionService dbService)
+    public TreasuryHandler(DbConnectionService dbService, AiClient aiClient)
     {
         _dbService = dbService;
+        _aiClient  = aiClient;
     }
 
     public bool Matches(string path) => path.StartsWith("/treasury");
@@ -46,12 +42,12 @@ internal sealed class TreasuryHandler
         var path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
         var method = ctx.Request.HttpMethod;
 
-        if (method == "POST" && path == "/treasury/update")        { await StartUpdate(ctx);    return; }
-        if (method == "GET"  && path == "/treasury/status")        { await GetStatus(ctx);      return; }
-        if (method == "GET"  && path == "/treasury/data")          { await GetData(ctx);         return; }
-        if (method == "POST" && path == "/treasury/ai-analyze")    { await AiAnalyze(ctx);       return; }
-        if (method == "GET"  && path == "/treasury/ai-cache")      { await AiCacheGet(ctx);      return; }
-        if (method == "DELETE" && path == "/treasury/ai-cache")    { await AiCacheDelete(ctx);   return; }
+        if (method == "POST"   && path == "/treasury/update")     { await StartUpdate(ctx);   return; }
+        if (method == "GET"    && path == "/treasury/status")     { await GetStatus(ctx);     return; }
+        if (method == "GET"    && path == "/treasury/data")       { await GetData(ctx);       return; }
+        if (method == "POST"   && path == "/treasury/ai-analyze") { await AiAnalyze(ctx);     return; }
+        if (method == "GET"    && path == "/treasury/ai-cache")   { await AiCacheGet(ctx);    return; }
+        if (method == "DELETE" && path == "/treasury/ai-cache")   { await AiCacheDelete(ctx); return; }
 
         ctx.Response.StatusCode = 404;
         await HttpHelpers.WriteJson(ctx.Response, new { error = "Not found" });
@@ -141,24 +137,11 @@ internal sealed class TreasuryHandler
     }
 
     // ── POST /treasury/ai-analyze ─────────────────────────────────────────────
-    // Body: { model: string, data: [ { id, address, totalUsd, chainData: { chain: [ { symbol, valueUsd, amount } ] } } ] }
 
     private async Task AiAnalyze(HttpListenerContext ctx)
     {
-        if (!_dbService.TryGetDb(out var db))
-        {
-            ctx.Response.StatusCode = 503;
-            await HttpHelpers.WriteJson(ctx.Response, new { error = "db" });
-            return;
-        }
-
-        string? apiKey = GetApiKey(db!);
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            ctx.Response.StatusCode = 500;
-            await HttpHelpers.WriteJson(ctx.Response, new { error = "aiio key not found" });
-            return;
-        }
+        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
+        if (!_aiClient.IsEnabled)             { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "ai disabled" }); return; }
 
         string model;
         JsonElement dataEl;
@@ -170,31 +153,19 @@ internal sealed class TreasuryHandler
             model  = json.TryGetProperty("model",  out var mp) ? mp.GetString() ?? "" : "";
             dataEl = json.TryGetProperty("data",   out var dp) ? dp : default;
         }
-        catch
-        {
-            ctx.Response.StatusCode = 400;
-            await HttpHelpers.WriteJson(ctx.Response, new { error = "invalid body" });
-            return;
-        }
+        catch { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "invalid body" }); return; }
 
         if (string.IsNullOrEmpty(model)) model = "deepseek-ai/DeepSeek-V3.2";
 
-        var prompt = BuildTreasuryPrompt(dataEl);
+        var promptPath   = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Prompts", "treasury.txt");
+        var systemPrompt = File.ReadAllText(promptPath) + $" Language: {Lang}.";
 
         string result;
-        try
-        {
-            result = await CallAiio(apiKey, model, prompt);
-        }
-        catch (Exception ex)
-        {
-            await HttpHelpers.WriteJson(ctx.Response, new { error = ex.Message });
-            return;
-        }
+        try   { result = await _aiClient.CompleteAsync(model, systemPrompt, BuildTreasuryPrompt(dataEl), temp: 0.3, maxTokens: 900); }
+        catch (Exception ex) { await HttpHelpers.WriteJson(ctx.Response, new { error = ex.Message }); return; }
 
         var ts = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
         SaveAiCache(db!, model, result, ts);
-
         await HttpHelpers.WriteJson(ctx.Response, new { analysis = result, model, ts });
     }
 
@@ -212,15 +183,7 @@ internal sealed class TreasuryHandler
             if (string.IsNullOrWhiteSpace(line)) continue;
             var cols = line.Split('|');
             if (cols.Length < 3) continue;
-            await HttpHelpers.WriteJson(ctx.Response, new
-            {
-                entry = new
-                {
-                    model    = cols[0].Trim(),
-                    ts       = cols[1].Trim(),
-                    analysis = cols[2].Trim()
-                }
-            });
+            await HttpHelpers.WriteJson(ctx.Response, new { entry = new { model = cols[0].Trim(), ts = cols[1].Trim(), analysis = cols[2].Trim() } });
             return;
         }
 
@@ -232,7 +195,6 @@ internal sealed class TreasuryHandler
     private async Task AiCacheDelete(HttpListenerContext ctx)
     {
         if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
-
         EnsureAiCacheTable(db!);
         db!.Del(tableName: AiCacheTable, where: "1=1");
         await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
@@ -255,33 +217,16 @@ internal sealed class TreasuryHandler
     {
         EnsureAiCacheTable(db);
         db.Del(tableName: AiCacheTable, where: "1=1");
-
         var rEsc = analysis.Replace("'", "''");
         var mEsc = model.Replace("'", "''");
         var tEsc = ts.Replace("'", "''");
         db.Query($"INSERT INTO \"{AiCacheTable}\" (\"model\", \"ts\", \"report\") VALUES ('{mEsc}', '{tEsc}', '{rEsc}')");
     }
 
-    // ── api key (same pattern as AiReportHandler) ─────────────────────────────
-
-    private static string? GetApiKey(Db db)
-    {
-        var now   = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-        var lines = db.GetLines(
-            "api",
-            tableName: "__aiio",
-            where: $"(\"expire\" = '' OR \"expire\" IS NULL OR \"expire\" > '{now}')"
-        );
-        var keys = lines.Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
-        if (keys.Count == 0) return null;
-        return keys[new Random().Next(keys.Count)].Trim();
-    }
-
     // ── prompt builder ────────────────────────────────────────────────────────
 
     private static string BuildTreasuryPrompt(JsonElement dataEl)
     {
-        // Агрегируем данные из JSON, переданного фронтендом
         var tokenAgg  = new Dictionary<string, (double val, int accs)>(StringComparer.OrdinalIgnoreCase);
         var chainAgg  = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         var zeroAccs  = new List<int>();
@@ -296,8 +241,8 @@ internal sealed class TreasuryHandler
             foreach (var acc in dataEl.EnumerateArray())
             {
                 accountCount++;
-                int    id       = acc.TryGetProperty("id",       out var idp)  ? idp.GetInt32()  : 0;
-                double accTotal = acc.TryGetProperty("totalUsd", out var tp)   ? tp.GetDouble()  : 0;
+                int    id       = acc.TryGetProperty("id",       out var idp) ? idp.GetInt32()  : 0;
+                double accTotal = acc.TryGetProperty("totalUsd", out var tp)  ? tp.GetDouble()  : 0;
                 totalPortfolio += accTotal;
 
                 if (accTotal == 0) zeroAccs.Add(id);
@@ -322,7 +267,6 @@ internal sealed class TreasuryHandler
                         if (!tokenAgg.TryGetValue(sym, out var ta)) ta = (0, 0);
                         tokenAgg[sym] = (ta.val + val, ta.accs + 1);
 
-                        // dust: есть значение, но < $1 и не нативный газ (нет смысла свапать 0.001$)
                         if (val > 0.01 && val < 1.0)
                             dustTokens.Add((sym, val, chain));
                     }
@@ -334,18 +278,15 @@ internal sealed class TreasuryHandler
         sb.AppendLine($"Treasury portfolio snapshot. Accounts: {accountCount}, Total: ${totalPortfolio:F2}");
         sb.AppendLine();
 
-        // Топ токены
         sb.AppendLine("=== Top tokens by value ===");
         foreach (var (sym, (val, accs)) in tokenAgg.OrderByDescending(x => x.Value.val).Take(20))
             sb.AppendLine($"{sym}: ${val:F2} across {accs} accounts ({val / totalPortfolio * 100:F1}%)");
 
-        // Цепочки
         sb.AppendLine();
         sb.AppendLine("=== Chain distribution ===");
         foreach (var (chain, val) in chainAgg.OrderByDescending(x => x.Value).Take(15))
             sb.AppendLine($"{chain}: ${val:F2} ({val / totalPortfolio * 100:F1}%)");
 
-        // Аномалии
         sb.AppendLine();
         sb.AppendLine("=== Anomalies ===");
         if (zeroAccs.Count > 0)
@@ -357,7 +298,6 @@ internal sealed class TreasuryHandler
                 sb.AppendLine($"  #{id}: ${val:F2}");
         }
 
-        // Пыль
         sb.AppendLine();
         sb.AppendLine($"=== Dust tokens (<$1, >$0.01): {dustTokens.Count} positions ===");
         var dustByToken = dustTokens.GroupBy(d => d.sym)
@@ -383,47 +323,7 @@ internal sealed class TreasuryHandler
         return 0;
     }
 
-    // ── aiio call ─────────────────────────────────────────────────────────────
-
-    private static async Task<string> CallAiio(string apiKey, string model, string prompt)
-    {
-        var promptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Prompts","treasury.txt");
-        
-        var systemPrompt = File.ReadAllText(promptPath) + $" Language: {Lang}.";
-        
-        var body = JsonSerializer.Serialize(new
-        {
-            model,
-            messages    = new[] { new { role = "system", content = systemPrompt }, new { role = "user", content = prompt } },
-            temperature = 0.3,
-            top_p       = 0.9,
-            stream      = false,
-            max_tokens  = 900
-        });
-
-        using var http    = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
-        using var request = new HttpRequestMessage(HttpMethod.Post, AiioUrl);
-        request.Headers.Add("Authorization", $"Bearer {apiKey}");
-        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-
-        using var response = await http.SendAsync(request);
-        var raw = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-            throw new Exception($"HTTP {(int)response.StatusCode}\n{raw}");
-
-        try
-        {
-            var json = JsonSerializer.Deserialize<JsonElement>(raw);
-            return json.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "No response";
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"{ex.Message}\nRAW:\n{raw}");
-        }
-    }
-
-    // ── background update (unchanged) ─────────────────────────────────────────
+    // ── background update ─────────────────────────────────────────────────────
 
     private async Task RunUpdate(int maxId, decimal minValue, int concurrency)
     {

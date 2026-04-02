@@ -113,4 +113,4 @@
 
 - [[shift + ctrl + 0.    Config]] — настройка LogHost и LogsFolder
 - [[shift + ctrl + 2.    ZP7]] — логи конкретной задачи прямо в PM без перехода на эту страницу
-- [[shift + ctrl + 1.    z3n8 (Scheduler)]] — логи конкретной задачи Scheduler без перехода сюда
+- [[shift + ctrl + 1.    z3nIO (Scheduler)]] — логи конкретной задачи Scheduler без перехода сюда

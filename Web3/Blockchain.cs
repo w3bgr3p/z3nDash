@@ -12,7 +12,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using NBitcoin;
 
-namespace z3n8
+namespace z3nIO
 {
     #region Nethereum
     public class Blockchain

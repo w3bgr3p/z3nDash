@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Newtonsoft.Json;
 
-namespace z3n8;
+namespace z3nIO;
 
 public sealed class ImportHandler : IScriptHandler
 {
@@ -360,7 +360,7 @@ public sealed class ImportHandler : IScriptHandler
 
         //string json;
         //using var http = new System.Net.Http.HttpClient();
-        //http.DefaultRequestHeaders.Add("User-Agent", "z3n8");
+        //http.DefaultRequestHeaders.Add("User-Agent", "z3nIO");
         //try   { json = await http.GetStringAsync(url); }
         //catch (Exception ex) { return new(0, $"Download failed: {ex.Message}"); }
         

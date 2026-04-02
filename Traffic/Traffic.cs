@@ -2,7 +2,7 @@
 using Microsoft.Playwright;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using z3n8;
+using z3nIO;
 
 
 
@@ -194,7 +194,7 @@ public class TrafficMonitor
 
 
 
-namespace z3n8
+namespace z3nIO
 {
     /// <summary>
     /// Работа с трафиком браузера - поиск и извлечение данных из HTTP запросов/ответов
@@ -550,7 +550,7 @@ namespace z3n8
                                 body = resBody
                             },
                             machine = Environment.MachineName,
-                            project = "z3n8"
+                            project = "z3nIO"
                         };
 
                         var content = new StringContent(

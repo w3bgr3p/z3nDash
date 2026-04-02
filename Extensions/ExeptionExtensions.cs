@@ -1,4 +1,4 @@
-﻿namespace z3n8;
+﻿namespace z3nIO;
 
 internal static class ExceptionExtensions
 {

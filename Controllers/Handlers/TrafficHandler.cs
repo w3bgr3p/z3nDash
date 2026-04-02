@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json;
 
-namespace z3n8;
+namespace z3nIO;
 
 internal sealed class TrafficHandler
 {

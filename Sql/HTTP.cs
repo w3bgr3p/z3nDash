@@ -12,7 +12,7 @@ public class HTTP
         var networkHandler = new HttpClientHandler();
 
         // Оборачиваем его в твой логгер
-        var debugHandler = new z3n8.HttpDebugHandler(
+        var debugHandler = new z3nIO.HttpDebugHandler(
             projectName: "SUK",
             logHost: "http://localhost:10993/http-log"
         ) 

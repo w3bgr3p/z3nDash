@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace z3n8
+namespace z3nIO
 {
     
     public enum dbMode

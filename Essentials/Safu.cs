@@ -2,7 +2,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace z3n8;
+namespace z3nIO;
 
 public class SAFU
 {

@@ -34,7 +34,7 @@ using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
-namespace z3n8;
+namespace z3nIO;
 
 public class DashboardOverlay : Form
 {
@@ -100,7 +100,7 @@ public class DashboardOverlay : Form
 
     private static readonly (string Label, string Match, Func<string, string> Url)[] Tabs =
     [
-        ("⏻ z3n8",   "page=scheduler", b => b + "/?page=scheduler"),
+        ("⏻ z3nIO",   "page=scheduler", b => b + "/?page=scheduler"),
         ("߷ ZP7",    "page=zp7",       b => b + "/?page=zp7"),
         ("🌍 ZB",    "page=zb",        b => b + "/?page=zb"),
         ("☰ Logs",   "page=logs",      b => b + "/?page=logs"),
@@ -172,7 +172,7 @@ public class DashboardOverlay : Form
         BackColor       = Color.FromArgb(13, 15, 20); // фон окна до загрузки WebView2
         Opacity         = _opacity;
         ShowInTaskbar   = true;
-        Text            = "z3n8";
+        Text            = "z3nIO";
         DoubleBuffered  = true;
         MinimumSize     = new Size(400, 300);
 
@@ -196,7 +196,7 @@ public class DashboardOverlay : Form
         if (!ok)
             MessageBox.Show(
                 $"Hotkey Ctrl+Alt+Z already in use (err {Marshal.GetLastWin32Error()})",
-                "z3n8", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                "z3nIO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
         // GlobalMouseFilter перехватывает WM_MOUSEMOVE/WM_LBUTTONUP во время
         // drag и resize — нужно, потому что мышь может уйти за пределы любого
@@ -227,7 +227,7 @@ public class DashboardOverlay : Form
 
     private void InitTray()
     {
-        _trayIcon = new NotifyIcon { Text = "z3n8", Visible = false };
+        _trayIcon = new NotifyIcon { Text = "z3nIO", Visible = false };
 
         try
         {
@@ -339,7 +339,7 @@ public class DashboardOverlay : Form
         {
             MessageBox.Show(
                 $"WebView2 init failed:\n{ex.Message}\n\nInstall WebView2 Runtime.",
-                "z3n8", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                "z3nIO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -397,7 +397,7 @@ public class DashboardOverlay : Form
 
         var title = new Label
         {
-            Text      = "z3n8",
+            Text      = "z3nIO",
             ForeColor = Color.FromArgb(255, 255, 255),  // цвет текста заголовка
             BackColor = Color.Transparent,
             Font      = new Font(family, 10f, FontStyle.Regular),

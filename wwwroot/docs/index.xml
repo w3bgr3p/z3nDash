@@ -36,16 +36,16 @@
     <description><![CDATA[ Центральная страница управления ZP7-задачами. ]]></description>
     <pubDate>Tue, 17 Mar 2026 00:45:55 GMT</pubDate>
   </item><item>
-    <title>shift + ctrl + 1.    z3n8 (Scheduler)</title>
-    <link>https://localhost:38109/docs/Pages/shift-+-ctrl-+-1.----z3n8-(Scheduler)</link>
-    <guid>https://localhost:38109/docs/Pages/shift-+-ctrl-+-1.----z3n8-(Scheduler)</guid>
+    <title>shift + ctrl + 1.    z3nIO (Scheduler)</title>
+    <link>https://localhost:38109/docs/Pages/shift-+-ctrl-+-1.----z3nIO-(Scheduler)</link>
+    <guid>https://localhost:38109/docs/Pages/shift-+-ctrl-+-1.----z3nIO-(Scheduler)</guid>
     <description><![CDATA[ Встроенный планировщик задач. Запускает скрипты (.py, .js, .exe, .bat и др.) по расписанию — cron, интервалу или фиксированному времени. ]]></description>
     <pubDate>Tue, 17 Mar 2026 00:45:55 GMT</pubDate>
   </item><item>
     <title>shift + ctrl + 0.    Config</title>
     <link>https://localhost:38109/docs/Pages/shift-+-ctrl-+-0.----Config</link>
     <guid>https://localhost:38109/docs/Pages/shift-+-ctrl-+-0.----Config</guid>
-    <description><![CDATA[ Страница настройки z3n8. Открывается автоматически при первом запуске, если appsettings.secrets.json не найден. ]]></description>
+    <description><![CDATA[ Страница настройки z3nIO. Открывается автоматически при первом запуске, если appsettings.secrets.json не найден. ]]></description>
     <pubDate>Tue, 17 Mar 2026 00:45:55 GMT</pubDate>
   </item><item>
     <title>shift + ctrl + 6.    JSON</title>
@@ -63,7 +63,7 @@
     <title>XML Converter not Implemented</title>
     <link>https://localhost:38109/docs/Pages/not-implemented/XML-Converter-not-Implemented</link>
     <guid>https://localhost:38109/docs/Pages/not-implemented/XML-Converter-not-Implemented</guid>
-    <description><![CDATA[ XML Converter Конвертер XML-формата InputSettings (ZennoPoster) в JSON payload для shift + ctrl + 1. z3n8 (Scheduler) и shift + ctrl + 2. ZP7. ]]></description>
+    <description><![CDATA[ XML Converter Конвертер XML-формата InputSettings (ZennoPoster) в JSON payload для shift + ctrl + 1. z3nIO (Scheduler) и shift + ctrl + 2. ZP7. ]]></description>
     <pubDate>Tue, 17 Mar 2026 00:45:38 GMT</pubDate>
   </item>
     </channel>

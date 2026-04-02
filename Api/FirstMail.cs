@@ -6,7 +6,7 @@ using ZennoLab.InterfacesLibrary.ProjectModel;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace z3n8
+namespace z3nIO
 {
     public class FirstMail
     {
@@ -40,21 +40,21 @@ namespace z3n8
             _project = project;
             _logger = log;
             LoadKeys();
-            _login = Uri.EscapeDataString(mail);
-            _pass = Uri.EscapeDataString(password);
-            _auth = $"?username={_login} &password={_pass}";
+            _login = mail;
+            _pass  = password;
+            _auth = $"?username={Uri.EscapeDataString(_login)}&password={Uri.EscapeDataString(_pass)}";
         }
 
         private void LoadKeys()
         {
             var creds = _project.DbGetColumns("apikey, apisecret, passphrase, proxy", "_api", where: "id = 'firstmail'");
 
-            _key = creds["apikey"];
-            _login = Uri.EscapeDataString(creds["apisecret"]);
-            _pass = Uri.EscapeDataString(creds["passphrase"]);
+            _key   = creds["apikey"];
+            _login = creds["apisecret"];
+            _pass  = creds["passphrase"];
             _proxy = creds["proxy"];
-            _headers = new [] { $"accept: application/json", $"X-API-KEY: {_key}" };
-            _auth = $"?username={_login} &password={_pass}";
+            _headers = new[] { "accept: application/json", $"X-API-KEY: {_key}" };
+            _auth = $"?username={Uri.EscapeDataString(_login)}&password={Uri.EscapeDataString(_pass)}";
         }
         
         public string Delete(string email, bool seen = false)

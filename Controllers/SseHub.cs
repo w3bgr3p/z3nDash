@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text;
 
-namespace z3n8;
+namespace z3nIO;
 
 /// <summary>
 /// Центральный хаб SSE-подписок.

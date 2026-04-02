@@ -1,4 +1,4 @@
-﻿namespace z3n8;
+﻿namespace z3nIO;
 
 public class DbConfig
 {
@@ -37,6 +37,14 @@ public class SecurityConfig
 {
     public string JVarsPath { get; set; } = string.Empty;
 }
+
+public class AiConfig
+{
+    // "aiio" | "omniroute" | "" (disabled)
+    public string Provider { get; set; } = string.Empty;
+    public string OmniRouteHost { get; set; } = "http://localhost:20128";
+}
+
 public class CrxItem
 {
     public string Id { get; set; } = string.Empty;

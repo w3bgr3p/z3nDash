@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace z3n8;
+namespace z3nIO;
 
 public interface IScriptHandler
 {
