@@ -29,8 +29,8 @@ Source: "publish-new\z3nIO.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish-new\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish-new\wwwroot\*"; DestDir: "{app}\wwwroot"; Flags: ignoreversion recursesubdirs
 Source: "publish-new\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "Tasks\ps1\*"; DestDir: "{app}\Tasks\ps1"; Flags: ignoreversion
-Source: "Tasks\examples\*"; DestDir: "{app}\Tasks\examples"; Flags: ignoreversion
+Source: "w:\code_hard\.net\z3n8.Tasks\ps1\*"; DestDir: "{app}\Tasks\ps1"; Flags: ignoreversion
+Source: "w:\code_hard\.net\z3n8.Tasks\examples\*"; DestDir: "{app}\Tasks\examples"; Flags: ignoreversion
 Source: "z3n7dll\*"; DestDir: "{app}\z3n7dll"; Flags: ignoreversion
 
 

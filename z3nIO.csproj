@@ -109,7 +109,6 @@
       <Compile Remove="installer_output\**" />
       <Compile Remove="publish-new\**" />
       <Compile Remove="UnitTests\**" />
-      <Compile Remove="z3nLib\**" />
       <Compile Remove="z3n7\**" />
       <Compile Remove="Controllers\Handlers\TrafficHandler.cs" />
       <Compile Remove="Tasks\csx\Chedraui.cs" />
