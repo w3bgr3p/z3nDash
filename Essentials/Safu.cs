@@ -1,6 +1,9 @@
-﻿using System.Management;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
+
+#if WINDOWS
+using System.Management;
+#endif
 
 namespace z3nIO;
 
@@ -12,8 +15,6 @@ public class SAFU
 
     public static byte[] LoadOrCreateFileKey()
     {
-        
-
         if (_fileKey != null) return _fileKey;
         lock (_fileKeyLock)
         {
@@ -34,6 +35,16 @@ public class SAFU
     }
 
     public static string? GetStableHWId()
+    {
+#if WINDOWS
+        return GetStableHWIdWindows();
+#else
+        return GetStableHWIdLinux();
+#endif
+    }
+
+#if WINDOWS
+    private static string? GetStableHWIdWindows()
     {
         var components = new List<string>();
         try
@@ -87,6 +98,58 @@ public class SAFU
             return null;
         }
     }
+#else
+    private static string? GetStableHWIdLinux()
+    {
+        var components = new List<string>();
+        try
+        {
+            // /etc/machine-id — стабилен до переустановки ОС
+            var machineId = ReadFileStripped("/etc/machine-id");
+            if (!string.IsNullOrEmpty(machineId)) components.Add(machineId);
+
+            // Серийник материнской платы (аналог Win32_BaseBoard.SerialNumber)
+            var boardSerial = ReadFileStripped("/sys/class/dmi/id/board_serial");
+            if (!string.IsNullOrEmpty(boardSerial) && boardSerial != "None" && boardSerial != "Default string")
+                components.Add(boardSerial);
+
+            // CPU serial из /proc/cpuinfo (есть не на всех архитектурах)
+            if (File.Exists("/proc/cpuinfo"))
+            {
+                foreach (var line in File.ReadLines("/proc/cpuinfo"))
+                {
+                    if (!line.StartsWith("Serial", StringComparison.OrdinalIgnoreCase) &&
+                        !line.StartsWith("processor id", StringComparison.OrdinalIgnoreCase)) continue;
+                    var val = line.Contains(':') ? line[(line.IndexOf(':') + 1)..].Trim() : "";
+                    if (!string.IsNullOrEmpty(val) && val != "0000000000000000") { components.Add(val); break; }
+                }
+            }
+
+            // Серийник первого диска (аналог Win32_DiskDrive.SerialNumber)
+            foreach (var path in new[] { "/sys/class/block/sda/device/serial", "/sys/class/block/nvme0n1/device/serial" })
+            {
+                var serial = ReadFileStripped(path);
+                if (!string.IsNullOrEmpty(serial)) { components.Add(serial); break; }
+            }
+
+            if (components.Count == 0) throw new Exception("No hardware components found");
+
+            using var sha256 = SHA256.Create();
+            var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(string.Join(":", components)));
+            return Convert.ToBase64String(hashBytes);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? ReadFileStripped(string path)
+    {
+        try { return File.Exists(path) ? File.ReadAllText(path).Trim() : null; }
+        catch { return null; }
+    }
+#endif
 
     static byte[] DeriveSalt(string domain)
     {
@@ -159,9 +222,7 @@ public class SAFU
                 var computedHmac = hmac.ComputeHash(payload);
                 for (int i = 0; i < hmacSize; i++)
                     if (receivedHmac[i] != computedHmac[i])
-                    {
                         return string.Empty;
-                    }
             }
 
             var iv = new byte[16];
@@ -204,7 +265,7 @@ public class SAFU
         string all = lower + upper + digits + special;
         for (int i = 4; i < 24; i++)
         {
-            int si = (i * 2) % seedBytes.Length;
+            int si  = (i * 2) % seedBytes.Length;
             int idx = Math.Abs((seedBytes[si] << 8) | seedBytes[(si + 1) % seedBytes.Length]) % all.Length;
             password.Append(all[idx]);
         }
@@ -219,7 +280,6 @@ public class SAFU
         return new string(chars);
     }
 
-    // Шифрует HWID локальной машины
     public static string EncryptHWIDOnly(string plaintext)
     {
         if (string.IsNullOrEmpty(plaintext)) return string.Empty;
@@ -227,7 +287,6 @@ public class SAFU
         return AesEncrypt(plaintext, DeriveKeyFromHWID(hwId));
     }
 
-    // Шифрует с явным HWID (для генерации бандла клиента)
     public static string EncryptHWIDOnly(string plaintext, string hwid)
     {
         if (string.IsNullOrEmpty(plaintext)) return string.Empty;
@@ -241,15 +300,12 @@ public class SAFU
         var hwId = GetStableHWId() ?? throw new InvalidOperationException("HWID resolution failed");
         return AesDecrypt(ciphertext, DeriveKeyFromHWID(hwId)) ?? string.Empty;
     }
+
     public static string DecryptHWIDOnly(string ciphertext)
     {
         if (string.IsNullOrEmpty(ciphertext)) return string.Empty;
         var hwId = GetStableHWId() ?? throw new InvalidOperationException("HWID resolution failed");
-        var key  = DeriveKeyFromHWID(hwId);
-    
-    
-        var result = AesDecrypt(ciphertext, key);
-        return result ?? string.Empty;
+        return AesDecrypt(ciphertext, DeriveKeyFromHWID(hwId)) ?? string.Empty;
     }
 
     public static string Encode(string toEncrypt, string pin, string acc)

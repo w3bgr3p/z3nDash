@@ -88,7 +88,7 @@ internal sealed class SystemSnapshotHandler
         foreach (var p in allProcs)
             pidName[p.Id] = p.ProcessName;
 
-        var tcpRows   = GetTcpRowsWithPid();
+        var tcpRows   = PlatformSnapshot.GetTcpRowsWithPid();
         var connByPid = new Dictionary<int, int>();
         foreach (var r in tcpRows) { connByPid.TryGetValue(r.Pid, out var c); connByPid[r.Pid] = c + 1; }
 
@@ -104,27 +104,15 @@ internal sealed class SystemSnapshotHandler
         Line($"Uptime   : {uptime.Days}d {uptime.Hours}h {uptime.Minutes}m");
 
         Section("SYSTEM MEMORY SUMMARY");
-        var memStatus = new NativeMethods.MEMORYSTATUSEX { dwLength = 64 };
-        if (NativeMethods.GlobalMemoryStatusEx(ref memStatus))
-        {
-            var totalGB = Math.Round(memStatus.ullTotalPhys / 1073741824.0, 2);
-            var freeGB  = Math.Round(memStatus.ullAvailPhys / 1073741824.0, 2);
-            var usedGB  = Math.Round(totalGB - freeGB, 2);
-            Line($"Total    : {totalGB} GB");
-            Line($"Used     : {usedGB} GB  ({Math.Round(usedGB / totalGB * 100, 1)}%)");
-            Line($"Free     : {freeGB} GB");
-        }
+        var mem = PlatformSnapshot.GetMemoryInfo();
+        Line($"Total    : {mem.TotalGb} GB");
+        Line($"Used     : {mem.UsedGb} GB  ({mem.UsedPct}%)");
+        Line($"Free     : {mem.FreeGb} GB");
 
         Section("CPU SUMMARY");
         Line($"Logical CPUs : {Environment.ProcessorCount}");
-        try
-        {
-            using var c = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-            c.NextValue();
-            System.Threading.Thread.Sleep(400);
-            Line($"Load         : {Math.Round(c.NextValue(), 1)}%");
-        }
-        catch { Line("Load         : n/a"); }
+        var cpuLoad = PlatformSnapshot.GetCpuLoad();
+        Line($"Load         : {cpuLoad}");
 
         Section("PROCESS AGGREGATION BY NAME (ALL INSTANCES SUMMED)");
         Line($"{"NAME",-35} {"TOTAL_MEM_MB",-12} {"INSTANCES",-10} {"TCP_CONNS",-12} AVG_MEM_MB");
@@ -132,9 +120,9 @@ internal sealed class SystemSnapshotHandler
 
         foreach (var g in allProcs.GroupBy(p => p.ProcessName)
             .Select(g => {
-                long mem = 0;
-                foreach (var p in g) try { mem += p.WorkingSet64; } catch { }
-                var totalMB = Math.Round(mem / 1048576.0, 1);
+                long mem2 = 0;
+                foreach (var p in g) try { mem2 += p.WorkingSet64; } catch { }
+                var totalMB = Math.Round(mem2 / 1048576.0, 1);
                 var tcp     = g.Sum(p => connByPid.TryGetValue(p.Id, out var c) ? c : 0);
                 return (Name: g.Key, TotalMB: totalMB, Count: g.Count(), Tcp: tcp, AvgMB: Math.Round(totalMB / g.Count(), 1));
             })
@@ -150,13 +138,13 @@ internal sealed class SystemSnapshotHandler
 
         foreach (var p in allProcs.OrderBy(p => p.ProcessName))
         {
-            var mem = 0.0; var cpu = 0.0; var thr = 0; var started = "n/a";
-            try { mem     = Math.Round(p.WorkingSet64 / 1048576.0, 1); }             catch { }
+            var mem2 = 0.0; var cpu = 0.0; var thr = 0; var started = "n/a";
+            try { mem2    = Math.Round(p.WorkingSet64 / 1048576.0, 1); }             catch { }
             try { cpu     = Math.Round(p.TotalProcessorTime.TotalSeconds, 1); }      catch { }
             try { thr     = p.Threads.Count; }                                        catch { }
             try { started = p.StartTime.ToString("HH:mm:ss"); }                       catch { }
             var name = p.ProcessName.Length > 35 ? p.ProcessName[..35] : p.ProcessName;
-            Line($"{p.Id,-8} {name,-35} {mem,-10} {cpu,-12} {thr,-8} {started}");
+            Line($"{p.Id,-8} {name,-35} {mem2,-10} {cpu,-12} {thr,-8} {started}");
         }
 
         Section("ACTIVE NETWORK CONNECTIONS (TCP + UDP)");
@@ -185,21 +173,11 @@ internal sealed class SystemSnapshotHandler
         foreach (var r in tcpRows.Where(r => r.State == "Established").OrderBy(r => r.Pid))
             Line($"{r.Pid,-10} {r.LocalAddr}:{r.LocalPort,-20} {r.RemoteAddr}:{r.RemotePort,-20} {(pidName.TryGetValue(r.Pid, out var pn) ? pn : "?")}");
 
-        Section("RUNNING WINDOWS SERVICES");
+        Section("RUNNING SERVICES");
         Line($"{"NAME",-50} {"STATUS",-12} DISPLAY");
         Line(new string('-', 100));
-        try
-        {
-            foreach (var s in System.ServiceProcess.ServiceController.GetServices()
-                .Where(s => s.Status == System.ServiceProcess.ServiceControllerStatus.Running)
-                .OrderBy(s => s.ServiceName))
-            {
-                var name    = s.ServiceName.Length > 50 ? s.ServiceName[..50] : s.ServiceName;
-                var display = s.DisplayName.Length  > 60 ? s.DisplayName[..60]  : s.DisplayName;
-                Line($"{name,-50} {"Running",-12} {display}");
-            }
-        }
-        catch (Exception ex) { Line($"Error: {ex.Message}"); }
+        foreach (var svc in PlatformSnapshot.GetRunningServices())
+            Line($"{svc.Name,-50} {"Running",-12} {svc.Display}");
 
         Section("DISK USAGE");
         Line($"{"DRIVE",-6} {"TOTAL_GB",-12} {"USED_GB",-12} {"FREE_GB",-12} PCT_USED");
@@ -213,7 +191,7 @@ internal sealed class SystemSnapshotHandler
                 var total = Math.Round(drive.TotalSize      / 1073741824.0, 1);
                 var free  = Math.Round(drive.TotalFreeSpace / 1073741824.0, 1);
                 var used  = Math.Round(total - free, 1);
-                Line($"{drive.Name.TrimEnd('\\'),-6} {total,-12} {used,-12} {free,-12} {(total > 0 ? Math.Round(used / total * 100, 1) : 0)}%");
+                Line($"{drive.Name.TrimEnd('\\', '/'),-6} {total,-12} {used,-12} {free,-12} {(total > 0 ? Math.Round(used / total * 100, 1) : 0)}%");
             }
             catch { }
         }
@@ -228,8 +206,11 @@ internal sealed class SystemSnapshotHandler
         Section("PATH ENTRIES");
         Line($"{"IDX",-5} PATH");
         Line(new string('-', 80));
+        // Windows использует ';', Linux использует ':'
+        var pathSep = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+            System.Runtime.InteropServices.OSPlatform.Windows) ? ';' : ':';
         var pathEntries = (Environment.GetEnvironmentVariable("PATH") ?? "")
-            .Split(';', StringSplitOptions.RemoveEmptyEntries);
+            .Split(pathSep, StringSplitOptions.RemoveEmptyEntries);
         for (int i = 0; i < pathEntries.Length; i++)
             Line($"{i + 1,-5} {pathEntries[i]}");
         Line($"\nTotal entries: {pathEntries.Length}");
@@ -238,52 +219,6 @@ internal sealed class SystemSnapshotHandler
 
         return sb.ToString();
     }
-
-    // ── P/Invoke: GetExtendedTcpTable ─────────────────────────────────────────
-
-    private record TcpRow(int Pid, string LocalAddr, int LocalPort, string RemoteAddr, int RemotePort, string State);
-
-    private static List<TcpRow> GetTcpRowsWithPid()
-    {
-        var rows = new List<TcpRow>();
-        try
-        {
-            int size = 0;
-            NativeMethods.GetExtendedTcpTable(IntPtr.Zero, ref size, false, 2, 4, 0);
-            var buf = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
-            try
-            {
-                if (NativeMethods.GetExtendedTcpTable(buf, ref size, false, 2, 4, 0) != 0) return rows;
-                int count       = System.Runtime.InteropServices.Marshal.ReadInt32(buf);
-                const int rowSize = 24;
-                for (int i = 0; i < count; i++)
-                {
-                    var ptr   = IntPtr.Add(buf, 4 + i * rowSize);
-                    var state = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 0);
-                    var lAddr = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 4);
-                    var lPort = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 8);
-                    var rAddr = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 12);
-                    var rPort = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 16);
-                    var pid   = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 20);
-                    rows.Add(new TcpRow(pid, Ip(lAddr), Ntohs(lPort), Ip(rAddr), Ntohs(rPort), TcpState(state)));
-                }
-            }
-            finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(buf); }
-        }
-        catch { }
-        return rows;
-    }
-
-    private static string Ip(int raw) { var b = BitConverter.GetBytes(raw); return $"{b[0]}.{b[1]}.{b[2]}.{b[3]}"; }
-    private static int    Ntohs(int raw) { var b = BitConverter.GetBytes(raw); return (b[2] << 8) | b[3]; }
-
-    private static string TcpState(int s) => s switch
-    {
-        1 => "Closed", 2 => "Listen", 3 => "SynSent", 4 => "SynReceived",
-        5 => "Established", 6 => "FinWait1", 7 => "FinWait2", 8 => "CloseWait",
-        9 => "Closing", 10 => "LastAck", 11 => "TimeWait", 12 => "DeleteTcb",
-        _ => "Unknown"
-    };
 
     // ── POST /system-snapshot/save ────────────────────────────────────────────
 
@@ -403,7 +338,7 @@ internal sealed class SystemSnapshotHandler
         if (string.IsNullOrEmpty(model)) model = "deepseek-ai/DeepSeek-V3.2";
 
         var systemPrompt =
-            "You are a Windows system auditor. Analyze the provided system snapshot and identify: " +
+            "You are a system auditor. Analyze the provided system snapshot and identify: " +
             "1) Memory pressure — which processes or process groups consume the most RAM (total, not just per-instance). " +
             "2) Network anomalies — unusually high connection counts per process, suspicious listening ports, unexpected established connections. " +
             "3) Disk pressure — drives above 80% utilization. " +
@@ -497,8 +432,279 @@ internal sealed class SystemSnapshotHandler
     private static string Esc(string s) => s.Replace("'", "''");
 }
 
-// ── P/Invoke ──────────────────────────────────────────────────────────────────
+// ── Платформенная абстракция ──────────────────────────────────────────────────
+//
+// Все Windows-specific вызовы изолированы здесь.
+// На Linux используются /proc/net/tcp, /proc/meminfo, /proc/stat.
 
+internal static class PlatformSnapshot
+{
+    internal record TcpRow(int Pid, string LocalAddr, int LocalPort, string RemoteAddr, int RemotePort, string State);
+    internal record MemInfo(double TotalGb, double UsedGb, double FreeGb, double UsedPct);
+    internal record ServiceInfo(string Name, string Display);
+
+    // ── TCP rows ──────────────────────────────────────────────────────────────
+
+    internal static List<TcpRow> GetTcpRowsWithPid()
+    {
+#if WINDOWS
+        return GetTcpRowsWindows();
+#else
+        return GetTcpRowsLinux();
+#endif
+    }
+
+#if WINDOWS
+    private static List<TcpRow> GetTcpRowsWindows()
+    {
+        var rows = new List<TcpRow>();
+        try
+        {
+            int size = 0;
+            NativeMethods.GetExtendedTcpTable(IntPtr.Zero, ref size, false, 2, 4, 0);
+            var buf = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
+            try
+            {
+                if (NativeMethods.GetExtendedTcpTable(buf, ref size, false, 2, 4, 0) != 0) return rows;
+                int count       = System.Runtime.InteropServices.Marshal.ReadInt32(buf);
+                const int rowSz = 24;
+                for (int i = 0; i < count; i++)
+                {
+                    var ptr   = IntPtr.Add(buf, 4 + i * rowSz);
+                    var state = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 0);
+                    var lAddr = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 4);
+                    var lPort = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 8);
+                    var rAddr = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 12);
+                    var rPort = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 16);
+                    var pid   = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 20);
+                    rows.Add(new TcpRow(pid, Ip(lAddr), Ntohs(lPort), Ip(rAddr), Ntohs(rPort), TcpStateWin(state)));
+                }
+            }
+            finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(buf); }
+        }
+        catch { }
+        return rows;
+    }
+
+    private static string Ip(int raw)    { var b = BitConverter.GetBytes(raw); return $"{b[0]}.{b[1]}.{b[2]}.{b[3]}"; }
+    private static int    Ntohs(int raw) { var b = BitConverter.GetBytes(raw); return (b[2] << 8) | b[3]; }
+
+    private static string TcpStateWin(int s) => s switch
+    {
+        1 => "Closed", 2 => "Listen", 3 => "SynSent", 4 => "SynReceived",
+        5 => "Established", 6 => "FinWait1", 7 => "FinWait2", 8 => "CloseWait",
+        9 => "Closing", 10 => "LastAck", 11 => "TimeWait", 12 => "DeleteTcb",
+        _ => "Unknown"
+    };
+#else
+    // /proc/net/tcp формат:
+    // sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+    // Адреса в little-endian hex, порты в big-endian hex, state hex.
+    // PID недоступен напрямую — определяется через /proc/<pid>/net/tcp или /proc/<pid>/fd (требует root).
+    // Для не-root возвращаем Pid=0.
+    private static List<TcpRow> GetTcpRowsLinux()
+    {
+        var rows = new List<TcpRow>();
+        foreach (var file in new[] { "/proc/net/tcp", "/proc/net/tcp6" })
+        {
+            if (!File.Exists(file)) continue;
+            try
+            {
+                foreach (var line in File.ReadLines(file).Skip(1))
+                {
+                    var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 4) continue;
+
+                    var localHex  = parts[1];
+                    var remoteHex = parts[2];
+                    var stateHex  = parts[3];
+
+                    var (lAddr, lPort) = ParseHexEndpoint(localHex);
+                    var (rAddr, rPort) = ParseHexEndpoint(remoteHex);
+                    var state          = TcpStateLinux(Convert.ToInt32(stateHex, 16));
+
+                    rows.Add(new TcpRow(0, lAddr, lPort, rAddr, rPort, state));
+                }
+            }
+            catch { }
+        }
+        return rows;
+    }
+
+    private static (string Addr, int Port) ParseHexEndpoint(string hex)
+    {
+        // формат: XXXXXXXX:PPPP  (адрес:порт в hex)
+        var sep = hex.IndexOf(':');
+        if (sep < 0) return ("0.0.0.0", 0);
+
+        var addrHex = hex[..sep];
+        var portHex = hex[(sep + 1)..];
+
+        int port = Convert.ToInt32(portHex, 16);
+
+        // IPv4: 8 hex chars, little-endian 32-bit
+        if (addrHex.Length == 8)
+        {
+            var val = Convert.ToUInt32(addrHex, 16);
+            var b0  = (val)       & 0xFF;
+            var b1  = (val >> 8)  & 0xFF;
+            var b2  = (val >> 16) & 0xFF;
+            var b3  = (val >> 24) & 0xFF;
+            return ($"{b0}.{b1}.{b2}.{b3}", port);
+        }
+
+        // IPv6: 32 hex chars — вернуть сокращённо
+        return (addrHex, port);
+    }
+
+    private static string TcpStateLinux(int s) => s switch
+    {
+        0x01 => "Established", 0x02 => "SynSent",  0x03 => "SynReceived",
+        0x04 => "FinWait1",    0x05 => "FinWait2",  0x06 => "TimeWait",
+        0x07 => "Closed",      0x08 => "CloseWait", 0x09 => "LastAck",
+        0x0A => "Listen",      0x0B => "Closing",
+        _ => "Unknown"
+    };
+#endif
+
+    // ── Memory ────────────────────────────────────────────────────────────────
+
+    internal static MemInfo GetMemoryInfo()
+    {
+#if WINDOWS
+        var s = new NativeMethods.MEMORYSTATUSEX { dwLength = 64 };
+        if (!NativeMethods.GlobalMemoryStatusEx(ref s)) return new MemInfo(0, 0, 0, 0);
+        var total = Math.Round(s.ullTotalPhys / 1073741824.0, 2);
+        var free  = Math.Round(s.ullAvailPhys / 1073741824.0, 2);
+        var used  = Math.Round(total - free, 2);
+        return new MemInfo(total, used, free, total > 0 ? Math.Round(used / total * 100, 1) : 0);
+#else
+        // /proc/meminfo: значения в kB
+        try
+        {
+            var lines  = File.ReadAllLines("/proc/meminfo");
+            long total = ParseMemInfoKb(lines, "MemTotal");
+            long avail = ParseMemInfoKb(lines, "MemAvailable");
+            if (avail == 0) avail = ParseMemInfoKb(lines, "MemFree");
+            var totalGb = Math.Round(total / 1048576.0, 2);
+            var freeGb  = Math.Round(avail / 1048576.0, 2);
+            var usedGb  = Math.Round(totalGb - freeGb, 2);
+            return new MemInfo(totalGb, usedGb, freeGb, totalGb > 0 ? Math.Round(usedGb / totalGb * 100, 1) : 0);
+        }
+        catch { return new MemInfo(0, 0, 0, 0); }
+#endif
+    }
+
+#if !WINDOWS
+    private static long ParseMemInfoKb(string[] lines, string key)
+    {
+        foreach (var l in lines)
+        {
+            if (!l.StartsWith(key + ":", StringComparison.OrdinalIgnoreCase)) continue;
+            var parts = l.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length >= 2 && long.TryParse(parts[1], out var v) ? v : 0;
+        }
+        return 0;
+    }
+#endif
+
+    // ── CPU load ──────────────────────────────────────────────────────────────
+
+    internal static string GetCpuLoad()
+    {
+#if WINDOWS
+        try
+        {
+            using var c = new System.Diagnostics.PerformanceCounter("Processor", "% Processor Time", "_Total");
+            c.NextValue();
+            System.Threading.Thread.Sleep(400);
+            return $"{Math.Round(c.NextValue(), 1)}%";
+        }
+        catch { return "n/a"; }
+#else
+        // /proc/stat: первая строка — суммарное время cpu
+        // cpu  user nice system idle iowait irq softirq steal guest guest_nice
+        // load = 1 - idle/total, взять две точки с паузой
+        try
+        {
+            static long[] ReadStat()
+            {
+                var line = File.ReadLines("/proc/stat").FirstOrDefault(l => l.StartsWith("cpu "));
+                if (line == null) return Array.Empty<long>();
+                return line.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Skip(1).Select(v => long.TryParse(v, out var x) ? x : 0).ToArray();
+            }
+
+            var a = ReadStat();
+            System.Threading.Thread.Sleep(400);
+            var b = ReadStat();
+
+            if (a.Length < 5 || b.Length < 5) return "n/a";
+
+            var totalA = a.Sum(); var idleA = a[3];
+            var totalB = b.Sum(); var idleB = b[3];
+            var totalD = totalB - totalA;
+            var idleD  = idleB  - idleA;
+
+            if (totalD == 0) return "n/a";
+            return $"{Math.Round((1.0 - (double)idleD / totalD) * 100, 1)}%";
+        }
+        catch { return "n/a"; }
+#endif
+    }
+
+    // ── Services ──────────────────────────────────────────────────────────────
+
+    internal static List<ServiceInfo> GetRunningServices()
+    {
+#if WINDOWS
+        var result = new List<ServiceInfo>();
+        try
+        {
+            foreach (var s in System.ServiceProcess.ServiceController.GetServices()
+                .Where(s => s.Status == System.ServiceProcess.ServiceControllerStatus.Running)
+                .OrderBy(s => s.ServiceName))
+            {
+                var name    = s.ServiceName.Length > 50 ? s.ServiceName[..50] : s.ServiceName;
+                var display = s.DisplayName.Length  > 60 ? s.DisplayName[..60]  : s.DisplayName;
+                result.Add(new ServiceInfo(name, display));
+            }
+        }
+        catch { }
+        return result;
+#else
+        // systemctl list-units --type=service --state=running --no-pager --no-legend
+        var result = new List<ServiceInfo>();
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("systemctl",
+                "list-units --type=service --state=running --no-pager --no-legend")
+            {
+                RedirectStandardOutput = true,
+                UseShellExecute        = false
+            };
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) return result;
+            var output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 0) continue;
+                var name    = parts[0].Length > 50 ? parts[0][..50] : parts[0];
+                var display = parts.Length > 1 ? (parts[1].Length > 60 ? parts[1][..60] : parts[1]) : "";
+                result.Add(new ServiceInfo(name, display));
+            }
+        }
+        catch { }
+        return result;
+#endif
+    }
+}
+
+// ── P/Invoke (Windows only) ───────────────────────────────────────────────────
+
+#if WINDOWS
 internal static class NativeMethods
 {
     [System.Runtime.InteropServices.DllImport("iphlpapi.dll", SetLastError = true)]
@@ -526,3 +732,4 @@ internal static class NativeMethods
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 }
+#endif

@@ -1,51 +1,58 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>WinExe</OutputType>
-        <TargetFramework>net10.0-windows</TargetFramework>
-        <UseWindowsForms>true</UseWindowsForms>
+        <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
+        <OutputType>Exe</OutputType>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        
-        <!-- Иконка приложения -->
-        <ApplicationIcon>icon.ico</ApplicationIcon>
+
+        <ApplicationIcon Condition="'$(TargetFramework)' == 'net10.0-windows'">icon.ico</ApplicationIcon>
 
         <RootNamespace>z3nIO</RootNamespace>
         <PublishSingleFile>true</PublishSingleFile>
         <SelfContained>true</SelfContained>
-        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
         <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
         <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
         <!--   <ApplicationManifest>app.manifest</ApplicationManifest> -->
-      </PropertyGroup>
-    
-      <ItemGroup>
-          <PackageReference Include="Microsoft.Playwright" Version="1.58.0" />
-          <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-          <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3800.47" />
-          
-          <PackageReference Include="Npgsql" Version="10.0.1" />
-          <PackageReference Include="System.Data.Odbc" Version="10.0.2" />
-          <PackageReference Include="System.Management" Version="10.0.0-rc.2.25502.107" />
-  
-          <PackageReference Include="Nethereum.ABI" Version="4.29.0.0" />
-          <PackageReference Include="Nethereum.HdWallet" Version="4.29.0.0" />
-          <PackageReference Include="Nethereum.Web3" Version="4.29.0.0" />
-  
-          <PackageReference Include="Otp.NET" Version="1.4.0" />
-          <PackageReference Include="Cronos" Version="0.8.*" />
-          <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.*" />
-          <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.*" />
-          <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.*" />   <!-- для Bind -->
-        <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.*" />
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.13.0" />
-          <PackageReference Include="System.ServiceProcess.ServiceController" Version="6.0.0" />
+        <NoWarn>$(NoWarn);8625;8618;8604;8603;8602;8600;8601;8619</NoWarn>
+    </PropertyGroup>
 
+    <!-- Windows-only SDK features -->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+        <UseWindowsForms>true</UseWindowsForms>
+    </PropertyGroup>
 
-          <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
-        <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
+    <!-- WINDOWS compile-time constant — по таргет-фреймворку, не по ОС -->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+        <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+    </PropertyGroup>
+
+    <!-- Cross-platform packages -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Playwright"                      Version="1.58.0" />
+        <PackageReference Include="Newtonsoft.Json"                           Version="13.0.4" />
+        <PackageReference Include="Npgsql"                                    Version="10.0.1" />
+        <PackageReference Include="System.Data.Odbc"                          Version="10.0.2" />
+        <PackageReference Include="Nethereum.ABI"                             Version="4.29.0.0" />
+        <PackageReference Include="Nethereum.HdWallet"                        Version="4.29.0.0" />
+        <PackageReference Include="Nethereum.Web3"                            Version="4.29.0.0" />
+        <PackageReference Include="Otp.NET"                                   Version="1.4.0" />
+        <PackageReference Include="Cronos"                                    Version="0.8.*" />
+        <PackageReference Include="Microsoft.Extensions.Configuration"        Version="8.0.*" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json"   Version="8.0.*" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.*" />
+        <PackageReference Include="Microsoft.Extensions.Options"              Version="8.0.*" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting"   Version="4.13.0" />
+        <PackageReference Include="System.ServiceProcess.ServiceController"   Version="6.0.0" />
+        <PackageReference Include="OpenCvSharp4"                              Version="4.9.0.20240103" />
     </ItemGroup>
 
+    <!-- Windows-only packages -->
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+        <PackageReference Include="Microsoft.Web.WebView2"       Version="1.0.3800.47" />
+        <PackageReference Include="OpenCvSharp4.runtime.win"     Version="4.9.0.20240103" />
+        <PackageReference Include="System.Management"            Version="10.0.0-rc.2.25502.107" />
+    </ItemGroup>
 
     <ItemGroup>
         <None Update="wwwroot\**\*">
@@ -54,80 +61,59 @@
         <None Update="templates\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        
         <None Update="wwwroot\static\fonts\JetBrainsMonoNerdFont-Regular.ttf">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="wwwroot\docs\favcon.ico">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
     </ItemGroup>
-    
 
     <ItemGroup>
         <None Update="Prompts\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        
-
         <None Update="appsettings.json">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="appsettings.secrets.json">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        
-
         <None Update="icon.ico">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-
-       
         <None Remove="z3nStub\**" />
-
-       
         <None Remove="installer_output\**" />
-
-       
         <None Remove="publish-new\**" />
-
-       
         <None Remove="UnitTests\**" />
-
-       
         <None Remove="z3nLib\**" />
-
-       
         <None Remove="z3n7\**" />
-
-       
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Remove="Controllers\ZpOrchestratorHandler.cs" />
-      <Compile Remove="z3nStub\**" />
-      <Compile Remove="installer_output\**" />
-      <Compile Remove="publish-new\**" />
-      <Compile Remove="UnitTests\**" />
-      <Compile Remove="z3n7\**" />
-      <Compile Remove="Controllers\Handlers\TrafficHandler.cs" />
-      <Compile Remove="Tasks\csx\Chedraui.cs" />
-
+        <Compile Remove="Controllers\ZpOrchestratorHandler.cs" />
+        <Compile Remove="z3nStub\**" />
+        <Compile Remove="installer_output\**" />
+        <Compile Remove="publish-new\**" />
+        <Compile Remove="UnitTests\**" />
+        <Compile Remove="z3n7\**" />
+        <Compile Remove="Controllers\Handlers\TrafficHandler.cs" />
+        <Compile Remove="Tasks\csx\Chedraui.cs" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="docs-vault\" />
-      <Folder Include="scripts\" />
+        <Folder Include="docs-vault\" />
+        <Folder Include="InternalTasks\" />
+        <Folder Include="scripts\" />
     </ItemGroup>
 
     <ItemGroup>
-      <EmbeddedResource Remove="z3nStub\**" />
-      <EmbeddedResource Remove="installer_output\**" />
-      <EmbeddedResource Remove="publish-new\**" />
-      <EmbeddedResource Remove="UnitTests\**" />
-      <EmbeddedResource Remove="z3nLib\**" />
-      <EmbeddedResource Remove="z3n7\**" />
+        <EmbeddedResource Remove="z3nStub\**" />
+        <EmbeddedResource Remove="installer_output\**" />
+        <EmbeddedResource Remove="publish-new\**" />
+        <EmbeddedResource Remove="UnitTests\**" />
+        <EmbeddedResource Remove="z3nLib\**" />
+        <EmbeddedResource Remove="z3n7\**" />
     </ItemGroup>
 
-    
 </Project>

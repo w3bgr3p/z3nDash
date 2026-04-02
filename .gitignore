@@ -16,6 +16,7 @@ obj/
 /packages/
 TestResults/
 publish-new/
+PrivateTasks/
 # User-specific files
 *.user
 *.userosscache
@@ -33,3 +34,14 @@ publish-new/
 logs/
 http-logs/
 *.jsonl
+
+
+
+# Local runtime files
+safu.key
+crash.log
+*.key
+
+
+# Sensitive
+appsettings.secrets.json
