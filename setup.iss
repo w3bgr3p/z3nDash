@@ -15,7 +15,7 @@ DisableProgramGroupPage=no
 AlwaysShowDirOnReadyPage=yes
 
 OutputDir=installer_output
-OutputBaseFilename=z3n8_Setup
+OutputBaseFilename=z3nIO_Setup
 Compression=lzma2
 SolidCompression=yes
 SetupIconFile=icon.ico
