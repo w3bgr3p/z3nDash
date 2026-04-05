@@ -82,6 +82,7 @@ public class DashboardOverlay : Form
     private const int TH  = 0;
 
     private static readonly PrivateFontCollection _fonts = new();
+    private readonly bool _isSecondary;
 
     // ── Вкладки ────────────────────────────────────────────────────────────────
 
@@ -128,23 +129,23 @@ public class DashboardOverlay : Form
     // ── Статический фабричный метод ───────────────────────────────────────────
 
     public static void Open(string url, int width = 1400, int height = 900,
-                            int x = -1, int y = -1)
+        int x = -1, int y = -1, bool isSecondary = false)
     {
         var t = new Thread(() =>
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new DashboardOverlay(url, width, height, x, y));
+            Application.Run(new DashboardOverlay(url, width, height, x, y, isSecondary));
         });
         t.SetApartmentState(ApartmentState.STA);
         t.IsBackground = true;
         t.Start();
     }
-
     // ── Конструктор ───────────────────────────────────────────────────────────
 
-    public DashboardOverlay(string url, int width, int height, int x, int y)
+    public DashboardOverlay(string url, int width, int height, int x, int y, bool isSecondary = false)
     {
+        _isSecondary = isSecondary;
         _url = url;
 
         FormBorderStyle = FormBorderStyle.None;
@@ -271,7 +272,7 @@ public class DashboardOverlay : Form
             _wv.CoreWebView2.NewWindowRequested += (_, e) =>
             {
                 e.Handled = true;
-                DashboardOverlay.Open(e.Uri, Width, Height);
+                DashboardOverlay.Open(e.Uri, Width, Height, isSecondary: true);
             };
 
             var uri = new Uri(_url);
@@ -615,7 +616,7 @@ public class DashboardOverlay : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (e.CloseReason != CloseReason.ApplicationExitCall)
+        if (e.CloseReason != CloseReason.ApplicationExitCall && !_isSecondary)
         {
             e.Cancel    = true;
             WindowState = FormWindowState.Minimized;
@@ -625,6 +626,7 @@ public class DashboardOverlay : Form
         _hotkeyReceiver?.ReleaseHandle();
         base.OnFormClosing(e);
     }
+
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
