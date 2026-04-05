@@ -5,6 +5,7 @@ using System.Text.Json;
 using Cronos;
 using NBitcoin.Protocol;
 using z3nIO;
+using ZennoLab.InterfacesLibrary.ProjectModel;
 
 namespace z3nIO;
 
@@ -412,8 +413,9 @@ private static void SeedDefaults(Db db)
             InternalTasks.TaskContext? ctx = null;
             ZB? zb                        = null;
             Microsoft.Playwright.IPlaywright? pw = null;
-            var released = false;
-            var zbId     = "";
+            var released    = false;
+            var zbId        = "";
+            var keepBrowser = false;
 
             try
             {
@@ -441,6 +443,7 @@ private static void SeedDefaults(Db db)
                 }
 
                 var needsBrowser = payload.GetValueOrDefault("browser", "false") == "true";
+                keepBrowser      = payload.GetValueOrDefault("browser_keep", "false") == "true";
                 zbId = ctx.Project.Variables["zb_id"].Value;
                 zb = needsBrowser && !string.IsNullOrWhiteSpace(zbId)
                     ? new ZB(Config.ApiConfig.ZB)
@@ -470,7 +473,7 @@ private static void SeedDefaults(Db db)
                     log      = ctx.Logger,
                 };
 
-                await CsxExecutor.RunAsync(scriptPath, globals, cts.Token);
+                await CsxExecutor.RunAsync<CsxGlobals>(scriptPath, globals, cts.Token);
 
                 ctx.Release("idle");
                 SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
@@ -502,8 +505,8 @@ private static void SeedDefaults(Db db)
             }
             finally
             {
-                try { if (zb != null) await zb.ProfileDown(zbId); } catch { }
-                try { pw?.Dispose(); } catch { }
+                try { if (zb != null && !keepBrowser) await zb.ProfileDown(zbId); } catch { }
+                try { if (!keepBrowser) pw?.Dispose(); } catch { }
                 if (!released) try { ctx?.Release("fail"); } catch { }
                 cts.Dispose();
                 TryDrainOne(db, id);
@@ -511,7 +514,76 @@ private static void SeedDefaults(Db db)
 
             return;
         }
+        if (executor == "csx-zp7")
+        {
+            if (!File.Exists(scriptPath))
+            {
+                _log?.Error($"[{name}] csx script not found: {scriptPath}");
+                UpdateStatus(db, id, "error", firedAt, "-1", $"script not found: {scriptPath}", runId);
+                return;
+            }
 
+            UpdateStatus(db, id, "running", firedAt, "", "", runId);
+            var cts = new CancellationTokenSource();
+            var rp  = new RunningProcess(null, firedAt, cts, broadcast);
+            _running[instanceKey] = rp;
+
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine($"[LIVE] csx-zp7 started id={id} name={name} run={runId} script={Path.GetFileName(scriptPath)}");
+            Console.ResetColor();
+
+            try
+            {
+                var project = new StubProject { Name = name, OnLog = rp.AddLine };
+
+                var globals = new CsxZp7Globals
+                {
+                    project  = project,
+                    instance = new ZennoLab.CommandCenter.Instance(),
+                    log      = RunLogger(scheduleTag, runId) ?? _log!,
+                };
+
+
+                var result = await CsxExecutor.RunAsync<CsxZp7Globals>(scriptPath, globals, cts.Token);
+
+                if (!result.Success)
+                {
+                    rp.AddLine("[ERR] " + result.Exception?.Message);
+                    if (result.Snippet != null) rp.AddLine(result.Snippet.ToString());
+                    SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                    RunLogger(scheduleTag, runId)?.Error($"[{name}] csx-zp7 failed: {result.Exception?.Message}");
+                    rp.Result = result.Exception?.Message ?? "error";
+                    _running.TryRemove(instanceKey, out _);
+                    UpdateStatus(db, id, "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
+                    FinishQueueEntry(db, queueUuid, "error", runId);
+                    return;
+                }
+
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                rp.Result = "ok";
+                RunLogger(scheduleTag, runId)?.Info($"[{name}] csx-zp7 done run={runId}");
+                _running.TryRemove(instanceKey, out _);
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
+                FinishQueueEntry(db, queueUuid, "done", runId);
+            }
+            catch (Exception ex)
+            {
+                rp.AddLine("[ERR] " + ex.Message);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                RunLogger(scheduleTag, runId)?.Error($"[{name}] csx-zp7 failed: {ex.Message}");
+                rp.Result = ex.Message;
+                _running.TryRemove(instanceKey, out _);
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
+                FinishQueueEntry(db, queueUuid, "error", runId);
+            }
+            finally
+            {
+                cts.Dispose();
+                TryDrainOne(db, id);
+            }
+
+            return;
+        }
         var (fileName, arguments) = BuildCommand(executor, scriptPath, args);
 
         _log?.Info($"[{name}] launch → {fileName} {Path.GetFileName(scriptPath)} run={runId}");

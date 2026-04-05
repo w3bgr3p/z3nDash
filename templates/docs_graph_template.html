@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Docs</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        @font-face { font-family: 'JetBrains Mono'; src: url('../wwwroot/static/fonts/JetBrainsMonoNerdFont-Regular.ttf'); }
+        :root {
+            --note:     #a78bfa;
+            --tag:      #34d399;
+            --wikilink: #38bdf8;
+            --taglink:  #fb923c;
+            --folder:   #f59e0b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; overflow: hidden; height: 100vh; }
+        #graph { width: 100vw; height: 100vh; display: block; }
+        #topbar { position: fixed; top: 0; left: 0; right: 0; height: 44px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 14px; z-index: 20; }
+        #topbar .logo { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--accent); letter-spacing: 0.05em; margin-right: 8px; flex-shrink: 0; }
+        #search { flex: 1; max-width: 280px; background: var(--bg); border: 1px solid var(--border2); border-radius: 5px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 5px 10px; outline: none; transition: border-color 0.15s; }
+        #search:focus { border-color: var(--accent); }
+        #search::placeholder { color: var(--muted); }
+        .btn { background: var(--border); border: 1px solid var(--border2); color: var(--text); border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.1s; flex-shrink: 0; }
+        .btn:hover { background: var(--border2); }
+        #stats { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+        #panel { position: fixed; top: 44px; right: 0; width: 50vw; height: calc(100vh - 44px); background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
+        #resizer { position: absolute; left: 0; top: 0; width: 4px; height: 100%; cursor: ew-resize; background: transparent; z-index: 11; }
+        #resizer:hover { background: var(--accent); opacity: 0.5; }
+        #panel-header { padding: 12px 14px 10px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
+        #info { padding: 14px; flex: 1; overflow-y: auto; line-height: 1.7; }
+        #info .empty { color: var(--muted); font-size: 12px; }
+        #info .node-name { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 500; color: #e0e0f0; margin-bottom: 10px; word-break: break-all; }
+        #info .row { display: flex; gap: 6px; font-size: 12px; margin-bottom: 4px; }
+        #info .row .key { color: var(--muted); min-width: 48px; flex-shrink: 0; }
+        #info .row .val { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px; word-break: break-all; }
+        .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 500; margin-right: 3px; margin-bottom: 3px; }
+        .badge-note { background: #2d1f6e; color: var(--note); }
+        .badge-tag  { background: #0d2d20; color: var(--tag); }
+        #content-block { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+        #content-block .content-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+        #content-pre { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--text); line-height: 1.7; word-break: break-word; }
+        .md-body h1,.md-body h2,.md-body h3 { color: #e0e0f0; margin: 12px 0 6px; font-family: 'JetBrains Mono', monospace; }
+        .md-body code { background: var(--border); padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--note); }
+        .md-body pre { background: var(--border); padding: 10px; border-radius: 5px; overflow-x: auto; margin: 8px 0; }
+        .md-body pre code { background: none; padding: 0; }
+        .md-body a { color: var(--wikilink); }
+        .md-body ul,.md-body ol { padding-left: 18px; }
+        .md-body blockquote { border-left: 3px solid var(--border2); padding-left: 10px; color: var(--muted); margin: 8px 0; }
+        .md-body hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+        
+        #io-bar { display: flex; gap: 8px; margin-top: 10px; margin-bottom: 4px; }
+        .io-box { flex: 1; background: var(--bg); border: 1px solid var(--border2); border-radius: 5px; padding: 6px 8px; text-align: center; }
+        .io-box .io-num { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 500; color: #e0e0f0; }
+        .io-box .io-label { font-size: 10px; color: var(--muted); margin-top: 1px; }
+        #legend { position: fixed; top: 54px; left: 10px; z-index: 15; pointer-events: none; }
+        #legend .leg-title { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+        .leg { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; font-size: 10px; color: var(--muted); }
+        .leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .leg-line { width: 18px; height: 2px; flex-shrink: 0; }
+        #tooltip { position: fixed; background: var(--surface); border: 1px solid var(--border2); border-radius: 5px; padding: 5px 9px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); pointer-events: none; opacity: 0; transition: opacity 0.1s; z-index: 100; white-space: nowrap; }
+        #info::-webkit-scrollbar { width: 4px; }
+        #info::-webkit-scrollbar-track { background: transparent; }
+        #info::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    </style>
+</head>
+<body>
+<div id="topbar">
+    <span class="logo">&#x2234; docs-graph</span>
+    <input id="vault-path" type="text" placeholder="vault path…" style="flex:1;max-width:400px;background:var(--bg);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:5px 10px;outline:none;" />
+    <button class="btn" onclick="generate()">Generate</button>
+    <button class="btn" onclick="reload()">Reload</button>
+    <input id="search" type="text" placeholder="search note&#8230;" />
+    <button class="btn" onclick="doSearch()">Find</button>
+    <button class="btn" onclick="resetView()">Reset</button>
+    <span id="stats"></span>
+</div>
+<svg id="graph"></svg>
+<div id="legend">
+    <div class="leg-title">Legend</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--note)"></div> note</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--tag)"></div> tag</div>
+    <div class="leg"><div class="leg-line" style="background:var(--wikilink)"></div> wikilink</div>
+    <div class="leg"><div class="leg-line" style="background:var(--taglink)"></div> tag link</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--folder)"></div> folder</div>
+    <div class="leg"><div class="leg-line" style="background:var(--folder);opacity:.5"></div> folder link</div>
+</div>
+<div id="panel">
+    <div id="resizer"></div>
+    <div id="panel-header">Note Info</div>
+    <div id="info"><span class="empty">Click a node to inspect.</span></div>
+</div>
+<div id="tooltip"></div>
+<script src="/js/d3.min.js"></script>
+<script src="/js/marked.min.js"></script>
+<script>
+    var GRAPH = DOCS_GRAPH_DATA_PLACEHOLDER;
+
+    var COLOR      = { 'note': '#a78bfa', 'tag': '#34d399', 'folder': '#f59e0b' };
+    var NODE_R     = { 'note': 9, 'tag': 7, 'folder': 11 };
+    var EDGE_COLOR = { 'wikilink': '#38bdf8', 'tag': '#fb923c', 'folder': '#f59e0b' };
+    var EDGE_OP    = { 'wikilink': 0.6, 'tag': 0.4, 'folder': 0.35 };
+
+    var allNodes = GRAPH.nodes;
+    var allEdges = GRAPH.edges;
+
+    // tag:: nodes are kind "tag", rest are kind "note"
+    allNodes.forEach(function(n) {
+        if (!n.kind) n.kind = n.id.startsWith('tag::') ? 'tag'
+            : n.id.startsWith('folder::') ? 'folder'
+                : 'note';
+    });
+
+    var panelWidth = Math.floor(window.innerWidth * 0.5);
+    var W = function() { return window.innerWidth - panelWidth; };
+    var H = function() { return window.innerHeight - 44; };
+
+    var svg = d3.select('#graph')
+        .attr('width', window.innerWidth)
+        .attr('height', window.innerHeight)
+        .style('position', 'absolute').style('top', '44px').style('left', '0');
+
+    var zoom = d3.zoom()
+        .scaleExtent([0.05, 4])
+        .wheelDelta(function(event) {
+            return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
+        })
+        .on('zoom', function(e) { g.attr('transform', e.transform); });
+
+    svg.call(zoom);
+    var g = svg.append('g');
+
+    var defs = svg.append('defs');
+    Object.keys(EDGE_COLOR).forEach(function(k) {
+        defs.append('marker')
+            .attr('id', 'arr-' + k)
+            .attr('viewBox', '0 -4 8 8')
+            .attr('refX', 14).attr('refY', 0)
+            .attr('markerWidth', 4).attr('markerHeight', 4)
+            .attr('orient', 'auto')
+            .append('path').attr('d', 'M0,-4L8,0L0,4')
+            .attr('fill', EDGE_COLOR[k]);
+    });
+
+    var linkG    = g.append('g');
+    var nodeGRoot = g.append('g');
+
+    var sim = d3.forceSimulation()
+        .force('link', d3.forceLink().id(function(d) { return d.id; }).distance(120))
+        .force('charge', d3.forceManyBody().strength(function(d) { return d.kind === 'note' ? -350 : -150; }))
+        .force('center', d3.forceCenter(W() / 2, H() / 2))
+        .force('collide', d3.forceCollide(function(d) { return d.kind === 'note' ? 24 : 18; }));
+
+    var link, nodeG, label;
+    var selected = null;
+
+    function generate() {
+        var p = document.getElementById('vault-path').value.trim();
+        if (!p) return;
+        fetch('/docs-graph/generate?vaultPath=' + encodeURIComponent(p), { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { if (d.ok) location.reload(); else alert(d.error); });
+    }
+    function reload() { location.reload(); }
+
+    function buildGraph() {
+        var nodes = allNodes.map(function(d) { return Object.assign({}, d); });
+        var edges = allEdges.map(function(e) { return Object.assign({}, e); });
+
+        document.getElementById('stats').textContent = nodes.length + ' nodes \u00b7 ' + edges.length + ' edges';
+
+        sim.stop();
+        sim.nodes(nodes);
+        sim.force('link').links(edges);
+        sim.alpha(0.8).restart();
+
+        link = linkG.selectAll('line').data(edges, function(d) { return d.source + '|' + d.target + '|' + d.kind; });
+        link.exit().remove();
+        link = link.enter().append('line')
+            .attr('stroke', function(d) { return EDGE_COLOR[d.kind] || '#555'; })
+            .attr('stroke-width', 1)
+            .attr('stroke-opacity', function(d) { return EDGE_OP[d.kind] || 0.3; })
+            .attr('marker-end', function(d) { return 'url(#arr-' + d.kind + ')'; })
+            .merge(link);
+
+        nodeG = nodeGRoot.selectAll('g').data(nodes, function(d) { return d.id; });
+        nodeG.exit().remove();
+        var nodeEnter = nodeG.enter().append('g')
+            .style('cursor', 'pointer')
+            .call(d3.drag()
+                .on('start', function(e, d) { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                .on('drag',  function(e, d) { d.fx = e.x; d.fy = e.y; })
+                .on('end',   function(e, d) { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }))
+            .on('click',     function(e, d) { e.stopPropagation(); selectNode(d, nodes, edges); })
+            .on('mouseover', function(e, d) { showTooltip(e, d); })
+            .on('mousemove', moveTooltip)
+            .on('mouseout',  hideTooltip);
+
+        nodeEnter.append('circle')
+            .attr('r', function(d) { return NODE_R[d.kind] || 9; })
+            .attr('fill', function(d) { return COLOR[d.kind] || COLOR['note']; })
+            .attr('fill-opacity', 0.18)
+            .attr('stroke', function(d) { return COLOR[d.kind] || COLOR['note']; })
+            .attr('stroke-width', 1.5);
+
+        nodeEnter.append('text')
+            .attr('font-size', function(d) { return d.kind === 'note' ? 11 : 9; })
+            .attr('font-family', 'JetBrains Mono, monospace')
+            .attr('fill', '#c8c8d8')
+            .attr('text-anchor', 'middle')
+            .attr('dy', function(d) { return d.kind === 'note' ? -14 : -10; })
+            .style('pointer-events', 'none')
+            .style('user-select', 'none')
+            .text(function(d) { return d.label; });
+
+        nodeG = nodeEnter.merge(nodeG);
+        label = nodeG.select('text');
+
+        sim.on('tick', function() {
+            link
+                .attr('x1', function(d) { return d.source.x; }).attr('y1', function(d) { return d.source.y; })
+                .attr('x2', function(d) { return d.target.x; }).attr('y2', function(d) { return d.target.y; });
+            nodeG.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+        });
+
+        selected = null;
+        document.getElementById('info').innerHTML = '<span class="empty">Click a node to inspect.</span>';
+        setTimeout(fitView, 2000);
+    }
+
+    function selectNode(d, nodes, edges) {
+        selected = d;
+        var connected = {};
+        connected[d.id] = true;
+        edges.forEach(function(e) {
+            var sid = typeof e.source === 'object' ? e.source.id : e.source;
+            var tid = typeof e.target === 'object' ? e.target.id : e.target;
+            if (sid === d.id) connected[tid] = true;
+            if (tid === d.id) connected[sid] = true;
+        });
+
+        nodeG.select('circle')
+            .attr('fill-opacity', function(n) { return connected[n.id] ? 0.28 : 0.06; })
+            .attr('stroke-opacity', function(n) { return connected[n.id] ? 1 : 0.15; });
+        label.attr('opacity', function(n) { return connected[n.id] ? 1 : 0.15; });
+        link.attr('stroke-opacity', function(e) {
+            var sid = typeof e.source === 'object' ? e.source.id : e.source;
+            var tid = typeof e.target === 'object' ? e.target.id : e.target;
+            return (sid === d.id || tid === d.id) ? (EDGE_OP[e.kind] || 0.3) * 1.8 : 0.04;
+        });
+
+        var inn = 0, out = 0;
+        edges.forEach(function(e) {
+            var sid = typeof e.source === 'object' ? e.source.id : e.source;
+            var tid = typeof e.target === 'object' ? e.target.id : e.target;
+            if (tid === d.id) inn++;
+            if (sid === d.id) out++;
+        });
+
+        var isTag = d.kind === 'tag';
+        var displayName = d.title || d.label;
+        var tagsHtml = '';
+        if (d.tags && d.tags.length) {
+            tagsHtml = '<div style="margin-top:6px;">';
+            d.tags.forEach(function(t) { tagsHtml += '<span class="badge badge-tag">#' + escHtml(t) + '</span>'; });
+            tagsHtml += '</div>';
+        }
+
+        var isFolderNode = d.kind === 'folder';
+        var folderContentHtml = '';
+        if (isFolderNode) {
+            var children = edges
+                .filter(function(e) {
+                    var sid = typeof e.source === 'object' ? e.source.id : e.source;
+                    return sid === d.id && e.kind === 'folder';
+                })
+                .map(function(e) {
+                    var tid = typeof e.target === 'object' ? e.target.id : e.target;
+                    return nodes.find(function(n) { return n.id === tid; });
+                })
+                .filter(Boolean);
+
+            if (children.length) {
+                folderContentHtml = '<div id="content-block"><div class="content-label">Contents</div>';
+                children.forEach(function(child) {
+                    folderContentHtml += '<div style="padding:4px 0;border-bottom:1px solid var(--border);">'
+                        + '<span style="cursor:pointer;color:var(--note);font-family:JetBrains Mono,monospace;font-size:12px;" '
+                        + 'onclick="selectNodeById(\'' + escHtml(child.id) + '\')">'
+                        + escHtml(child.label)
+                        + '</span></div>';
+                });
+                folderContentHtml += '</div>';
+            }
+        }
+
+
+        var raw = marked.parse(d.content);
+        console.log(raw);
+        var rendered = raw.replace(/\[\[([^\]\n<]+)\]\]/g, function(_, inner) {
+            var parts  = inner.split('|');
+            var ref    = parts[0].trim();
+            var display = (parts[1] || ref).trim();
+            var nodeName = ref.split('#')[0].trim(); // убрать якорь
+            var targetNode = allNodes.find(function(n) { return n.label === nodeName || n.id === nodeName; });
+            if (targetNode) {
+                return '<span style="cursor:pointer;color:var(--wikilink);text-decoration:underline;" onclick="selectNodeById(\''
+                    + nodeName.replace(/'/g, "\\'") + '\')">' + escHtml(display) + '</span>';
+            }
+            return '<span style="color:var(--muted);">' + escHtml(display) + '</span>';
+        });
+        
+        var contentHtml = '';
+        if (!isTag && d.content) {
+            contentHtml = '<div id="content-block">'
+                + '<div class="content-label">Content</div>'
+                + '<div id="content-pre" class="md-body">' + rendered + '</div>'
+                + '</div>';
+        }
+        console.log('rendered:', rendered.indexOf('selectNodeById'));
+        console.log('isFolderNode:', isFolderNode, 'isTag:', isTag)
+        console.log('contentHtml:', contentHtml.length, 'innerHTML result:', (isFolderNode ? folderContentHtml : contentHtml).length);
+
+        document.getElementById('info').innerHTML =
+            '<div class="node-name">' + escHtml(displayName) + '</div>'
+            + '<div class="row"><span class="key">kind</span><span class="val"><span class="badge badge-' + d.kind + '">' + d.kind + '</span></span></div>'
+            + (isTag ? '' : '<div class="row"><span class="key">path</span><span class="val">' + escHtml(d.path || '—') + '</span></div>')
+            + tagsHtml
+            + '<div id="io-bar">'
+            + '<div class="io-box"><div class="io-num">' + inn + '</div><div class="io-label">incoming</div></div>'
+            + '<div class="io-box"><div class="io-num">' + out + '</div><div class="io-label">outgoing</div></div>'
+            + '</div>'
+            + (isFolderNode ? folderContentHtml : contentHtml)
+    }
+
+    function selectNodeById(id) {
+        console.log('looking for:', id, allNodes.filter(function(n){ return n.label === id; }));
+        var nodes = allNodes.map(function(d) { return Object.assign({}, d); });
+        var edges = allEdges.map(function(e) { return Object.assign({}, e); });
+        var target = null;
+        if (nodeG) nodeG.each(function(d) { if (d.id === id || d.label === id) target = d; });
+        if (target) selectNode(target, nodes, edges);
+    }
+
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    svg.on('click', function() { resetHighlight(); });
+
+    function resetHighlight() {
+        selected = null;
+        if (nodeG) nodeG.select('circle').attr('fill-opacity', 0.18).attr('stroke-opacity', 1);
+        if (label) label.attr('opacity', 1);
+        if (link)  link.attr('stroke-opacity', function(d) { return EDGE_OP[d.kind] || 0.3; });
+        document.getElementById('info').innerHTML = '<span class="empty">Click a node to inspect.</span>';
+    }
+
+    var tip = document.getElementById('tooltip');
+    function showTooltip(e, d) { tip.textContent = d.title || d.label; tip.style.opacity = '1'; moveTooltip(e); }
+    function moveTooltip(e) { tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY - 24) + 'px'; }
+    function hideTooltip() { tip.style.opacity = '0'; }
+
+    function doSearch() {
+        var q = document.getElementById('search').value.toLowerCase().trim();
+        if (!q) { resetHighlight(); return; }
+        var matched = {};
+        if (nodeG) nodeG.each(function(d) { if (d.label.toLowerCase().indexOf(q) >= 0) matched[d.id] = true; });
+        if (nodeG) nodeG.select('circle')
+            .attr('fill-opacity', function(d) { return matched[d.id] ? 0.3 : 0.05; })
+            .attr('stroke-opacity', function(d) { return matched[d.id] ? 1 : 0.1; });
+        if (label) label.attr('opacity', function(d) { return matched[d.id] ? 1 : 0.08; });
+        if (link)  link.attr('stroke-opacity', 0.04);
+        var exact = null;
+        if (nodeG) nodeG.each(function(d) { if (d.label.toLowerCase() === q) exact = d; });
+        if (exact && exact.x != null) {
+            svg.transition().duration(500).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(W() / 2 - exact.x + 130, H() / 2 - exact.y).scale(1.4)
+            );
+        }
+    }
+
+    function resetView() {
+        document.getElementById('search').value = '';
+        resetHighlight();
+        fitView();
+    }
+
+    function fitView() {
+        var xs = [], ys = [];
+        if (nodeG) nodeG.each(function(d) { if (d.x != null) { xs.push(d.x); ys.push(d.y); } });
+        if (!xs.length) return;
+        var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+        var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+        var gw = maxX - minX + 80, gh = maxY - minY + 80;
+        var scale = Math.min(0.95, Math.min(W() / gw, H() / gh));
+        var tx = W() / 2 - scale * (minX + maxX) / 2;
+        var ty = H() / 2 - scale * (minY + maxY) / 2;
+        svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+    }
+
+    document.getElementById('search').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') doSearch();
+    });
+
+    window.addEventListener('resize', function() {
+        svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+        document.getElementById('panel').style.width = panelWidth + 'px';
+    });
+
+    // Resizer
+    var resizer = document.getElementById('resizer');
+    var isResizing = false;
+    resizer.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        var newWidth = window.innerWidth - e.clientX;
+        if (newWidth < 300)  newWidth = 300;
+        if (newWidth > Math.floor(window.innerWidth * 0.8)) newWidth = Math.floor(window.innerWidth * 0.8);
+        panelWidth = newWidth;
+        document.getElementById('panel').style.width = panelWidth + 'px';
+        svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+        sim.force('center', d3.forceCenter(W() / 2, H() / 2));
+        sim.alpha(0.1).restart();
+    });
+    document.addEventListener('mouseup', function() {
+        if (!isResizing) return;
+        isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+
+    buildGraph();
+    document.getElementById('info').addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+</script>
+</body>
+</html>

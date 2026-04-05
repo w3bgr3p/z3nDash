@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>C# Dependency Graph</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+        :root {
+            --bg:       #0d0d0f;
+            --surface:  #13131a;
+            --border:   #1e1e2a;
+            --border2:  #2a2a3a;
+            --text:     #c8c8d8;
+            --muted:    #55556a;
+            --accent:   #7c6af7;
+            --class:    #a78bfa;
+            --iface:    #38bdf8;
+            --struct:   #34d399;
+            --inherits: #f87171;
+            --creates:  #fb923c;
+            --uses:     #334155;
+            --method:   #fbbf24;
+            --field:    #a3e635;
+            --contains: #2a3a2a;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; overflow: hidden; height: 100vh; }
+        #graph { width: 100vw; height: 100vh; display: block; }
+        #topbar { position: fixed; top: 0; left: 0; right: 0; height: 44px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 14px; z-index: 20; }
+        #topbar .logo { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--accent); letter-spacing: 0.05em; margin-right: 8px; flex-shrink: 0; }
+        #search { flex: 1; max-width: 280px; background: var(--bg); border: 1px solid var(--border2); border-radius: 5px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 5px 10px; outline: none; transition: border-color 0.15s; }
+        #search:focus { border-color: var(--accent); }
+        #search::placeholder { color: var(--muted); }
+        .btn { background: var(--border); border: 1px solid var(--border2); color: var(--text); border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.1s; flex-shrink: 0; }
+        .btn:hover { background: var(--border2); }
+        #stats { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+        #panel { position: fixed; top: 44px; right: 0; width: 320px; height: calc(100vh - 44px); background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
+        #resizer { position: absolute; left: 0; top: 0; width: 4px; height: 100%; cursor: ew-resize; background: transparent; z-index: 11; }
+        #resizer:hover { background: var(--accent); opacity: 0.5; }
+        #panel-header { padding: 12px 14px 10px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+        #info { padding: 14px; flex: 1; overflow-y: auto; line-height: 1.7; }
+        #info .empty { color: var(--muted); font-size: 12px; }
+        #info .node-name { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: #e0e0f0; margin-bottom: 10px; word-break: break-all; }
+        #info .row { display: flex; gap: 6px; font-size: 12px; margin-bottom: 4px; }
+        #info .row .key { color: var(--muted); min-width: 48px; flex-shrink: 0; }
+        #info .row .val { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px; word-break: break-all; }
+        .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+        .badge-class     { background: #2d1f6e; color: var(--class); }
+        .badge-interface { background: #0c2a3d; color: var(--iface); }
+        .badge-struct    { background: #0d2d20; color: var(--struct); }
+        .badge-record    { background: #0d2d20; color: var(--struct); }
+        .badge-method    { background: #2d2200; color: var(--method); }
+        .badge-field     { background: #1a2200; color: var(--field); }
+        #filter-group { display: flex; gap: 4px; flex-shrink: 0; }
+        .filter-btn { background: var(--border); border: 1px solid var(--border2); color: var(--muted); border-radius: 5px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-family: 'JetBrains Mono', monospace; transition: background 0.1s, color 0.1s; flex-shrink: 0; }
+        .filter-btn.active { background: var(--border2); color: var(--text); border-color: var(--accent); }
+        .filter-btn:hover { background: var(--border2); }
+        #io-bar { display: flex; gap: 8px; margin-top: 10px; }
+        .io-box { flex: 1; background: var(--bg); border: 1px solid var(--border2); border-radius: 5px; padding: 6px 8px; text-align: center; }
+        .io-box .io-num { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 500; color: #e0e0f0; }
+        .io-box .io-label { font-size: 10px; color: var(--muted); margin-top: 1px; }
+        #legend { position: fixed; top: 54px; left: 10px; z-index: 15; pointer-events: none; }
+        #legend .leg-title { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+        .leg { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; font-size: 10px; color: var(--muted); }
+        .leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .leg-line { width: 18px; height: 2px; flex-shrink: 0; }
+        #tooltip { position: fixed; background: var(--surface); border: 1px solid var(--border2); border-radius: 5px; padding: 5px 9px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); pointer-events: none; opacity: 0; transition: opacity 0.1s; z-index: 100; white-space: nowrap; }
+        #info::-webkit-scrollbar { width: 4px; }
+        #info::-webkit-scrollbar-track { background: transparent; }
+        #info::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+        .method-item { font-family: JetBrains Mono, monospace; font-size: 10px; margin-top: 4px; word-break: break-all; line-height: 1.5; }
+        .sig-ret    { color: #38bdf8; }
+        .sig-name   { color: #e0e0f0; font-weight: 600; }
+        .sig-paren  { color: #55556a; }
+        .sig-param-type { color: #34d399; }
+        .sig-param-name { color: #c8c8d8; }
+        .sig-comma  { color: #55556a; }
+        .field-type { color: #38bdf8; }
+        .field-name { color: #a3e635; font-weight: 600; }
+        .access-public    { opacity: 1.0; }
+        .access-internal  { opacity: 0.75; }
+        .access-protected { opacity: 0.6; }
+        .access-private   { opacity: 0.45; }
+    </style>
+</head>
+<body>
+<div id="topbar">
+    <span class="logo">&#x2234; cs-graph</span>
+    <input id="search" type="text" placeholder="search class&#8230;" />
+    <button class="btn" onclick="doSearch()">Find</button>
+    <button class="btn" onclick="resetView()">Reset</button>
+    <div id="filter-group">
+        <button class="filter-btn active" data-level="types" onclick="setFilter('types')">classes</button>
+        <button class="filter-btn" data-level="methods" onclick="setFilter('methods')">+methods</button>
+        <button class="filter-btn" data-level="fields" onclick="setFilter('fields')">+fields</button>
+    </div>
+    <span id="stats"></span>
+</div>
+<svg id="graph"></svg>
+<div id="legend">
+    <div class="leg-title">Legend</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--class)"></div> class</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--iface)"></div> interface</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--struct)"></div> struct / record</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--method)"></div> method</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--field)"></div> field</div>
+    <div class="leg"><div class="leg-line" style="background:var(--inherits)"></div> inherits</div>
+    <div class="leg"><div class="leg-line" style="background:var(--creates)"></div> creates</div>
+    <div class="leg"><div class="leg-line" style="background:var(--uses);opacity:.5"></div> uses</div>
+    <div class="leg"><div class="leg-line" style="background:var(--method);opacity:.4"></div> contains</div>
+</div>
+<div id="panel">
+    <div id="resizer"></div>
+    <div id="panel-header">Node Info</div>
+    <div id="info"><span class="empty">Click a node to inspect.</span></div>
+</div>
+<div id="tooltip"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+    const GRAPH = GRAPH_DATA_PLACEHOLDER;
+
+    var COLOR = { 'class': '#a78bfa', 'interface': '#38bdf8', 'struct': '#34d399', 'record': '#34d399', 'method': '#fbbf24', 'field': '#a3e635' };
+    var NODE_RADIUS = { 'class': 9, 'interface': 9, 'struct': 9, 'record': 9, 'method': 6, 'field': 5 };
+    var EDGE_COLOR = { 'inherits': '#f87171', 'creates': '#fb923c', 'uses': '#334155', 'contains': '#2a3a1a' };
+    var EDGE_OPACITY = { 'inherits': 0.9, 'creates': 0.8, 'uses': 0.35, 'contains': 0.5 };
+
+    var filterLevel = 'types';
+    var TYPE_KINDS = { 'class': 1, 'interface': 1, 'struct': 1, 'record': 1 };
+
+    var allNodes = GRAPH.nodes;
+    var allEdges = GRAPH.edges;
+
+    var panelWidth = 320;
+    var W = function() { return window.innerWidth - panelWidth; };
+    var H = function() { return window.innerHeight - 44; };
+
+    var svg = d3.select('#graph')
+        .attr('width', window.innerWidth)
+        .attr('height', window.innerHeight)
+        .style('position', 'absolute').style('top', '44px').style('left', '0');
+
+    var zoom = d3.zoom()
+        .scaleExtent([0.05, 4])
+        .wheelDelta(function(event) {
+            return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
+        })
+        .on('zoom', function(e) { g.attr('transform', e.transform); });
+
+    svg.call(zoom);
+    var g = svg.append('g');
+
+    var defs = svg.append('defs');
+    Object.keys(EDGE_COLOR).forEach(function(k) {
+        defs.append('marker')
+            .attr('id', 'arr-' + k)
+            .attr('viewBox', '0 -4 8 8')
+            .attr('refX', 14).attr('refY', 0)
+            .attr('markerWidth', 4).attr('markerHeight', 4)
+            .attr('orient', 'auto')
+            .append('path').attr('d', 'M0,-4L8,0L0,4')
+            .attr('fill', EDGE_COLOR[k]);
+    });
+
+    var linkG = g.append('g');
+    var nodeGRoot = g.append('g');
+
+    var sim = d3.forceSimulation()
+        .force('link', d3.forceLink().id(function(d) { return d.id; }).distance(function(e) {
+            return e.kind === 'contains' ? 55 : 110;
+        }))
+        .force('charge', d3.forceManyBody().strength(function(d) {
+            return TYPE_KINDS[d.kind] ? -400 : -80;
+        }))
+        .force('center', d3.forceCenter(W() / 2, H() / 2))
+        .force('collide', d3.forceCollide(function(d) {
+            return TYPE_KINDS[d.kind] ? 26 : 16;
+        }));
+
+    var link, nodeG, label;
+    var selected = null;
+
+    function getVisibleNodes() {
+        if (filterLevel === 'types')   return allNodes.filter(function(n) { return TYPE_KINDS[n.kind]; });
+        if (filterLevel === 'methods') return allNodes.filter(function(n) { return TYPE_KINDS[n.kind] || n.kind === 'method'; });
+        return allNodes;
+    }
+
+    function getVisibleEdges(visNodeIds) {
+        return allEdges.filter(function(e) { return visNodeIds[e.source] && visNodeIds[e.target]; });
+    }
+
+    function rebuildGraph() {
+        var visNodes = getVisibleNodes();
+        var visIds = {};
+        visNodes.forEach(function(n) { visIds[n.id] = true; });
+        var visEdges = getVisibleEdges(visIds);
+
+        var nodes = visNodes.map(function(d) { return Object.assign({}, d); });
+        var edges = visEdges.map(function(e) { return Object.assign({}, e); });
+
+        document.getElementById('stats').textContent = nodes.length + ' nodes \u00b7 ' + edges.length + ' edges';
+
+        sim.stop();
+        sim.nodes(nodes);
+        sim.force('link').links(edges);
+        sim.alpha(0.8).restart();
+
+        link = linkG.selectAll('line').data(edges, function(d) { return d.source + '|' + d.target + '|' + d.kind; });
+        link.exit().remove();
+        link = link.enter().append('line')
+            .attr('stroke', function(d) { return EDGE_COLOR[d.kind] || '#555'; })
+            .attr('stroke-width', function(d) { return d.kind === 'inherits' ? 1.5 : 1; })
+            .attr('stroke-opacity', function(d) { return EDGE_OPACITY[d.kind] || 0.3; })
+            .attr('marker-end', function(d) { return 'url(#arr-' + d.kind + ')'; })
+            .merge(link);
+
+        nodeG = nodeGRoot.selectAll('g').data(nodes, function(d) { return d.id; });
+        nodeG.exit().remove();
+        var nodeEnter = nodeG.enter().append('g')
+            .style('cursor', 'pointer')
+            .call(d3.drag()
+                .on('start', function(e, d) { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                .on('drag',  function(e, d) { d.fx = e.x; d.fy = e.y; })
+                .on('end',   function(e, d) { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }))
+            .on('click',      function(e, d) { e.stopPropagation(); selectNode(d, nodes, edges); })
+            .on('mouseover', function(e, d) { showTooltip(e, d); })
+            .on('mousemove', moveTooltip)
+            .on('mouseout',  hideTooltip);
+
+        nodeEnter.append('circle')
+            .attr('r', function(d) { return NODE_RADIUS[d.kind] || 9; })
+            .attr('fill', function(d) { return COLOR[d.kind] || COLOR['class']; })
+            .attr('fill-opacity', 0.18)
+            .attr('stroke', function(d) { return COLOR[d.kind] || COLOR['class']; })
+            .attr('stroke-width', 1.5);
+
+        nodeEnter.append('text')
+            .attr('font-size', function(d) { return TYPE_KINDS[d.kind] ? 11 : 9; })
+            .attr('font-family', 'JetBrains Mono, monospace')
+            .attr('fill', '#c8c8d8')
+            .attr('text-anchor', 'middle')
+            .attr('dy', function(d) { return TYPE_KINDS[d.kind] ? -14 : -10; })
+            .style('pointer-events', 'none')
+            .style('user-select', 'none')
+            .text(function(d) { return d.label; });
+
+        nodeG = nodeEnter.merge(nodeG);
+        label = nodeG.select('text');
+
+        sim.on('tick', function() {
+            link
+                .attr('x1', function(d) { return d.source.x; }).attr('y1', function(d) { return d.source.y; })
+                .attr('x2', function(d) { return d.target.x; }).attr('y2', function(d) { return d.target.y; });
+            nodeG.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+        });
+
+        selected = null;
+        document.getElementById('info').innerHTML = '<span class="empty">Click a node to inspect.</span>';
+
+        setTimeout(fitView, 2000);
+    }
+
+    function setFilter(level) {
+        if (filterLevel === level) return;
+        filterLevel = level;
+        document.querySelectorAll('.filter-btn').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.level === level);
+        });
+        rebuildGraph();
+    }
+
+    function selectNode(d, nodes, edges) {
+        selected = d;
+        var connected = {};
+        connected[d.id] = true;
+        edges.forEach(function(e) {
+            var sid = typeof e.source === 'object' ? e.source.id : e.source;
+            var tid = typeof e.target === 'object' ? e.target.id : e.target;
+            if (sid === d.id) connected[tid] = true;
+            if (tid === d.id) connected[sid] = true;
+        });
+        nodeG.select('circle')
+            .attr('fill-opacity', function(n) { return connected[n.id] ? 0.25 : 0.06; })
+            .attr('stroke-opacity', function(n) { return connected[n.id] ? 1 : 0.2; });
+        label.attr('opacity', function(n) { return connected[n.id] ? 1 : 0.2; });
+        link.attr('stroke-opacity', function(e) {
+            var sid = typeof e.source === 'object' ? e.source.id : e.source;
+            var tid = typeof e.target === 'object' ? e.target.id : e.target;
+            return (sid === d.id || tid === d.id) ? (EDGE_OPACITY[e.kind] || 0.3) * 2 : 0.04;
+        });
+
+        var inn = 0, out = 0;
+        edges.forEach(function(e) {
+            var sid = typeof e.source === 'object' ? e.source.id : e.source;
+            var tid = typeof e.target === 'object' ? e.target.id : e.target;
+            if (tid === d.id) inn++;
+            if (sid === d.id) out++;
+        });
+
+        var extraHtml = '';
+        var ACCESS_ORDER = { 'public': 0, 'internal': 1, 'protected': 2, 'private': 3 };
+        var ACCESS_COLOR = { 'public': '#3fb950', 'internal': '#e3b341', 'protected': '#fb923c', 'private': '#55556a' };
+
+        if (TYPE_KINDS[d.kind]) {
+            var ownedMethods = allNodes.filter(function(n) { return n.kind === 'method' && n.owner === d.id; });
+            var ownedFields  = allNodes.filter(function(n) { return n.kind === 'field'  && n.owner === d.id; });
+
+            function groupByAccess(items) {
+                var groups = {};
+                items.forEach(function(m) {
+                    var a = m.access || 'private';
+                    if (!groups[a]) groups[a] = [];
+                    groups[a].push(m);
+                });
+                return ['public', 'internal', 'protected', 'private'].filter(function(a) { return groups[a]; }).map(function(a) { return { access: a, items: groups[a] }; });
+            }
+
+            function accessLabel(a) {
+                return '<span style="font-size:9px;font-weight:700;color:' + ACCESS_COLOR[a] + ';letter-spacing:.06em;text-transform:uppercase;">' + a + '</span>';
+            }
+
+            if (ownedMethods.length) {
+                extraHtml += '<div style="margin-top:10px;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:600;">Methods</div>';
+                groupByAccess(ownedMethods).forEach(function(g) {
+                    extraHtml += '<div style="margin-top:6px;margin-bottom:2px;">' + accessLabel(g.access) + '</div>';
+                    g.items.forEach(function(m) {
+                        extraHtml += '<div class="method-item">' + renderMethodHtml(m.signature || m.label) + '</div>';
+                    });
+                });
+            }
+            if (ownedFields.length) {
+                extraHtml += '<div style="margin-top:10px;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:600;">Fields</div>';
+                groupByAccess(ownedFields).forEach(function(g) {
+                    extraHtml += '<div style="margin-top:6px;margin-bottom:2px;">' + accessLabel(g.access) + '</div>';
+                    g.items.forEach(function(f) {
+                        extraHtml += '<div class="method-item">' + renderFieldSigHtml(f.signature || f.label) + '</div>';
+                    });
+                });
+            }
+        } else {
+            extraHtml += '<div class="row"><span class="key">owner</span><span class="val">' + escHtml(d.owner || '—') + '</span></div>';
+            if (d.access) {
+                var ACCESS_COLOR = { 'public': '#3fb950', 'internal': '#e3b341', 'protected': '#fb923c', 'private': '#55556a' };
+                extraHtml += '<div class="row"><span class="key">access</span><span class="val" style="color:' + (ACCESS_COLOR[d.access] || 'var(--text)') + '">' + escHtml(d.access) + '</span></div>';
+            }
+            if (d.signature) {
+                var renderFn = d.kind === 'field' ? renderFieldSigHtml : renderMethodHtml;
+                extraHtml += '<div class="method-item" style="margin-top:8px;">' + renderFn(d.signature) + '</div>';
+            }
+        }
+
+        document.getElementById('info').innerHTML =
+            '<div class="node-name">' + escHtml(d.label) + '</div>' +
+            '<div class="row"><span class="key">kind</span><span class="val"><span class="badge badge-' + d.kind + '">' + d.kind + '</span></span></div>' +
+            '<div class="row"><span class="key">ns</span><span class="val">' + escHtml(d.ns || '—') + '</span></div>' +
+            '<div class="row"><span class="key">file</span><span class="val">' + escHtml(d.file || '—') + '</span></div>' +
+            '<div id="io-bar">' +
+            '<div class="io-box"><div class="io-num">' + inn + '</div><div class="io-label">incoming</div></div>' +
+            '<div class="io-box"><div class="io-num">' + out + '</div><div class="io-label">outgoing</div></div>' +
+            '</div>' + extraHtml;
+    }
+
+    function parseMethodSignature(sig) {
+        var match = sig.match(/^(.+?)\s+(\w+)\s*(\(.*\))$/);
+        if (match) {
+            return { ret: match[1].trim(), name: match[2], params: match[3] };
+        }
+        return { ret: '', name: sig, params: '' };
+    }
+
+    function renderParamList(paramsStr) {
+        var inner = paramsStr.slice(1, paramsStr.length - 1).trim();
+        if (!inner) return '<span class="sig-paren">()</span>';
+        var parts = splitParams(inner);
+        var html = '<span class="sig-paren">(</span>';
+        parts.forEach(function(p, i) {
+            var t = p.trim().split(/\s+/);
+            var pname = t.length > 1 ? t[t.length - 1] : '';
+            var ptype = t.length > 1 ? t.slice(0, t.length - 1).join(' ') : t[0];
+            html += '<span class="sig-param-type">' + escHtml(ptype) + '</span>';
+            if (pname) html += ' <span class="sig-param-name">' + escHtml(pname) + '</span>';
+            if (i < parts.length - 1) html += '<span class="sig-comma">, </span>';
+        });
+        html += '<span class="sig-paren">)</span>';
+        return html;
+    }
+
+    function splitParams(s) {
+        var parts = [], depth = 0, cur = '';
+        for (var i = 0; i < s.length; i++) {
+            var c = s[i];
+            if (c === '<' || c === '[') depth++;
+            else if (c === '>' || c === ']') depth--;
+            else if (c === ',' && depth === 0) { parts.push(cur); cur = ''; continue; }
+            cur += c;
+        }
+        if (cur.trim()) parts.push(cur);
+        return parts;
+    }
+
+    function renderMethodHtml(sig) {
+        var p = parseMethodSignature(sig);
+        return '<span class="sig-ret">' + escHtml(p.ret) + '</span> '
+            + '<span class="sig-name">' + escHtml(p.name) + '</span>'
+            + (p.params !== undefined ? renderParamList(p.params) : '');
+    }
+
+    function renderFieldSigHtml(sig) {
+        var propMatch = sig.match(/^(.+?)\s+(\w+)\s*(\{|$)/);
+        if (propMatch) {
+            return '<span class="field-type">' + escHtml(propMatch[1].trim()) + '</span> '
+                + '<span class="field-name">' + escHtml(propMatch[2]) + '</span>';
+        }
+        var parts = sig.trim().split(/\s+/);
+        if (parts.length > 1) {
+            var fname = parts[parts.length - 1];
+            var ftype = parts.slice(0, parts.length - 1).join(' ');
+            return '<span class="field-type">' + escHtml(ftype) + '</span> '
+                + '<span class="field-name">' + escHtml(fname) + '</span>';
+        }
+        return '<span class="field-name">' + escHtml(sig) + '</span>';
+    }
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    svg.on('click', function() { resetHighlight(); });
+
+    function resetHighlight() {
+        selected = null;
+        if (nodeG) nodeG.select('circle').attr('fill-opacity', 0.18).attr('stroke-opacity', 1);
+        if (label) label.attr('opacity', 1);
+        if (link)  link.attr('stroke-opacity', function(d) { return EDGE_OPACITY[d.kind] || 0.3; });
+        document.getElementById('info').innerHTML = '<span class="empty">Click a node to inspect.</span>';
+    }
+
+    var tip = document.getElementById('tooltip');
+    function showTooltip(e, d) { tip.textContent = d.id; tip.style.opacity = '1'; moveTooltip(e); }
+    function moveTooltip(e) { tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY - 24) + 'px'; }
+    function hideTooltip() { tip.style.opacity = '0'; }
+
+    function doSearch() {
+        var q = document.getElementById('search').value.toLowerCase().trim();
+        if (!q) { resetHighlight(); return; }
+        var matched = {};
+        if (nodeG) nodeG.each(function(d) { if (d.label.toLowerCase().indexOf(q) >= 0) matched[d.id] = true; });
+        if (nodeG) nodeG.select('circle')
+            .attr('fill-opacity', function(d) { return matched[d.id] ? 0.3 : 0.05; })
+            .attr('stroke-opacity', function(d) { return matched[d.id] ? 1 : 0.1; });
+        if (label) label.attr('opacity', function(d) { return matched[d.id] ? 1 : 0.08; });
+        if (link)  link.attr('stroke-opacity', 0.04);
+        var exact = null;
+        if (nodeG) nodeG.each(function(d) { if (d.label.toLowerCase() === q) exact = d; });
+        if (exact && exact.x != null) {
+            svg.transition().duration(500).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(W() / 2 - exact.x + 130, H() / 2 - exact.y).scale(1.4)
+            );
+        }
+    }
+
+    function resetView() {
+        document.getElementById('search').value = '';
+        resetHighlight();
+        fitView();
+    }
+
+    function fitView() {
+        var xs = [], ys = [];
+        if (nodeG) nodeG.each(function(d) { if (d.x != null) { xs.push(d.x); ys.push(d.y); } });
+        if (!xs.length) return;
+        var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+        var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+        var gw = maxX - minX + 80, gh = maxY - minY + 80;
+        var scale = Math.min(0.95, Math.min(W() / gw, H() / gh));
+        var tx = W() / 2 - scale * (minX + maxX) / 2 + 130;
+        var ty = H() / 2 - scale * (minY + maxY) / 2;
+        svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+    }
+
+    document.getElementById('search').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') doSearch();
+    });
+
+    window.addEventListener('resize', function() {
+        svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+        var panel = document.getElementById('panel');
+        panel.style.width = panelWidth + 'px';
+    });
+
+    // Resizer
+    var resizer = document.getElementById('resizer');
+    var isResizing = false;
+    resizer.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        var newWidth = window.innerWidth - e.clientX;
+        if (newWidth < 200) newWidth = 200;
+        if (newWidth > 640) newWidth = 640;
+        panelWidth = newWidth;
+        var panel = document.getElementById('panel');
+        panel.style.width = panelWidth + 'px';
+        svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+        sim.force('center', d3.forceCenter(W() / 2, H() / 2));
+        sim.alpha(0.1).restart();
+    });
+    document.addEventListener('mouseup', function() {
+        if (!isResizing) return;
+        isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+
+    rebuildGraph();
+</script>
+</body>
+</html>

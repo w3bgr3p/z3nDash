@@ -28,6 +28,8 @@ ArchitecturesInstallIn64BitMode=x64
 Source: "publish-new\z3nIO.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish-new\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish-new\wwwroot\*"; DestDir: "{app}\wwwroot"; Flags: ignoreversion recursesubdirs
+Source: "publish-new\templates\*"; DestDir: "{app}\Templates"; Flags: ignoreversion recursesubdirs
+Source: "publish-new\docs-vault\*"; DestDir: "{app}\docs-vault"; Flags: ignoreversion recursesubdirs
 Source: "publish-new\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "w:\code_hard\.net\z3n8.Tasks\ps1\*"; DestDir: "{app}\Tasks\ps1"; Flags: ignoreversion
 Source: "w:\code_hard\.net\z3n8.Tasks\examples\*"; DestDir: "{app}\Tasks\examples"; Flags: ignoreversion

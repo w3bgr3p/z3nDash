@@ -1,23 +1,53 @@
 // Inline SVG — no CDN, no font dependency, works offline, consistent cross-OS rendering
 window.ICONS = {
     scheduler:  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 350">
-                  <defs>
-                    <linearGradient id="sched-grad-b" x1="-537.183" x2="-416.602" y1="-136.622" y2="-136.622" gradientTransform="matrix(.91142 0 0 1.09719 566.38 241.245)" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stop-color="#00ffb3"/>
-                      <stop offset="100%" stop-color="#00a3ff"/>
-                    </linearGradient>
-                    <linearGradient id="sched-grad-a" x1="-363.619" x2="-268.455" y1="-63.074" y2="-63.074" gradientTransform="matrix(1.49112 0 0 .67064 566.38 241.245)" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stop-color="#1a0000"/>
-                      <stop offset="40%" stop-color="#8b0000"/>
-                      <stop offset="100%" stop-color="#d70301"/>
-                    </linearGradient>
-                  </defs>
-                  <path fill="url(#sched-grad-a)" d="M81.38 262.545a86 86 0 0 1-46.4-18.4l-3.1-2.5-3.9-3.8-3.8-3.8.7-.2.6-.3 10.6-10.7 10.5-10.8 3.5 3.4 3.4 3.5 3.1 2.3 3.1 2.4 4.3 2 4.2 2.2 2.8.9 2.8.9 4.2.7 4.3.8h10.6l3.7-.8c2-.4 5.1-1.3 6.9-1.8l3.1-1 4-2 3.8-1.9 4.2-2.8a142 142 0 0 0 22.7-19.2l2.6-2.7h.4c1.6 0 21.8 19.7 21.8 21.3v.4l-6.8 6.5c-28.1 27-51 37.3-77.9 35.4"
-                   style="color:#fff;font-weight:400;font-size:16px;font-family:&quot;Anthropic Sans&quot;,&quot;-apple-system&quot;,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:url(#sched-grad-a);stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter"/>
-                  <path fill="url(#sched-grad-b)" d="M78.38 91.645c-.4.2-1.5-.2-1.4.5l-.2 30.7 5.3-1h54q0 1.1-1 1.8c-14.2 14.7-28.9 29-43.1 43.8q-1 .8.3.7 9.5.6 18.9 2.3l7.5 2q2.8.7 5.4 1.8 12 4.5 22.7 12a153 153 0 0 1 19.3 16.4q6.8 7.1 13.4 14.4l6.9 6.6v-43.6l-1.4-1.4a119 119 0 0 0-24.9-19.9c-3.3-2-6.9-3.6-10.2-5.7q-.7-.5-.6-1.2 9.9-8.9 19-18.5a154 154 0 0 0 15.2-20q1.4-2.5 3.2-4.5l-.1-17.5h-105Z" 
-                  style="color:#fff;font-weight:400;font-size:16px;font-family:&quot;Anthropic Sans&quot;,&quot;-apple-system&quot;,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:url(#sched-grad-b);stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter"/>
-                  <path fill="#111" d="M256.88 262.245a121 121 0 0 1-13-2.1l-3.6-.9-5.1-1.8-5-1.7-5.5-2.7-5.4-2.7-5.9-4a172 172 0 0 1-22.4-17.8l-4-3.7v-22.1l-.1-22.2h.3c.2 0 2.8 2.8 5.8 6.1l5.4 6 7 7 7.1 6.9 4.4 3.7c5.8 4.9 9.9 8 14.4 11l3.8 2.4 3.9 2 3.9 1.8 3.7 1.3c2 .6 5.1 1.5 6.9 1.8l3 .6h12.8l3-.6c4-.9 8.7-2.5 12.2-4.2l2.9-1.3 3.1-2.1 3.1-2 2.8-2.6q5.5-4.8 9.4-10.8l2.2-3.2 1.9-3.8 1.9-4 1.2-4.2 1.2-4.2.6-4.4.6-4.3-.2-5-.2-5-.8-3.5-.7-3.5-1.4-4.4-1.5-4.3-2.3-4-2.2-4-2.4-3a72 72 0 0 0-5.2-5.7l-2.9-2.8-3-2.2-3.2-2.3-3.8-2-3.7-1.8-3.3-1.1c-1.7-.6-4.6-1.4-6.3-1.8l-3-.7-5.5-.2-5.5-.2-3 .4a48 48 0 0 0-23.2 9.5l-2.6 2-3.3 3.3a83 83 0 0 0-14.8 21.1l-8.1 13.5-3.3 5h-.4c-.2 0-3.6-3.2-7.5-7.1l-7.1-7.2-2.8-2.3-4-3.3-1.3-1.1 3-5.1a127 127 0 0 0 7.8-13.6l3-4.5a122 122 0 0 1 11.1-14.6l3-3.3 3.6-3c8.8-7.8 18-13.1 29-16.7l4.2-1.4 4.3-.9c2.4-.5 5.8-1 7.5-1.2l3.2-.4h10.6l4.5.6 4.6.5 4 .9 4 .9 4 1.4a86 86 0 0 1 25.6 13.8l3.3 2.6 4 3.8a85 85 0 0 1 25.2 57.8l.3 4.2-.4 4.8-1.1 9.2-.8 4.4-1.2 4.2a82 82 0 0 1-6 15.2l-2.3 4.6-3 4.4-3 4.4-3 3.6-3 3.5-3.4 3.3-3.4 3.2-3.9 3a86 86 0 0 1-20.9 11.6l-4 1.6-4 1-8.1 1.8-4.3.8h-14.1m-235.2-31.7-5-6.6-2.2-3.3-2.1-4.3a86 86 0 0 1-9.3-30.1l-.5-3.4v-12l.5-3.9c.2-2 .8-5.7 1.3-8l.9-4.3 1.7-5.2 1.7-5.3 2.5-5 2.4-5 2.2-3.6c1.3-1.9 3.3-4.8 4.6-6.4l2.3-3 4-4.2a84 84 0 0 1 49.5-25.3h.3l-.1 15.8-.1 15.7-2.5.6c-5.2 1.4-11 4-16 7.4l-3 2-2.7 2.5c-3.1 2.8-5 4.9-7.8 8.6l-2 2.6-2.3 4.4-2.2 4.5-1 2.8a56 56 0 0 0-2.5 11l-.5 3.8v6.4l.4 3a55 55 0 0 0 10.8 27.2l1.6 2-2.8 3-10.7 10.9-8 8h-.8z" 
-                  style="color:#fff;font-weight:400;font-size:16px;font-family:&quot;Anthropic Sans&quot;,&quot;-apple-system&quot;,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;dominant-baseline:auto;text-anchor:start;opacity:1;fill:#111;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter"/>
+                    <defs>
+                        <linearGradient id="i" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="transparent"/>
+                            <stop offset="100%" stop-color="currentColor"/>
+                        </linearGradient>
+                
+                        <linearGradient id="i2" x1="100%" y1="0%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="transparent"/>
+                            <stop offset="100%" stop-color="currentColor"/>
+                        </linearGradient>
+                
+                
+                        <linearGradient id="z" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="transparent"/>
+                            <stop offset="100%" stop-color="currentColor"/>
+                        </linearGradient>
+                
+                        <linearGradient id="3" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="transparent"/>
+                            <stop offset="100%" stop-color="currentColor"/>
+                        </linearGradient>
+                
+                        <clipPath id="right-half" clipPathUnits="userSpaceOnUse">
+                            <rect x="157.5" y="0" width="192.5" height="350"/>
+                        </clipPath>
+                    </defs>
+                    <path fill="url(#i2)"
+                          d="m-490.1 32-.3-5.8v-5.5l1.7.2 5.8.5 4 .2 5.2-.4 5.1-.4 3.6-.7c20.4-4 35.8-13 57.9-34.2l6.8-6.5v-.4c0-1.6-20.2-21.3-21.8-21.3h-.4l-2.6 2.7a137 137 0 0 1-22.7 19.2l-4.2 2.8-3.9 2-3.9 1.8-3.1 1c-1.8.6-4.9 1.5-7 1.9l-3.6.8h-10.2l-4.1-.7-4-.7h.7l.8-.2v-105.8l.6-.3 3.2-.7 2.5-.4h53.1l-.2.4c0 .2-10.1 10.4-22.4 22.7A1116 1116 0 0 0-475.8-73v.4l2.7.2q8.4.7 14.2 1.6l4 .7 5.1 1.4 5 1.4 4.2 1.7c12.2 4.8 23.2 12 35.4 23a209 209 0 0 1 13.1 13.8l7.8 8 5.3 5.2-.1 24-.2 24h-55.3l-55.3.2zm106.8-97.3c-9-8.8-18-15.3-28.4-20.7a34 34 0 0 1-4.7-2.8l-.2-.3 5.3-4.8a165 165 0 0 0 28.3-33l3.4-4.8.4-.3.1 13.8.1 13.8-.2.2q-.3.2-.3.7v.6l-2.2 3.7-5 8.4a39 39 0 0 0-2.7 5.1v.5l3.3 2.7 5.2 4.6 1.9 1.9-.1 7-.2 7.2c-.1 0-1.9-1.5-4-3.5m-107-90.5.2-6h110.8v5.7l.2 5.6h-104.6l-3.4.3-3.3.3z"
+                          transform="translate(563.8 161.7)"/>
+                    <path fill="#111"
+                          d="M-485 21.3a86 86 0 0 1-46.4-18.4l-3.1-2.5-3.9-3.8-3.8-3.8.7-.2.6-.3 10.6-10.7 10.5-10.8 3.5 3.4 3.4 3.5 3.1 2.3 3.1 2.4 4.3 2 4.2 2.2 2.8.9 2.8.9 4.2.7 4.3.8h10.6l3.7-.8c2-.4 5.1-1.3 6.9-1.8l3.1-1 4-2 3.8-1.9 4.2-2.8a142 142 0 0 0 22.7-19.2l2.6-2.7h.4c1.6 0 21.8 19.7 21.8 21.3v.4l-6.8 6.5c-28.1 27-51 37.3-77.9 35.4"
+                          style="stroke:none;color:#fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"
+                          transform="translate(563.8 161.7)"/>
+                    <path fill="url(#i)"
+                          d="M-488-149.6c-.4.2-1.5-.2-1.4.5l-.2 30.7 5.3-1h54q0 1.1-1 1.8c-14.2 14.7-28.9 29-43.1 43.8q-1 .8.3.7 9.5.6 18.9 2.3l7.5 2q2.8.7 5.4 1.8 12 4.5 22.7 12a153 153 0 0 1 19.3 16.4q6.8 7.1 13.4 14.4l6.9 6.6v-43.6l-1.4-1.4a119 119 0 0 0-24.9-19.9c-3.3-2-6.9-3.6-10.2-5.7q-.7-.5-.6-1.2 9.9-8.9 19-18.5a154 154 0 0 0 15.2-20q1.4-2.5 3.2-4.5l-.1-17.5h-105z"
+                          style="stroke:none;color:#fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"
+                          transform="translate(563.8 161.7)"/>
+                    <path fill="#111"
+                          d="M-309.5 21a121 121 0 0 1-13-2.1l-3.6-.9-5.1-1.8-5-1.7-5.5-2.7-5.4-2.7-5.9-4a172 172 0 0 1-22.4-17.8l-4-3.7v-22.1l-.1-22.2h.3c.2 0 2.8 2.8 5.8 6.1l5.4 6 7 7 7.1 6.9 4.4 3.7c5.8 4.9 9.9 8 14.4 11l3.8 2.4 3.9 2 3.9 1.8 3.7 1.3c2 .6 5.1 1.5 6.9 1.8l3 .6h12.8l3-.6c4-.9 8.7-2.5 12.2-4.2l2.9-1.3 3.1-2.1 3.1-2 2.8-2.6q5.5-4.8 9.4-10.8l2.2-3.2 1.9-3.8 1.9-4 1.2-4.2 1.2-4.2.6-4.4.6-4.3-.2-5-.2-5-.8-3.5-.7-3.5-1.4-4.4-1.5-4.3-2.3-4-2.2-4-2.4-3a72 72 0 0 0-5.2-5.7l-2.9-2.8-3-2.2-3.2-2.3-3.8-2-3.7-1.8-3.3-1.1c-1.7-.6-4.6-1.4-6.3-1.8l-3-.7-5.5-.2-5.5-.2-3 .4a48 48 0 0 0-23.2 9.5l-2.6 2-3.3 3.3A83 83 0 0 0-355-83l-8.1 13.5-3.3 5h-.4c-.2 0-3.6-3.2-7.5-7.1l-7.1-7.2-2.8-2.3-4-3.3-1.3-1.1 3-5.1a127 127 0 0 0 7.8-13.6l3-4.5a122 122 0 0 1 11.1-14.6l3-3.3 3.6-3c8.8-7.8 18-13.1 29-16.7l4.2-1.4 4.3-.9c2.4-.5 5.8-1 7.5-1.2l3.2-.4h10.6l4.5.6 4.6.5 4 .9 4 .9 4 1.4a86 86 0 0 1 25.6 13.8l3.3 2.6 4 3.8A85 85 0 0 1-220-67.9l.3 4.2-.4 4.8-1.1 9.2-.8 4.4-1.2 4.2a82 82 0 0 1-6 15.2l-2.3 4.6-3 4.4-3 4.4-3 3.6-3 3.5-3.4 3.3-3.4 3.2-3.9 3a86 86 0 0 1-20.9 11.6l-4 1.6-4 1-8.1 1.8-4.3.8h-14.1m-235.2-31.7-5-6.6-2.2-3.3-2.1-4.3a86 86 0 0 1-9.3-30.1l-.5-3.4v-12l.5-3.9c.2-2 .8-5.7 1.3-8l.9-4.3 1.7-5.2 1.7-5.3 2.5-5 2.4-5 2.2-3.6c1.3-1.9 3.3-4.8 4.6-6.4l2.3-3 4-4.2a84 84 0 0 1 49.5-25.3h.3l-.1 15.8-.1 15.7-2.5.6c-5.2 1.4-11 4-16 7.4l-3 2-2.7 2.5c-3.1 2.8-5 4.9-7.8 8.6l-2 2.6-2.3 4.4-2.2 4.5-1 2.8a56 56 0 0 0-2.5 11l-.5 3.8v6.4l.4 3a55 55 0 0 0 10.8 27.2l1.6 2-2.8 3-10.7 10.9-8 8h-.8z"
+                          style="fill:#111;stroke:none;color:#fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"
+                          transform="translate(563.8 161.7)"/>
+                    <g clip-path="url(#right-half)">
+                        <path fill="currentColor"
+                              d="M-309.5 21a121 121 0 0 1-13-2.1l-3.6-.9-5.1-1.8-5-1.7-5.5-2.7-5.4-2.7-5.9-4a172 172 0 0 1-22.4-17.8l-4-3.7v-22.1l-.1-22.2h.3c.2 0 2.8 2.8 5.8 6.1l5.4 6 7 7 7.1 6.9 4.4 3.7c5.8 4.9 9.9 8 14.4 11l3.8 2.4 3.9 2 3.9 1.8 3.7 1.3c2 .6 5.1 1.5 6.9 1.8l3 .6h12.8l3-.6c4-.9 8.7-2.5 12.2-4.2l2.9-1.3 3.1-2.1 3.1-2 2.8-2.6q5.5-4.8 9.4-10.8l2.2-3.2 1.9-3.8 1.9-4 1.2-4.2 1.2-4.2.6-4.4.6-4.3-.2-5-.2-5-.8-3.5-.7-3.5-1.4-4.4-1.5-4.3-2.3-4-2.2-4-2.4-3a72 72 0 0 0-5.2-5.7l-2.9-2.8-3-2.2-3.2-2.3-3.8-2-3.7-1.8-3.3-1.1c-1.7-.6-4.6-1.4-6.3-1.8l-3-.7-5.5-.2-5.5-.2-3 .4a48 48 0 0 0-23.2 9.5l-2.6 2-3.3 3.3A83 83 0 0 0-355-83l-8.1 13.5-3.3 5h-.4c-.2 0-3.6-3.2-7.5-7.1l-7.1-7.2-2.8-2.3-4-3.3-1.3-1.1 3-5.1a127 127 0 0 0 7.8-13.6l3-4.5a122 122 0 0 1 11.1-14.6l3-3.3 3.6-3c8.8-7.8 18-13.1 29-16.7l4.2-1.4 4.3-.9c2.4-.5 5.8-1 7.5-1.2l3.2-.4h10.6l4.5.6 4.6.5 4 .9 4 .9 4 1.4a86 86 0 0 1 25.6 13.8l3.3 2.6 4 3.8A85 85 0 0 1-220-67.9l.3 4.2-.4 4.8-1.1 9.2-.8 4.4-1.2 4.2a82 82 0 0 1-6 15.2l-2.3 4.6-3 4.4-3 4.4-3 3.6-3 3.5-3.4 3.3-3.4 3.2-3.9 3a86 86 0 0 1-20.9 11.6l-4 1.6-4 1-8.1 1.8-4.3.8h-14.1m-235.2-31.7-5-6.6-2.2-3.3-2.1-4.3a86 86 0 0 1-9.3-30.1l-.5-3.4v-12l.5-3.9c.2-2 .8-5.7 1.3-8l.9-4.3 1.7-5.2 1.7-5.3 2.5-5 2.4-5 2.2-3.6c1.3-1.9 3.3-4.8 4.6-6.4l2.3-3 4-4.2a84 84 0 0 1 49.5-25.3h.3l-.1 15.8-.1 15.7-2.5.6c-5.2 1.4-11 4-16 7.4l-3 2-2.7 2.5c-3.1 2.8-5 4.9-7.8 8.6l-2 2.6-2.3 4.4-2.2 4.5-1 2.8a56 56 0 0 0-2.5 11l-.5 3.8v6.4l.4 3a55 55 0 0 0 10.8 27.2l1.6 2-2.8 3-10.7 10.9-8 8h-.8z"
+                              transform="translate(563.8 161.7)"/>
+                    </g>
+                
                 </svg>`,
     zp7:        `<svg viewBox="0 0 256 256">
                   <path fill="none" d="M0 0h256v256H0z"/>
@@ -121,7 +151,18 @@ window.ICONS = {
                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M152 216v-56L88 96V40M88 152V96"/>
                     <rect width="176" height="176" x="40" y="40" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" rx="8"/>
                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M136 40v32l20.69 20.69"/>
-                </svg>`
+                </svg>`,
+    graph: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <circle cx="128" cy="128" r="24" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m118.25 106.07-12.5-28.14M177.23 111.59l-26.46 8.82M181.06 169.27l-34.12-26.54M110.06 143.94l-36.12 32.12"/>
+                  <circle cx="128" cy="128" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="96" cy="56" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="200" cy="104" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="200" cy="184" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <circle cx="56" cy="192" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                </svg>`   
+    
 };
 
 

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>z3nIO | Graph</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'Iosevka', 'Consolas', monospace;
+            font-size: 11px; height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        #app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        /* ── Header ── */
+        .main-header {
+            background: var(--bg1); padding: 6px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+        }
+        .main-header h1 { font-size: 13px; font-weight: 700; color: var(--accent); }
+        .header-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+        /* ── Toolbar ── */
+        .toolbar {
+            background: var(--bg1); padding: 5px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+        }
+        .toolbar input[type="text"] {
+            flex: 1; max-width: 520px;
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 3px; padding: 3px 8px;
+            color: var(--text); font-size: 11px; font-family: inherit;
+        }
+        .toolbar input[type="text"]:focus { outline: none; border-color: var(--accent); }
+        .toolbar-label { font-size: 10px; color: var(--text2); white-space: nowrap; }
+        .toolbar-sep { width: 1px; height: 14px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+
+        /* ── Buttons ── */
+        .btn { padding: 3px 9px; border-radius: 3px; border: 1px solid var(--border); cursor: pointer; font-size: 10px; background: var(--bg2); color: var(--text); font-family: inherit; white-space: nowrap; }
+        .btn:hover { background: var(--bg3, #30363d); }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { opacity: 0.85; }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── Status bar ── */
+        .statusbar {
+            background: var(--bg1); padding: 3px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+            font-size: 10px; color: var(--text2); min-height: 22px;
+        }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+        .status-dot.ok   { background: var(--green, #3fb950); }
+        .status-dot.err  { background: var(--red, #f85149); }
+        .status-dot.busy { background: var(--yellow, #e3b341); animation: blink 0.8s step-end infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        #statusText { color: var(--text2); }
+        #statusText.ok  { color: var(--green, #3fb950); }
+        #statusText.err { color: var(--red, #f85149); }
+
+        /* ── Graph frame ── */
+        .graph-area { flex: 1; overflow: hidden; position: relative; }
+        #graphFrame {
+            width: 100%; height: 100%;
+            border: none; display: none;
+            background: var(--bg);
+        }
+        #graphFrame.visible { display: block; }
+
+        /* ── Empty state ── */
+        #emptyState {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 10px; color: var(--text2);
+        }
+        #emptyState.hidden { display: none; }
+        .empty-icon { font-size: 32px; opacity: 0.25; }
+        .empty-title { font-size: 13px; color: var(--text2); }
+        .empty-sub   { font-size: 10px; color: var(--text2); opacity: 0.6; }
+    </style>
+</head>
+<body>
+<div id="app">
+
+    <div class="main-header">
+        <h1>cs-graph</h1>
+        <div class="header-right">
+            <button class="btn" onclick="openInTab()" id="btnOpenTab" disabled>Open in tab</button>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <span class="toolbar-label">repo path</span>
+        <input type="text" id="repoPath" placeholder="C:\path\to\repo" />
+        <button class="btn primary" id="btnGenerate" onclick="generate()">Generate</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn" onclick="reload()" id="btnReload" disabled>Reload</button>
+    </div>
+
+    <div class="statusbar">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">—</span>
+    </div>
+
+    <div class="graph-area">
+        <iframe id="graphFrame" src="about:blank"></iframe>
+        <div id="emptyState">
+            <div class="empty-icon">⬡</div>
+            <div class="empty-title">No graph loaded</div>
+            <div class="empty-sub">Enter repo path and click Generate</div>
+        </div>
+    </div>
+
+</div>
+<script>
+    var _generated = false;
+
+    function setStatus(state, text) {
+        var dot  = document.getElementById('statusDot');
+        var txt  = document.getElementById('statusText');
+        dot.className  = 'status-dot ' + (state || '');
+        txt.className  = state || '';
+        txt.textContent = text || '—';
+    }
+
+    async function generate() {
+        var repoPath = document.getElementById('repoPath').value.trim();
+        if (!repoPath) { Dialog.error('repoPath is required.'); return; }
+
+        var btnG = document.getElementById('btnGenerate');
+        btnG.disabled = true;
+        setStatus('busy', 'Generating…');
+
+        try {
+            var res  = await fetch('/graph/generate?repoPath=' + encodeURIComponent(repoPath), { method: 'POST' });
+            var data = await res.json();
+
+            if (!res.ok || data.error) {
+                setStatus('err', data.error || ('HTTP ' + res.status));
+                return;
+            }
+
+            setStatus('ok', 'Done — ' + (data.repoPath || repoPath));
+            _generated = true;
+            loadFrame();
+
+        } catch (e) {
+            setStatus('err', e.message);
+        } finally {
+            btnG.disabled = false;
+        }
+    }
+
+    function loadFrame() {
+        var frame  = document.getElementById('graphFrame');
+        var empty  = document.getElementById('emptyState');
+        var btnR   = document.getElementById('btnReload');
+        var btnTab = document.getElementById('btnOpenTab');
+
+        frame.src = '/graph?' + Date.now();
+        frame.className = 'visible';
+        empty.className = 'hidden';
+        btnR.disabled   = false;
+        btnTab.disabled = false;
+    }
+
+    function reload() {
+        if (!_generated) return;
+        loadFrame();
+    }
+
+    function openInTab() {
+        if (!_generated) return;
+        window.open('/graph', '_blank');
+    }
+
+    document.getElementById('repoPath').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') generate();
+    });
+</script>
+</body>
+</html>

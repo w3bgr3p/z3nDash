@@ -278,6 +278,8 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         private readonly StubProfile        _profile   = new StubProfile();
         private readonly DynamicJson        _json      = new DynamicJson();
         public Logger? Logger { get; set; }
+        public Action<string>? OnLog { get; set; }
+
         public string Name   { get; set; } = "stub.zp";
         public string Path   { get; set; } = System.IO.Directory.GetCurrentDirectory();
         public string TaskId { get; } = Guid.NewGuid().ToString("N").Substring(0, 8);
@@ -314,26 +316,34 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
                 return Environment.UserName;
             return macro;
         }
+        
+        
 
         public void SendToLog(string message, LogType type, bool show, LogColor color)
-            => WriteConsole(message, type);
+        {
+            WriteConsole(message, type);
+            OnLog?.Invoke(message);
+        }
 
         public void SendInfoToLog(string message, bool show = false)
         {
             WriteConsole(message, LogType.Info);
             Logger?.Info(message);
+            OnLog?.Invoke(message);
         }
 
         public void SendWarningToLog(string message, bool show = false)
         {
             WriteConsole(message, LogType.Warning);
             Logger?.Warn(message);
+            OnLog?.Invoke(message);
         }
 
         public void SendErrorToLog(string message, bool show = false)
         {
             WriteConsole(message, LogType.Error);
             Logger?.Error(message);
+            OnLog?.Invoke(message);
         }
 
         private static void WriteConsole(string message, LogType type)
@@ -873,6 +883,47 @@ namespace z3nIO
         public const string Zksync    = "https://mainnet.era.zksync.io";
         public const string Scroll    = "https://rpc.scroll.io";
         public const string Linea     = "https://rpc.linea.build";
+    }
+
+    public static partial class Tools
+    {
+        public static string OtpCode(string keyString, int waitIfTimeLess = 5)
+        {
+            if (string.IsNullOrEmpty(keyString))
+                throw new Exception($"invalid input:[{keyString}]");
+            
+            var key = OtpNet.Base32Encoding.ToBytes(keyString.Trim());
+            var otp = new OtpNet.Totp(key);
+            string code = otp.ComputeTotp();
+            int remainingSeconds = otp.RemainingSeconds();
+
+            if (remainingSeconds <= waitIfTimeLess)
+            {
+                Thread.Sleep(remainingSeconds * 1000 + 1);
+                code = otp.ComputeTotp();
+            }
+
+            return code;
+        }
+        public static string OtpCode(this IZennoPosterProjectModel project,  string keyString, int waitIfTimeLess = 5)
+        {
+            if (string.IsNullOrEmpty(keyString))
+                throw new Exception($"invalid input:[{keyString}]");
+            
+            var key = OtpNet.Base32Encoding.ToBytes(keyString.Trim());
+            var otp = new OtpNet.Totp(key);
+            string code = otp.ComputeTotp();
+            int remainingSeconds = otp.RemainingSeconds();
+
+            if (remainingSeconds <= waitIfTimeLess)
+            {
+                Thread.Sleep(remainingSeconds * 1000 + 1);
+                code = otp.ComputeTotp();
+            }
+
+            return code;
+        }
+        
     }
 }
 

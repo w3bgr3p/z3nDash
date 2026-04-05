@@ -5,6 +5,7 @@
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
+    <script src="/js/icons.js"></script>
     <title>z3nIO | Scheduler</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -222,6 +223,7 @@
         }
         .nav-card:hover::before { opacity: 1; }
         .card-icon  { font-size: 24px; line-height: 1; }
+        .card-icon svg { width: 32px; height: 32px; }
         .card-title { font-size: 14px; font-weight: 600; color: var(--text-hi, var(--text)); }
         .card-desc  { font-size: 11px; color: var(--text-dim, var(--text2)); line-height: 1.5; }
         .card-badge {
@@ -388,7 +390,7 @@
 <body>
 <div id="app">
     <div class="main-header">
-        <h1>z3nIO Tasker</h1>
+        <h1>Tasker</h1>
         <div class="header-stats" id="headerStats"></div>
         <div class="header-right">
             <button class="btn sm" onclick="loadList()">↺</button>
@@ -871,14 +873,14 @@
     }
 
     var NAV_PAGES = [
-        { icon: '&#x23F1;',         title: 'z3nIO',       desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)',          url: '/scheduler.html',  color: '#e3b341' },
-        { icon: '&#x2699;&#xFE0F;', title: 'ZP7',         desc: 'Управление ZP7', url: '/?page=zp7',        color: '#58a6ff' },
-        { icon: '&#x1F4CB;',        title: 'Logs',       desc: 'Логи приложения с фильтрацией по уровню, машине, проекту, аккаунту.',                 url: '/?page=logs',      color: '#3fb950' },
-        { icon: '&#x1F310;',        title: 'HTTP',       desc: 'Перехваченные HTTP-запросы и ответы из ZP-задач. Replay запросов.',                   url: '/?page=http',      color: '#d29922' },
-        { icon: '&#x1F50D;',        title: 'JSON',       desc: 'Интерактивный JSON-tree с определением auth/captcha и replay запросов.',              url: '/json',            color: '#4e9eff' },
-        { icon: '&#x1F4C4;',        title: 'Clips',  desc: 'Copy-paste шаблоны, организованные в дерево. Клик по листу - копирует содержимое.',   url: '/?page=clips', color: '#f0883e' },
-        { icon: '&#x1F4DD;',        title: 'Text Tools', desc: 'URL encode/decode, C# escaper, Base64, JSON escape.',                                 url: '/text.html',       color: '#a371f7' },
-        { icon: '&#x2699;&#xFE0F;', title: 'Config',     desc: 'Статус сервера, редактор конфигурации, управление хранилищем логов.',                 url: '/?page=config',    color: '#f78166' },
+        { icon: ICONS.scheduler,         title: 'z3nIO',      desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)',                  url: '/scheduler.html',  color: '#e3b341' },
+        { icon: ICONS.zp7, title: 'ZP7',        desc: 'Управление ZP7',                                                                      url: '/?page=zp7',       color: '#58a6ff' },
+        { icon: ICONS.logs,        title: 'Logs',       desc: 'Логи приложения с фильтрацией по уровню, машине, проекту, аккаунту.',                 url: '/?page=logs',      color: '#3fb950' },
+        { icon: ICONS.http,        title: 'HTTP',       desc: 'Перехваченные HTTP-запросы и ответы из ZP-задач. Replay запросов.',                   url: '/?page=http',      color: '#d29922' },
+        { icon: ICONS.json,        title: 'JSON',       desc: 'Интерактивный JSON-tree с определением auth/captcha и replay запросов.',              url: '/json',            color: '#4e9eff' },
+        { icon: ICONS.clips,        title: 'Clips',      desc: 'Copy-paste шаблоны, организованные в дерево. Клик по листу - копирует содержимое.',   url: '/?page=clips',     color: '#f0883e' },
+        { icon: ICONS.text,        title: 'Text Tools', desc: 'URL encode/decode, C# escaper, Base64, JSON escape.',                                 url: '/text.html',       color: '#a371f7' },
+        { icon: ICONS.config, title: 'Config',     desc: 'Статус сервера, редактор конфигурации, управление хранилищем логов.',                 url: '/?page=config',    color: '#f78166' },
     ];
 
     function renderGlobalStats() {
@@ -941,11 +943,11 @@
             + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">🗑</button>'
             + '</div>'
             + '<div class="action-group">'
-            + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">⚙ Set</button>'
-            + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">🔧 Build Settings</button>'
-            + (s.executor === 'csx-internal' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Prebuild</button>' : '')
+            + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">⚙ Settings</button>'
+            + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">🔧 Edit Settings</button>'
             + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📥 Import</button>'
             + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📤 Export</button>'
+            + (s.executor === 'csx-internal' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Build csx</button>' : '')
             + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFile(this.dataset.fp)" title="' + escHtml(s.script_path) + '" style="border-color:#3fb950;color:#3fb950;">📄 Open File</button>' : '')
             + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFolder(this.dataset.fp)" title="Open folder: ' + escHtml(s.script_path) + '" style="border-color:#3fb950;color:#3fb950;">📁 Open Folder</button>' : '')
             + '</div>';
@@ -1123,7 +1125,7 @@
 
             + '<div class="form-label">Executor</div>'
             + '<select class="form-input" id="f_executor">'
-            + ['python','node','ts-node','csx','exe','bat','bash','ps1','internal','csx-internal'].map(function(e) {
+            + ['python','node','ts-node','csx','exe','bat','bash','ps1','internal','csx-internal','csx-zp7'].map(function(e) {
                 return '<option ' + (s.executor === e ? 'selected' : '') + '>' + e + '</option>';
             }).join('') + '</select>'
 

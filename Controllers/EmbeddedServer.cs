@@ -25,6 +25,8 @@ public class EmbeddedServer
     private readonly TreasuryHandler _treasuryHandler;
     private readonly SystemSnapshotHandler _snapshotHandler;
     private readonly JsonAnalyzerHandler _jsonAnalyzerHandler;
+    private readonly GraphHandler _graphHandler;
+    private readonly DocsGraphHandler _docsGraphHandler;
 
     private const int DefaultPort = 10993;
 
@@ -98,8 +100,8 @@ public class EmbeddedServer
         _treasuryHandler     = new TreasuryHandler(dbService, _aiClient);
         _snapshotHandler     = new SystemSnapshotHandler(dbService, _aiClient);
         _jsonAnalyzerHandler = new JsonAnalyzerHandler(dbService, _aiClient);
-
-        
+        _graphHandler = new GraphHandler();
+        _docsGraphHandler = new DocsGraphHandler();
         
         int replayPort = int.TryParse(config.ReplayPort, out var rp) ? rp : _port + 1;
         try
@@ -185,6 +187,7 @@ public class EmbeddedServer
 
     private async Task ProcessRequest(HttpListenerContext context)
     {
+        
         var request  = context.Request;
         var response = context.Response;
 
@@ -201,12 +204,11 @@ public class EmbeddedServer
         
         if (_debug ) request.RawUrl.Debug();
 
-
+    
         try
         {
             string path   = request.Url?.AbsolutePath.ToLower() ?? "";
             string method = request.HttpMethod;
-
 // Script handlers (/zp, /py, /node, ...)
             foreach (var handler in _scriptHandlers)
             {
@@ -217,15 +219,15 @@ public class EmbeddedServer
                     return;
                 }
             }
-
+            
+            if (path.StartsWith("/docs-graph")) { await _docsGraphHandler.Handle(context); return; }
             // Docs
             if (method == "GET" && path.StartsWith("/docs"))
             {
-                if (path == "/docs")
+                
+                if (path == "/docs" || path == "/docs/")
                 {
-                    response.StatusCode = 301;
-                    response.Headers["Location"] = "/docs/";
-                    response.Close();
+                    await _docsGraphHandler.Handle(context);
                     return;
                 }
 
@@ -319,6 +321,9 @@ public class EmbeddedServer
             }
 
 // Domain handlers
+            if (path.StartsWith("/graph")) { await _graphHandler.Handle(context); return; }
+
+
             if (path.StartsWith("/report"))
             {
                 if (_debug )  $"[handler] ReportHandler → {path}".Debug();

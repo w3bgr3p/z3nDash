@@ -36,8 +36,46 @@ internal static class SseHub
     public static async Task SubscribeHttp(HttpListenerResponse res, string taskId, CancellationToken ct)
         => await Keep(_http, res, taskId, ct);
 
-    public static async Task SubscribeOutput(HttpListenerResponse res, string scheduleId, CancellationToken ct)
-        => await Keep(_output, res, scheduleId, ct);
+    public static async Task SubscribeOutput(
+        HttpListenerResponse res,
+        string scheduleId,
+        CancellationToken ct,
+        IEnumerable<string>? initialLines = null)
+    {
+        var id  = Guid.NewGuid();
+        var sub = new Subscriber(res, scheduleId, ct);
+
+        res.ContentType                  = "text/event-stream; charset=utf-8";
+        res.Headers["Cache-Control"]     = "no-cache";
+        res.Headers["X-Accel-Buffering"] = "no";
+        res.SendChunked                  = true;
+
+        try { await WriteEvent(res, "ping", "{}"); } catch { return; }
+
+        if (initialLines != null)
+        {
+            foreach (var line in initialLines)
+            {
+                try
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(
+                        new { line, level = line.StartsWith("[ERR]") ? "ERROR" : "INFO" });
+                    await WriteEvent(res, "output", json);
+                }
+                catch { return; }
+            }
+        }
+
+        _output[id] = sub;
+
+        try   { await Task.Delay(Timeout.Infinite, ct); }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            _output.TryRemove(id, out _);
+            try { res.Close(); } catch { }
+        }
+    }
 
     // ── Broadcast ─────────────────────────────────────────────────────────────
 
