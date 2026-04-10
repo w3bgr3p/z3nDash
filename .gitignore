@@ -17,6 +17,7 @@ obj/
 TestResults/
 publish-new/
 PrivateTasks/
+media/
 # User-specific files
 *.user
 *.userosscache

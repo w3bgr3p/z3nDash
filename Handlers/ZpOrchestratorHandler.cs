@@ -277,7 +277,7 @@ public class ZpOrchestratorHandler : IScriptHandler
         var newJsonB64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(currentDict)))
                                 .Replace("'", "''");
 
-        db.Query($"UPDATE \"{DbSchema.Settings}\" SET \"_json_b64\" = '{newJsonB64}' WHERE {where}");
+        db.Query($"UPDATE \"{DbSchema.Settings.Name}\" SET \"_json_b64\" = '{newJsonB64}' WHERE {where}");
 
         var cmdId = $"{machine}|{Guid.NewGuid()}";
 // PostSettingsXml — строки 305–307

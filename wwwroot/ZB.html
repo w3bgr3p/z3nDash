@@ -121,40 +121,28 @@
 </div>
 
 <div class="tabs">
-    <button class="tab-btn active" data-tab="instances">Instances</button>
-    <button class="tab-btn" data-tab="profiles">Profiles</button>
+    <button class="tab-btn active" data-tab="profiles">Profiles</button>
     <button class="tab-btn" data-tab="proxies">Proxies</button>
     <button class="tab-btn" data-tab="threads">Threads</button>
 </div>
 
-<!-- Instances -->
-<div class="tab-panel active" id="tab-instances">
-    <div class="section-header">
-        <span class="section-title">Running Browsers</span>
-        <span class="section-count" id="instancesCount">0</span>
-        <div class="section-actions">
-            <button class="btn sm" id="btnRefreshInstances">↻ Refresh</button>
-            <button class="btn sm red" id="btnStopAll">⛔ Stop All</button>
-        </div>
-    </div>
-    <div class="tbl-wrap">
-        <table>
-            <thead><tr><th>Profile ID</th><th>PID</th><th>WS Endpoint</th><th>Uptime</th><th></th></tr></thead>
-            <tbody id="instancesTbody"><tr><td colspan="4" class="empty">Not connected</td></tr></tbody>
-        </table>
-    </div>
-</div>
-
 <!-- Profiles -->
-<div class="tab-panel" id="tab-profiles">
+<div class="tab-panel active" id="tab-profiles">
     <div class="section-header">
         <span class="section-title">Profiles</span>
         <span class="section-count" id="profilesCount">0</span>
-        <div class="section-actions"><button class="btn sm" id="btnRefreshProfiles">↻ Refresh</button></div>
+        <div class="section-actions">
+            <button class="btn sm red" id="btnStopAll">⛔ Stop All</button>
+            <button class="btn sm" id="btnRefreshProfiles">↻ Refresh</button>
+        </div>
     </div>
     <div class="filter-row">
         <input type="text" id="profileSearch" placeholder="Search by name or tag...">
         <select id="profileFolderFilter"><option value="">All folders</option></select>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);cursor:pointer">
+            <input type="checkbox" id="profileRunningOnly" style="cursor:pointer">
+            Running
+        </label>
     </div>
     <div class="tbl-wrap">
         <table>
@@ -208,7 +196,7 @@
 
 <script>
     let _connected = false, _uptimeStart = null, _uptimeTimer = null, _refreshTimer = null;
-    let _allProfiles = [], _folders = [];
+    let _allProfiles = [], _folders = [], _instanceMap = {}, _uptimeMap = {}; // profileId->instance, pid->uptimeSec
 
     // Все запросы через прокси /zb/api/v1/*
     async function zbGet(path) {
@@ -283,10 +271,9 @@
     }
 
     // ── Instances ─────────────────────────────────────────────────────────────────
-    document.getElementById('btnRefreshInstances').addEventListener('click', loadInstances);
     document.getElementById('btnStopAll').addEventListener('click', async () => {
         if (!_connected) return;
-        const ids = [...document.querySelectorAll('#instancesTbody tr[data-profileid]')].map(r => r.dataset.profileid).filter(Boolean);
+        const ids = Object.keys(_instanceMap);
         if (!ids.length) { toast('No running instances'); return; }
         if (!await Dialog.confirm(`Stop ${ids.length} instance(s)?`)) return;
         try { await zbDelete('/browser_instances/delete_bulk?workspaceId=-1', ids); toast(`Stopped ${ids.length}`, 'ok'); await loadInstances(); }
@@ -295,47 +282,29 @@
 
     async function loadInstances() {
         if (!_connected) return;
-        const tbody = document.getElementById('instancesTbody');
         try {
             const data = await zbGet('/browser_instances?workspaceId=-1&start=0&total=1000');
             const items = data.items || [];
-            document.getElementById('statRunning').textContent    = items.length;
-            document.getElementById('instancesCount').textContent = items.length;
-            if (!items.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No running instances</td></tr>'; return; }
+            document.getElementById('statRunning').textContent = items.length;
 
-            // Рендерим без аптайма сначала
-            tbody.innerHTML = items.map(i => {
-                const pid = i.processId ?? 0;
-                const ws  = i.connectionString || '—';
-                return `<tr data-profileid="${i.profileId}" data-pid="${pid}">
-                <td class="mono">${i.profileId}</td>
-                <td class="mono">${pid||'—'}</td>
-                <td class="mono" title="${ws}">${ws.length>52?ws.slice(0,52)+'…':ws}</td>
-                <td class="mono" id="uptime-${pid}">—</td>
-                <td><div class="btn-row">
-                    <button class="btn sm red"    onclick="stopInstance('${i.profileId}',this)">Stop</button>
-                    ${pid?`<button class="btn sm orange" onclick="killInstance(${pid},'${i.profileId}',this)" title="Force kill (Process.Kill)">Kill</button>`:''}
-                    <button class="btn sm"        onclick="copyText('${ws}')">WS</button>
-                    <button class="btn sm"        onclick="copyText('${i.profileId}')">ID</button>
-                </div></td>
-            </tr>`;
-            }).join('');
+            // Обновляем кэш инстансов для рендера профилей
+            _instanceMap = {};
+            items.forEach(i => { _instanceMap[i.profileId] = i; });
 
             // Подгружаем аптаймы по PID
+            _uptimeMap = {};
             const pids = items.map(i => i.processId).filter(Boolean);
             if (pids.length) {
                 try {
                     const up = await fetch('/zb/process/uptime?pids=' + pids.join(',')).then(r => r.json());
                     pids.forEach(pid => {
-                        const el = document.getElementById('uptime-' + pid);
-                        if (!el) return;
                         const d = up[String(pid)];
-                        if (!d) { el.textContent = 'dead?'; el.style.color = '#f85149'; return; }
-                        el.textContent = fmtUptime(d.uptimeSeconds);
+                        _uptimeMap[pid] = d ? d.uptimeSeconds : null;
                     });
                 } catch (_) {}
             }
-        } catch (e) { tbody.innerHTML = `<tr><td colspan="4" class="empty">Error: ${e.message}</td></tr>`; }
+            renderProfilesTable();
+        } catch (e) { console.error('loadInstances:', e); }
     }
 
     async function stopInstance(profileId, btn) {
@@ -357,6 +326,7 @@
     document.getElementById('btnRefreshProfiles').addEventListener('click', loadProfiles);
     document.getElementById('profileSearch').addEventListener('input', renderProfilesTable);
     document.getElementById('profileFolderFilter').addEventListener('change', renderProfilesTable);
+    document.getElementById('profileRunningOnly').addEventListener('change', renderProfilesTable);
 
     let _sortField = 'name', _sortDir = 1; // 1=asc, -1=desc
 
@@ -389,12 +359,14 @@
         } catch (e) { tbody.innerHTML = `<tr><td colspan="6" class="empty">Error: ${e.message}</td></tr>`; }
     }
     function renderProfilesTable() {
-        const tbody    = document.getElementById('profilesTbody');
-        const search   = document.getElementById('profileSearch').value.toLowerCase();
-        const folderId = document.getElementById('profileFolderFilter').value;
+        const tbody      = document.getElementById('profilesTbody');
+        const search     = document.getElementById('profileSearch').value.toLowerCase();
+        const folderId   = document.getElementById('profileFolderFilter').value;
+        const runningOnly = document.getElementById('profileRunningOnly').checked;
         let items = _allProfiles;
-        if (search)   items = items.filter(p => (p.name||'').toLowerCase().includes(search) || (p.tags||[]).map(t=>(t.name||'').toLowerCase()).join(' ').includes(search));
-        if (folderId) items = items.filter(p => p.folderId === folderId);
+        if (search)      items = items.filter(p => (p.name||'').toLowerCase().includes(search) || (p.tags||[]).map(t=>(t.name||'').toLowerCase()).join(' ').includes(search));
+        if (folderId)    items = items.filter(p => p.folderId === folderId);
+        if (runningOnly) items = items.filter(p => !!_instanceMap[p.id]);
 
         // Sort
         items = [...items].sort((a, b) => {
@@ -428,16 +400,34 @@
             const folderName = folder ? (folder.name||p.folderId?.slice(0,8)) : (p.folderId?p.folderId.slice(0,8):'—');
             const tags      = (p.tags||[]).map(t=>`<span class="tag">${t.name||''}</span>`).join('');
             const lastStart = p.lastStartTime ? new Date(p.lastStartTime).toLocaleString() : '—';
-            return `<tr>
+            const inst      = _instanceMap[p.id];
+            const pid       = inst?.processId || 0;
+            const ws        = inst?.connectionString || '';
+            let actionCell;
+            if (inst) {
+                actionCell = `<div class="btn-row">
+                    <button class="btn sm red"    onclick="stopInstance('${p.id}',this)">Stop</button>
+                    ${pid?`<button class="btn sm orange" onclick="killInstance(${pid},'${p.id}',this)">Kill</button>`:''}
+                    <button class="btn sm"        onclick="copyText('${ws}')">WS</button>
+                    <button class="btn sm"        onclick="copyText('${p.id}')">ID</button>
+                </div>`;
+            } else {
+                actionCell = `<div class="btn-row">
+                    <button class="btn sm green" onclick="startProfile('${p.id}',this)">▶ Start</button>
+                    <button class="btn sm" onclick="copyText('${p.id}')">ID</button>
+                </div>`;
+            }
+            const upSec  = pid ? _uptimeMap[pid] : null;
+            const midCell = inst
+                ? `<span style="font-size:10px;color:var(--text-dim)">PID ${pid||'—'} · ${upSec != null ? fmtUptime(upSec) : '—'}</span>`
+                : `<span class="mono">${lastStart}</span>`;
+            return `<tr${inst?' style="background:rgba(63,185,80,0.06)"':''}>
             <td class="name-cell" title="${p.id}">${p.name||p.id.slice(0,8)}</td>
             <td class="mono">${folderName}</td>
             <td>${tags||'—'}</td>
             <td>${p.status?`<span class="badge unknown">${p.status}</span>`:'<span class="badge stopped">—</span>'}</td>
-            <td class="mono">${lastStart}</td>
-            <td><div class="btn-row">
-                <button class="btn sm green" onclick="startProfile('${p.id}',this)">▶ Start</button>
-                <button class="btn sm" onclick="copyText('${p.id}')">ID</button>
-            </div></td>
+            <td class="mono">${midCell}</td>
+            <td style="min-width:160px">${actionCell}</td>
         </tr>`;
         }).join('');
     }

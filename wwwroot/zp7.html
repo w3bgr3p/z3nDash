@@ -636,8 +636,9 @@
         .zp7-tooltip-time  { color: var(--text2); font-size: 11px; margin-bottom: 8px; }
         .zp7-tooltip-ok    { color: var(--green); background: rgba(63,185,80,0.1); padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 11px; }
         .zp7-tooltip-err   { color: var(--red);   background: rgba(248,81,73,0.1);  padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 11px; }
-        .zp7-tooltip-report { margin-top: 8px; color: var(--red); font-family: monospace; font-size: 11px; padding: 8px; background: rgba(248,81,73,0.05); border-radius: 4px; border-left: 3px solid var(--red); }
-
+        .zp7-tooltip-report { margin-top: 8px; color: var(--text2); font-family: monospace; font-size: 11px; padding: 8px; background: var(--bg2); border-radius: 4px; border-left: 3px solid var(--border); }
+        .zp7-tooltip-report-ok { color: var(--green); background: rgba(63,185,80,0.05); border-left-color: var(--green); }
+        
         /* Точно как report.html */
         .heatmap-with-stats   { display: flex; gap: 12px; align-items: stretch; }
         .heatmap-project-card { width: 160px; flex-shrink: 0; }
@@ -2326,7 +2327,7 @@
             if (status === 'success')    html += `<div class="zp7-tooltip-ok">✓ Success</div>`;
             else if (status === 'error') html += `<div class="zp7-tooltip-err">✗ Failed</div>`;
             else                         html += `<div style="color:var(--muted);font-size:11px;">Not touched</div>`;
-            if (report && report.trim()) html += `<div class="zp7-tooltip-report">${report.substring(0, 200)}</div>`;
+            if (report && report.trim()) html += `<div class="zp7-tooltip-report ${status === 'success' ? 'zp7-tooltip-report-ok' : ''}">${report.substring(0, 200)}</div>`;
 
             t.innerHTML = html;
             t.classList.add('show');

@@ -31,7 +31,10 @@ public class CapMonsterSolver
 				break;	
 			case "reV3e":
 				task = "RecaptchaV2EnterpriseTaskProxyless";
-				break;		
+				break;
+            case "hc":
+                task = "HCaptchaTaskProxyless";
+                break;
 		}
 		
         try

@@ -941,6 +941,7 @@
             + '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled||'true') + '\')">' + pauseLabel + '</button>'
             + '<button class="btn stop sm" onclick="stopNow(\'' + id + '\')">■ Interrupt</button>'
             + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">🗑</button>'
+            + '<button class="btn sm" onclick="duplicateSchedule(\'' + id + '\')" style="border-color:#d29922;color:#d29922;">📋 Duplicate</button>'
             + '</div>'
             + '<div class="action-group">'
             + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name||'') + '\')">⚙ Settings</button>'
@@ -1532,6 +1533,57 @@
         var data = await res.json();
         if (data.ok) { selectedId = data.id; formDirty = false; await loadList(); selectRow(data.id); }
         else Dialog.error(data.error || 'Save failed');
+    }
+
+    function _nextDuplicateName(name, existingNames) {
+        var match = name.match(/^(.*)\s\((\d+)\)$/);
+        var base  = match ? match[1] : name;
+        var n     = match ? parseInt(match[2]) : 1;
+        var candidate;
+        do { n++; candidate = base + ' (' + n + ')'; } while (existingNames.indexOf(candidate) >= 0);
+        return candidate;
+    }
+
+    async function duplicateSchedule(id) {
+        var s = schedules.find(function(x) { return x.id === id; });
+        if (!s) return;
+
+        var existingNames = schedules.map(function(x) { return x.name || ''; });
+        var newName = _nextDuplicateName(s.name || 'task', existingNames);
+
+        var taskPayload = {
+            name:             newName,
+            executor:         s.executor,
+            script_path:      s.script_path,
+            args:             s.args,
+            enabled:          'false',
+            cron:             s.cron,
+            interval_minutes: s.interval_minutes,
+            fixed_time:       s.fixed_time,
+            on_overlap:       s.on_overlap,
+            max_threads:      s.max_threads,
+        };
+
+        var res  = await fetch('/scheduler/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskPayload) });
+        var data = await res.json();
+        if (!data.ok) { Dialog.error(data.error || 'Duplicate: save failed'); return; }
+
+        var newId = data.id;
+
+        try {
+            var pRes  = await fetch('/scheduler/payload?id=' + encodeURIComponent(id));
+            var pData = await pRes.json();
+            if (pData.schema || pData.values) {
+                await fetch('/scheduler/payload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: newId, schema: pData.schema, values: pData.values })
+                });
+            }
+        } catch(e) {}
+
+        await loadList();
+        selectRow(newId);
     }
 
     async function deleteSchedule(id, name) {
