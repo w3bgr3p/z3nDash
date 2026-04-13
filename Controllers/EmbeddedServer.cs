@@ -43,7 +43,8 @@ public class EmbeddedServer
     private readonly JsonAnalyzerHandler _jsonAnalyzerHandler;
     private readonly GraphHandler _graphHandler;
     private readonly DocsGraphHandler _docsGraphHandler;
-
+    private readonly TerminalHandler _terminalHandler;
+    
     private const int DefaultPort = 10993;
 
     public EmbeddedServer(LogsConfig config, DbConnectionService dbService)
@@ -118,6 +119,7 @@ public class EmbeddedServer
         _jsonAnalyzerHandler = new JsonAnalyzerHandler(dbService, _aiClient);
         _graphHandler = new GraphHandler();
         _docsGraphHandler = new DocsGraphHandler();
+        _terminalHandler = new TerminalHandler(_wwwrootPath);
         
         int replayPort = int.TryParse(config.ReplayPort, out var rp) ? rp : _port + 1;
         try
@@ -397,7 +399,11 @@ public class EmbeddedServer
                 await _jsonAnalyzerHandler.Handle(context);
                 return;
             }
-            
+            if (path.StartsWith("/terminal"))
+            {
+                await _terminalHandler.HandleRequest(context);
+                return;
+            }
             
 // Static (wwwroot)
             if (method == "GET")

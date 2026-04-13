@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/icons.js"></script>
+    <title>z3nIO | Terminal</title>
+
+    <!-- xterm.js -->
+    <link   rel="stylesheet" href="/js/xterm/xterm.min.css"/>
+    <script src="/js/xterm/xterm.min.js"></script>
+    <script src="/js/xterm/addon-fit.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'Consolas', 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 11px; overflow: hidden; height: 100vh;
+            display: flex; flex-direction: column;
+        }
+
+        /* ── Header ── */
+        .main-header {
+            background: var(--bg1); padding: 6px 14px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+        }
+        .main-header h1 { font-size: 13px; font-weight: 700; color: var(--accent); }
+        .header-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+        .btn {
+            background: var(--bg2); border: 1px solid var(--border);
+            color: var(--text); padding: 3px 10px; border-radius: 3px;
+            cursor: pointer; font-size: 11px; font-family: inherit;
+        }
+        .btn:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-accent { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+        .btn-accent:hover { opacity: 0.85; color: #000; }
+        .btn-red { border-color: var(--red); color: var(--red); }
+        .btn-red:hover { background: var(--red); color: #000; }
+
+        /* ── Layout ── */
+        .workspace {
+            display: flex; flex: 1; overflow: hidden;
+        }
+
+        /* ── Sessions sidebar ── */
+        .sidebar {
+            width: 200px; flex-shrink: 0;
+            background: var(--bg1); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .sidebar-header {
+            padding: 6px 10px; border-bottom: 1px solid var(--border);
+            font-size: 10px; font-weight: 700; color: var(--text2);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .sessions-list { flex: 1; overflow-y: auto; }
+
+        .session-item {
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+            transition: background 0.08s; position: relative;
+        }
+        .session-item:hover { background: var(--bg2); }
+        .session-item.active { background: var(--bg2); border-left: 2px solid var(--accent); padding-left: 8px; }
+        .session-item.dead { opacity: 0.45; }
+
+        .session-label {
+            font-size: 11px; font-weight: 600; color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 150px;
+        }
+        .session-meta {
+            font-size: 9px; color: var(--text2);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .session-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green); flex-shrink: 0;
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+        }
+        .session-dot.dead { background: var(--red); }
+
+        /* ── Terminal area ── */
+        .terminal-area {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden;
+            background: #0d0d0d;
+        }
+
+        /* tabs */
+        .tabs-bar {
+            background: var(--bg1); border-bottom: 1px solid var(--border);
+            display: flex; align-items: stretch; overflow-x: auto; flex-shrink: 0;
+            height: 30px;
+        }
+        .tabs-bar::-webkit-scrollbar { height: 3px; }
+        .tabs-bar::-webkit-scrollbar-thumb { background: var(--border); }
+
+        .tab {
+            display: flex; align-items: center; gap: 6px;
+            padding: 0 12px; border-right: 1px solid var(--border);
+            cursor: pointer; white-space: nowrap; font-size: 11px;
+            color: var(--text2); flex-shrink: 0; user-select: none;
+            min-width: 100px; max-width: 180px;
+        }
+        .tab:hover { background: var(--bg2); color: var(--text); }
+        .tab.active { background: #0d0d0d; color: var(--text); border-bottom: 2px solid var(--accent); }
+        .tab-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+        .tab-close {
+            font-size: 12px; color: var(--text2); line-height: 1;
+            padding: 0 2px; border-radius: 2px;
+        }
+        .tab-close:hover { color: var(--red); background: rgba(255,80,80,0.12); }
+        .tab-dot {
+            width: 5px; height: 5px; border-radius: 50%;
+            background: var(--green); flex-shrink: 0;
+        }
+        .tab-dot.dead { background: var(--red); }
+
+        /* xterm panes */
+        .terminals-container { flex: 1; position: relative; overflow: hidden; }
+
+        .terminal-pane {
+            position: absolute; inset: 0;
+            display: none; padding: 4px;
+        }
+        .terminal-pane.active { display: block; }
+
+        /* xterm overrides */
+        .xterm { height: 100%; }
+        .xterm-viewport { overflow-y: auto !important; }
+
+        /* ── New session modal ── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6); z-index: 100;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--bg1); border: 1px solid var(--border);
+            border-radius: 6px; padding: 20px; width: 400px;
+            display: flex; flex-direction: column; gap: 14px;
+        }
+        .modal h2 { font-size: 13px; font-weight: 700; color: var(--accent); }
+        .field { display: flex; flex-direction: column; gap: 4px; }
+        .field label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; }
+        .field input, .field select {
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 3px; padding: 5px 8px; color: var(--text);
+            font-size: 12px; font-family: monospace;
+        }
+        .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+        /* empty state */
+        .empty-state {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 10px;
+            color: var(--text2); font-size: 12px;
+        }
+        .empty-state .big { font-size: 32px; opacity: 0.3; }
+    </style>
+</head>
+<body>
+<div id="app" style="display:flex;flex-direction:column;height:100vh;overflow:hidden;">
+
+    <!-- Header -->
+    <div class="main-header">
+        <h1>⬛ Terminal</h1>
+        <div class="header-right">
+            <button class="btn btn-accent" onclick="openNewModal()">+ New Terminal</button>
+        </div>
+    </div>
+
+    <!-- Workspace -->
+    <div class="workspace">
+
+        <!-- Sidebar sessions list -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span>Sessions</span>
+                <span id="session-count" style="color:var(--text2);">0</span>
+            </div>
+            <div class="sessions-list" id="sessions-list"></div>
+        </div>
+
+        <!-- Terminal area -->
+        <div class="terminal-area" id="terminal-area">
+
+            <!-- Tabs -->
+            <div class="tabs-bar" id="tabs-bar"></div>
+
+            <!-- Panes -->
+            <div class="terminals-container" id="terminals-container">
+                <div class="empty-state" id="empty-state">
+                    <div class="big">⬛</div>
+                    <div>No terminals open</div>
+                    <button class="btn btn-accent" onclick="openNewModal()">+ New Terminal</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- New session modal -->
+<div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+        <h2>New Terminal</h2>
+        <div class="field">
+            <label>Label</label>
+            <input id="new-label" type="text" placeholder="my-terminal" />
+        </div>
+        <div class="field">
+            <label>Shell</label>
+            <select id="new-shell">
+                <option value="bash">bash (Git Bash)</option>
+                <option value="cmd">cmd.exe</option>
+                <option value="powershell">powershell.exe</option>
+                <option value="pwsh">pwsh (PowerShell 7)</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Working Directory</label>
+            <input id="new-cwd" type="text" placeholder="C:\projects\z3nIO" />
+        </div>
+        <div class="modal-actions">
+            <button class="btn" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-accent" onclick="createTerminal()">Open</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ── State ──────────────────────────────────────────────────────────────────────
+    const sessions  = {};   // id → { id, label, shell, cwd, term, ws, fitAddon, alive }
+    let   activeId  = null;
+
+    const WS_BASE = `ws://${location.host}`;
+
+    // ── Modal ──────────────────────────────────────────────────────────────────────
+    function openNewModal() {
+        document.getElementById('new-label').value = '';
+        document.getElementById('new-cwd').value   = '';
+        document.getElementById('modal-overlay').classList.add('open');
+        document.getElementById('new-label').focus();
+    }
+    function closeModal() {
+        document.getElementById('modal-overlay').classList.remove('open');
+    }
+    document.getElementById('modal-overlay').addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeModal();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeModal();
+    });
+
+    // ── Create ─────────────────────────────────────────────────────────────────────
+    async function createTerminal() {
+        const label = document.getElementById('new-label').value.trim() || document.getElementById('new-shell').value;
+        const shell = document.getElementById('new-shell').value;
+        const cwd   = document.getElementById('new-cwd').value.trim();
+
+        closeModal();
+
+        const res  = await fetch('/terminal/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label, shell, cwd })
+        });
+        const data = await res.json();
+        spawnTerminal(data.Id ?? data.id, data.Label ?? data.label, data.Shell ?? data.shell, data.Cwd ?? data.cwd);
+    }
+
+    function spawnTerminal(id, label, shell, cwd) {
+        // pane
+        const pane = document.createElement('div');
+        pane.className = 'terminal-pane';
+        pane.id = `pane-${id}`;
+        document.getElementById('terminals-container').appendChild(pane);
+
+        // xterm
+        const term = new Terminal({
+            theme: {
+                background:  '#0d0d0d',
+                foreground:  '#d4d4d4',
+                cursor:      '#00ff9c',
+                selectionBackground: 'rgba(0,255,156,0.25)',
+            },
+            fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+            fontSize:   13,
+            lineHeight: 1.3,
+            cursorBlink: true,
+            scrollback: 5000,
+        });
+
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(pane);
+
+        // websocket
+        const ws = new WebSocket(`${WS_BASE}/terminal/ws?id=${id}`);
+        // addEventListener вместо onX= — nav.js перезаписывает свойства
+        ws.addEventListener('open', () => {
+            setTimeout(() => {
+                try { fitAddon.fit(); } catch(e) {}
+                term.focus();
+            }, 50);
+        });
+        ws.addEventListener('message', e => {
+            try {
+                const bin   = atob(e.data);
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                term.write(bytes);
+            } catch(err) { console.error('[term] decode error', err); }
+        });
+        ws.addEventListener('close', () => {
+            if (sessions[id]) sessions[id].alive = false;
+            term.write('\r\n\x1b[31m[session closed]\x1b[0m\r\n');
+            refreshUI();
+        });
+        ws.addEventListener('error', e => console.error('[term] ws error', e));
+
+        // stdin → ws
+        term.onData(data => {
+            if (ws.readyState === WebSocket.OPEN)
+                ws.send(data);
+        });
+
+        sessions[id] = { id, label, shell, cwd, term, ws, fitAddon, alive: true };
+
+        document.getElementById('empty-state').style.display = 'none';
+
+        activateSession(id);
+        refreshUI();
+    }
+
+    // ── Activate ───────────────────────────────────────────────────────────────────
+    function activateSession(id) {
+        activeId = id;
+
+        // panes
+        document.querySelectorAll('.terminal-pane').forEach(p => p.classList.remove('active'));
+        const pane = document.getElementById(`pane-${id}`);
+        if (pane) {
+            pane.classList.add('active');
+            const s = sessions[id];
+            if (s) {
+                setTimeout(() => {
+                    try { s.fitAddon.fit(); } catch {}
+                    s.term.focus();
+                }, 50);
+            }
+        }
+
+        refreshUI();
+    }
+
+    // ── Close session ─────────────────────────────────────────────────────────────
+    async function closeSession(id) {
+        const s = sessions[id];
+        if (!s) return;
+
+        try { s.ws.close(); } catch {}
+        try { s.term.dispose(); } catch {}
+        document.getElementById(`pane-${id}`)?.remove();
+
+        delete sessions[id];
+
+        await fetch('/terminal/close', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+
+        const ids = Object.keys(sessions);
+        if (ids.length > 0) activateSession(ids[ids.length - 1]);
+        else {
+            activeId = null;
+            document.getElementById('empty-state').style.display = '';
+        }
+
+        refreshUI();
+    }
+
+    // ── UI refresh ────────────────────────────────────────────────────────────────
+    function refreshUI() {
+        const list  = document.getElementById('sessions-list');
+        const tabs  = document.getElementById('tabs-bar');
+        const count = Object.keys(sessions).length;
+
+        document.getElementById('session-count').textContent = count;
+
+        // sidebar
+        list.innerHTML = '';
+        for (const s of Object.values(sessions)) {
+            const el = document.createElement('div');
+            el.className = `session-item${s.id === activeId ? ' active' : ''}${!s.alive ? ' dead' : ''}`;
+            el.innerHTML = `
+            <div class="session-label">${esc(s.label)}</div>
+            <div class="session-meta">${esc(s.shell)} · ${esc(s.cwd.split(/[\\/]/).pop() || s.cwd)}</div>
+            <div class="session-dot${!s.alive ? ' dead' : ''}"></div>
+        `;
+            el.onclick = () => activateSession(s.id);
+            list.appendChild(el);
+        }
+
+        // tabs
+        tabs.innerHTML = '';
+        for (const s of Object.values(sessions)) {
+            const tab = document.createElement('div');
+            tab.className = `tab${s.id === activeId ? ' active' : ''}`;
+            tab.innerHTML = `
+            <div class="tab-dot${!s.alive ? ' dead' : ''}"></div>
+            <div class="tab-label" title="${esc(s.cwd)}">${esc(s.label)}</div>
+            <div class="tab-close" title="Close">×</div>
+        `;
+            tab.querySelector('.tab-label').onclick = () => activateSession(s.id);
+            tab.querySelector('.tab-close').onclick = e => { e.stopPropagation(); closeSession(s.id); };
+            tabs.appendChild(tab);
+        }
+    }
+
+    function esc(s) {
+        return String(s)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Resize observer ───────────────────────────────────────────────────────────
+    const ro = new ResizeObserver(() => {
+        if (activeId && sessions[activeId])
+            sessions[activeId].fitAddon.fit();
+    });
+    ro.observe(document.getElementById('terminals-container'));
+</script>
+</body>
+</html>

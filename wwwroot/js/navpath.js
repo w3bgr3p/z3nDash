@@ -29,5 +29,6 @@ window.NAV_CONFIG = {
         { id: 'config',    label: 'Config',     href: '/?page=config',   hotkey: '0' },
         { id: 'help',      label: 'Docs',       href: '/docs',           hotkey: 'H' },
         { id: 'graph',      label: 'Grapher',       href: '/?page=graph',           hotkey: 'G' },
+        //{ id: 'terminal',      label: 'Terminal',       href: '/?page=terminal',           hotkey: 'R' },
     ],
 };

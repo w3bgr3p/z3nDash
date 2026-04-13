@@ -68,6 +68,10 @@
         <None Update="wwwroot\static\fonts\JetBrainsMonoNerdFont-Regular.ttf">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Remove="media\z3nIO__.mp4" />
+        <None Remove="media\z3nIO_done.mp4" />
+        <None Remove="media\z3nIOlogo.mp4" />
+        <None Remove="media\**" />
   
     </ItemGroup>
 
@@ -101,6 +105,7 @@
         <Compile Remove="z3n7\**" />
         <Compile Remove="Controllers\Handlers\TrafficHandler.cs" />
         <Compile Remove="Tasks\csx\Chedraui.cs" />
+        <Compile Remove="media\**" />
     </ItemGroup>
 
     <ItemGroup>
@@ -116,6 +121,7 @@
         <EmbeddedResource Remove="UnitTests\**" />
         <EmbeddedResource Remove="z3nLib\**" />
         <EmbeddedResource Remove="z3n7\**" />
+        <EmbeddedResource Remove="media\**" />
     </ItemGroup>
 
 </Project>
