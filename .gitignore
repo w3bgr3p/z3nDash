@@ -18,6 +18,7 @@ TestResults/
 publish-new/
 PrivateTasks/
 media/
+installer_output/
 # User-specific files
 *.user
 *.userosscache
