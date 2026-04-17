@@ -1,6 +1,6 @@
 [Setup]
 AppName=z3nIO
-AppVersion=1.0.0.11
+AppVersion=1.0.0.12
 ; По умолчанию предлагаем локальную папку, но даем ВЫБОР
 DefaultDirName={localappdata}\z3nIO
 DefaultGroupName=z3nIO
