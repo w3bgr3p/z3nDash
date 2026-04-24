@@ -44,6 +44,8 @@ public class EmbeddedServer
     private readonly GraphHandler _graphHandler;
     private readonly DocsGraphHandler _docsGraphHandler;
     private readonly TerminalHandler _terminalHandler;
+    private readonly SqliteViewerHandler _sqliteViewerHandler;
+
     
     private const int DefaultPort = 10993;
 
@@ -120,7 +122,8 @@ public class EmbeddedServer
         _graphHandler = new GraphHandler();
         _docsGraphHandler = new DocsGraphHandler();
         _terminalHandler = new TerminalHandler(_wwwrootPath);
-        
+        _sqliteViewerHandler = new SqliteViewerHandler();
+
         int replayPort = int.TryParse(config.ReplayPort, out var rp) ? rp : _port + 1;
         try
         {
@@ -242,94 +245,15 @@ public class EmbeddedServer
             // Docs
             if (method == "GET" && path.StartsWith("/docs"))
             {
-                
-                if (path == "/docs" || path == "/docs/")
-                {
-                    await _docsGraphHandler.Handle(context);
-                    return;
-                }
-
-                var relative = Uri.UnescapeDataString(path.TrimStart('/'));
-                var filePath = Path.Combine(_wwwrootPath, relative).Replace("\\", "/");
-
-                // 1. Точное совпадение
-                if (!File.Exists(filePath))
-                    filePath = Path.Combine(_wwwrootPath, relative, "index.html").Replace("\\", "/");
-
-                // 2. Quartz кладёт страницы как Slug.html рядом, без подпапки
-                if (!File.Exists(filePath))
-                    filePath = Path.Combine(_wwwrootPath, relative + ".html").Replace("\\", "/");
-
-                if (!File.Exists(filePath))
-                {
-                    response.StatusCode = 404;
-                    var msg = Encoding.UTF8.GetBytes($"Not found: {filePath}");
-                    await response.OutputStream.WriteAsync(msg);
-                    response.Close();
-                    return;
-                }
-
-                var rel = Path.GetRelativePath(_wwwrootPath, filePath).Replace("\\", "/");
-                
-                if (filePath.EndsWith(".html"))
-                {
-                    var html = await File.ReadAllTextAsync(filePath);
-                    var inject = """
-                                 <link rel="stylesheet" href="/css/themes.css">
-                                 <link rel="stylesheet" href="/css/quartz-bridge.css">
-                                 <script src="/js/theme.js"></script>
-                                 <script>
-                                   (function() {
-                                     function applyTheme() {
-                                       var theme = localStorage.getItem('zp-theme') || 'dark';
-                                       var quartzTheme = theme === 'light' ? 'light' : 'dark';
-                                       localStorage.setItem('theme', quartzTheme);
-                                       document.documentElement.setAttribute('data-theme', theme);
-                                       document.documentElement.setAttribute('saved-theme', quartzTheme);
-                                     }
-                                     applyTheme();
-                                     document.addEventListener('nav', applyTheme);
-
-                                     document.addEventListener('nav', function() {
-                                       var old = document.getElementById('zp-dock-wrap');
-                                       var oldZone = document.getElementById('zp-dock-zone');
-                                       var oldOtp = document.getElementById('zp-otp-overlay');
-                                       if (old) old.remove();
-                                       if (oldZone) oldZone.remove();
-                                       if (oldOtp) oldOtp.remove();
-                                       var s = document.createElement('script');
-                                       s.src = '/js/nav.js?' + Date.now();
-                                       document.body.appendChild(s);
-                                     });
-                                   })();
-                                 </script>
-                                 """;
-                    
-                    var before = html.Contains("<script src=\"./prescript.js\"");
-
-                    var prescriptTag = html.Contains("<script src=\"./prescript.js\"")
-                        ? "<script src=\"./prescript.js\""
-                        : "<script src=\"../prescript.js\"";
-
-                    html = html.Replace(prescriptTag, inject + prescriptTag);
-                    
-                    html = html.Replace("</body>", "<script src=\"/js/nav.js\"></script></body>");
-
-                    var after = html.Contains(inject.Substring(0, 20));
-                    $"[docs inject] found={before} injected={after} path={filePath}".Debug();
-                    
-                    var bytes = Encoding.UTF8.GetBytes(html);
-                    response.ContentType = "text/html; charset=utf-8";
-                    response.ContentLength64 = bytes.Length;
-                    await response.OutputStream.WriteAsync(bytes);
-                    response.Close();
-                    return;
-                }
-
-                await ServeFile(response, rel, _wwwrootPath);
+                await _docsGraphHandler.Handle(context);
                 return;
+                
             }
-// Pages
+            
+            
+            
+            
+            // Pages
             if (method == "GET" && (path == "/" || path == "/index.html"))
             {
                 var page = request.QueryString["page"] ?? "home";
@@ -339,9 +263,17 @@ public class EmbeddedServer
             }
 
 // Domain handlers
-            if (path.StartsWith("/graph")) { await _graphHandler.Handle(context); return; }
+            if (path.StartsWith("/graph"))
+            {
+                await _graphHandler.Handle(context); 
+                return;
+            }
 
-
+            if (_sqliteViewerHandler.Matches(path))
+            {
+                await _sqliteViewerHandler.Handle(context);
+                return;
+            }
             if (path.StartsWith("/report"))
             {
                 if (_debug )  $"[handler] ReportHandler → {path}".Debug();

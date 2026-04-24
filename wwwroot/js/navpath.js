@@ -24,6 +24,7 @@ window.NAV_CONFIG = {
         { id: 'text',      label: 'Text',       href: '/?page=text',     hotkey: '7' },
         { id: 'clips',     label: 'Clips',      href: '/?page=clips',    hotkey: 'C' },
         { id: 'ai',        label: 'Ai',         href: '/?page=ai',       hotkey: '9' },
+        { id: 'sql',        label: 'sql',         href: '/?page=sqlite',       hotkey: '-' },
         { id: 'treasury',        label: 'Treasury',         href: '/?page=treasury',       hotkey: '8' },
         { id: 'system',        label: 'System',         href: '/?page=system',       hotkey: 'S' },
         { id: 'config',    label: 'Config',     href: '/?page=config',   hotkey: '0' },

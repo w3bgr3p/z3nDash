@@ -46,6 +46,8 @@
         <PackageReference Include="System.ServiceProcess.ServiceController"   Version="6.0.0" />
         <PackageReference Include="OpenCvSharp4"                              Version="4.9.0.20240103" />
         <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.*" />
+
     </ItemGroup>
 
     <!-- Windows-only packages -->
