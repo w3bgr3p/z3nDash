@@ -29,18 +29,8 @@
             gap: 10px;
             flex-shrink: 0;
         }
-
         .header h1 { font-size: 15px; color: var(--accent); flex-shrink: 0; }
-
-        .file-label {
-            font-size: 11px;
-            color: var(--text2);
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
+        .file-label { font-size: 11px; color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         input[type="file"] { display: none; }
 
         .btn {
@@ -60,6 +50,7 @@
 
         .main { display: flex; flex: 1; overflow: hidden; }
 
+        /* sidebar */
         .sidebar {
             width: 200px;
             flex-shrink: 0;
@@ -68,7 +59,6 @@
             flex-direction: column;
             overflow: hidden;
         }
-
         .sidebar-head {
             padding: 5px 10px;
             border-bottom: 1px solid var(--border);
@@ -79,9 +69,7 @@
             background: var(--bg1);
             flex-shrink: 0;
         }
-
         .table-list { flex: 1; overflow-y: auto; }
-
         .table-item {
             padding: 6px 12px;
             cursor: pointer;
@@ -96,6 +84,7 @@
         .table-item:hover { background: var(--bg2); color: var(--text); }
         .table-item.active { background: var(--bg2); color: var(--accent); border-left: 2px solid var(--accent); padding-left: 10px; }
 
+        /* content */
         .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
         .query-bar {
@@ -107,7 +96,6 @@
             flex-shrink: 0;
             align-items: center;
         }
-
         .query-input {
             flex: 1;
             background: var(--bg2);
@@ -121,19 +109,56 @@
         }
         .query-input:focus { border-color: var(--accent); }
 
-        /* column manager bar */
-        .col-bar {
-            display: flex;
-            gap: 4px;
-            padding: 4px 10px;
+        /* collapsible columns panel — mirrors json.html field-filter */
+        .col-panel {
             border-bottom: 1px solid var(--border);
             background: var(--bg1);
             flex-shrink: 0;
-            flex-wrap: wrap;
+            display: none;
+        }
+        .col-panel.show { display: block; }
+
+        .col-panel-header {
+            padding: 4px 10px;
+            display: flex;
             align-items: center;
-            min-height: 28px;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+            min-height: 24px;
+        }
+        .col-panel-header:hover { background: var(--bg2); }
+
+        .col-panel-title {
+            font-size: 9px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            flex: 1;
         }
 
+        .col-panel-badge {
+            background: var(--bg2);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            border-radius: 3px;
+            font-size: 9px;
+            padding: 0 5px;
+            display: none;
+        }
+        .col-panel-badge.show { display: inline; }
+
+        .col-panel-arrow { color: var(--text2); font-size: 9px; transition: transform 0.15s; }
+        .col-panel-arrow.open { transform: rotate(90deg); }
+
+        .col-panel-body {
+            display: none;
+            padding: 6px 10px 8px;
+            border-top: 1px solid var(--border);
+        }
+        .col-panel-body.open { display: flex; flex-wrap: wrap; gap: 4px; }
+
+        /* chips */
         .col-chip {
             display: flex;
             align-items: center;
@@ -150,19 +175,20 @@
             white-space: nowrap;
         }
         .col-chip:active { cursor: grabbing; }
-        .col-chip.visible { color: var(--text); border-color: var(--border); }
-        .col-chip.hidden-col { opacity: 0.4; }
+        .col-chip.visible { color: var(--text); }
+        .col-chip.hidden-col { opacity: 0.35; }
         .col-chip.drag-over { border-color: var(--accent); }
-        .col-chip.dragging { opacity: 0.3; }
+        .col-chip.dragging { opacity: 0.2; }
 
-        .col-chip-eye {
-            font-size: 10px;
+        .col-eye {
+            font-size: 9px;
             cursor: pointer;
             flex-shrink: 0;
-            opacity: 0.6;
+            line-height: 1;
         }
-        .col-chip-eye:hover { opacity: 1; }
+        .col-eye:hover { color: var(--accent); }
 
+        /* status */
         .status-bar {
             padding: 3px 10px;
             font-size: 10px;
@@ -171,9 +197,37 @@
             background: var(--bg1);
             flex-shrink: 0;
             min-height: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .status-bar.err { color: #f87171; }
+        .status-msg { flex: 1; }
 
+        /* pagination */
+        .pager {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: var(--text2);
+        }
+        .pager-btn {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            color: var(--text2);
+            padding: 1px 7px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            font-family: inherit;
+            transition: border-color 0.1s;
+        }
+        .pager-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+        .pager-btn:disabled { opacity: 0.3; cursor: default; }
+        .pager-info { white-space: nowrap; }
+
+        /* table */
         .table-wrap { flex: 1; overflow: auto; }
 
         table { border-collapse: collapse; width: max-content; min-width: 100%; }
@@ -191,8 +245,12 @@
             letter-spacing: 0.05em;
             white-space: nowrap;
             z-index: 1;
+            cursor: pointer;
+            user-select: none;
         }
-
+        thead th:hover { color: var(--text); }
+        thead th.sort-asc::after  { content: ' ▲'; color: var(--accent); }
+        thead th.sort-desc::after { content: ' ▼'; color: var(--accent); }
         tbody td {
             border: 1px solid var(--border);
             padding: 3px 10px;
@@ -201,14 +259,56 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            cursor: pointer;
+            position: relative;
+            user-select: none;
         }
-
         tbody tr:hover td { background: var(--bg2); }
-
-        td.is-null { color: var(--text2); font-style: italic; cursor: default; }
+        td.is-null { color: var(--text2); font-style: italic; }
         td a { color: var(--accent); text-decoration: none; }
         td a:hover { text-decoration: underline; }
+
+        /* cell action icons */
+        .td-inner {
+            position: relative;
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .td-val {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .td-actions {
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+            gap: 2px;
+            background: var(--bg2);
+            border-radius: 3px;
+            padding: 1px 2px;
+        }
+        tbody tr:hover .td-actions { display: flex; }
+        .td-act {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: none;
+            background: transparent;
+            color: var(--text2);
+            cursor: pointer;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            flex-shrink: 0;
+        }
+        .td-act:hover { background: var(--border); color: var(--accent); }
 
         .empty {
             display: flex;
@@ -235,6 +335,43 @@
             z-index: 9999;
         }
         #toast.show { opacity: 1; }
+
+        /* inline cell edit */
+        td.editing { padding: 0; }
+        td.editing input {
+            width: 100%;
+            height: 100%;
+            padding: 3px 10px;
+            background: var(--bg);
+            border: 1px solid var(--accent);
+            color: var(--text);
+            font-family: monospace;
+            font-size: 11px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        /* context menu */
+        #ctxMenu {
+            position: fixed;
+            background: var(--bg1);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 11px;
+            z-index: 9998;
+            min-width: 120px;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        #ctxMenu.show { display: block; }
+        .ctx-item {
+            padding: 6px 14px;
+            cursor: pointer;
+            color: var(--text2);
+            white-space: nowrap;
+        }
+        .ctx-item:hover { background: var(--bg2); color: var(--text); }
+        .ctx-item.danger:hover { color: #f87171; }
     </style>
 </head>
 <body>
@@ -254,11 +391,33 @@
 
     <div class="content">
         <div class="query-bar">
-            <input class="query-input" id="queryInput" type="text" placeholder="SELECT * FROM table LIMIT 100">
+            <input class="query-input" id="queryInput" type="text" placeholder="SELECT * FROM table LIMIT 500">
             <button class="btn primary" onclick="runQuery()">Run</button>
         </div>
-        <div class="col-bar" id="colBar"></div>
-        <div class="status-bar" id="statusBar"></div>
+
+        <!-- collapsible columns panel -->
+        <div class="col-panel" id="colPanel">
+            <div class="col-panel-header" onclick="toggleColPanel()">
+                <span class="col-panel-title">Columns</span>
+                <span class="col-panel-badge" id="hiddenBadge"></span>
+                <button class="btn" style="padding:1px 7px;font-size:9px" onclick="event.stopPropagation();setAllCols(true)">Hide All</button>
+                <button class="btn" style="padding:1px 7px;font-size:9px" onclick="event.stopPropagation();setAllCols(false)">Show All</button>
+                <span class="col-panel-arrow" id="colArrow">▶</span>
+            </div>
+            <div class="col-panel-body" id="colBody"></div>
+        </div>
+
+        <div class="status-bar" id="statusBar">
+            <span class="status-msg"></span>
+            <div class="pager" id="pager" style="display:none">
+                <button class="pager-btn" id="pgFirst" onclick="goPage(0)">«</button>
+                <button class="pager-btn" id="pgPrev"  onclick="goPage(currentPage-1)">‹</button>
+                <span class="pager-info" id="pgInfo"></span>
+                <button class="pager-btn" id="pgNext"  onclick="goPage(currentPage+1)">›</button>
+                <button class="pager-btn" id="pgLast"  onclick="goPage(totalPages-1)">»</button>
+            </div>
+        </div>
+
         <div class="table-wrap" id="tableWrap">
             <div class="empty">Open a .db file to start</div>
         </div>
@@ -266,15 +425,25 @@
 </div>
 
 <div id="toast">Copied</div>
+<div id="ctxMenu">
+    <div class="ctx-item danger" id="ctxDelete">Delete row</div>
+</div>
 
 <script>
-    let currentFile  = null;
-    // source data from last query
-    let lastColumns  = [];
-    let lastRows     = [];
-    // view state: ordered list of column names, set of hidden names
-    let colOrder     = [];
-    let hiddenCols   = new Set();
+    const PAGE_SIZE = 100;
+
+    let currentFile = null;
+    let lastColumns = [];
+    let lastRows    = [];
+    let lastRowids  = [];   // rowid per row, null if not available
+    let lastTable   = '';   // table name for writes
+    let colOrder    = [];
+    let hiddenCols  = new Set();
+    let currentPage = 0;
+    let totalPages  = 0;
+    let sortCol     = null;   // column name or null
+    let sortDir     = 1;      // 1 = asc, -1 = desc
+    let sortedRows  = [];     // lastRows after sort applied
 
     // ── file picker ────────────────────────────────────────────────────────────
 
@@ -295,11 +464,9 @@
     // ── server calls ───────────────────────────────────────────────────────────
 
     async function loadTables() {
-        if (!currentFile) return;
         setStatus('Loading...');
         document.getElementById('tableList').innerHTML = '';
-        clearTable();
-
+        clearAll();
         try {
             const buf = await currentFile.arrayBuffer();
             const res = await fetch('/sqlite-viewer/tables', {
@@ -317,8 +484,7 @@
     async function execQuery(sql) {
         if (!currentFile) { setStatus('No file open', true); return; }
         setStatus('Running...');
-        clearTable();
-
+        clearAll();
         try {
             const buf = await currentFile.arrayBuffer();
             const res = await fetch('/sqlite-viewer/query?' + new URLSearchParams({ sql }), {
@@ -331,17 +497,23 @@
 
             lastColumns = data.columns;
             lastRows    = data.rows;
-            // init colOrder only when columns change
-            colOrder  = data.columns.slice();
-            hiddenCols = new Set();
+            lastRowids  = data.rowids || [];
+            lastTable   = data.table  || '';
+            colOrder    = data.columns.slice();
+            hiddenCols  = new Set();
+            sortCol     = null;
+            sortDir     = 1;
+            sortedRows  = data.rows.slice();
+            currentPage = 0;
+            totalPages  = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
 
-            renderColBar();
-            renderTable();
-            setStatus(`${data.rows.length} row(s)`);
+            renderColPanel();
+            renderPage();
+            setStatus(`${lastRows.length} row(s)`);
         } catch (e) { setStatus(e.message, true); }
     }
 
-    // ── UI helpers ─────────────────────────────────────────────────────────────
+    // ── table list ─────────────────────────────────────────────────────────────
 
     function renderTableList(tables) {
         const el = document.getElementById('tableList');
@@ -360,7 +532,7 @@
         document.querySelectorAll('.table-item').forEach(el =>
             el.classList.toggle('active', el.textContent === name)
         );
-        const sql = `SELECT * FROM "${name}" LIMIT 500`;
+        const sql = `SELECT * FROM "${name}" LIMIT 1000`;
         document.getElementById('queryInput').value = sql;
         execQuery(sql);
     }
@@ -370,25 +542,35 @@
         if (sql) execQuery(sql);
     }
 
-    // ── column bar (drag + hide) ───────────────────────────────────────────────
+    // ── collapsible col panel ──────────────────────────────────────────────────
 
+    let colPanelOpen = false;
     let dragSrc = null;
 
-    function renderColBar() {
-        const bar = document.getElementById('colBar');
-        bar.innerHTML = '';
+    function toggleColPanel() {
+        colPanelOpen = !colPanelOpen;
+        document.getElementById('colBody').classList.toggle('open', colPanelOpen);
+        document.getElementById('colArrow').classList.toggle('open', colPanelOpen);
+    }
+
+    function renderColPanel() {
+        const panel = document.getElementById('colPanel');
+        const body  = document.getElementById('colBody');
+        panel.classList.add('show');
+        body.innerHTML = '';
 
         colOrder.forEach(col => {
             const chip = document.createElement('div');
-            chip.className = 'col-chip' + (hiddenCols.has(col) ? ' hidden-col' : ' visible');
+            const isHidden = hiddenCols.has(col);
+            chip.className = 'col-chip ' + (isHidden ? 'hidden-col' : 'visible');
             chip.draggable = true;
             chip.dataset.col = col;
 
             const eye = document.createElement('span');
-            eye.className = 'col-chip-eye';
-            eye.textContent = hiddenCols.has(col) ? '○' : '●';
-            eye.title = hiddenCols.has(col) ? 'Show' : 'Hide';
-            eye.onclick = (e) => { e.stopPropagation(); toggleCol(col); };
+            eye.className = 'col-eye';
+            eye.textContent = isHidden ? '○' : '●';
+            eye.title = isHidden ? 'Show' : 'Hide';
+            eye.onclick = e => { e.stopPropagation(); toggleColVisibility(col); };
 
             const label = document.createElement('span');
             label.textContent = col;
@@ -396,7 +578,6 @@
             chip.appendChild(eye);
             chip.appendChild(label);
 
-            // drag events
             chip.addEventListener('dragstart', e => {
                 dragSrc = col;
                 chip.classList.add('dragging');
@@ -405,12 +586,12 @@
             chip.addEventListener('dragend', () => {
                 chip.classList.remove('dragging');
                 dragSrc = null;
-                bar.querySelectorAll('.col-chip').forEach(c => c.classList.remove('drag-over'));
+                body.querySelectorAll('.col-chip').forEach(c => c.classList.remove('drag-over'));
             });
             chip.addEventListener('dragover', e => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
-                bar.querySelectorAll('.col-chip').forEach(c => c.classList.remove('drag-over'));
+                body.querySelectorAll('.col-chip').forEach(c => c.classList.remove('drag-over'));
                 if (dragSrc && dragSrc !== col) chip.classList.add('drag-over');
             });
             chip.addEventListener('drop', e => {
@@ -420,32 +601,107 @@
                 const to   = colOrder.indexOf(col);
                 colOrder.splice(from, 1);
                 colOrder.splice(to, 0, dragSrc);
-                renderColBar();
-                renderTable();
+                renderColPanel();
+                renderPage();
             });
 
-            bar.appendChild(chip);
+            body.appendChild(chip);
         });
+
+        updateHiddenBadge();
     }
 
-    function toggleCol(col) {
+    function setAllCols(hide) {
+        hiddenCols = hide ? new Set(colOrder) : new Set();
+        renderColPanel();
+        currentPage = 0;
+        renderPage();
+    }
+
+    function toggleColVisibility(col) {
         if (hiddenCols.has(col)) hiddenCols.delete(col);
         else hiddenCols.add(col);
-        renderColBar();
-        renderTable();
+        renderColPanel();
+        currentPage = 0;
+        renderPage();
+    }
+
+    function updateHiddenBadge() {
+        const badge = document.getElementById('hiddenBadge');
+        const n = hiddenCols.size;
+        if (n > 0) {
+            badge.textContent = `${n} hidden`;
+            badge.classList.add('show');
+        } else {
+            badge.classList.remove('show');
+        }
+    }
+
+    // ── pagination ─────────────────────────────────────────────────────────────
+
+    function goPage(n) {
+        n = Math.max(0, Math.min(n, totalPages - 1));
+        if (n === currentPage) return;
+        currentPage = n;
+        renderPage();
+        document.getElementById('tableWrap').scrollTop = 0;
+    }
+
+    function updatePager() {
+        const pager = document.getElementById('pager');
+        if (totalPages <= 1) { pager.style.display = 'none'; return; }
+        pager.style.display = 'flex';
+
+        const start = currentPage * PAGE_SIZE + 1;
+        const end   = Math.min((currentPage + 1) * PAGE_SIZE, lastRows.length);
+        document.getElementById('pgInfo').textContent  = `${start}–${end} / ${sortedRows.length}`;
+        document.getElementById('pgFirst').disabled = currentPage === 0;
+        document.getElementById('pgPrev').disabled  = currentPage === 0;
+        document.getElementById('pgNext').disabled  = currentPage >= totalPages - 1;
+        document.getElementById('pgLast').disabled  = currentPage >= totalPages - 1;
+    }
+
+    // ── sort ───────────────────────────────────────────────────────────────────
+
+    function sortBy(col) {
+        if (sortCol === col) {
+            sortDir *= -1;
+        } else {
+            sortCol = col;
+            sortDir = 1;
+        }
+        applySort();
+        currentPage = 0;
+        totalPages  = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+        renderPage();
+    }
+
+    function applySort() {
+        if (!sortCol) { sortedRows = lastRows.slice(); return; }
+        const idx = lastColumns.indexOf(sortCol);
+        sortedRows = lastRows.slice().sort((a, b) => {
+            const av = a[idx] ?? '';
+            const bv = b[idx] ?? '';
+            // numeric if both parse as number
+            const an = parseFloat(av), bn = parseFloat(bv);
+            const cmp = (!isNaN(an) && !isNaN(bn))
+                ? an - bn
+                : String(av).localeCompare(String(bv), undefined, { sensitivity: 'base' });
+            return cmp * sortDir;
+        });
     }
 
     // ── table render ───────────────────────────────────────────────────────────
 
-    function renderTable() {
-        const wrap = document.getElementById('tableWrap');
-        wrap.innerHTML = '';
-
-        // visible columns in current order
+    function renderPage() {
+        const wrap    = document.getElementById('tableWrap');
         const visible = colOrder.filter(c => !hiddenCols.has(c));
-        // index map: visible col name → original index in lastColumns
         const idxMap  = {};
         lastColumns.forEach((c, i) => idxMap[c] = i);
+
+        const pageRows   = sortedRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+        // sortedRows contains original row objects from lastRows — find their original index for rowid lookup
+        const pageStart  = currentPage * PAGE_SIZE;
 
         const tbl   = document.createElement('table');
         const thead = document.createElement('thead');
@@ -453,42 +709,227 @@
         visible.forEach(c => {
             const th = document.createElement('th');
             th.textContent = c;
+            if (sortCol === c) th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+            th.onclick = () => sortBy(c);
             hrow.appendChild(th);
         });
         thead.appendChild(hrow);
         tbl.appendChild(thead);
 
-        const tbody = document.createElement('tbody');
-        lastRows.forEach(row => {
+        const tbody    = document.createElement('tbody');
+        const fragment = document.createDocumentFragment();
+
+        pageRows.forEach((row, pageRowIdx) => {
+            const origIdx = lastRows.indexOf(row);
+            const rowid   = origIdx >= 0 ? lastRowids[origIdx] : null;
+            const canEdit = !!lastTable && rowid !== null && rowid !== undefined;
+
             const tr = document.createElement('tr');
+            tr.dataset.rowid = rowid ?? '';
+
+            // right-click → context menu
+            if (canEdit) {
+                tr.addEventListener('contextmenu', e => {
+                    e.preventDefault();
+                    showCtxMenu(e.clientX, e.clientY, rowid);
+                });
+            }
+
             visible.forEach(c => {
                 const val = row[idxMap[c]];
                 const td  = document.createElement('td');
-                if (val === null || val === undefined) {
-                    td.textContent = 'NULL';
-                    td.className = 'is-null';
-                } else if (typeof val === 'string' && (val.startsWith('http://') || val.startsWith('https://'))) {
+                const isNull = val === null || val === undefined;
+                const isUrl  = !isNull && typeof val === 'string' && (val.startsWith('http://') || val.startsWith('https://'));
+
+                const inner = document.createElement('div');
+                inner.className = 'td-inner';
+
+                const valSpan = document.createElement('span');
+                valSpan.className = 'td-val';
+
+                if (isNull) {
+                    valSpan.textContent = 'NULL';
+                    valSpan.style.opacity = '0.4';
+                    valSpan.style.fontStyle = 'italic';
+                } else if (isUrl) {
                     const a = document.createElement('a');
                     a.href = val; a.target = '_blank'; a.rel = 'noopener noreferrer';
                     a.textContent = val;
-                    a.onclick = e => e.stopPropagation();
-                    td.appendChild(a);
+                    valSpan.appendChild(a);
                 } else {
-                    td.textContent = val;
-                    td.onclick = () => copyVal(val);
+                    valSpan.textContent = val;
                 }
+
+                inner.appendChild(valSpan);
+
+                // action icons
+                const actions = document.createElement('div');
+                actions.className = 'td-actions';
+
+                // copy icon — always
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'td-act';
+                copyBtn.title = 'Copy';
+                copyBtn.textContent = '⎘';
+                copyBtn.onclick = e => { e.stopPropagation(); copyVal(isNull ? 'NULL' : String(val)); };
+                actions.appendChild(copyBtn);
+
+                // edit icon — only when editable
+                if (canEdit) {
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'td-act';
+                    editBtn.title = 'Edit';
+                    editBtn.textContent = '✎';
+                    editBtn.onclick = e => { e.stopPropagation(); startEdit(td, valSpan, row, origIdx, c, rowid, isNull ? null : val); };
+                    actions.appendChild(editBtn);
+                }
+
+                inner.appendChild(actions);
+                td.appendChild(inner);
                 tr.appendChild(td);
             });
-            tbody.appendChild(tr);
+
+            fragment.appendChild(tr);
         });
+
+        tbody.appendChild(fragment);
         tbl.appendChild(tbody);
+        wrap.innerHTML = '';
         wrap.appendChild(tbl);
+
+        updatePager();
     }
 
-    function clearTable() {
+    // ── inline edit ────────────────────────────────────────────────────────────
+
+    function startEdit(td, valSpan, row, origIdx, col, rowid, currentVal) {
+        if (td.querySelector('input')) return;
+
+        const inp = document.createElement('input');
+        inp.type  = 'text';
+        inp.value = currentVal ?? '';
+        inp.style.cssText = 'width:100%;padding:0 4px;background:var(--bg);border:1px solid var(--accent);color:var(--text);font-family:monospace;font-size:11px;outline:none;box-sizing:border-box;border-radius:2px;';
+
+        valSpan.replaceWith(inp);
+        inp.focus();
+        inp.select();
+
+        const commit = async () => {
+            cleanup();
+            const newVal = inp.value;
+            if (newVal === (currentVal ?? '')) { restore(); return; }
+            inp.replaceWith(valSpan);
+            valSpan.textContent = '…';
+            const ok = await doUpdate(rowid, col, newVal === '' ? null : newVal);
+            if (ok) {
+                row[lastColumns.indexOf(col)] = newVal === '' ? null : newVal;
+                applySort();
+                renderPage();
+                setStatus('Saved');
+            } else {
+                restore();
+            }
+        };
+
+        const restore = () => {
+            if (inp.parentNode) inp.replaceWith(valSpan);
+        };
+
+        const cleanup = () => {
+            inp.removeEventListener('keydown', onKey);
+            document.removeEventListener('mousedown', outsideDown);
+        };
+
+        const onKey = e => {
+            if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); cleanup(); restore(); }
+        };
+
+        const outsideDown = e => {
+            if (!td.contains(e.target)) commit();
+        };
+
+        inp.addEventListener('keydown', onKey);
+        setTimeout(() => document.addEventListener('mousedown', outsideDown), 0);
+    }
+
+    async function doUpdate(rowid, col, value) {
+        if (!currentFile || !lastTable) return false;
+        try {
+            const buf = await currentFile.arrayBuffer();
+            const qs  = new URLSearchParams({ table: lastTable, rowid, col });
+            if (value !== null) qs.set('value', value);
+            const res = await fetch('/sqlite-viewer/update?' + qs, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: buf
+            });
+            if (!res.ok) { const d = await res.json(); setStatus(d.error, true); return false; }
+            await updateFile(res);
+            return true;
+        } catch (e) { setStatus(e.message, true); return false; }
+    }
+
+    // ── delete ─────────────────────────────────────────────────────────────────
+
+    let ctxRowid = null;
+
+    function showCtxMenu(x, y, rowid) {
+        ctxRowid = rowid;
+        const m = document.getElementById('ctxMenu');
+        m.style.left = x + 'px';
+        m.style.top  = y + 'px';
+        m.classList.add('show');
+    }
+
+    function hideCtxMenu() { document.getElementById('ctxMenu').classList.remove('show'); }
+
+    document.addEventListener('click', hideCtxMenu);
+    document.addEventListener('contextmenu', e => { if (!e.target.closest('tr[data-rowid]')) hideCtxMenu(); });
+
+    document.getElementById('ctxDelete').addEventListener('click', async () => {
+        if (ctxRowid === null) return;
+        hideCtxMenu();
+        if (!currentFile || !lastTable) return;
+        try {
+            const buf = await currentFile.arrayBuffer();
+            const res = await fetch('/sqlite-viewer/delete?' + new URLSearchParams({ table: lastTable, rowid: ctxRowid }), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: buf
+            });
+            if (!res.ok) { const d = await res.json(); setStatus(d.error, true); return; }
+            await updateFile(res);
+            // remove from lastRows
+            const idx = lastRowids.indexOf(ctxRowid);
+            if (idx >= 0) { lastRows.splice(idx, 1); lastRowids.splice(idx, 1); }
+            applySort();
+            totalPages  = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+            currentPage = Math.min(currentPage, totalPages - 1);
+            renderPage();
+            setStatus(`Deleted rowid ${ctxRowid}`);
+        } catch (e) { setStatus(e.message, true); }
+    });
+
+    // replace currentFile with bytes returned from server after mutation
+    async function updateFile(res) {
+        const bytes = await res.arrayBuffer();
+        const blob  = new Blob([bytes], { type: 'application/octet-stream' });
+        currentFile = new File([blob], currentFile.name, { type: blob.type });
+    }
+
+
+    // ── helpers ────────────────────────────────────────────────────────────────
+
+    function clearAll() {
         document.getElementById('tableWrap').innerHTML = '';
-        document.getElementById('colBar').innerHTML = '';
-        lastColumns = []; lastRows = [];
+        document.getElementById('colBody').innerHTML = '';
+        document.getElementById('colPanel').classList.remove('show');
+        document.getElementById('pager').style.display = 'none';
+        lastColumns = []; lastRows = []; lastRowids = []; lastTable = '';
+        sortedRows = []; colOrder = []; hiddenCols = new Set();
+        sortCol = null; sortDir = 1;
+        currentPage = 0; totalPages = 0;
     }
 
     function copyVal(text) {
@@ -500,9 +941,9 @@
     }
 
     function setStatus(msg, isErr = false) {
-        const el = document.getElementById('statusBar');
+        const el = document.querySelector('#statusBar .status-msg');
         el.textContent = msg;
-        el.className = 'status-bar' + (isErr ? ' err' : '');
+        document.getElementById('statusBar').className = 'status-bar' + (isErr ? ' err' : '');
     }
 </script>
 </body>

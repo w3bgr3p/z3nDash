@@ -161,7 +161,14 @@ window.ICONS = {
                   <circle cx="200" cy="104" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                   <circle cx="200" cy="184" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                   <circle cx="56" cy="192" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
-                </svg>`   
+                </svg>`   ,
+    sql: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+              <path fill="none" d="M0 0h256v256H0z"/>
+              <ellipse cx="128" cy="80" opacity=".2" rx="88" ry="48"/>
+              <ellipse cx="128" cy="80" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" rx="88" ry="48"/>
+              <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M40 80v48c0 26.51 39.4 48 88 48s88-21.49 88-48V80"/>
+              <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M40 128v48c0 26.51 39.4 48 88 48s88-21.49 88-48v-48"/>
+            </svg>`
     
 };
 
