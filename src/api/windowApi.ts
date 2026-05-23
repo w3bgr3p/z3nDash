@@ -5,6 +5,7 @@
 
 import { useGraphStore } from '../store/graphStore';
 import { generateZenPosterXML, reactFlowToZPGraph } from '../utils/xmlGenerator';
+import { computeXmlDiff } from '../utils/xmlDiff';
 
 export interface ZpEditorAPI {
   version: string;
@@ -38,6 +39,7 @@ export interface HighlightOptions {
  */
 class ZpEditorAPIImpl implements ZpEditorAPI {
   version = '1.0.0';
+  private highlightTimeouts = new Map<string, number>();
 
   /**
    * Get current editor state as context for AI.
@@ -79,11 +81,16 @@ class ZpEditorAPIImpl implements ZpEditorAPI {
    * @param newXml - Proposed XML state
    */
   proposeXmlChange(oldXml: string, newXml: string): void {
-    const diff = this.computeXmlDiff(oldXml, newXml);
+    try {
+      const diff = this.computeXmlDiff(oldXml, newXml);
 
-    window.dispatchEvent(new CustomEvent('zp-editor:show-diff', {
-      detail: { diff }
-    }));
+      window.dispatchEvent(new CustomEvent('zp-editor:show-diff', {
+        detail: { diff }
+      }));
+    } catch (error) {
+      console.error('Failed to propose XML change:', error);
+      throw error;
+    }
   }
 
   /**
@@ -93,13 +100,7 @@ class ZpEditorAPIImpl implements ZpEditorAPI {
    * @returns Diff object for display
    */
   private computeXmlDiff(oldXml: string, newXml: string): any {
-    // Simple line-based diff for now
-    // TODO: Implement proper XML-aware diff
-    return {
-      oldXml,
-      newXml,
-      changes: [] // Placeholder for structured diff
-    };
+    return computeXmlDiff(oldXml, newXml);
   }
 
   /**
@@ -108,27 +109,31 @@ class ZpEditorAPIImpl implements ZpEditorAPI {
    * @param options - Highlight options (duration, color, pulse)
    */
   highlightNodes(nodeIds: string[], options?: HighlightOptions): void {
-    const duration = options?.duration || 3000;
-    const color = options?.color || '#3fb950';
-    const pulse = options?.pulse !== false;
+    const duration = options?.duration ?? 2000;
 
-    nodeIds.forEach(id => {
-      const node = document.querySelector(`[data-id="${id}"]`);
+    nodeIds.forEach(nodeId => {
+      // Clear existing timeout for this node
+      const existingTimeout = this.highlightTimeouts.get(nodeId);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      const node = document.querySelector(`[data-id="${nodeId}"]`);
       if (node) {
         (node as HTMLElement).classList.add('ai-highlighted');
-        (node as HTMLElement).style.setProperty('--highlight-color', color);
-        if (pulse) (node as HTMLElement).classList.add('ai-pulse');
+        if (options?.pulse) {
+          (node as HTMLElement).classList.add('ai-pulse');
+        }
+
+        // Store new timeout
+        const timeoutId = window.setTimeout(() => {
+          (node as HTMLElement).classList.remove('ai-highlighted', 'ai-pulse');
+          this.highlightTimeouts.delete(nodeId);
+        }, duration);
+
+        this.highlightTimeouts.set(nodeId, timeoutId);
       }
     });
-
-    setTimeout(() => {
-      nodeIds.forEach(id => {
-        const node = document.querySelector(`[data-id="${id}"]`);
-        if (node) {
-          (node as HTMLElement).classList.remove('ai-highlighted', 'ai-pulse');
-        }
-      });
-    }, duration);
   }
 
   /**
