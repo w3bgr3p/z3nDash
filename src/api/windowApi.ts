@@ -9,7 +9,7 @@ import { generateZenPosterXML, reactFlowToZPGraph } from '../utils/xmlGenerator'
 export interface ZpEditorAPI {
   version: string;
   getContext(): ZpEditorContext;
-  proposeXmlChange(proposal: XmlChangeProposal): void;
+  proposeXmlChange(oldXml: string, newXml: string): void;
   highlightNodes(nodeIds: string[], options?: HighlightOptions): void;
   getStore(): any;
 }
@@ -25,13 +25,6 @@ export interface ZpEditorContext {
     projectName: string;
     historySize: number;
   };
-}
-
-export interface XmlChangeProposal {
-  description: string;
-  operation: 'insert' | 'replace' | 'delete';
-  targetNodeId?: string;
-  xmlFragment: string;
 }
 
 export interface HighlightOptions {
@@ -82,12 +75,31 @@ class ZpEditorAPIImpl implements ZpEditorAPI {
   /**
    * Propose XML change with diff modal for user approval.
    * Dispatches custom event that XmlDiffModal listens to.
-   * @param proposal - Change proposal with operation and XML fragment
+   * @param oldXml - Current XML state
+   * @param newXml - Proposed XML state
    */
-  proposeXmlChange(proposal: XmlChangeProposal): void {
+  proposeXmlChange(oldXml: string, newXml: string): void {
+    const diff = this.computeXmlDiff(oldXml, newXml);
+
     window.dispatchEvent(new CustomEvent('zp-editor:show-diff', {
-      detail: proposal
+      detail: { diff }
     }));
+  }
+
+  /**
+   * Compute diff between old and new XML.
+   * @param oldXml - Current XML
+   * @param newXml - Proposed XML
+   * @returns Diff object for display
+   */
+  private computeXmlDiff(oldXml: string, newXml: string): any {
+    // Simple line-based diff for now
+    // TODO: Implement proper XML-aware diff
+    return {
+      oldXml,
+      newXml,
+      changes: [] // Placeholder for structured diff
+    };
   }
 
   /**
