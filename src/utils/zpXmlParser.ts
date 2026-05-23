@@ -15,6 +15,7 @@ export interface ZpTemplate {
 
 /**
  * Parse ZennoPoster XML string into structured template object
+ * Expected structure: <Project><Actions><Action type="..." id="...">...</Action></Actions></Project>
  */
 export function parseZpXml(xml: string): ZpTemplate {
   const parser = new DOMParser();
@@ -23,7 +24,7 @@ export function parseZpXml(xml: string): ZpTemplate {
   // Check for parsing errors
   const parserError = doc.querySelector('parsererror');
   if (parserError) {
-    throw new Error(`XML parsing error: ${parserError.textContent}`);
+    throw new Error(`XML parsing error: ${parserError.textContent || 'Unknown parse error'}`);
   }
 
   const actions: ZpAction[] = [];
