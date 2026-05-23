@@ -15,7 +15,9 @@ export function applyInsert(xml: string, path: string, fragment: string): string
   const lines = xml.split('\n');
 
   // Insert fragment at specified line (0-indexed)
-  lines.splice(lineNum - 1, 0, fragment);
+  if (lineNum > 0 && lineNum <= lines.length + 1) {
+    lines.splice(lineNum - 1, 0, fragment);
+  }
 
   return lines.join('\n');
 }
