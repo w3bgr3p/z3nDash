@@ -65,6 +65,9 @@ public class ZpOrchestratorHandler : IScriptHandler
             if (path == "/zp/commands/clear" && method == "POST")   { await ClearCommands(context, db);   return true; }
             if (path == "/zp/settings-xml"   && method == "GET")    { await GetSettingsXml(context, db);  return true; }
             if (path == "/zp/settings-xml"   && method == "POST")   { await PostSettingsXml(context, db); return true; }
+            if (path == "/zp/nodes"  && method == "GET")  { await GetNodes(context, db);  return true; }
+            if (path == "/zp/state"  && method == "GET")  { await GetState(context, db);  return true; }
+            if (path == "/zp/state/all" && method == "GET") { await GetStateAll(context, db); return true; }
         }
         catch (Exception ex)
         {
@@ -73,8 +76,32 @@ public class ZpOrchestratorHandler : IScriptHandler
 
         return true;
     }
+    
+    private static readonly System.Net.Http.HttpClient _http = new();
+
+    private async Task<string?> GetNodeUrl(Db db, string machine)
+    {
+        var row = db.Get("host,port", DbSchema.ZpNodes.Name, where: $"\"machine\" = '{machine}'");
+        if (string.IsNullOrEmpty(row)) return null;
+        var parts = row.Split('¦');
+        if (parts.Length < 2) return null;
+        return $"http://{parts[0]}:{parts[1]}";
+    }
 
     // ── Handlers ──────────────────────────────────────────────────────────────
+    // GET /zp/nodes
+    private async Task GetNodes(HttpListenerContext ctx, Db db)
+    {
+        var rows = db.GetLines("machine,host,port,updated_at", DbSchema.ZpNodes.Name, where: "1=1");
+        var result = new List<object>();
+        foreach (var row in rows)
+        {
+            var p = row.Split('¦');
+            if (p.Length < 4 || string.IsNullOrEmpty(p[0])) continue;
+            result.Add(new { machine = p[0], host = p[1], port = p[2], updated_at = p[3] });
+        }
+        await WriteJson(ctx.Response, result);
+    }
 
     private async Task GetTasks(HttpListenerContext ctx, Db db)
     {
@@ -162,18 +189,177 @@ public class ZpOrchestratorHandler : IScriptHandler
         var action  = json.Value.TryGetProperty("action",  out var a) ? a.GetString() ?? "" : "";
         var payload = json.Value.TryGetProperty("payload", out var p) ? p.GetString() ?? "" : "";
         var machine = json.Value.TryGetProperty("machine", out var m) ? m.GetString() ?? "" : "";
+
         if (string.IsNullOrEmpty(machine)) { await WriteError(ctx.Response, 400, "machine required"); return; }
 
-        var cmdId = $"{machine}|{Guid.NewGuid()}";
+        var url = await GetNodeUrl(db, machine);
+        if (url == null) { await WriteError(ctx.Response, 404, $"Node not found: {machine}"); return; }
 
-        db.Query($"INSERT INTO \"{DbSchema.Commands.Name}\" " +
-                 $"(\"id\", \"task_id\", \"action\", \"payload\", \"status\", \"result\", \"created_at\") VALUES " +
-                 $"('{cmdId}', '{taskId}', '{action}', '{payload.Replace("'", "''")}', 'pending', '', '{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}') " +
-                 $"ON CONFLICT (\"id\") DO UPDATE SET " +
-                 $"\"task_id\" = EXCLUDED.\"task_id\", \"action\" = EXCLUDED.\"action\", \"payload\" = EXCLUDED.\"payload\", " +
-                 $"\"status\" = EXCLUDED.\"status\", \"result\" = EXCLUDED.\"result\", \"created_at\" = EXCLUDED.\"created_at\"");
+        var body = JsonSerializer.Serialize(new { action, task_id = taskId, payload });
+        var content = new System.Net.Http.StringContent(body, Encoding.UTF8, "application/json");
 
-        await WriteJson(ctx.Response, new { id = cmdId, status = "pending" });
+        try
+        {
+            var resp = await _http.PostAsync($"{url}/command", content);
+            var text = await resp.Content.ReadAsStringAsync();
+            ctx.Response.StatusCode = (int)resp.StatusCode;
+            await WriteRaw(ctx.Response, text);
+        }
+        catch (Exception ex)
+        {
+            await WriteError(ctx.Response, 502, $"Node unreachable: {ex.Message}");
+        }
+    }
+        // GET /zp/state?machine=MACHINENAME
+    private async Task GetState(HttpListenerContext ctx, Db db)
+    {
+        var machine = ctx.Request.QueryString["machine"] ?? "";
+        if (string.IsNullOrEmpty(machine)) { await WriteError(ctx.Response, 400, "machine required"); return; }
+
+        var url = await GetNodeUrl(db, machine);
+        if (url == null) { await WriteError(ctx.Response, 404, $"Node not found: {machine}"); return; }
+
+        string raw;
+        try
+        {
+            var resp = await _http.GetAsync($"{url}/state");
+            raw = await resp.Content.ReadAsStringAsync();
+        }
+        catch (Exception ex)
+        {
+            await WriteError(ctx.Response, 502, $"Node unreachable: {ex.Message}");
+            return;
+        }
+
+        var state   = JsonSerializer.Deserialize<JsonElement>(raw);
+        var tasksB64 = state.TryGetProperty("tasks_b64", out var tb) ? tb : default;
+
+        var tasks = new List<Dictionary<string, object>>();
+        if (tasksB64.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in tasksB64.EnumerateArray())
+            {
+                var b64 = item.GetString() ?? "";
+                if (string.IsNullOrEmpty(b64)) continue;
+                try
+                {
+                    var xml  = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                    var doc  = System.Xml.Linq.XDocument.Parse("<root>" + xml + "</root>");
+                    var jObj = Newtonsoft.Json.Linq.JObject.Parse(
+                        Newtonsoft.Json.JsonConvert.SerializeXNode(doc))["root"];
+
+                    var dict = new Dictionary<string, object>();
+                    var el   = JsonSerializer.Deserialize<JsonElement>(jObj.ToString());
+                    FlattenJson(el, "", dict);
+
+                    var idRaw = dict.TryGetValue("Id", out var idVal) ? idVal?.ToString() ?? "" : "";
+                    dict["id"]      = $"{machine}|{idRaw}";
+                    dict["guid"]    = idRaw;
+                    dict["machine"] = machine;
+
+                    tasks.Add(dict);
+                }
+                catch { }
+            }
+        }
+
+        await WriteJson(ctx.Response, new
+        {
+            machine   = machine,
+            tasks     = tasks,
+            processes = state.TryGetProperty("processes", out var p) ? p : default,
+        });
+    }
+
+    private async Task GetStateAll(HttpListenerContext ctx, Db db)
+    {
+        var rows = db.GetLines("machine,host,port", DbSchema.ZpNodes.Name, where: "1=1");
+
+        var nodes = rows
+            .Select(r => r.Split('¦'))
+            .Where(p => p.Length >= 3 && !string.IsNullOrEmpty(p[0]))
+            .Select(p => (machine: p[0], url: $"http://{p[1]}:{p[2]}"))
+            .ToList();
+
+        var fetches = nodes.Select(async node =>
+        {
+            try
+            {
+                var resp = await _http.GetAsync($"{node.url}/state");
+                var raw  = await resp.Content.ReadAsStringAsync();
+                return (node.machine, raw, ok: true);
+            }
+            catch
+            {
+                return (node.machine, raw: "", ok: false);
+            }
+        });
+
+        var results = await Task.WhenAll(fetches);
+
+        var allTasks  = new List<object>();
+        var allProcs  = new List<object>();
+        var deadNodes = new List<string>();
+
+        foreach (var (machine, raw, ok) in results)
+        {
+            if (!ok) { deadNodes.Add(machine); continue; }
+
+            try
+            {
+                var state    = JsonSerializer.Deserialize<JsonElement>(raw);
+                var tasksB64 = state.TryGetProperty("tasks_b64", out var tb) ? tb : default;
+
+                if (tasksB64.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in tasksB64.EnumerateArray())
+                    {
+                        var b64 = item.GetString() ?? "";
+                        if (string.IsNullOrEmpty(b64)) continue;
+                        try
+                        {
+                            var xml  = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                            var doc  = System.Xml.Linq.XDocument.Parse("<root>" + xml + "</root>");
+                            var jObj = Newtonsoft.Json.Linq.JObject.Parse(
+                                Newtonsoft.Json.JsonConvert.SerializeXNode(doc))["root"];
+
+                            var dict = new Dictionary<string, object>();
+                            var el   = JsonSerializer.Deserialize<JsonElement>(jObj.ToString());
+                            FlattenJson(el, "", dict);
+
+                            var idRaw = dict.TryGetValue("Id", out var idVal) ? idVal?.ToString() ?? "" : "";
+                            dict["id"]      = $"{machine}|{idRaw}";
+                            dict["guid"]    = idRaw;
+                            dict["machine"] = machine;
+
+                            allTasks.Add(dict);
+                        }
+                        catch { }
+                    }
+                }
+
+                if (state.TryGetProperty("processes", out var procs) && procs.ValueKind == JsonValueKind.Array)
+                    foreach (var p in procs.EnumerateArray())
+                        allProcs.Add(p);
+            }
+            catch { deadNodes.Add(machine); }
+        }
+
+        await WriteJson(ctx.Response, new
+        {
+            tasks      = allTasks,
+            processes  = allProcs,
+            dead_nodes = deadNodes,
+        });
+    }
+
+    private static async Task WriteRaw(HttpListenerResponse res, string json)
+    {
+        res.ContentType = "application/json";
+        var bytes = Encoding.UTF8.GetBytes(json);
+        res.ContentLength64 = bytes.Length;
+        await res.OutputStream.WriteAsync(bytes);
+        res.Close();
     }
 
     private async Task MarkCommandDone(HttpListenerContext ctx, Db db)

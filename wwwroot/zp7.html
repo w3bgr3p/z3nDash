@@ -1003,9 +1003,9 @@
     // ── TASKS ──
     async function refreshTasks() {
         try {
-            const r = await fetch(`${SERVER}/zp/tasks`);
+            const r    = await fetch(`${SERVER}/zp/state/all`);
             const data = await r.json();
-            allTasks = data.filter(t => t.Name && t.Name.trim() !== '');
+            allTasks = (data.tasks || []).filter(t => t.Name && t.Name.trim() !== '');
             updateHeaderStats();
             updateTagFilterBar();
             applyFilters();

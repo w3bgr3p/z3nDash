@@ -87,7 +87,13 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/scheduler/build"         && method == "POST") { await Build(context, db); return true; }
             if (path == "/scheduler/open-file"   && method == "GET") { await OpenFile(context);   return true; }
             if (path == "/scheduler/open-folder" && method == "GET") { await OpenFolder(context); return true; }
-
+            if (path == "/scheduler/scan-folder" && method == "GET") { await ScanFolder(context, db); return true; }
+            if (path == "/scheduler/package-scripts" && method == "GET") { await PackageScripts(context, db); return true; }
+            if (path == "/scheduler/config-file" && method == "GET") { await GetConfigFile(context, db); return true; }
+            if (path == "/scheduler/config-file" && method == "POST") { await SaveConfigFile(context); return true; }
+            if (path == "/scheduler/terminal-config" && method == "GET") { await TerminalConfig(context); return true; }
+            if (path == "/scheduler/detect-venv" && method == "GET") { await DetectVenv(context, db); return true; }
+            if (path == "/scheduler/open-terminal" && method == "GET") { await OpenTerminal(context, db); return true; }
 
         }
         catch (Exception ex)
@@ -437,5 +443,431 @@ public sealed class SchedulerHandler : IScriptHandler
         });
 
         await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
+    }
+
+    // ── Scan folder ────────────────────────────────────────────────────────────
+
+    private async Task ScanFolder(HttpListenerContext ctx, Db db)
+    {
+        var id = ctx.Request.QueryString["id"] ?? "";
+        if (string.IsNullOrEmpty(id))
+        {
+            ctx.Response.StatusCode = 400;
+            return;
+        }
+
+        var row = db.Get("executor,script_path", Table, where: $"\"id\" = '{id}'");
+        if (string.IsNullOrEmpty(row))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { });
+            return;
+        }
+
+        var parts = row.Split('¦');
+        var executor = parts.Length > 0 ? parts[0] : "";
+        var scriptPath = parts.Length > 1 ? parts[1] : "";
+        var folder = Directory.Exists(scriptPath) ? scriptPath : Path.GetDirectoryName(scriptPath) ?? "";
+
+        var result = new
+        {
+            has_config = false,
+            config_path = "",
+            has_requirements = false,
+            req_path = "",
+            has_package_json = false,
+            package_json_path = ""
+        };
+
+        if (IsJs(executor))
+        {
+            var cfg = Path.Combine(folder, "config.json");
+            var pkg = Path.Combine(folder, "package.json");
+            result = new
+            {
+                has_config = File.Exists(cfg),
+                config_path = cfg,
+                has_requirements = false,
+                req_path = "",
+                has_package_json = File.Exists(pkg),
+                package_json_path = pkg
+            };
+        }
+        else if (IsPy(executor))
+        {
+            var cfg = Path.Combine(folder, "config.py");
+            var req = Path.Combine(folder, "requirements.txt");
+            result = new
+            {
+                has_config = File.Exists(cfg),
+                config_path = cfg,
+                has_requirements = File.Exists(req),
+                req_path = req,
+                has_package_json = false,
+                package_json_path = ""
+            };
+        }
+
+        await HttpHelpers.WriteJson(ctx.Response, result);
+    }
+
+    // ── Package scripts ────────────────────────────────────────────────────────
+
+    private async Task PackageScripts(HttpListenerContext ctx, Db db)
+    {
+        var id = ctx.Request.QueryString["id"] ?? "";
+        if (string.IsNullOrEmpty(id))
+        {
+            ctx.Response.StatusCode = 400;
+            return;
+        }
+
+        var row = db.Get("executor,script_path", Table, where: $"\"id\" = '{id}'");
+        if (string.IsNullOrEmpty(row))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, scripts = new { } });
+            return;
+        }
+
+        var parts = row.Split('¦');
+        var executor = parts.Length > 0 ? parts[0] : "";
+        var scriptPath = parts.Length > 1 ? parts[1] : "";
+
+        if (!IsJs(executor))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, scripts = new { } });
+            return;
+        }
+
+        var folder = Directory.Exists(scriptPath) ? scriptPath : Path.GetDirectoryName(scriptPath) ?? "";
+        var pkgPath = Path.Combine(folder, "package.json");
+
+        if (!File.Exists(pkgPath))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, scripts = new { }, missing = true });
+            return;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(pkgPath);
+            var pkg = JsonSerializer.Deserialize<JsonElement>(json);
+            var scripts = pkg.TryGetProperty("scripts", out var s) ? s : new JsonElement();
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, scripts });
+        }
+        catch (Exception ex)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, scripts = new { }, error = ex.Message });
+        }
+    }
+
+    // ── Config file ────────────────────────────────────────────────────────────
+
+    private async Task GetConfigFile(HttpListenerContext ctx, Db db)
+    {
+        var id = ctx.Request.QueryString["id"] ?? "";
+        var type = ctx.Request.QueryString["type"] ?? "config";
+
+        if (string.IsNullOrEmpty(id))
+        {
+            ctx.Response.StatusCode = 400;
+            return;
+        }
+
+        var row = db.Get("executor,script_path", Table, where: $"\"id\" = '{id}'");
+        if (string.IsNullOrEmpty(row))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = "Schedule not found" });
+            return;
+        }
+
+        var parts = row.Split('¦');
+        var executor = parts.Length > 0 ? parts[0] : "";
+        var scriptPath = parts.Length > 1 ? parts[1] : "";
+
+        string configPath;
+        bool found;
+
+        if (type == "package" && IsJs(executor))
+        {
+            var folder = Directory.Exists(scriptPath) ? scriptPath : Path.GetDirectoryName(scriptPath) ?? "";
+            configPath = Path.Combine(folder, "package.json");
+            found = File.Exists(configPath);
+        }
+        else
+        {
+            (configPath, found) = ResolveConfigPath(executor, scriptPath);
+        }
+
+        if (!found)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, missing = true, path = configPath, content = "" });
+            return;
+        }
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(configPath);
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, path = configPath, content });
+        }
+        catch (Exception ex)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = ex.Message });
+        }
+    }
+
+    private async Task SaveConfigFile(HttpListenerContext ctx)
+    {
+        var json = await ReadJson(ctx.Request);
+        if (json == null)
+        {
+            ctx.Response.StatusCode = 400;
+            return;
+        }
+
+        var path = json.Value.TryGetProperty("path", out var p) ? p.GetString() ?? "" : "";
+        var content = json.Value.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
+
+        if (string.IsNullOrEmpty(path))
+        {
+            ctx.Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            await File.WriteAllTextAsync(path, content);
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
+        }
+        catch (Exception ex)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = ex.Message });
+        }
+    }
+
+    // ── Terminal config ────────────────────────────────────────────────────────
+
+    private async Task TerminalConfig(HttpListenerContext ctx)
+    {
+        var terminal = Config.Terminal ?? "cmd";
+        var terminalPath = Config.TerminalPath ?? "";
+        var gitbashFound = FindGitBash() ?? "";
+
+        await HttpHelpers.WriteJson(ctx.Response, new
+        {
+            terminal,
+            terminal_path = terminalPath,
+            gitbash_found = gitbashFound
+        });
+    }
+
+    // ── Detect venv ────────────────────────────────────────────────────────────
+
+    private async Task DetectVenv(HttpListenerContext ctx, Db db)
+    {
+        var id = ctx.Request.QueryString["id"] ?? "";
+        if (string.IsNullOrEmpty(id))
+        {
+            ctx.Response.StatusCode = 400;
+            return;
+        }
+
+        var row = db.Get("script_path", Table, where: $"\"id\" = '{id}'");
+        if (string.IsNullOrEmpty(row))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, venvs = new List<object>() });
+            return;
+        }
+
+        var scriptPath = row;
+        var venvs = DetectVenvFolders(scriptPath);
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true, venvs });
+    }
+
+    // ── Open terminal ──────────────────────────────────────────────────────────
+
+    private async Task OpenTerminal(HttpListenerContext ctx, Db db)
+    {
+        var id = ctx.Request.QueryString["id"] ?? "";
+        if (string.IsNullOrEmpty(id))
+        {
+            ctx.Response.StatusCode = 400;
+            return;
+        }
+
+        var row = db.Get("script_path,terminal_override,terminal_init_cmd", Table, where: $"\"id\" = '{id}'");
+        if (string.IsNullOrEmpty(row))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = "Schedule not found" });
+            return;
+        }
+
+        var parts = row.Split('¦');
+        var scriptPath = parts.Length > 0 ? parts[0] : "";
+        var termOverride = parts.Length > 1 ? parts[1] : "";
+        var termInitCmd = parts.Length > 2 ? parts[2] : "";
+
+        var folder = Directory.Exists(scriptPath) ? scriptPath : Path.GetDirectoryName(scriptPath) ?? "";
+
+        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = $"Folder not found: {folder}" });
+            return;
+        }
+
+        try
+        {
+            var error = LaunchTerminal(folder, termOverride, termInitCmd);
+            if (error != null)
+            {
+                await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error });
+            }
+            else
+            {
+                await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = ex.Message });
+        }
+    }
+
+    // ── Helper methods ─────────────────────────────────────────────────────────
+
+    private static bool IsJs(string executor) => executor is "node" or "ts-node";
+    private static bool IsPy(string executor) => executor == "python";
+
+    private static (string path, bool found) ResolveConfigPath(string executor, string scriptPath)
+    {
+        if (IsJs(executor))
+        {
+            var folder = Directory.Exists(scriptPath) ? scriptPath : Path.GetDirectoryName(scriptPath) ?? "";
+            var cfg = Path.Combine(folder, "config.json");
+            return (cfg, File.Exists(cfg));
+        }
+        else if (IsPy(executor))
+        {
+            var folder = Path.GetDirectoryName(scriptPath) ?? "";
+            var cfg = Path.Combine(folder, "config.py");
+            return (cfg, File.Exists(cfg));
+        }
+        return ("", false);
+    }
+
+    private static string? FindGitBash()
+    {
+        var candidates = new[]
+        {
+            @"C:\Program Files\Git\bin\bash.exe",
+            @"C:\Program Files (x86)\Git\bin\bash.exe",
+            @"C:\Git\bin\bash.exe"
+        };
+
+        foreach (var path in candidates)
+        {
+            if (File.Exists(path))
+                return path;
+        }
+        return null;
+    }
+
+    private static List<object> DetectVenvFolders(string scriptPath)
+    {
+        var folder = Directory.Exists(scriptPath) ? scriptPath : Path.GetDirectoryName(scriptPath) ?? "";
+        if (!Directory.Exists(folder))
+            return new List<object>();
+
+        var venvCandidates = new[] { ".venv", "venv", "env", ".env" };
+        var results = new List<object>();
+
+        foreach (var venvName in venvCandidates)
+        {
+            var venvPath = Path.Combine(folder, venvName);
+            if (!Directory.Exists(venvPath))
+                continue;
+
+            var pythonExe = Path.Combine(venvPath, "Scripts", "python.exe");
+            if (File.Exists(pythonExe))
+            {
+                results.Add(new
+                {
+                    name = venvName,
+                    path = venvPath,
+                    python = pythonExe
+                });
+            }
+        }
+
+        return results;
+    }
+
+    private static string? LaunchTerminal(string cwd, string termOverride, string initCmd)
+    {
+        var terminal = !string.IsNullOrWhiteSpace(termOverride) ? termOverride : (Config.Terminal ?? "cmd");
+
+        if (terminal == "cmd")
+        {
+            var cdCmd = $"cd /d {cwd}";
+            var full = !string.IsNullOrWhiteSpace(initCmd) ? $"{cdCmd} && {initCmd}" : cdCmd;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/K {full}",
+                UseShellExecute = true,
+                CreateNoWindow = false
+            });
+        }
+        else if (terminal == "powershell")
+        {
+            var cdCmd = $"Set-Location '{cwd}'";
+            var full = !string.IsNullOrWhiteSpace(initCmd) ? $"{cdCmd}; {initCmd}" : cdCmd;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoExit -Command \"{full}\"",
+                UseShellExecute = true,
+                CreateNoWindow = false
+            });
+        }
+        else if (terminal == "gitbash")
+        {
+            var bash = FindGitBash();
+            if (bash == null)
+                return "Git Bash not found. Install Git for Windows.";
+
+            var cdExpr = $"cd '{cwd}'";
+            var full = !string.IsNullOrWhiteSpace(initCmd)
+                ? $"{cdExpr} && {initCmd} && exec bash"
+                : $"{cdExpr} && exec bash";
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = bash,
+                Arguments = $"--login -c \"{full}\"",
+                UseShellExecute = true,
+                CreateNoWindow = false
+            });
+        }
+        else if (terminal == "third_party")
+        {
+            var termPath = Config.TerminalPath ?? "";
+            if (string.IsNullOrWhiteSpace(termPath))
+                return "TERMINAL_PATH is not set in config";
+            if (!File.Exists(termPath))
+                return $"Terminal not found: {termPath}";
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = termPath,
+                WorkingDirectory = cwd,
+                UseShellExecute = true
+            });
+        }
+        else
+        {
+            return $"Unknown terminal: {terminal}";
+        }
+
+        return null;
     }
 }

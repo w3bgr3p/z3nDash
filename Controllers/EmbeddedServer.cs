@@ -38,6 +38,7 @@ public class EmbeddedServer
     private readonly ZbHandler _zbHandler;
     private readonly AiClient _aiClient;
     private readonly AiReportHandler _aiReportHandler;
+    private readonly AiAgentHandler _aiAgentHandler;
     private readonly TreasuryHandler _treasuryHandler;
     private readonly SystemSnapshotHandler _snapshotHandler;
     private readonly JsonAnalyzerHandler _jsonAnalyzerHandler;
@@ -116,6 +117,7 @@ public class EmbeddedServer
         _aiClient            = new AiClient(dbService);
         _configHandler       = new ConfigHandler(logPath, _listener, _port, dbService, _aiClient);
         _aiReportHandler     = new AiReportHandler(dbService, _aiClient);
+        _aiAgentHandler      = new AiAgentHandler(dbService, _aiClient);
         _treasuryHandler     = new TreasuryHandler(dbService, _aiClient);
         _snapshotHandler     = new SystemSnapshotHandler(dbService, _aiClient);
         _jsonAnalyzerHandler = new JsonAnalyzerHandler(dbService, _aiClient);
@@ -309,6 +311,11 @@ public class EmbeddedServer
                  $"[handler] ZbHandler → {method} {path}".Debug();
                  await _zbHandler.Handle(context);
                  return;
+            }
+            if (_aiAgentHandler.Matches(path))
+            {
+                await _aiAgentHandler.Handle(context);
+                return;
             }
             if (_aiReportHandler.Matches(path))
             {

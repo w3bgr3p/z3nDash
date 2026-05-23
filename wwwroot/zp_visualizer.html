@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>ZP Flow Visualizer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f0eb;color:#1a1a1a;font-size:14px}
+#app{display:flex;flex-direction:column;height:100vh}
+#top{padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.btn{font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid #ccc;background:#fff;color:#1a1a1a;cursor:pointer}
+.btn:hover{background:#f0f0ec}
+.btn.primary{background:#1a6ebd;color:#fff;border-color:#1a6ebd}
+.btn.primary:hover{background:#155fa3}
+.btn.active{background:#e8f0fa;color:#1a6ebd;border-color:#aac4e8}
+#file-input{display:none}
+#drop-zone{border:2px dashed #ccc;border-radius:8px;padding:10px 18px;font-size:12px;color:#888;cursor:pointer;white-space:nowrap;background:#fafaf8}
+#drop-zone:hover,#drop-zone.over{border-color:#1a6ebd;color:#1a6ebd;background:#f0f6ff}
+#status{font-size:11px;color:#666;align-self:center;max-width:400px}
+#toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 14px;background:#fafaf8;border-bottom:1px solid #ddd}
+#search{font-size:12px;padding:4px 9px;border-radius:6px;border:1px solid #ccc;background:#fff;width:180px;outline:none}
+.legend{display:flex;gap:10px;align-items:center;font-size:11px;color:#666;margin-left:6px;flex-wrap:wrap}
+.ld{display:flex;align-items:center;gap:4px}
+.ldot{width:10px;height:10px;border-radius:50%;border:1.5px solid;flex-shrink:0}
+.lline{width:20px;height:2px;border-radius:1px;opacity:.8}
+#canvas-wrap{flex:1;position:relative;overflow:hidden;background:#e8e8e4;cursor:grab}
+#canvas-wrap.grabbing{cursor:grabbing}
+#canvas{position:absolute;transform-origin:0 0}
+svg#edges{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;transform-origin:0 0}
+.node{position:absolute;border-radius:8px;border:1px solid #ccc;background:#fff;padding:8px 10px;width:190px;cursor:pointer;user-select:none}
+.node:hover{border-color:#888;z-index:10}
+.node.selected{border:2px solid #1a6ebd;z-index:20}
+.node.start-node{background:#eaf7f1;border-color:#2da870}
+.node.good-end{background:#eaf7f1;border-color:#2da870}
+.node.bad-end{background:#fdecea;border-color:#d94f4f}
+.node-id{font-size:9px;color:#aaa;font-family:monospace;margin-bottom:2px}
+.node-label{font-size:12px;font-weight:600;color:#1a1a1a;word-break:break-word;line-height:1.35}
+.node-btypes{margin-top:5px;display:flex;flex-wrap:wrap;gap:2px}
+.bt{font-size:9px;padding:1px 5px;border-radius:3px;background:#f0f0ec;color:#666}
+.bt.own{background:#e8f0fa;color:#1a6ebd}
+.bt.logic{background:#fdf3e0;color:#b07a00}
+.bt.profile{background:#f0eaf8;color:#7030a0}
+#detail{position:absolute;right:0;top:0;bottom:0;width:290px;background:#fff;border-left:1px solid #ddd;padding:12px;overflow-y:auto;font-size:12px;display:none;z-index:40;box-shadow:-2px 0 8px rgba(0,0,0,.08)}
+#detail.open{display:block}
+#dc{float:right;cursor:pointer;color:#aaa;font-size:16px;border:none;background:none;padding:0}
+#dc:hover{color:#333}
+#detail h3{font-size:13px;font-weight:600;margin:0 0 8px;color:#1a1a1a;padding-right:20px}
+.dl{display:grid;grid-template-columns:72px 1fr;gap:3px 8px;margin-bottom:10px}
+.dl dt{color:#888;font-size:11px}
+.dl dd{color:#333;font-size:11px;word-break:break-all;font-family:monospace}
+.bi{border:1px solid #e8e8e4;border-radius:6px;padding:7px 9px;margin-bottom:7px}
+.bi-head{font-size:10px;color:#888;margin-bottom:3px;font-weight:500}
+.bi-utext{font-size:11px;font-weight:600;color:#333;margin-bottom:4px}
+.bi-code{background:#f7f7f4;border-radius:4px;padding:5px 7px;font-family:monospace;font-size:10px;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;line-height:1.45;color:#1a1a1a;margin-bottom:4px}
+.bi-link{font-size:10px;margin-top:2px}
+.bi-link.ok{color:#2da870}
+.bi-link.err{color:#d94f4f}
+.bi-link.case{color:#1a6ebd}
+#mini{position:absolute;bottom:10px;left:10px;background:rgba(255,255,255,.9);border:1px solid #ddd;border-radius:5px;padding:3px 9px;font-size:10px;color:#888;pointer-events:none}
+#empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#aaa;font-size:13px;gap:6px;line-height:1.7;text-align:center}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+        📂 выбери XML файл или перетащи сюда
+      </div>
+      <input type="file" id="file-input" accept=".xml,.zp,.txt">
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn" onclick="clearAll()">clear</button>
+        <span id="status"></span>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#888;line-height:1.7">
+      <b>Формат файла:</b> XML из ZennoPoster<br>
+      (сохрани вывод <code>ExtractXml()</code> в .xml)<br>
+      <br>
+      <b>Управление:</b> тащи фон · колесо = зум · клик на ноду = детали
+    </div>
+  </div>
+
+  <div id="toolbar">
+    <button class="btn" onclick="zoomIn()">＋</button>
+    <button class="btn" onclick="zoomOut()">－</button>
+    <button class="btn" onclick="resetView()">reset</button>
+    <button class="btn active" id="btn-layout" onclick="toggleLayout()">↕ vertical</button>
+    <input id="search" type="text" placeholder="поиск по label / ID…" oninput="filterNodes(this.value)">
+    <div class="legend">
+      <div class="ld"><div class="ldot" style="background:#eaf7f1;border-color:#2da870"></div>start/good</div>
+      <div class="ld"><div class="ldot" style="background:#fdecea;border-color:#d94f4f"></div>bad end</div>
+      <div class="ld"><div class="lline" style="background:#2da870"></div>ok</div>
+      <div class="ld"><div class="lline" style="background:#d94f4f"></div>error</div>
+      <div class="ld"><div class="lline" style="background:#1a6ebd"></div>switch/case</div>
+    </div>
+  </div>
+
+  <div id="canvas-wrap">
+    <svg id="edges"></svg>
+    <div id="canvas"></div>
+    <div id="detail">
+      <button id="dc" onclick="closeDetail()">✕</button>
+      <h3 id="d-label"></h3>
+      <div class="dl" id="d-meta"></div>
+      <div id="d-branches"></div>
+    </div>
+    <div id="mini"></div>
+    <div id="empty">
+      <span>выбери XML файл выше</span>
+      <span style="font-size:11px">сохрани вывод ExtractXml() / LoadFromBytesArray() в .xml</span>
+    </div>
+  </div>
+</div>
+
+<script>
+let steps={}, edges=[], stepList=[];
+let isVertical=true, scale=0.72, panX=24, panY=24;
+let isDragging=false, startX, startY, startPX, startPY;
+let selectedId=null, filterText='';
+let startId='', goodEndId='', badEndId='', positions={};
+const NW=190, NH=86, GX=44, GY=38;
+
+// ── File input ──────────────────────────────────────────────────────────────
+
+document.getElementById('file-input').addEventListener('change', function(){
+  if(this.files[0]) readFile(this.files[0]);
+});
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', ()=> dz.classList.remove('over'));
+dz.addEventListener('drop', e=>{
+  e.preventDefault(); dz.classList.remove('over');
+  if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+});
+
+function readFile(file){
+  setStatus('читаю файл…','info');
+  const reader = new FileReader();
+  reader.onload = e => processXml(e.target.result, file.name);
+  reader.onerror = () => setStatus('ошибка чтения файла','err');
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ── Parse ───────────────────────────────────────────────────────────────────
+
+function processXml(raw, filename){
+  try{
+    // strip XML declaration — DOMParser не любит его с некоторыми encoding
+    raw = raw.replace(/^<\?xml[^?]*\?>\s*/,'');
+
+    // ZP хранит код внутри CDATA-like атрибутов с entity encoding
+    // Парсим как есть — браузерный DOMParser справится если XML валиден
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(raw, 'text/xml');
+    const perr = doc.querySelector('parsererror');
+    if(perr){
+      // Попытка 2: оборачиваем в root если нет
+      const doc2 = parser.parseFromString('<root>'+raw+'</root>', 'text/xml');
+      const perr2 = doc2.querySelector('parsererror');
+      if(perr2) throw new Error(perr.textContent.replace(/\s+/g,' ').substring(0,180));
+      buildFromDoc(doc2);
+    } else {
+      buildFromDoc(doc);
+    }
+    setStatus('✓ '+filename+' · '+stepList.length+' шагов · '+edges.length+' рёбер','ok');
+    document.getElementById('empty').style.display='none';
+    render();
+    resetView();
+  }catch(e){
+    setStatus('ошибка: '+e.message,'err');
+    console.error(e);
+  }
+}
+
+function buildFromDoc(doc){
+  steps={};
+  doc.querySelectorAll('Step').forEach(s=>{
+    const id = s.getAttribute('ID');
+    if(!id) return;
+    const label = s.getAttribute('UserText')||'';
+    const branches = [];
+    s.querySelectorAll('Branch').forEach(b=>{
+      const res = b.querySelector('Results');
+      const onSuccess = res?.querySelector('OnSuccess')?.textContent||'';
+      const onError   = res?.querySelector('OnError')?.textContent||'';
+      const cases = [];
+      if(res) Array.from(res.children).forEach(c=>{
+        if(/^Case|^Default/.test(c.tagName)){
+          // значение — XML-строка вида <Pair><Key>…</Key><Value>guid|guid</Value></Pair>
+          const txt = c.textContent||'';
+          try{
+            const inner = new DOMParser().parseFromString(txt,'text/xml');
+            const val = inner.querySelector('Value')?.textContent||'';
+            const key = inner.querySelector('Key')?.textContent||'';
+            if(val) cases.push({key, val});
+          }catch(e){
+            // если текст не XML — пробуем regex
+            const m = txt.match(/<Value>([^<]*)<\/Value>/);
+            const mk = txt.match(/<Key>([^<]*)<\/Key>/);
+            if(m&&m[1]) cases.push({key:mk?mk[1]:'', val:m[1]});
+          }
+        }
+      });
+      branches.push({
+        id:      b.getAttribute('ID')||'',
+        type:    b.getAttribute('Type')||'',
+        action:  b.getAttribute('Action')||'',
+        userText:b.getAttribute('UserText')||'',
+        code:    b.querySelector('Code')?.textContent||'',
+        onSuccess, onError, cases
+      });
+    });
+    steps[id]={id, label, branches};
+  });
+
+  stepList = Object.values(steps);
+  if(!stepList.length) throw new Error('Step элементы не найдены');
+
+  const startEl = doc.querySelector('Start');
+  const goodEl  = doc.querySelector('GoodEnd');
+  const badEl   = doc.querySelector('BadEnd');
+  startId   = (startEl?.getAttribute('nextAction')||'').split('|')[0]||'';
+  goodEndId = (goodEl?.getAttribute('nextAction')||'').split('|')[0]||'';
+  badEndId  = (badEl?.getAttribute('nextAction')||'').split('|')[0]||'';
+
+  buildEdges();
+}
+
+function setStatus(msg,type){
+  const s=document.getElementById('status');
+  s.textContent=msg;
+  s.style.color=type==='err'?'#d94f4f':type==='ok'?'#2da870':'#888';
+}
+
+function clearAll(){
+  steps={}; edges=[]; stepList=[];
+  document.getElementById('canvas').innerHTML='';
+  document.getElementById('edges').innerHTML='';
+  document.getElementById('empty').style.display='flex';
+  document.getElementById('status').textContent='';
+  document.getElementById('file-input').value='';
+  closeDetail();
+}
+
+// ── Graph ────────────────────────────────────────────────────────────────────
+
+function buildEdges(){
+  edges=[];
+  const pt=raw=>{
+    if(!raw||!raw.trim()) return null;
+    const p=raw.trim().split('|');
+    return p[0]&&p[0].length>10?p[0]:null;
+  };
+  stepList.forEach(step=>{
+    step.branches.forEach(b=>{
+      const seen=new Set();
+      const add=(raw,lbl,color)=>{
+        const t=pt(raw);
+        if(t&&steps[t]&&!seen.has(t)){seen.add(t);edges.push({from:step.id,to:t,label:lbl,color});}
+      };
+      add(b.onSuccess,'ok','#2da870');
+      add(b.onError,'err','#d94f4f');
+      b.cases.forEach(c=>add(c.val,c.key||'case','#1a6ebd'));
+    });
+  });
+}
+
+function layoutDag(){
+  const adj={};
+  stepList.forEach(s=>adj[s.id]=[]);
+  edges.forEach(e=>{ if(adj[e.from]) adj[e.from].push(e.to); });
+
+  const order=[],visited=new Set();
+  const visit=id=>{
+    if(visited.has(id)||!steps[id])return;
+    visited.add(id);order.push(id);
+    (adj[id]||[]).forEach(visit);
+  };
+  if(startId&&steps[startId]) visit(startId);
+  stepList.forEach(s=>visit(s.id));
+
+  const ranks={},lm={};
+  order.forEach(id=>{
+    let r=0;
+    edges.filter(e=>e.to===id).forEach(e=>{
+      if(ranks[e.from]!==undefined) r=Math.max(r,ranks[e.from]+1);
+    });
+    ranks[id]=r;
+    if(!lm[r]) lm[r]=[];
+    lm[r].push(id);
+  });
+
+  const pos={};
+  Object.entries(lm).forEach(([rank,ids])=>{
+    ids.forEach((id,i)=>{
+      pos[id]=isVertical
+        ?{x:i*(NW+GX)+24, y:+rank*(NH+GY)+24}
+        :{x:+rank*(NW+GX)+24, y:i*(NH+GY)+24};
+    });
+  });
+  return pos;
+}
+
+function render(){
+  positions=layoutDag();
+  renderNodes();
+  renderEdges();
+  updateMini();
+}
+
+function typeClass(t){
+  if(t==='OwnCode') return 'own';
+  if(t==='Logic')   return 'logic';
+  if(t==='Profile') return 'profile';
+  return '';
+}
+
+function renderNodes(){
+  const canvas=document.getElementById('canvas');
+  canvas.innerHTML='';
+  const ft=filterText;
+  stepList.forEach(s=>{
+    if(ft&&!s.label.toLowerCase().includes(ft)&&!s.id.toLowerCase().includes(ft)) return;
+    const p=positions[s.id]; if(!p) return;
+    const div=document.createElement('div');
+    let cls='node';
+    if(s.id===startId)   cls+=' start-node';
+    else if(s.id===goodEndId) cls+=' good-end';
+    else if(s.id===badEndId)  cls+=' bad-end';
+    if(s.id===selectedId) cls+=' selected';
+    div.className=cls;
+    div.style.left=p.x+'px';
+    div.style.top=p.y+'px';
+    const bTypes=[...new Set(s.branches.map(b=>b.type))];
+    div.innerHTML=
+      '<div class="node-id">'+s.id.substring(0,8)+'…</div>'+
+      '<div class="node-label">'+(s.label||'(step)')+'</div>'+
+      '<div class="node-btypes">'+
+        bTypes.map(t=>'<span class="bt '+typeClass(t)+'">'+t+'</span>').join('')+
+      '</div>';
+    div.addEventListener('click',e=>{e.stopPropagation();selectNode(s.id);});
+    canvas.appendChild(div);
+  });
+  applyTransform();
+}
+
+function renderEdges(){
+  const svg=document.getElementById('edges');
+  let mx=200,my=200;
+  Object.values(positions).forEach(p=>{mx=Math.max(mx,p.x+NW+80);my=Math.max(my,p.y+NH+80);});
+  svg.setAttribute('width',mx); svg.setAttribute('height',my);
+  svg.innerHTML=
+    '<defs>'+
+    '<marker id="a-ok" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#2da870" opacity=".8"/></marker>'+
+    '<marker id="a-err" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#d94f4f" opacity=".8"/></marker>'+
+    '<marker id="a-case" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#1a6ebd" opacity=".8"/></marker>'+
+    '</defs>';
+
+  const ft=filterText;
+  edges.forEach(e=>{
+    if(ft){
+      const fs=steps[e.from],ts=steps[e.to]; if(!fs||!ts) return;
+      if(!fs.label.toLowerCase().includes(ft)&&!fs.id.toLowerCase().includes(ft)&&
+         !ts.label.toLowerCase().includes(ft)&&!ts.id.toLowerCase().includes(ft)) return;
+    }
+    const fp=positions[e.from],tp=positions[e.to]; if(!fp||!tp) return;
+
+    let x1,y1,x2,y2,pathD;
+    if(isVertical){
+      x1=fp.x+NW/2; y1=fp.y+NH;
+      x2=tp.x+NW/2; y2=tp.y;
+      pathD='M'+x1+','+y1+' C'+x1+','+(y1+28)+' '+x2+','+(y2-28)+' '+x2+','+y2;
+    }else{
+      x1=fp.x+NW; y1=fp.y+NH/2;
+      x2=tp.x;    y2=tp.y+NH/2;
+      pathD='M'+x1+','+y1+' C'+(x1+28)+','+y1+' '+(x2-28)+','+y2+' '+x2+','+y2;
+    }
+
+    const mid={x:(x1+x2)/2, y:(y1+y2)/2};
+    const markId=e.color==='#2da870'?'a-ok':e.color==='#d94f4f'?'a-err':'a-case';
+
+    const ns='http://www.w3.org/2000/svg';
+    const path=document.createElementNS(ns,'path');
+    path.setAttribute('d',pathD);
+    path.setAttribute('stroke',e.color);
+    path.setAttribute('stroke-opacity','0.55');
+    path.setAttribute('stroke-width','1.5');
+    path.setAttribute('fill','none');
+    path.setAttribute('marker-end','url(#'+markId+')');
+    svg.appendChild(path);
+
+    if(e.label&&e.label!=='ok'){
+      const txt=document.createElementNS(ns,'text');
+      txt.setAttribute('x',mid.x); txt.setAttribute('y',mid.y-4);
+      txt.setAttribute('text-anchor','middle');
+      txt.setAttribute('font-size','9');
+      txt.setAttribute('fill',e.color);
+      txt.setAttribute('opacity','0.9');
+      txt.setAttribute('font-family','monospace');
+      txt.textContent=e.label.length>14?e.label.substring(0,14)+'…':e.label;
+      svg.appendChild(txt);
+    }
+  });
+}
+
+function applyTransform(){
+  const t='translate('+panX+'px,'+panY+'px) scale('+scale+')';
+  document.getElementById('canvas').style.transform=t;
+  document.getElementById('edges').style.transform=t;
+}
+
+function selectNode(id){
+  selectedId=id;
+  renderNodes();
+  showDetail(steps[id]);
+}
+
+function showDetail(step){
+  document.getElementById('detail').classList.add('open');
+  document.getElementById('d-label').textContent=step.label||'(step)';
+  document.getElementById('d-meta').innerHTML=
+    '<dt>ID</dt><dd>'+step.id+'</dd>'+
+    '<dt>branches</dt><dd>'+step.branches.length+'</dd>';
+  const db=document.getElementById('d-branches');
+  db.innerHTML='';
+  step.branches.forEach(b=>{
+    const div=document.createElement('div');
+    div.className='bi';
+    let html='<div class="bi-head">'+b.type+' / '+b.action+'</div>';
+    if(b.userText) html+='<div class="bi-utext">'+escHtml(b.userText)+'</div>';
+    if(b.code&&b.code.trim())
+      html+='<div class="bi-code">'+escHtml(b.code.trim())+'</div>';
+    if(b.onSuccess&&b.onSuccess.trim())
+      html+='<div class="bi-link ok">→ ok: '+b.onSuccess.trim().substring(0,40)+'</div>';
+    if(b.onError&&b.onError.trim())
+      html+='<div class="bi-link err">→ err: '+b.onError.trim().substring(0,40)+'</div>';
+    b.cases.forEach(c=>{
+      html+='<div class="bi-link case">→ "'+escHtml(c.key||'default')+'": '+c.val.trim().substring(0,36)+'</div>';
+    });
+    div.innerHTML=html;
+    db.appendChild(div);
+  });
+}
+
+function escHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function closeDetail(){
+  document.getElementById('detail').classList.remove('open');
+  selectedId=null;
+  renderNodes();
+}
+
+function updateMini(){
+  document.getElementById('mini').textContent=
+    stepList.length+' steps · '+edges.length+' edges · ×'+scale.toFixed(2);
+}
+
+function zoomIn(){scale=Math.min(scale*1.2,4);applyTransform();updateMini();}
+function zoomOut(){scale=Math.max(scale/1.2,0.1);applyTransform();updateMini();}
+function resetView(){scale=0.72;panX=24;panY=24;applyTransform();updateMini();}
+function toggleLayout(){
+  isVertical=!isVertical;
+  document.getElementById('btn-layout').textContent=isVertical?'↕ vertical':'↔ horizontal';
+  render();
+}
+function filterNodes(val){
+  filterText=val.toLowerCase().trim();
+  renderNodes();renderEdges();
+}
+
+const wrap=document.getElementById('canvas-wrap');
+wrap.addEventListener('mousedown',e=>{
+  if(e.target.closest('.node')||e.target.closest('#detail'))return;
+  isDragging=true;
+  startX=e.clientX;startY=e.clientY;startPX=panX;startPY=panY;
+  wrap.classList.add('grabbing');
+});
+window.addEventListener('mousemove',e=>{
+  if(!isDragging)return;
+  panX=startPX+(e.clientX-startX);
+  panY=startPY+(e.clientY-startY);
+  applyTransform();
+});
+window.addEventListener('mouseup',()=>{isDragging=false;wrap.classList.remove('grabbing');});
+wrap.addEventListener('wheel',e=>{
+  e.preventDefault();
+  scale=Math.max(0.1,Math.min(4,scale*(e.deltaY>0?0.88:1.12)));
+  applyTransform();updateMini();
+},{passive:false});
+wrap.addEventListener('click',e=>{
+  if(!e.target.closest('.node')&&!e.target.closest('#detail'))closeDetail();
+});
+</script>
+</body>
+</html>

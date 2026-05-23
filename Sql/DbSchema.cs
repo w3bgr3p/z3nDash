@@ -95,5 +95,17 @@
             }
         };
         
+        public static readonly TableSchema ZpNodes = new()
+        {
+            Name = "_zp_nodes",
+            Columns = new()
+            {
+                { "machine",    "TEXT PRIMARY KEY" },
+                { "host",       "TEXT DEFAULT ''"  },
+                { "port",       "TEXT DEFAULT ''"  },
+                { "updated_at", "TEXT DEFAULT ''"  },
+            }
+        };
+        
     }
 }
