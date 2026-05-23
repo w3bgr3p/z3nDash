@@ -1,0 +1,149 @@
+.xml-diff-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.xml-diff-modal {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1200px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.xml-diff-modal-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.xml-diff-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.xml-diff-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+
+.xml-diff-modal-close:hover {
+  color: #333;
+}
+
+.xml-diff-modal-description {
+  padding: 12px 24px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 14px;
+}
+
+.xml-diff-modal-content {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+}
+
+.xml-diff-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.xml-diff-modal-button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.xml-diff-modal-button:hover {
+  opacity: 0.9;
+}
+
+.xml-diff-modal-button.cancel {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.xml-diff-modal-button.cancel:hover {
+  background: #e0e0e0;
+}
+
+.xml-diff-modal-button.apply {
+  background: #007bff;
+  color: white;
+}
+
+.xml-diff-modal-button.apply:hover {
+  background: #0056b3;
+}
+
+/* Diff styling */
+.xml-diff-container {
+  display: flex;
+  gap: 24px;
+}
+
+.xml-diff-side {
+  flex: 1;
+  min-width: 0;
+}
+
+.xml-diff-header {
+  font-weight: bold;
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.xml-diff-content {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #fafafa;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.xml-diff-line {
+  white-space: pre;
+  padding: 2px 4px;
+}
+
+.xml-diff-line-deleted {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.xml-diff-line-inserted {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.xml-diff-line-modified {
+  background: #fff3e0;
+  color: #ef6c00;
+}
