@@ -86,11 +86,21 @@ export function renderDiffHtml(diff: XmlDiff): string {
   const oldLines = diff.oldXml.split('\n');
   const newLines = diff.newXml.split('\n');
 
-  // Build change map for quick lookup
-  const changeMap = new Map<number, XmlChange>();
+  // Build separate change maps for old and new sides
+  // This prevents line number mismatches when insertions/deletions occur
+  const oldChangeMap = new Map<number, XmlChange>();
+  const newChangeMap = new Map<number, XmlChange>();
+
   diff.changes.forEach(change => {
     const lineNum = parseInt(change.path.split(':')[1]) - 1;
-    changeMap.set(lineNum, change);
+
+    // Map changes to appropriate side(s)
+    if (change.type === 'delete' || change.type === 'modify') {
+      oldChangeMap.set(lineNum, change);
+    }
+    if (change.type === 'insert' || change.type === 'modify') {
+      newChangeMap.set(lineNum, change);
+    }
   });
 
   let html = '<div class="xml-diff-container">';
@@ -100,7 +110,7 @@ export function renderDiffHtml(diff: XmlDiff): string {
   html += '<div class="xml-diff-header">Before</div>';
   html += '<pre class="xml-diff-content">';
   oldLines.forEach((line, idx) => {
-    const change = changeMap.get(idx);
+    const change = oldChangeMap.get(idx);
     let className = 'xml-diff-line';
 
     if (change?.type === 'delete') {
@@ -118,7 +128,7 @@ export function renderDiffHtml(diff: XmlDiff): string {
   html += '<div class="xml-diff-header">After</div>';
   html += '<pre class="xml-diff-content">';
   newLines.forEach((line, idx) => {
-    const change = changeMap.get(idx);
+    const change = newChangeMap.get(idx);
     let className = 'xml-diff-line';
 
     if (change?.type === 'insert') {
