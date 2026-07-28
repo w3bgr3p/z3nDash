@@ -151,13 +151,13 @@ window.PageState = {
                 align-items: flex-end;
                 gap: 8px;
                 padding: 10px 16px 12px;
-                background: rgba(13,17,23,0.9);
-                border: 1px solid rgba(48,54,61,0.9);
+                background: color-mix(in srgb, var(--bg1) 90%, transparent);
+                border: 1px solid var(--border);
                 border-bottom: none;
                 border-radius: 16px 16px 0 0;
                 backdrop-filter: blur(20px);
                 -webkit-backdrop-filter: blur(20px);
-                box-shadow: 0 -4px 32px rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.04) inset;
+                box-shadow: 0 -4px 32px rgba(0,0,0,0.35), 0 -1px 0 color-mix(in srgb, var(--text) 8%, transparent) inset;
                 pointer-events: auto;
                 opacity: 0;
                 transform: translateY(110%);
@@ -180,9 +180,9 @@ window.PageState = {
                 width: 46px; height: 46px;
                 display: flex; align-items: center; justify-content: center;
                 border-radius: 12px;
-                background: rgba(33,38,45,0.95);
-                border: 1px solid rgba(48,54,61,0.7);
-                color: #6e7681;
+                background: var(--bg2);
+                border: 1px solid var(--border);
+                color: var(--text2);
                 transition: background 0.15s, border-color 0.15s, color 0.15s,
                             transform 0.15s cubic-bezier(.4,0,.2,1), box-shadow 0.15s;
                 user-select: none;
@@ -196,7 +196,7 @@ window.PageState = {
             .zp-di-label {
                 font-size: 9px;
                 font-family: 'JetBrains Mono', ui-monospace, monospace;
-                color: #484f58;
+                color: var(--muted);
                 letter-spacing: 0.2px;
                 text-align: center;
                 white-space: nowrap;
@@ -204,20 +204,20 @@ window.PageState = {
                 user-select: none;
                 line-height: 1;
             }
-            .zp-di:hover .zp-di-label { color: #8b949e; }
-            .zp-di.active .zp-di-label { color: #58a6ff; }
+            .zp-di:hover .zp-di-label { color: var(--text2); }
+            .zp-di.active .zp-di-label { color: var(--accent); }
             .zp-di:hover .zp-di-icon {
-                background: rgba(56,68,84,0.95);
-                border-color: rgba(88,166,255,0.5);
-                color: #e6edf3;
+                background: var(--bg3);
+                border-color: var(--accent);
+                color: var(--text-hi);
                 transform: translateY(-8px) scale(1.18);
                 box-shadow: 0 8px 20px rgba(0,0,0,0.45);
             }
             .zp-di.active .zp-di-icon {
-                background: rgba(30,50,80,0.95);
-                border-color: rgba(56,139,253,0.8);
-                color: #58a6ff;
-                box-shadow: 0 0 14px rgba(56,139,253,0.3);
+                background: var(--accent-dim);
+                border-color: var(--accent);
+                color: var(--accent);
+                box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 30%, transparent);
             }
             .zp-di.active:hover .zp-di-icon {
                 transform: translateY(-8px) scale(1.18);
@@ -229,17 +229,17 @@ window.PageState = {
                 transition: background 0.15s;
                 margin-top: -2px;
             }
-            .zp-di.active .zp-di-dot { background: #58a6ff; }
+            .zp-di.active .zp-di-dot { background: var(--accent); }
             .zp-di-tip {
                 position: absolute;
                 bottom: 60px;
                 left: 50%; transform: translateX(-50%);
-                background: rgba(13,17,23,0.97);
-                border: 1px solid #30363d;
+                background: var(--bg1);
+                border: 1px solid var(--border);
                 border-radius: 6px;
                 padding: 4px 9px;
                 font-size: 10px;
-                color: #c9d1d9;
+                color: var(--text);
                 white-space: nowrap;
                 font-family: 'JetBrains Mono', ui-monospace, monospace;
                 pointer-events: none;
@@ -254,7 +254,7 @@ window.PageState = {
             }
             .zp-dock-sep {
                 width: 1px; height: 34px;
-                background: rgba(48,54,61,0.8);
+                background: var(--border);
                 margin: 0 2px;
                 align-self: center;
             }
@@ -294,7 +294,7 @@ window.PageState = {
             el.innerHTML = `
                 <div class="zp-di-icon">${item.svg}</div>
                 <div class="zp-di-label">${item.label}</div>
-                <div class="zp-di-tip">${item.label}${hkLabel ? ` <span style="color:#484f58">${hkLabel}</span>` : ''}</div>
+                <div class="zp-di-tip">${item.label}${hkLabel ? ` <span style="color:var(--muted)">${hkLabel}</span>` : ''}</div>
                 <div class="zp-di-dot"></div>
             `;
             dock.appendChild(el);
@@ -309,7 +309,7 @@ window.PageState = {
         th.innerHTML = `
             <div class="zp-di-icon">${ICONS.theme}</div>
             <div class="zp-di-label">Theme</div>
-            <div class="zp-di-tip">Theme <span style="color:#484f58">Alt+T</span></div>
+            <div class="zp-di-tip">Theme <span style="color:var(--muted)">Alt+T</span></div>
             <div class="zp-di-dot"></div>
         `;
         th.onclick = () => typeof cycleTheme === 'function' && cycleTheme();
@@ -366,32 +366,32 @@ window.PageState = {
         style.textContent = `
             #zp-otp-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10001; align-items: center; justify-content: center; }
             #zp-otp-overlay.open { display: flex; }
-            #zp-otp-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; width: 340px; padding: 18px; display: flex; flex-direction: column; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #c9d1d9; }
+            #zp-otp-box { background: var(--bg1); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 340px; padding: 18px; display: flex; flex-direction: column; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); }
             #zp-otp-box .zp-otp-hdr { display: flex; align-items: center; gap: 9px; }
             #zp-otp-box .zp-otp-hdr span { font-size: 18px; line-height: 1; }
-            #zp-otp-box .zp-otp-hdr h3 { font-size: 13px; font-weight: 600; color: #e6edf3; flex: 1; margin: 0; }
-            #zp-otp-box .zp-otp-hdr button { background: none; border: none; color: #8b949e; font-size: 16px; cursor: pointer; padding: 0 4px; line-height: 1; }
-            #zp-otp-box .zp-otp-hdr button:hover { color: #e6edf3; }
-            #zp-otp-key { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; padding: 5px 9px; font-size: 11px; width: 100%; box-sizing: border-box; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
-            #zp-otp-key:focus { border-color: #388bfd; }
-            #zp-otp-key::placeholder { color: #484f58; }
-            #zp-otp-result { display: none; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px 14px; text-align: center; cursor: pointer; transition: border-color 0.15s; }
-            #zp-otp-result:hover { border-color: #388bfd; }
-            #zp-otp-code { font-size: 30px; font-weight: 700; letter-spacing: 8px; color: #388bfd; font-family: 'JetBrains Mono', monospace; }
-            #zp-otp-hint { font-size: 9px; color: #484f58; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+            #zp-otp-box .zp-otp-hdr h3 { font-size: 13px; font-weight: 600; color: var(--text-hi); flex: 1; margin: 0; }
+            #zp-otp-box .zp-otp-hdr button { background: none; border: none; color: var(--text2); font-size: 16px; cursor: pointer; padding: 0 4px; line-height: 1; }
+            #zp-otp-box .zp-otp-hdr button:hover { color: var(--text-hi); }
+            #zp-otp-key { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 5px 9px; font-size: 11px; width: 100%; box-sizing: border-box; font-family: 'JetBrains Mono', monospace; outline: none; letter-spacing: 0.5px; }
+            #zp-otp-key:focus { border-color: var(--accent); }
+            #zp-otp-key::placeholder { color: var(--muted); }
+            #zp-otp-result { display: none; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; text-align: center; cursor: pointer; transition: border-color 0.15s; }
+            #zp-otp-result:hover { border-color: var(--accent); }
+            #zp-otp-code { font-size: 30px; font-weight: 700; letter-spacing: 8px; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+            #zp-otp-hint { font-size: 9px; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
             #zp-otp-timer { display: none; align-items: center; gap: 7px; }
-            #zp-otp-bar-wrap { flex: 1; height: 3px; background: #21262d; border-radius: 2px; overflow: hidden; }
-            #zp-otp-bar-fill { height: 100%; background: #388bfd; transition: width 0.9s linear; border-radius: 2px; }
-            #zp-otp-sec { font-size: 10px; color: #8b949e; width: 26px; text-align: right; }
-            #zp-otp-status { font-size: 10px; color: #8b949e; min-height: 14px; }
-            #zp-otp-status.err { color: #f85149; }
-            #zp-otp-status.ok  { color: #3fb950; }
+            #zp-otp-bar-wrap { flex: 1; height: 3px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
+            #zp-otp-bar-fill { height: 100%; background: var(--accent); transition: width 0.9s linear; border-radius: 2px; }
+            #zp-otp-sec { font-size: 10px; color: var(--text2); width: 26px; text-align: right; }
+            #zp-otp-status { font-size: 10px; color: var(--text2); min-height: 14px; }
+            #zp-otp-status.err { color: var(--red); }
+            #zp-otp-status.ok  { color: var(--green); }
             .zp-otp-actions { display: flex; gap: 7px; justify-content: flex-end; }
-            .zp-btn { padding: 4px 12px; border-radius: 5px; border: 1px solid #30363d; font-size: 11px; font-family: 'JetBrains Mono', monospace; cursor: pointer; background: #21262d; color: #c9d1d9; }
-            .zp-btn:hover { background: #30363d; }
+            .zp-btn { padding: 4px 12px; border-radius: var(--radius); border: 1px solid var(--border); font-size: 11px; font-family: 'JetBrains Mono', monospace; cursor: pointer; background: var(--bg2); color: var(--text); }
+            .zp-btn:hover { background: var(--border); }
             .zp-btn:disabled { opacity: 0.4; cursor: default; }
-            .zp-btn.primary { background: #238636; border-color: #238636; color: #fff; }
-            .zp-btn.primary:hover { background: #2ea043; }
+            .zp-btn.primary { background: var(--green-bg); border-color: var(--green); color: var(--text-hi); }
+            .zp-btn.primary:hover { background: var(--green-bg2); }
         `;
         document.head.appendChild(style);
 

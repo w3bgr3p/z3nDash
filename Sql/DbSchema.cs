@@ -1,4 +1,4 @@
-﻿namespace z3nIO
+﻿namespace DevDeck
 {
     
     public class TableSchema
@@ -8,96 +8,13 @@
     }
     
     /// <summary>
-    /// Централизованное хранилище имён таблиц с дефолтными значениями.
-    ///
-    /// Источники:
-    ///   TaskManager.cs  — _settings, _tasks, _commands
-    ///   DbExtencions.cs — _wlt (хардкод на строке 150, в SqlGet цепочки кошелька)
+    /// Централизованное хранилище схем таблиц, которые DevDeck использует напрямую.
     /// </summary>
     public static class DbSchema
     {
-        // ── TaskManager ───────────────────────────────────────────────────────
-
-        /// <summary>
-        /// InputSettings каждой задачи (переменные + _xml в base64).
-        /// TaskManager._settingsTable
-        /// </summary>
-        public static readonly TableSchema Settings = new()
-        {
-            Name = "_settings",
-            Columns = new()
-            {
-                { "id",        "TEXT PRIMARY KEY" },
-                { "name",      "TEXT DEFAULT ''"  },
-                { "_xml_b64",  "TEXT DEFAULT ''"  },
-                { "_json_b64", "TEXT DEFAULT ''"  },
-            }
-        };
-
-        /// <summary>
-        /// Список задач ZennoPoster (JsonToDb из ZennoPoster.TasksList).
-        /// TaskManager._tasksTable
-        /// </summary>
-        public static readonly TableSchema Tasks = new()
-        {
-            Name = "_tasks",
-            Columns = new()
-            {
-                { "id",        "TEXT PRIMARY KEY" },
-                { "name",      "TEXT DEFAULT ''"  },
-                { "_json_b64", "TEXT DEFAULT ''"  },
-            }
-        };
-        /// <summary>
-        /// Очередь команд для выполнения (status: pending → done/error).
-        /// TaskManager._commandsTable
-        /// </summary>
-        //public static string Commands  { get; set; } = "_commands";
-
-        // ── DbExtencions ──────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Таблица кошельков — используется в SqlGet при chainType-запросах.
-        /// DbExtencions.cs:150 — хардкод "_wlt"
-        /// </summary>
-        public static string Wlt { get; set; } = "_wlt";
-        
-        
-        public static readonly TableSchema Commands = new()
-        {
-            Name = "_commands",
-            Columns = new()
-            {
-                { "id",         "TEXT PRIMARY KEY"       },
-                { "task_id",    "TEXT DEFAULT ''"        },
-                { "action",     "TEXT DEFAULT ''"        },
-                { "payload",    "TEXT DEFAULT ''"        },
-                { "status",     "TEXT DEFAULT 'pending'" },
-                { "result",     "TEXT DEFAULT ''"        },
-                { "created_at", "TEXT DEFAULT ''"        },
-            }
-        };
-        
-        
-        
-        public static readonly TableSchema Process = new()
-        {
-            Name = "_processes",
-            Columns = new()
-            {
-                { "id",           "TEXT PRIMARY KEY" },
-                { "machine",      "TEXT DEFAULT ''"  },
-                { "name",         "TEXT DEFAULT ''"  },
-                { "ram",          "TEXT DEFAULT ''"  },
-                { "uptime",       "TEXT DEFAULT ''"  },
-                { "command_line", "TEXT DEFAULT ''"  },
-                { "updated_at",   "TEXT DEFAULT ''"  },
-            }
-        };
-        
         public static readonly TableSchema ZpNodes = new()
         {
-            Name = "_zp_nodes",
+            Name = "zp_nodes",
             Columns = new()
             {
                 { "machine",    "TEXT PRIMARY KEY" },
@@ -106,6 +23,137 @@
                 { "updated_at", "TEXT DEFAULT ''"  },
             }
         };
-        
+
+        public static readonly TableSchema Schedules = new()
+        {
+            Name = "schedules",
+            Columns = new()
+            {
+                { "id",               "TEXT PRIMARY KEY" },
+                { "name",             "TEXT DEFAULT ''" },
+                { "executor",         "TEXT DEFAULT 'internal'" },
+                { "script_path",      "TEXT DEFAULT ''" },
+                { "args",             "TEXT DEFAULT ''" },
+                { "enabled",          "TEXT DEFAULT 'true'" },
+                { "cron",             "TEXT DEFAULT ''" },
+                { "interval_minutes", "TEXT DEFAULT '0'" },
+                { "fixed_time",       "TEXT DEFAULT ''" },
+                { "on_overlap",       "TEXT DEFAULT 'skip'" },
+                { "max_threads",      "TEXT DEFAULT '1'" },
+                { "status",           "TEXT DEFAULT 'idle'" },
+                { "last_run",         "TEXT DEFAULT ''" },
+                { "last_exit",        "TEXT DEFAULT ''" },
+                { "last_output",      "TEXT DEFAULT ''" },
+                { "payload_schema",   "TEXT DEFAULT ''" },
+                { "payload_values",   "TEXT DEFAULT ''" },
+                { "runs_total",       "TEXT DEFAULT '0'" },
+                { "runs_success",     "TEXT DEFAULT '0'" },
+                { "schedule_tag",     "TEXT DEFAULT ''" },
+                { "last_run_id",      "TEXT DEFAULT ''" },
+            }
+        };
+
+        public static readonly TableSchema ScheduleQueue = new()
+        {
+            Name = "schedule_queue",
+            Columns = new()
+            {
+                { "uuid",        "TEXT PRIMARY KEY" },
+                { "schedule_id", "TEXT DEFAULT ''" },
+                { "queued_at",   "TEXT DEFAULT ''" },
+                { "status",      "TEXT DEFAULT 'pending'" },
+                { "priority",    "TEXT DEFAULT '10'" },
+                { "run_id",      "TEXT DEFAULT ''" },
+                { "args_b64",    "TEXT DEFAULT ''" },
+            }
+        };
+
+        public static readonly TableSchema Clips = new()
+        {
+            Name = "clips",
+            Columns = new()
+            {
+                { "id",         "TEXT PRIMARY KEY" },
+                { "path",       "TEXT DEFAULT ''" },
+                { "title",      "TEXT DEFAULT ''" },
+                { "content",    "TEXT DEFAULT ''" },
+                { "created_at", "TEXT DEFAULT ''" },
+            }
+        };
+
+        public static readonly TableSchema JsonAnalyzerCache = new()
+        {
+            Name = "ai_json_cache",
+            Columns = new()
+            {
+                { "key",      "TEXT PRIMARY KEY" },
+                { "analysis", "TEXT" },
+                { "model",    "TEXT" },
+                { "ts",       "TEXT" },
+            }
+        };
+
+        public static readonly TableSchema SystemSnapshots = new()
+        {
+            Name = "system_snapshots",
+            Columns = new()
+            {
+                { "id",   "INTEGER PRIMARY KEY" },
+                { "ts",   "TEXT" },
+                { "host", "TEXT" },
+                { "raw",  "TEXT" },
+            }
+        };
+
+        public static readonly TableSchema SystemSnapshotAiCache = new()
+        {
+            Name = "system_snapshot_ai_cache",
+            Columns = new()
+            {
+                { "id",     "INTEGER PRIMARY KEY" },
+                { "model",  "TEXT" },
+                { "ts",     "TEXT" },
+                { "report", "TEXT" },
+            }
+        };
+
+        public static readonly TableSchema TreasuryAiCache = new()
+        {
+            Name = "treasury_ai_cache",
+            Columns = new()
+            {
+                { "id",     "INTEGER PRIMARY KEY" },
+                { "model",  "TEXT" },
+                { "ts",     "TEXT" },
+                { "report", "TEXT" },
+            }
+        };
+
+        public static readonly TableSchema Instance = new()
+        {
+            Name = "instance",
+            Columns = new()
+            {
+                { "id",      "INTEGER PRIMARY KEY" },
+                { "proxy",   "TEXT DEFAULT ''" },
+                { "cookies", "TEXT DEFAULT ''" },
+                { "webgl",   "TEXT DEFAULT ''" },
+                { "zb_id",   "TEXT DEFAULT ''" },
+            }
+        };
+
+        public static readonly TableSchema Addresses = new()
+        {
+            Name = "addresses",
+            Columns = new()
+            {
+                { "id",       "INTEGER PRIMARY KEY" },
+                { "evm_pk",   "TEXT DEFAULT ''" },
+                { "sol_pk",   "TEXT DEFAULT ''" },
+                { "apt_pk",   "TEXT DEFAULT ''" },
+                { "evm_seed", "TEXT DEFAULT ''" },
+            }
+        };
+
     }
 }

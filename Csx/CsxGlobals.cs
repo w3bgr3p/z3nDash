@@ -1,10 +1,10 @@
 ﻿using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public sealed class CsxGlobals
 {
     public StubProject                    project  { get; init; } = null!;
-    public z3nIO.Browser.PlaywrightInstance instance { get; init; } = null!;
+    public DevDeck.Browser.PlaywrightInstance instance { get; init; } = null!;
     public Logger                         log      { get; init; } = null!;
 }

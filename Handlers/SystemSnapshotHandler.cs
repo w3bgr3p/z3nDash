@@ -17,15 +17,15 @@ using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
 
-namespace z3nIO;
+namespace DevDeck;
 
 internal sealed class SystemSnapshotHandler
 {
     private readonly DbConnectionService _dbService;
     private readonly AiClient _aiClient;
 
-    private const string SnapshotTable = "_system_snapshots";
-    private const string AiCacheTable  = "_system_snapshot_ai_cache";
+    private static string SnapshotTable => DbSchema.SystemSnapshots.Name;
+    private static string AiCacheTable  => DbSchema.SystemSnapshotAiCache.Name;
     private const string Lang          = "russian";
 
     public SystemSnapshotHandler(DbConnectionService dbService, AiClient aiClient)
@@ -408,12 +408,10 @@ internal sealed class SystemSnapshotHandler
     // ── DB helpers ────────────────────────────────────────────────────────────
 
     private static void EnsureSnapshotTable(Db db) =>
-        db.CreateTable(new Dictionary<string, string>
-            { ["id"] = "INTEGER PRIMARY KEY", ["ts"] = "TEXT", ["host"] = "TEXT", ["raw"] = "TEXT" }, SnapshotTable);
+        db.CreateTable(DbSchema.SystemSnapshots.Columns, SnapshotTable);
 
     private static void EnsureAiCacheTable(Db db) =>
-        db.CreateTable(new Dictionary<string, string>
-            { ["id"] = "INTEGER PRIMARY KEY", ["model"] = "TEXT", ["ts"] = "TEXT", ["report"] = "TEXT" }, AiCacheTable);
+        db.CreateTable(DbSchema.SystemSnapshotAiCache.Columns, AiCacheTable);
 
     private static void SaveAiCache(Db db, string model, string analysis, string ts)
     {

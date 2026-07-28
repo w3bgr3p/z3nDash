@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public class GmailClient
 {

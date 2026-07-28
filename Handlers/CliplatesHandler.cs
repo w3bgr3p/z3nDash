@@ -2,7 +2,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public class CliplatesHandler : IScriptHandler
 {
@@ -12,21 +12,12 @@ public class CliplatesHandler : IScriptHandler
 
     public CliplatesHandler(DbConnectionService dbService) => _dbService = dbService;
 
-    private const string Table = "_clips";
-
-    private static readonly Dictionary<string, string> Schema = new()
-    {
-        { "id",         "TEXT PRIMARY KEY" },
-        { "path",       "TEXT DEFAULT ''" },
-        { "title",      "TEXT DEFAULT ''" },
-        { "content",    "TEXT DEFAULT ''" },
-        { "created_at", "TEXT DEFAULT ''" }
-    };
+    private static string Table => DbSchema.Clips.Name;
 
     public void Init()
     {
         if (!_dbService.TryGetDb(out var db) || db == null) return;
-        db.PrepareTable(Schema, Table);
+        db.PrepareTable(DbSchema.Clips.Columns, Table);
     }
 
     public async Task<bool> HandleRequest(HttpListenerContext ctx)

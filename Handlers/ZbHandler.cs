@@ -3,7 +3,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 
-namespace z3nIO;
+namespace DevDeck;
 
 internal sealed class ZbHandler
 {

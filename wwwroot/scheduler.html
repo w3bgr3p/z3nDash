@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/python/python.min.js"></script>
 
-    <title>z3nIO | Scheduler</title>
+    <title>DevDeck | Scheduler</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -41,7 +41,7 @@
         .group-header:hover { background: var(--bg2); }
         .group-dot    { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
         .group-name   { font-size: 10px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; flex: 1; }
-        .group-count  { font-size: 9px; color: var(--text2); background: var(--bg2); padding: 1px 5px; border-radius: 8px; }
+        .group-count  { font-size: 9px; color: var(--text2); background: var(--bg2); padding: 1px 5px; border-radius: 3px; }
         .group-chevron { font-size: 9px; color: var(--text2); transition: transform 0.15s; display: inline-block; }
         .group-chevron.collapsed { transform: rotate(-90deg); }
 
@@ -63,7 +63,7 @@
         .row-done   { color: var(--green, #3fb950); font-weight: 600; }
         .row-total  { color: var(--text2); }
 
-        .task-status { font-size: 9px; padding: 1px 7px; border-radius: 4px; text-align: center; font-weight: 400; letter-spacing: 0.2px; text-transform: uppercase; }
+        .task-status { font-size: 9px; padding: 1px 7px; border-radius: 3px; text-align: center; font-weight: 400; letter-spacing: 0.2px; text-transform: uppercase; }
         .task-status.newbie  { background: var(--yellow-tint); color: var(--yellow); }
         .task-status.running { background: var(--green-tint); color: var(--text-hi); border: 1px solid var(--green-bg); }
         .task-status.done    { background: var(--purple-tint); color: var(--green); }
@@ -85,16 +85,7 @@
 
         .panel-header { background: var(--bg1); padding: 6px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
         .panel-title  { font-size: 12px; font-weight: 600; color: var(--accent); }
-        .count-badge  { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 1px 6px; font-size: 10px; color: var(--text2); }
-
-        .exec-filter-bar { background: var(--bg1); padding: 3px 8px; border-bottom: 1px solid var(--border); display: flex; gap: 4px; flex-wrap: wrap; align-items: center; flex-shrink: 0; min-height: 24px; }
-        .exec-filter-bar:empty { display: none; }
-        .tag-filter-label { font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; flex-shrink: 0; margin-right: 2px; }
-        .tag-chip { font-size: 10px; padding: 1px 7px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--border); color: var(--text2); cursor: pointer; user-select: none; transition: all 0.12s; white-space: nowrap; }
-        .tag-chip:hover   { border-color: var(--accent); color: var(--text); }
-        .tag-chip.active  { background: rgba(56,139,253,0.15); border-color: var(--accent); color: var(--accent); }
-        .tag-chip.clear-chip { color: var(--text2); border-style: dashed; }
-        .tag-chip.clear-chip:hover { color: var(--red, #f85149); border-color: var(--red, #f85149); }
+        .count-badge  { background: var(--bg2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; font-size: 10px; color: var(--text2); }
 
         .detail-tabs { display: flex; gap: 0; }
         .dtab { padding: 5px 14px; cursor: pointer; font-size: 11px; color: var(--text2); border-bottom: 2px solid transparent; transition: color 0.1s; user-select: none; }
@@ -253,6 +244,36 @@
         .cm-close { background: none; border: none; color: var(--text2); font-size: 16px; cursor: pointer; padding: 0 4px; line-height: 1; }
         .cm-close:hover { color: var(--text); }
 
+        /* Overview (no selection) — stats for all tasks */
+        .ov-wrap    { display: flex; flex-direction: column; gap: 12px; max-width: 1100px; margin: 0 auto; min-height: 100%; box-sizing: border-box; }
+        .ov-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+        .ov-stat    { background: var(--bg1); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+        .ov-stat-num   { font-size: 20px; font-weight: 700; color: var(--text-hi, var(--text)); line-height: 1.1; }
+        .ov-stat-num.green  { color: var(--green, #3fb950); }
+        .ov-stat-num.accent { color: var(--accent); }
+        .ov-stat-num.red    { color: var(--red, #f85149); }
+        .ov-stat-num.muted  { color: var(--text2); }
+        .ov-stat-label { font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+        .ov-table { border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; background: var(--bg); }
+        .ov-head, .ov-row { display: grid; grid-template-columns: 8px minmax(110px, 180px) 58px minmax(70px, 110px) 70px auto minmax(120px, 1fr); gap: 9px; align-items: center; padding: 5px 12px; min-width: 620px; }
+        .ov-head  { background: var(--bg1); border-bottom: 1px solid var(--border); font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 12px; }
+        .ov-row   { border-bottom: 1px solid var(--bg2); cursor: pointer; transition: background 0.08s; }
+        .ov-row:last-child { border-bottom: none; }
+        .ov-row:hover      { background: var(--bg2); }
+        .ov-row.off        { opacity: 0.5; }
+        .ov-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted, #484f58); }
+        .ov-dot.run  { background: var(--green, #3fb950); box-shadow: 0 0 5px var(--green, #3fb950); }
+        .ov-dot.fail { background: var(--red, #f85149); }
+        .ov-dot.off  { background: var(--border); }
+        .ov-name { font-size: 11px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ov-cell { font-size: 10px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ov-out  { font-family: 'Consolas', monospace; font-size: 10px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ov-out.err   { color: var(--red, #f85149); }
+        .ov-out.empty { opacity: 0.4; }
+        .ov-links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+        .ov-link  { font-size: 10px; color: var(--text2); text-decoration: none; border: 1px solid var(--border); border-radius: 3px; padding: 2px 9px; background: var(--bg1); transition: color 0.12s, border-color 0.12s; }
+        .ov-link:hover { color: var(--card-color, var(--accent)); border-color: var(--card-color, var(--accent)); }
+
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -280,7 +301,6 @@
                     <button class="btn sm" onclick="newSchedule()">+ New</button>
                 </div>
             </div>
-            <div class="exec-filter-bar" id="execFilterBar"></div>
             <div class="list-scroll" id="listScroll" onclick="if(!event.target.closest('.schedule-row'))deselect()"></div>
         </div>
         <div class="resizer" id="resizer"></div>

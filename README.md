@@ -1,183 +1,158 @@
-# z3nIO
+# DevDeck
 
-Cross-platform automation orchestrator with embedded web dashboard.  
-Built on .NET 10. Targets `net10.0-windows` (WinForms overlay + WebView2) and `net10.0` (headless / Linux).
+DevDeck is a local Windows control center for automation workflows. It combines
+task scheduling, ZennoPoster and ZennoBrowser operations, logs, HTTP inspection,
+system snapshots, Web3 tools, and day-to-day utilities in one embedded dashboard.
 
----
+The desktop application is built with .NET 10, WinForms, and WebView2. Its
+dashboard and local API are served by the built-in HTTP server.
+
+## What is included
+
+- Task scheduler with manual runs, recurring schedules, process control, live
+  output, payloads, and several script/executable runners.
+- ZP7 worker overview and control for ZennoPoster jobs on the local network.
+- ZennoBrowser profile and process integration.
+- Application logs, HTTP request inspection, and request replay.
+- JSON, text, clipboard-template, code-graph, and SQLite file-viewer tools.
+- System snapshots and a configurable process-memory watchdog.
+- Web3 treasury views and supporting blockchain utilities.
+- Built-in documentation available from the dashboard.
+- OmniRoute integration for AI-assisted features.
 
 ## Requirements
 
-| Component | Version |
-|---|---|
-| .NET SDK | 10.0 |
-| OS | Windows 10+ / Linux (Ubuntu 22+) |
-| PostgreSQL *(optional)* | 14+ |
-| SQLite *(default)* | bundled |
-| ZennoBrowser *(optional)* | any, with WS endpoint exposed |
+- Windows 10 or Windows 11, x64.
+- PostgreSQL and a database user allowed to create and use the selected schema.
+- Microsoft Edge WebView2 Runtime.
+- .NET 10 SDK when building from source. The repository pins SDK `10.0.103`
+  and allows later .NET 10 feature-band versions.
 
----
+ZennoPoster, ZennoBrowser, and OmniRoute are required only for the dashboard
+features that integrate with those services.
 
-## Build
+PostgreSQL stores DevDeck application data. The SQLite page in the dashboard is
+a standalone viewer for local SQLite files; it is not the default DevDeck
+datastore.
 
-```bash
-# Windows (WinForms overlay, WebView2, System.Management)
-dotnet publish -f net10.0-windows -c Release
+## Build from source
 
-# Cross-platform / Linux
-dotnet publish -f net10.0 -c Release
+```powershell
+git clone https://github.com/w3bgr3p/DevDeck.git
+cd DevDeck
+dotnet restore DevDeck.sln
+dotnet build DevDeck.csproj -c Release -f net10.0-windows
 ```
 
-Both targets use `PublishSingleFile=true` + `SelfContained=true`.  
-Output binary is large (~150–300 MB) — that is expected.
+To create a self-contained Windows build:
 
-### Windows — port registration (required for `http://*:10993/`)
+```powershell
+dotnet publish DevDeck.csproj `
+  -c Release `
+  -f net10.0-windows `
+  -r win-x64 `
+  --self-contained true `
+  -o publish/DevDeck
+```
 
-Run once as Administrator before first launch:
+Build output and installers are intentionally excluded from Git.
 
-```cmd
+## First launch
+
+The embedded server uses port `10993` by default. Because DevDeck registers an
+`HttpListener` wildcard prefix, reserve the URL once from an elevated terminal:
+
+```powershell
 netsh http add urlacl url=http://*:10993/ user=Everyone
 ```
 
-Replace `10993` if you changed `DashboardPort` in config.
+Start the application:
 
----
-
-## Configuration
-
-On first launch with no config present, the dashboard opens at:
-
+```powershell
+dotnet run --project DevDeck.csproj -f net10.0-windows
 ```
+
+When no valid configuration exists, DevDeck opens:
+
+```text
 http://localhost:10993/?page=config
 ```
 
-Fill in the config form and save. This writes `appsettings.secrets.json` next to the binary.
+In **Config**:
 
-### `appsettings.secrets.json` — key fields
+1. Select `PostgreSQL`.
+2. Enter the complete PostgreSQL connection string.
+3. Set the dashboard port and storage folders if the defaults are unsuitable.
+4. Add ZennoBrowser and OmniRoute endpoints when those integrations are used.
+5. Save the configuration.
 
-```json
-{
-  "LogsConfig": {
-    "DashboardPort": "10993",
-    "LogHost": "http://localhost:10994",
-    "TrafficHost": "http://localhost:10995"
-  },
-  "DbConfig": {
-    "Mode": "sqlite",
-    "ConnectionString": "Data Source=z3nIO.db"
-  }
-}
+Example connection string:
+
+```text
+Host=127.0.0.1;Port=5432;Database=devdeck;Username=devdeck;Password=change-me;Search Path=devdeck
 ```
 
-`DbConfig.Mode` accepts `sqlite` or `postgres`.
+`Search Path` selects the PostgreSQL schema. If it is omitted, DevDeck uses
+`public`.
 
-AI provider keys and OmniRoute config are set through the config page (`/config`) and stored in the same file under `AiConfig`.
+After configuration, the application connects to PostgreSQL and opens the
+Scheduler. Startup failures are written to `crash.log` next to the executable.
 
----
+## Configuration and secrets
 
-## Run
+The Config page writes `appsettings.secrets.json` next to the executable and
+reloads it without requiring manual JSON edits. The file contains the database
+connection string and integration settings.
 
-```bash
-./z3nIO          # Linux
-z3nIO.exe        # Windows
-```
-
-On Windows — opens `DashboardOverlay` (WebView2 WinForms window).  
-On Linux — calls `xdg-open http://localhost:10993/`.
-
-Exit: press any key in the terminal.
-
-Startup crash details are written to `crash.log` next to the binary.
-
----
+`appsettings.secrets.json`, its backups, local environment files, IDE settings,
+logs, databases, build output, and installers are ignored by Git. Never commit a
+real configuration file or paste its contents into an issue.
 
 ## Dashboard
 
-Default: `http://localhost:10993`
+The default dashboard address is `http://localhost:10993`.
 
-| Page | Path |
+| Section | Purpose |
 |---|---|
-| Scheduler | `/?page=scheduler` |
-| Config | `/?page=config` |
-| AI | `/?page=ai` |
-| Logs | `/?page=logs` |
-| HTTP Log | `/?page=http` |
-| Treasury | `/?page=treasury` |
-| System Snapshot | `/?page=system` |
-| ZennoBrowser | `/?page=zb` |
-| Cliplates | `/?page=clips` |
-| JSON Analyzer | `/?page=json` |
-| ZP Orchestrator | `/?page=zp7` |
-| Reports | `/?page=report` |
+| Scheduler | Configure, run, stop, and monitor scheduled tasks |
+| ZP7 | Manage ZennoPoster workers and jobs |
+| ZB | Work with ZennoBrowser profiles and processes |
+| Logs | Inspect application logs |
+| HTTP | Inspect and replay HTTP requests |
+| JSON / Text | Transform and analyze structured or plain text |
+| Clips | Store and copy reusable templates |
+| Treasury | Inspect Web3 assets |
+| System | Capture and compare system state |
+| Graph | Explore C# source relationships |
+| Config | Configure PostgreSQL, services, storage, and watchdog |
+| Docs | Open the bundled DevDeck documentation |
 
----
+The navigation dock also shows the current keyboard shortcuts for these pages.
 
-## Scheduler
+## Network safety
 
-Schedules are stored in `_schedules` table. Queue in `_schedule_queue`.
+DevDeck is designed for a trusted local machine or private network. Its embedded
+server listens on all interfaces and exposes operational endpoints. Do not
+publish the dashboard port directly to the internet. Restrict access with the
+Windows firewall or place it behind an authenticated reverse proxy.
 
-### Executor types
+## Repository layout
 
-| Executor | Description |
-|---|---|
-| `internal` | Registered C# delegate via `RegisterTask` |
-| `csx-internal` | Roslyn `.csx` script via `CsxExecutor` |
-| `python` | External process |
-| `node` / `ts-node` | External process |
-| `bash` / `ps1` / `bat` | Shell scripts |
-| `exe` | Arbitrary executable |
-
-### Schedule triggers
-
-- `cron` — standard cron expression (via Cronos)
-- `interval_minutes` — fixed interval
-- `fixed_time` — daily at HH:mm
-
-`on_overlap`: `skip` (default) or `queue`.  
-`max_threads`: concurrent run limit per schedule.
-
----
-
-## Key dependencies
-
-| Package | Version | Purpose |
-|---|---|---|
-| Microsoft.Playwright | 1.58.0 | Browser automation (CDP / WS endpoint) |
-| Nethereum.Web3 | 4.29.0 | EVM chains, wallet, signing |
-| Npgsql | 10.0.1 | PostgreSQL driver |
-| Microsoft.CodeAnalysis.CSharp.Scripting | 4.13.0 | Roslyn `.csx` executor |
-| Cronos | 0.8.x | Cron parsing |
-| OpenCvSharp4 | 4.9.0 | Image matching |
-| Otp.NET | 1.4.0 | TOTP |
-| Newtonsoft.Json | 13.0.4 | JSON serialization |
-| Microsoft.Web.WebView2 | 1.0.3800.47 | *(Windows only)* Embedded browser |
-| System.Management | 10.0.0-rc | *(Windows only)* WMI / HWID |
-
----
-
-## Project structure
-
-```
-z3nIO/
-├── Program.cs                  # Entry point
-├── EmbeddedServer.cs           # HttpListener server, handler registry
-├── SchedulerService.cs         # Cron/interval/queue executor
-├── AiClient.cs                 # AI HTTP client (aiio / OmniRoute)
-├── ConfigHandler.cs            # /config endpoints
-├── DashboardOverlay.cs         # WinForms WebView2 (WINDOWS only)
-├── wwwroot/                    # Static dashboard (HTML/CSS/JS)
-│   └── *.html, themes.css, nav.js ...
-├── Prompts/                    # AI prompt templates
-├── scripts/                    # User .csx / .py / .js scripts
-├── templates/                  # Report / output templates
-├── appsettings.json            # Base config
-└── appsettings.secrets.json    # Secrets (not committed)
+```text
+App/Config/   configuration models and loader
+Controllers/  embedded server, scheduler, and runtime services
+Handlers/     dashboard and local API handlers
+Sql/          PostgreSQL access and schema helpers
+Csx/          C# script execution
+Browser/      browser automation abstractions
+Api/          external service integrations
+Web3/         blockchain and wallet utilities
+wwwroot/      dashboard HTML, CSS, and JavaScript
+docs-vault/   bundled product documentation
+templates/    dashboard and report templates
 ```
 
----
+## License
 
-## Notes
-
-- `appsettings.secrets.json` — not committed, must be created on each machine via config UI or manually.
-- `WINDOWS` compile constant is set by target framework (`net10.0-windows`), not runtime OS detection.
-- Linux HWID reads from `/etc/machine-id`, `/sys/class/dmi/id/board_serial`, `/proc/cpuinfo`.
-- `.csx` scripts support `#load` directives; stack traces include real file paths.
+DevDeck is distributed under the
+[GNU Affero General Public License v3.0](LICENSE).

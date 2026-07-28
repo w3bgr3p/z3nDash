@@ -5,7 +5,7 @@
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
-    <title>z3nIO | Treasury</title>
+    <title>DevDeck | Treasury</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -622,7 +622,7 @@
 
     async function aiLoadModels() {
         try {
-            const r    = await fetch(`${API}/ai-report/api/models`);
+        const r    = await fetch(`${API}/config/ai-models`);
             const body = await r.json();
             const sel  = document.getElementById('aiModel');
             if (body.models && body.models.length) {

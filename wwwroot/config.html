@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>z3nIO | Config</title>
+    <title>DevDeck | Config</title>
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
@@ -17,6 +17,21 @@
             color: var(--text);
             padding: 32px 24px 48px;
             min-height: 100vh;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 22px;
+        }
+        .page-header .page-sub { margin-bottom: 0; }
+        .page-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         h1 {
@@ -34,10 +49,16 @@
 
         .layout {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 18px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            align-items: stretch;
         }
-        @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+        @media (max-width: 900px) {
+            body { padding: 22px 14px 36px; }
+            .layout { grid-template-columns: 1fr; }
+            .page-header { flex-direction: column; }
+            .page-actions { justify-content: flex-start; }
+        }
 
         /* ── Card ── */
         .card {
@@ -45,6 +66,7 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-lg, 8px);
             padding: 18px 20px;
+            min-width: 0;
         }
         .card-hdr {
             display: flex;
@@ -186,8 +208,39 @@
         .field input:focus, .field select:focus { border-color: #388bfd; }
         .field input::placeholder { color: #484f58; }
 
-        .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .field-row,
+        .field-row-3 {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        @media (max-width: 560px) {
+            .field-row,
+            .field-row-3,
+            .status-grid { grid-template-columns: 1fr; }
+        }
+
+        .input-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 6px;
+        }
+        .page-header,
+        .layout {
+            width: min(1440px, 100%);
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .config-cards,
+        .config-cards > .field-group {
+            display: contents;
+        }
+        .config-cards > .card-hdr {
+            display: none;
+        }
+        .config-card > .section-label {
+            display: none;
+        }
 
         .section-label {
             font-size: 9px;
@@ -289,13 +342,21 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .full-col { grid-column: 1 / -1; }
     </style>
 </head>
 <body>
 
-<h1>⚙️ Config</h1>
-<p class="page-sub">Runtime status · Configuration · Log storage &nbsp;·&nbsp; <kbd style="font-size:9px;background:var(--surface2,#21262d);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--text-dim)">Ctrl+Shift+6</kbd></p>
+<div class="page-header">
+    <div>
+        <h1>Config</h1>
+        <p class="page-sub">Runtime status · Configuration · Storage</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn" onclick="openImport()">Fill DB</button>
+        <button class="btn" onclick="loadConfig()">Reset</button>
+        <button class="btn primary" onclick="saveConfig()">Save Config</button>
+    </div>
+</div>
 
 <div class="layout" id="layout">
 
@@ -350,18 +411,71 @@
         </div>
     </div>
 
+    <!-- ── MEMORY WATCHDOG ── -->
+    <div class="card">
+        <div class="card-hdr">
+            <span class="icon">🛡</span>
+            <h2>Memory Watchdog</h2>
+            <span class="badge" id="wdBadge">—</span>
+        </div>
+
+        <div class="status-grid" style="margin-bottom:14px;">
+            <div class="stat-item"><span class="stat-label">State</span><span class="stat-value" id="wdState"><span class="pill warn">—</span></span></div>
+            <div class="stat-item"><span class="stat-label">Process</span><span class="stat-value mono" id="wdProc">—</span></div>
+            <div class="stat-item"><span class="stat-label">Current Mem</span><span class="stat-value mono" id="wdCurMem">—</span></div>
+            <div class="stat-item"><span class="stat-label">Limit</span><span class="stat-value mono" id="wdCurLimit">—</span></div>
+            <div class="stat-item"><span class="stat-label">PID</span><span class="stat-value mono" id="wdPid">—</span></div>
+            <div class="stat-item"><span class="stat-label">Last Kill</span><span class="stat-value mono" id="wdLastKill" style="font-size:10px">—</span></div>
+        </div>
+
+        <div class="field-group">
+            <div class="field-row">
+                <div class="field">
+                    <label>Process Name</label>
+                    <input id="wdProcessName" type="text" placeholder="ZennoPoster">
+                </div>
+                <div class="field">
+                    <label>Enabled</label>
+                    <select id="wdEnabled">
+                        <option value="false">Off</option>
+                        <option value="true">On</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Limit (MB) · 0 = off</label>
+                    <input id="wdLimitMb" type="number" placeholder="4096" min="0">
+                </div>
+                <div class="field">
+                    <label>Check Interval (sec)</label>
+                    <input id="wdIntervalSec" type="number" placeholder="15" min="1">
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn primary" onclick="saveWatchdog()">💾 Save Watchdog</button>
+            </div>
+            <p style="font-size:10px; color:var(--text-dim); text-align:right; margin-top:-6px;">
+                При превышении лимита процесс убивается целиком (kill tree). Без перезапуска.
+            </p>
+        </div>
+    </div>
+
     <!-- ── CONFIG EDITOR ── -->
-    <div class="card full-col">
+    <div class="config-cards">
         <div class="card-hdr">
             <span class="icon">📝</span>
             <h2>Edit Configuration</h2>
             <span class="badge">appsettings.secrets.json</span>
             <button class="btn" onclick="openImport()" style="margin-left:8px; padding:3px 10px; font-size:10px;">⬆ Fill DB</button>
-            <button class="btn" id="btnInitStructure" onclick="initStructure()" style="margin-left:4px; padding:3px 10px; font-size:10px;">🗄 Init Structure</button>
         </div>
 
         <div class="field-group" id="configForm">
-            <div class="section-label">Database</div>
+            <section class="card config-card">
+            <div class="card-hdr">
+                <h2>Database</h2>
+                <span class="badge">appsettings.secrets.json</span>
+            </div>
             <div class="field-row">
                 <div class="field">
                     <label>DB Type</label>
@@ -375,30 +489,24 @@
                     <input id="cfgSqlitePath" type="text" placeholder="path/to/db.sqlite">
                 </div>
             </div>
-            <div class="field-row-3" id="pgFields">
-                <div class="field">
-                    <label>PG Host</label>
-                    <input id="cfgPgHost" type="text" placeholder="localhost">
-                </div>
-                <div class="field">
-                    <label>PG Port</label>
-                    <input id="cfgPgPort" type="text" placeholder="5432">
-                </div>
-                <div class="field">
-                    <label>PG Database</label>
-                    <input id="cfgPgDatabase" type="text" placeholder="postgres">
-                </div>
-                <div class="field">
-                    <label>PG User</label>
-                    <input id="cfgPgUser" type="text" placeholder="postgres">
-                </div>
-                <div class="field">
-                    <label>PG Password</label>
-                    <input id="cfgPgPassword" type="password" placeholder="••••••••">
+            <div class="field-row" id="pgFields">
+                <div class="field" style="grid-column:1 / -1;">
+                    <label>PostgreSQL Connection String</label>
+                    <div class="input-actions">
+                        <input id="cfgPgConnectionString" type="password"
+                               placeholder="Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=secret;">
+                        <button class="btn" id="btnTogglePgConnectionString" type="button"
+                                onclick="togglePgConnectionStringVisibility()">Show</button>
+                        <button class="btn" id="btnCopyPgConnectionString" type="button"
+                                onclick="copyPgConnectionString()">Copy</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="section-label">Logs & Server</div>
+            </section>
+
+            <section class="card config-card">
+            <div class="card-hdr"><h2>Logs &amp; Server</h2></div>
             <div class="field-row-3">
                 <div class="field">
                     <label>Dashboard Port</label>
@@ -434,7 +542,10 @@
                 </div>
             </div>
 
-            <div class="section-label">API Keys</div>
+            </section>
+
+            <section class="card config-card">
+            <div class="card-hdr"><h2>ZB API</h2></div>
             <div class="field-row">
                 <div class="field">
                     <label>ZB Host</label>
@@ -446,22 +557,15 @@
                 </div>
             </div>
 
-            <div class="btn-row">
-                <button class="btn" onclick="loadConfig()">↺ Reset</button>
-                <button class="btn primary" onclick="saveConfig()">💾 Save Config</button>
-            </div>
+            </section>
 
-            <div class="section-label" style="margin-top:8px;">AI Provider</div>
+            <section class="card config-card">
+            <div class="card-hdr">
+                <h2>OmniRoute</h2>
+                <span class="badge">AI</span>
+            </div>
             <div class="field-row">
                 <div class="field">
-                    <label>Provider</label>
-                    <select id="cfgAiProvider" onchange="toggleAiFields()">
-                        <option value="">Disabled</option>
-                        <option value="aiio">aiio (intelligence.io)</option>
-                        <option value="omniroute">OmniRoute (local)</option>
-                    </select>
-                </div>
-                <div class="field" id="cfgOmniRouteHostWrap" style="display:none;">
                     <label>OmniRoute Host</label>
                     <input id="cfgOmniRouteHost" type="text" placeholder="http://localhost:20128">
                 </div>
@@ -471,7 +575,10 @@
                 <span id="aiProviderStatus" style="font-size:11px; color:var(--text-dim);"></span>
             </div>
 
-            <div class="section-label" style="margin-top:8px;">Security · jVars</div>
+            </section>
+
+            <section class="card config-card">
+            <div class="card-hdr"><h2>Security · jVars</h2></div>
             <div class="field-row">
                 <div class="field">
                     <label>Wallet PIN</label>
@@ -500,6 +607,7 @@
             <p style="font-size:10px; color:var(--text-dim); text-align:right; margin-top:-6px;">
                 ⚠ Restart required for port / path changes to take effect
             </p>
+            </section>
         </div>
     </div>
 
@@ -703,32 +811,28 @@
             if (!r.ok) { toast('Config load failed', 'err'); return; }
             const d = await r.json();
 
-            setVal('cfgDbType',        (d.dbConfig?.type ?? 'sqlite').toLowerCase());
-            setVal('cfgSqlitePath',    d.dbConfig?.sqlitePath ?? '');
-            setVal('cfgPgHost',        d.dbConfig?.postgresHost ?? '');
-            setVal('cfgPgPort',        d.dbConfig?.postgresPort ?? '');
-            setVal('cfgPgDatabase',    d.dbConfig?.postgresDatabase ?? '');
-            setVal('cfgPgUser',        d.dbConfig?.postgresUser ?? '');
-            setVal('cfgPgPassword',    d.dbConfig?.postgresPassword ?? '');
-            setVal('cfgDashboardPort', d.logsConfig?.dashboardPort ?? '');
-            setVal('cfgLogHost',       d.logsConfig?.logHost ?? '');
-            setVal('cfgTrafficHost',   d.logsConfig?.trafficHost ?? '');
-            setVal('cfgLogsFolder',    d.logsConfig?.logsFolder ?? '');
-            setVal('cfgTempFolder',    d.logsConfig?.tempFolder ?? '');
-            setVal('cfgReportsFolder', d.logsConfig?.reportsFolder ?? '');
-            setVal('cfgMaxFileSizeMb', d.logsConfig?.maxFileSizeMb ?? '');
-            setVal('cfgZbKey',         d.apiConfig?.zb ?? '');
-            setVal('cfgZbHost',        d.apiConfig?.zbHost ?? '');
+            const dbConfig   = d.dbConfig   ?? d.DbConfig   ?? {};
+            const logsConfig = d.logsConfig ?? d.LogsConfig ?? {};
+            const apiConfig  = d.apiConfig  ?? d.ApiConfig  ?? {};
+
+            setVal('cfgDbType',        (dbConfig.type ?? dbConfig.Type ?? 'sqlite').toLowerCase());
+            setVal('cfgSqlitePath',    dbConfig.sqlitePath ?? dbConfig.SqlitePath ?? '');
+            setVal('cfgPgConnectionString', dbConfig.postgresConnectionString ?? dbConfig.PostgresConnectionString ?? '');
+            setVal('cfgDashboardPort', logsConfig.dashboardPort ?? logsConfig.DashboardPort ?? '');
+            setVal('cfgLogHost',       logsConfig.logHost ?? logsConfig.LogHost ?? '');
+            setVal('cfgTrafficHost',   logsConfig.trafficHost ?? logsConfig.TrafficHost ?? '');
+            setVal('cfgLogsFolder',    logsConfig.logsFolder ?? logsConfig.LogsFolder ?? '');
+            setVal('cfgTempFolder',    logsConfig.tempFolder ?? logsConfig.TempFolder ?? '');
+            setVal('cfgReportsFolder', logsConfig.reportsFolder ?? logsConfig.ReportsFolder ?? '');
+            setVal('cfgMaxFileSizeMb', logsConfig.maxFileSizeMb ?? logsConfig.MaxFileSizeMb ?? '');
+            setVal('cfgZbKey',         apiConfig.zb ?? apiConfig.ZB ?? '');
+            setVal('cfgZbHost',        apiConfig.zbHost ?? apiConfig.ZbHost ?? '');
             setVal('cfgJVarsPath',     d.securityConfig?.jVarsPath ?? '');
 
             // AI
-            const aiProvider = d.aiConfig?.provider ?? d.AiConfig?.provider ?? '';
-            const aiHost     = d.aiConfig?.omniRouteHost ?? d.AiConfig?.omniRouteHost ?? 'http://localhost:20128';
-            document.getElementById('cfgAiProvider').value = aiProvider;
+            const aiHost = d.aiConfig?.omniRouteHost ?? d.AiConfig?.omniRouteHost ?? 'http://localhost:20128';
             setVal('cfgOmniRouteHost', aiHost);
-            toggleAiFields();
-            document.getElementById('aiProviderStatus').textContent =
-                aiProvider ? '● active: ' + aiProvider : '○ disabled';
+            document.getElementById('aiProviderStatus').textContent = '● OmniRoute';
 
             togglePgFields();
         } catch(e) {
@@ -744,18 +848,38 @@
     function togglePgFields() {
         const isPg = document.getElementById('cfgDbType').value === 'postgres';
         document.getElementById('pgFields').style.opacity = isPg ? '1' : '0.35';
-        document.querySelectorAll('#pgFields input').forEach(i => i.disabled = !isPg);
+        document.querySelectorAll('#pgFields input, #pgFields button').forEach(i => i.disabled = !isPg);
     }
     document.getElementById('cfgDbType').addEventListener('change', togglePgFields);
 
-    // ── AI Provider ───────────────────────────────────────────────────
-    function toggleAiFields() {
-        const isOmni = document.getElementById('cfgAiProvider').value === 'omniroute';
-        document.getElementById('cfgOmniRouteHostWrap').style.display = isOmni ? '' : 'none';
+    function togglePgConnectionStringVisibility() {
+        const input = document.getElementById('cfgPgConnectionString');
+        const button = document.getElementById('btnTogglePgConnectionString');
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        button.textContent = show ? 'Hide' : 'Show';
     }
 
+    async function copyPgConnectionString() {
+        const value = document.getElementById('cfgPgConnectionString').value;
+        if (!value) {
+            toast('Connection string is empty', 'err');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(value);
+        } catch {
+            const input = document.getElementById('cfgPgConnectionString');
+            input.select();
+            document.execCommand('copy');
+            input.setSelectionRange(0, 0);
+        }
+        toast('✓ Connection string copied', 'ok');
+    }
+
+    // ── AI Provider ───────────────────────────────────────────────────
     async function saveAiConfig() {
-        const provider      = document.getElementById('cfgAiProvider').value;
         const omniRouteHost = document.getElementById('cfgOmniRouteHost').value || 'http://localhost:20128';
         const statusEl      = document.getElementById('aiProviderStatus');
         statusEl.textContent = '…';
@@ -763,19 +887,12 @@
             const r = await fetch('/config/ai-validate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, omniRouteHost })
+                body: JSON.stringify({ omniRouteHost })
             });
             const d = await r.json();
             if (d.ok) {
-                document.getElementById('cfgAiProvider').value = d.provider;
-                toggleAiFields();
-                if (d.provider) {
-                    statusEl.textContent = '● active: ' + d.provider;
-                    toast('✓ AI provider saved: ' + d.provider, 'ok');
-                } else {
-                    statusEl.textContent = '○ disabled' + (d.reason ? ' — ' + d.reason : '');
-                    toast('AI disabled: ' + (d.reason ?? 'validation failed'), 'err');
-                }
+                statusEl.textContent = '● OmniRoute';
+                toast('✓ OmniRoute saved', 'ok');
             } else {
                 statusEl.textContent = '✕ error';
                 toast('AI save error: ' + (d.error ?? 'unknown'), 'err');
@@ -792,11 +909,7 @@
             dbConfig: {
                 type:             document.getElementById('cfgDbType').value,
                 sqlitePath:       document.getElementById('cfgSqlitePath').value,
-                postgresHost:     document.getElementById('cfgPgHost').value,
-                postgresPort:     document.getElementById('cfgPgPort').value,
-                postgresDatabase: document.getElementById('cfgPgDatabase').value,
-                postgresUser:     document.getElementById('cfgPgUser').value,
-                postgresPassword: document.getElementById('cfgPgPassword').value,
+                postgresConnectionString: document.getElementById('cfgPgConnectionString').value,
             },
             logsConfig: {
                 dashboardPort:  document.getElementById('cfgDashboardPort').value,
@@ -914,57 +1027,87 @@
         }
     }
 
+    // ── Memory Watchdog ───────────────────────────────────────────────
+    function renderWatchdog(d) {
+        const stateEl = document.getElementById('wdState');
+        stateEl.innerHTML = d.enabled
+            ? '<span class="pill ok">ON</span>'
+            : '<span class="pill err">OFF</span>';
+
+        const over = d.limitMb > 0 && d.currentMemMb > d.limitMb;
+        document.getElementById('wdBadge').textContent =
+            d.running ? (over ? 'OVER LIMIT' : 'watching') : 'no process';
+
+        setText('wdProc', d.processName || '—');
+        setText('wdCurMem', d.running ? d.currentMemMb + ' MB' + (d.instances > 1 ? ' (' + d.instances + ')' : '') : 'not running');
+        setText('wdCurLimit', d.limitMb > 0 ? d.limitMb + ' MB' : 'off');
+        setText('wdPid', d.running && d.pid > 0 ? d.pid : '—');
+        setText('wdLastKill', d.lastKillTs ? d.lastKillTs + ' · ' + d.lastKillMemMb + ' MB' : 'never');
+    }
+
+    async function loadWatchdogStatus() {
+        try {
+            const r = await fetch('/watchdog/status');
+            if (!r.ok) return;
+            renderWatchdog(await r.json());
+        } catch (e) { /* silent */ }
+    }
+
+    async function loadWatchdog() {
+        try {
+            const r = await fetch('/watchdog/status');
+            if (!r.ok) return;
+            const d = await r.json();
+            setVal('wdProcessName', d.processName || 'ZennoPoster');
+            document.getElementById('wdEnabled').value = d.enabled ? 'true' : 'false';
+            setVal('wdLimitMb', d.limitMb ?? 0);
+            setVal('wdIntervalSec', d.intervalSec ?? 15);
+            renderWatchdog(d);
+        } catch (e) { /* silent */ }
+    }
+
+    async function saveWatchdog() {
+        const payload = {
+            enabled:     document.getElementById('wdEnabled').value === 'true',
+            processName: document.getElementById('wdProcessName').value.trim() || 'ZennoPoster',
+            limitMb:     parseInt(document.getElementById('wdLimitMb').value) || 0,
+            intervalSec: parseInt(document.getElementById('wdIntervalSec').value) || 15,
+        };
+        try {
+            const r = await fetch('/watchdog/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const d = await r.json();
+            if (d.ok) {
+                toast('✓ Watchdog saved', 'ok');
+                if (d.status) renderWatchdog(d.status);
+            } else {
+                toast('Save failed: ' + (d.error ?? 'unknown'), 'err');
+            }
+        } catch (e) {
+            toast('Error: ' + e.message, 'err');
+        }
+    }
+
     // ── Init ──────────────────────────────────────────────────────────
     (async () => {
-        await Promise.all([loadStatus(), loadStorage(), loadConfig()]);
+        await Promise.all([loadStatus(), loadStorage(), loadConfig(), loadWatchdog()]);
         jvEnsureSeed();
+        setInterval(loadWatchdogStatus, 5000);
     })();
 
     // ── IMPORT ────────────────────────────────────────────────────────
 
     const IMPORT_TYPES = [
-        { id: 'seeds',    label: 'Wallets · BIP39 Seeds' },
-        { id: 'evm',      label: 'Wallets · EVM Private Keys' },
-        { id: 'sol',      label: 'Wallets · SOL Base58 Keys' },
         { id: 'proxy',    label: 'Proxy' },
         { id: 'evm_addr', label: 'Addresses · EVM' },
         { id: 'sol_addr', label: 'Addresses · SOL' },
-        { id: 'twitter',  label: 'Social · Twitter' },
-        { id: 'discord',  label: 'Social · Discord' },
-        { id: 'google',   label: 'Social · Google' },
-        { id: 'github',   label: 'Social · GitHub' },
-        { id: 'bio',      label: 'Bio / Nicknames' },
-        { id: 'mail',     label: 'Mail' },
-        { id: 'rpc',      label: 'RPC' },
-        { id: 'deposits', label: 'Deposits' },
     ];
-
-    const SOCIAL_FIELDS = {
-        twitter: ['login','password','otpsecret','otpbackup','email','emailpass','token','cookies','status','last'],
-        discord: ['login','password','otpsecret','otpbackup','email','emailpass','token','recovery_phone','status','last'],
-        google:  ['login','password','otpsecret','otpbackup','recoveryemail','recovery_phone','cookies','status','last'],
-        github:  ['login','password','otpsecret','otpbackup','email','emailpass','token','cookies','status','last'],
-    };
 
     let _importQueue = [];
     let _importIdx   = 0;
-
-    async function initStructure() {
-        const btn = document.getElementById('btnInitStructure');
-        btn.disabled = true;
-        btn.textContent = '⏳ Loading…';
-        try {
-            const res  = await fetch('/import/structure', { method: 'POST' });
-            const data = await res.json();
-            if (data.ok) toast('\u2713 ' + data.imported + ' tables ready');
-            else         toast('Error: ' + data.error, 'err');
-        } catch (e) {
-            toast('Request failed: ' + e.message, 'err');
-        } finally {
-            btn.disabled    = false;
-            btn.textContent = '\uD83D\uDDC4 Init Structure';
-        }
-    }
 
     function openImport() {
         const overlay = document.getElementById('importOverlay');
@@ -1012,73 +1155,7 @@
         const body = document.getElementById('importStepBody');
         body.innerHTML = '';
 
-        if (id === 'rpc') {
-            addTextarea(body, 'lines', 'id;https://rpc.url;https://explorer.url;apiKey\none per line');
-        } else if (id === 'deposits') {
-            addInput(body, 'chain', 'Chain (e.g. eth)');
-            addInput(body, 'cex',   'CEX (e.g. binance)');
-            addTextarea(body, 'lines', '0x... one per line');
-        } else if (id === 'bio') {
-            addLabel(body, 'Nicknames'); addTextarea(body, 'nicknames', 'one per line');
-            addLabel(body, 'Bios');      addTextarea(body, 'bios',      'one per line');
-        } else if (id === 'mail') {
-            addLabel(body, 'Google');    addTextarea(body, 'google',    'one per line');
-            addLabel(body, 'iCloud');    addTextarea(body, 'icloud',    'one per line');
-            addLabel(body, 'Firstmail'); addTextarea(body, 'firstmail', 'one per line');
-        } else if (['twitter','discord','google','github'].includes(id)) {
-            renderSocialStep(body, id);
-        } else {
-            addTextarea(body, 'lines', 'One entry per line');
-        }
-    }
-
-    function renderSocialStep(body, network) {
-        const fields = SOCIAL_FIELDS[network];
-        addLabel(body, 'Field separator');
-        addInput(body, 'separator', 'e.g. :  or  ;', ':');
-        addLabel(body, 'Mask \u2014 click to toggle, order = column order in your data');
-
-        const maskBox = document.createElement('div');
-        maskBox.id = 'socialMask';
-        maskBox.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px;';
-        fields.forEach(function(f) {
-            const chip = document.createElement('span');
-            chip.dataset.field  = f;
-            chip.dataset.active = 'true';
-            chip.style.cssText  = 'padding:2px 10px; border-radius:12px; background:var(--accent,#58a6ff); color:#000; cursor:pointer; user-select:none; font-size:11px;';
-            chip.textContent    = f;
-            chip.onclick = function() {
-                const on = chip.dataset.active !== 'true';
-                chip.dataset.active   = on ? 'true' : 'false';
-                chip.style.background = on ? 'var(--accent,#58a6ff)' : 'var(--surface2,#21262d)';
-                chip.style.color      = on ? '#000' : 'var(--text-dim,#8b949e)';
-                updateMaskPreview();
-            };
-            maskBox.appendChild(chip);
-        });
-        body.appendChild(maskBox);
-
-        const preview = document.createElement('div');
-        preview.id = 'maskPreview';
-        preview.style.cssText = 'font-size:10px; color:var(--text-dim,#8b949e); margin-bottom:8px; font-style:italic; min-height:14px;';
-        body.appendChild(preview);
-        updateMaskPreview();
-
-        addLabel(body, 'Data');
-        addTextarea(body, 'lines', 'one account per line');
-    }
-
-    function updateMaskPreview() {
-        const sep = (document.querySelector('#importStepBody [data-id="separator"]') || {}).value || ':';
-        const active = getMask();
-        const el = document.getElementById('maskPreview');
-        if (el) el.textContent = active.length ? 'Expected: ' + active.join(sep) : '';
-    }
-
-    function getMask() {
-        return [...document.querySelectorAll('#socialMask [data-field]')]
-            .filter(function(c) { return c.dataset.active === 'true'; })
-            .map(function(c) { return c.dataset.field; });
+        addTextarea(body, 'lines', 'One entry per line');
     }
 
     function addTextarea(parent, dataId, placeholder) {
@@ -1087,24 +1164,6 @@
         ta.placeholder   = placeholder;
         ta.style.cssText = 'width:100%; min-height:100px; resize:vertical; background:var(--bg,#0d1117); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px; font-family:inherit; font-size:11px; box-sizing:border-box;';
         parent.appendChild(ta);
-    }
-
-    function addInput(parent, dataId, placeholder, value) {
-        const inp = document.createElement('input');
-        inp.type         = 'text';
-        inp.dataset.id   = dataId;
-        inp.placeholder  = placeholder;
-        inp.value        = value || '';
-        inp.style.cssText = 'width:100%; background:var(--bg,#0d1117); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px 8px; font-family:inherit; font-size:11px; box-sizing:border-box;';
-        inp.addEventListener('input', function() { if (dataId === 'separator') updateMaskPreview(); });
-        parent.appendChild(inp);
-    }
-
-    function addLabel(parent, text) {
-        const el = document.createElement('div');
-        el.style.cssText = 'font-size:10px; color:var(--text-dim,#8b949e); margin-top:4px;';
-        el.textContent   = text;
-        parent.appendChild(el);
     }
 
     function getField(dataId) {
@@ -1141,34 +1200,14 @@
     }
 
     function resolveEndpoint(id) {
-        if (id === 'seeds' || id === 'evm' || id === 'sol')                   return '/import/wallets';
         if (id === 'evm_addr' || id === 'sol_addr')                           return '/import/addresses';
-        if (id === 'twitter' || id === 'discord' || id === 'google' || id === 'github') return '/import/social';
         return '/import/' + id;
     }
 
     function buildPayload(id) {
-        if (id === 'seeds')    return { type:'seed', lines: getField('lines') };
-        if (id === 'evm')      return { type:'evm',  lines: getField('lines') };
-        if (id === 'sol')      return { type:'sol',  lines: getField('lines') };
         if (id === 'proxy')    return { lines: getField('lines') };
         if (id === 'evm_addr') return { type:'evm',  lines: getField('lines') };
         if (id === 'sol_addr') return { type:'sol',  lines: getField('lines') };
-        if (id === 'bio')      return { nicknames: getField('nicknames'), bios: getField('bios') };
-        if (id === 'mail')     return { google: getField('google'), icloud: getField('icloud'), firstmail: getField('firstmail') };
-        if (id === 'rpc')      return { lines: getField('lines') };
-
-        if (id === 'deposits') {
-            const chain = getField('chain'), cex = getField('cex');
-            if (!chain || !cex) { toast('Chain and CEX required', 'err'); return null; }
-            return { chain: chain, cex: cex, lines: getField('lines') };
-        }
-
-        if (id === 'twitter' || id === 'discord' || id === 'google' || id === 'github') {
-            const mask = getMask();
-            if (!mask.length) { toast('No mask fields selected', 'err'); return null; }
-            return { table: '_' + id, mask: mask, separator: getField('separator') || ':', lines: getField('lines') };
-        }
 
         return { lines: getField('lines') };
     }

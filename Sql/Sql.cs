@@ -5,7 +5,7 @@ using System.Data.Odbc;
 using System.Diagnostics;
 
 
-namespace z3nIO
+namespace DevDeck
 {
     public enum DatabaseType
     {

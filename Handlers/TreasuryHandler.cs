@@ -14,7 +14,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace z3nIO;
+namespace DevDeck;
 
 internal sealed class TreasuryHandler
 {
@@ -26,7 +26,7 @@ internal sealed class TreasuryHandler
     private volatile int    _total;
     private volatile string _lastError = "";
 
-    private const string AiCacheTable = "_treasury_ai_cache";
+    private static string AiCacheTable => DbSchema.TreasuryAiCache.Name;
     private const string Lang         = "russian";
 
     public TreasuryHandler(DbConnectionService dbService, AiClient aiClient)
@@ -105,7 +105,7 @@ internal sealed class TreasuryHandler
 
         for (int id = 1; id <= maxId; id++)
         {
-            var address = db.Get("evm", "_addresses", where: $"id = {id}");
+            var address = db.Get("evm", DbSchema.Addresses.Name, where: $"id = {id}");
             Console.WriteLine($"[treasury] {id} address='{address}' len={address?.Length}");
 
             if (string.IsNullOrEmpty(address)) continue;
@@ -204,13 +204,7 @@ internal sealed class TreasuryHandler
 
     private static void EnsureAiCacheTable(Db db)
     {
-        db.CreateTable(new Dictionary<string, string>
-        {
-            ["id"]     = "INTEGER PRIMARY KEY",
-            ["model"]  = "TEXT",
-            ["ts"]     = "TEXT",
-            ["report"] = "TEXT"
-        }, AiCacheTable);
+        db.CreateTable(DbSchema.TreasuryAiCache.Columns, AiCacheTable);
     }
 
     private static void SaveAiCache(Db db, string model, string analysis, string ts)
@@ -369,10 +363,10 @@ internal sealed class TreasuryHandler
 
     private async Task ProcessAccount(Db db, int id, decimal minValue)
     {
-        var address = db.Get("evm", "_addresses", where: $"id = {id}");
+        var address = db.Get("evm", DbSchema.Addresses.Name, where: $"id = {id}");
         if (string.IsNullOrEmpty(address)) return;
 
-        var proxy = db.GetRandom("proxy", "_instance");
+        var proxy = db.GetRandom("proxy", DbSchema.Instance.Name);
         if (string.IsNullOrEmpty(proxy)) return;
 
         try

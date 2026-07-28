@@ -2,7 +2,7 @@
 
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public static partial class InternalTasks
 {
@@ -98,10 +98,10 @@ public static partial class InternalTasks
 
             logger.Acc = accId;
 
-            var instanceCols = db.GetTableColumns("_instance");
+            var instanceCols = db.GetTableColumns(DbSchema.Instance.Name);
             if (instanceCols.Count > 0)
             {
-                var instance = db.GetColumns(string.Join(",", instanceCols), "_instance", where: $"\"id\" = '{accId}'");
+                var instance = db.GetColumns(string.Join(",", instanceCols), DbSchema.Instance.Name, where: $"\"id\" = '{accId}'");
                 project.VarsFromDict(instance);
             }
 

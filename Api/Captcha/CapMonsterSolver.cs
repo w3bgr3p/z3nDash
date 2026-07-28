@@ -2,7 +2,7 @@
 using System.Text.RegularExpressions;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3nIO.Api.Captcha;
+namespace DevDeck.Api.Captcha;
 
 
 public class CapMonsterSolver

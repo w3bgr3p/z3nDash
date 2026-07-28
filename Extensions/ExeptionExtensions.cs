@@ -1,4 +1,4 @@
-﻿namespace z3nIO;
+﻿namespace DevDeck;
 
 internal static class ExceptionExtensions
 {

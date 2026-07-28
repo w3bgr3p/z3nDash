@@ -16,7 +16,7 @@
 
 using System.Net;
 using System.Text;
-using z3nIO;
+using DevDeck;
 
 public class EmbeddedServer
 {
@@ -37,7 +37,6 @@ public class EmbeddedServer
     private readonly ConfigHandler     _configHandler; 
     private readonly ZbHandler _zbHandler;
     private readonly AiClient _aiClient;
-    private readonly AiReportHandler _aiReportHandler;
     private readonly AiAgentHandler _aiAgentHandler;
     private readonly TreasuryHandler _treasuryHandler;
     private readonly SystemSnapshotHandler _snapshotHandler;
@@ -114,9 +113,8 @@ public class EmbeddedServer
         _reportHandler = new ReportHandler(reportsPath, _wwwrootPath, dbService);
         _zbHandler = new ZbHandler();
         _replayHandler  = new HttpReplayHandler();
-        _aiClient            = new AiClient(dbService);
+        _aiClient            = new AiClient();
         _configHandler       = new ConfigHandler(logPath, _listener, _port, dbService, _aiClient);
-        _aiReportHandler     = new AiReportHandler(dbService, _aiClient);
         _aiAgentHandler      = new AiAgentHandler(dbService, _aiClient);
         _treasuryHandler     = new TreasuryHandler(dbService, _aiClient);
         _snapshotHandler     = new SystemSnapshotHandler(dbService, _aiClient);
@@ -315,11 +313,6 @@ public class EmbeddedServer
             if (_aiAgentHandler.Matches(path))
             {
                 await _aiAgentHandler.Handle(context);
-                return;
-            }
-            if (_aiReportHandler.Matches(path))
-            {
-                await _aiReportHandler.Handle(context);
                 return;
             }
             if (path.StartsWith("/treasury"))

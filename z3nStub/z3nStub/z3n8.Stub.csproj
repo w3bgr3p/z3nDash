@@ -4,8 +4,8 @@
         <OutputType>Library</OutputType>
         <TargetFramework>net8.0-windows</TargetFramework>
         <UseWindowsForms>false</UseWindowsForms>
-        <RootNamespace>z3nIO</RootNamespace>
-        <AssemblyName>z3nIO.Stub</AssemblyName>
+        <RootNamespace>DevDeck</RootNamespace>
+        <AssemblyName>DevDeck.Stub</AssemblyName>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>

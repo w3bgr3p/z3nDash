@@ -4,7 +4,7 @@
 
 using Newtonsoft.Json;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public static partial class InternalTasks
 {

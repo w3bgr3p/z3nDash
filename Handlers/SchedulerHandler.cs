@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using z3nIO;
+using DevDeck;
 
-namespace z3nIO;
+namespace DevDeck;
 
 /// <summary>
 /// Маршруты:
@@ -23,7 +23,7 @@ public sealed class SchedulerHandler : IScriptHandler
     private readonly SchedulerService    _scheduler;
     private readonly string              _wwwrootPath;
 
-    private const string Table = "_schedules";
+    private static string Table => DbSchema.Schedules.Name;
 
     private static readonly List<string> Columns = new()
     {
@@ -111,8 +111,10 @@ public sealed class SchedulerHandler : IScriptHandler
     {
         var cols = db.GetTableColumns(Table);
         if (cols.Count == 0) { await HttpHelpers.WriteJson(ctx.Response, new List<object>()); return; }
-
+        
+        cols = cols.Where(c => c != "last_output").ToList();
         var rows = db.GetLines(string.Join(",", cols), Table, where: "\"id\" != ''");
+
         await HttpHelpers.WriteJson(ctx.Response, RowsToList(rows, cols));
     }
 

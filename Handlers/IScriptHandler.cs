@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public interface IScriptHandler
 {

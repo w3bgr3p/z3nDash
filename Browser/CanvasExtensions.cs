@@ -7,7 +7,7 @@ using System.Threading;
 using Microsoft.Playwright;
 using OpenCvSharp;
 
-namespace z3nIO.Browser
+namespace DevDeck.Browser
 {
     /// <summary>
     /// Реализация canvas-методов IBrowserInstance для PlaywrightInstance:

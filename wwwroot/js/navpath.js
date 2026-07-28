@@ -7,8 +7,6 @@ window.NAV_CONFIG = {
         'alt+Digit5': '/?page=http',
         'alt+Digit6': '/json',
         'alt+Digit7': '/text.html',
-         
-        'alt+Digit9': '/ai.html',
         'alt+Digit0': '/?page=config',
         'alt+KeyC':   '/?page=clips',
         'alt+KeyH':   '/docs',
@@ -23,7 +21,6 @@ window.NAV_CONFIG = {
         { id: 'json',      label: 'JSON',       href: '/json',           hotkey: '6' },
         { id: 'text',      label: 'Text',       href: '/?page=text',     hotkey: '7' },
         { id: 'clips',     label: 'Clips',      href: '/?page=clips',    hotkey: 'C' },
-        { id: 'ai',        label: 'Ai',         href: '/?page=ai',       hotkey: '9' },
         { id: 'sql',        label: 'sql',         href: '/?page=sqlite',       hotkey: '-' },
         { id: 'treasury',        label: 'Treasury',         href: '/?page=treasury',       hotkey: '8' },
         { id: 'system',        label: 'System',         href: '/?page=system',       hotkey: 'S' },

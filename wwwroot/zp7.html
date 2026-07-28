@@ -293,43 +293,6 @@
             color: var(--text2);
         }
 
-        /* Commands panel */
-        .commands-panel {
-            height: 180px;
-            flex-shrink: 0;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            background: var(--bg);
-        }
-
-        .cmd-list { flex: 1; overflow-y: auto; }
-        .cmd-list::-webkit-scrollbar { width: 5px; }
-        .cmd-list::-webkit-scrollbar-track { background: var(--bg); }
-        .cmd-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-        .cmd-row {
-            display: grid;
-            grid-template-columns: 70px 80px 80px 1fr 90px;
-            gap: 5px;
-            padding: 4px 9px;
-            border-bottom: 1px solid var(--bg2);
-            align-items: center;
-            font-size: 10px;
-        }
-
-        .cmd-status-pending { color: var(--yellow); }
-        .cmd-status-done    { color: var(--green); }
-        .cmd-status-error   { color: var(--red); }
-        .cmd-action-start   { color: var(--green); }
-        .cmd-action-stop    { color: var(--red); }
-        .cmd-action-update  { color: var(--accent); }
-        .cmd-result { color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .cmd-time   { color: var(--muted); }
-        .cmd-task   { color: var(--text2); }
-
         .empty-msg { padding: 16px; text-align: center; color: var(--muted); }
 
         /* Resizer */
@@ -680,49 +643,6 @@
         .heatmap-cell.error-old        { background: #3a1210; border-color: #5a1a18; }
         .heatmap-cell:hover { transform: scale(1.3); z-index: 10; box-shadow: 0 0 8px rgba(255,255,255,0.3); }
 
-        /* AI report icon */
-        .ai-info-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 14px; height: 14px;
-            border-radius: 50%;
-            border: 1px solid var(--accent);
-            color: var(--accent);
-            font-size: 9px;
-            font-weight: 700;
-            cursor: pointer;
-            flex-shrink: 0;
-            margin-left: 4px;
-            line-height: 1;
-            user-select: none;
-            transition: background 0.12s;
-        }
-        .ai-info-icon:hover { background: rgba(56,139,253,0.15); }
-
-        /* AI report popup */
-        #aiReportPopup {
-            position: fixed;
-            background: var(--bg2);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 10px 12px;
-            color: var(--text);
-            font-size: 11px;
-            pointer-events: none;
-            z-index: 9500;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            display: none;
-            max-width: 340px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        #aiReportPopup.show { display: block; }
-        .ai-popup-title { font-size: 10px; font-weight: 600; color: var(--accent); margin-bottom: 6px; }
-        .ai-popup-meta  { font-size: 9px; color: var(--muted); margin-bottom: 6px; }
-        .ai-popup-body  { font-size: 11px; color: var(--text); }
-        .ai-popup-none  { font-size: 11px; color: var(--muted); font-style: italic; }
     </style>
 
 </head>
@@ -850,29 +770,6 @@
             </div>
         </div>
 
-        <div class="h-resizer" id="hResizerBot"></div>
-
-        <div class="commands-panel">
-            <div class="panel-header">
-                <span class="panel-title">Commands Queue</span>
-                <span class="count-badge" id="cmdCount">0</span>
-                <div style="margin-left:auto;display:flex;gap:5px;">
-                    <select id="cmdStatusFilter" onchange="refreshCommands()" style="background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;padding:2px 5px;font-size:10px;">
-                        <option value="">All</option>
-                        <option value="pending">Pending</option>
-                        <option value="done">Done</option>
-                        <option value="error">Error</option>
-                    </select>
-                    <button class="auto-badge" onclick="clearCommands('done')" style="color:#8b949e;" title="Clear done commands">✗ Done</button>
-                    <button class="auto-badge" onclick="clearCommands('all')" style="color:#f85149;" title="Clear all commands">✗ All</button>
-                    <button class="auto-badge" onclick="refreshCommands()" style="color:#c9d1d9;">↺</button>
-                </div>
-            </div>
-            <div class="cmd-list" id="cmdList">
-                <div class="empty-msg">No commands</div>
-            </div>
-        </div>
-
     </div>
 </div>
 
@@ -906,25 +803,6 @@
     </div>
 </div>
 
-<!-- Settings Modal -->
-<div class="modal-overlay" id="settingsModal">
-    <div class="modal">
-        <div class="modal-header">
-            <h3 id="modalTitle">Settings</h3>
-            <button class="modal-close" onclick="closeModal()">✕</button>
-        </div>
-        <div class="modal-tabs" id="modalTabs"></div>
-        <div class="modal-body" id="modalBody">
-            <div class="empty-msg">Loading...</div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-update" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-update" id="copyPayloadBtn" onclick="copySettingsPayload()" style="border-color:#58a6ff;color:#58a6ff;" title="Copy settings as scheduler payload to clipboard">📋 Copy Payload</button>
-            <button class="btn btn-start" onclick="saveSettings()">💾 Save & Apply</button>
-        </div>
-    </div>
-</div>
-
 <script>
     const SERVER = window.location.origin;
     let allTasks = [];
@@ -946,8 +824,7 @@
                 tagFilters:     [...activeTagFilters],
                 nameFilter:     document.getElementById('nameFilter')?.value    || '',
                 statusFilter:   document.getElementById('statusFilter')?.value  || '',
-                workFilter:     document.getElementById('workFilter')?.value    || '',
-                cmdStatusFilter:document.getElementById('cmdStatusFilter')?.value || ''
+                workFilter:     document.getElementById('workFilter')?.value    || ''
             }));
         } catch {}
     }
@@ -963,7 +840,6 @@
             if (s.nameFilter)     { const el = document.getElementById('nameFilter');     if (el) el.value = s.nameFilter; }
             if (s.statusFilter)   { const el = document.getElementById('statusFilter');   if (el) el.value = s.statusFilter; }
             if (s.workFilter)     { const el = document.getElementById('workFilter');     if (el) el.value = s.workFilter; }
-            if (s.cmdStatusFilter){ const el = document.getElementById('cmdStatusFilter');if (el) el.value = s.cmdStatusFilter; }
         } catch {}
     }
 
@@ -971,7 +847,6 @@
     window.addEventListener('DOMContentLoaded', () => {
         _restoreState();
         refreshTasks();
-        refreshCommands();
         startAuto();
         initResizer();
         initLogsResizer();
@@ -982,7 +857,6 @@
     function startAuto() {
         autoInterval = setInterval(() => {
             refreshTasks();
-            refreshCommands();
         }, 3000);
     }
 
@@ -1456,7 +1330,6 @@
     function initHResizers() {
         const detail   = document.querySelector('.detail-panel');
         const logsArea = document.getElementById('logsArea');
-        const commands = document.querySelector('.commands-panel');
 
         function makeRowResizer(resizerId, topEl, botEl, saveKeyTop, saveKeyBot) {
             const r = document.getElementById(resizerId);
@@ -1495,8 +1368,7 @@
             });
         }
 
-        makeRowResizer('hResizerTop', detail, logsArea,  'pm_h_detail',   'pm_h_logs');
-        makeRowResizer('hResizerBot', logsArea, commands, 'pm_h_logs',     'pm_h_cmds');
+        makeRowResizer('hResizerTop', detail, logsArea, 'pm_h_detail', 'pm_h_logs');
     }
 
     function renderDetail(t) {
@@ -1523,7 +1395,6 @@
                 <button class="btn btn-stop" onclick="sendCommand('${t.Id}','stop')">■ Stop</button>
                 <button class="btn btn-stop" onclick="sendCommand('${t.Id}','interrupt')" style="background:#7c2d12;border-color:#c2410c;">⚡ Interrupt</button>
                 <button class="btn btn-update" onclick="sendCommand('${t.Id}','update_settings')">↺ Apply</button>
-                <button class="btn btn-update" onclick="openSettings('${t.Id}','${escHtml(t.Name)}')" style="border-color:#58a6ff;color:#58a6ff;">⚙ Settings</button>
                 <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','add_tries')">+ Tries</button>
                 <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','set_tries')">= Tries</button>
                 <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','set_threads')">⚙ Threads</button>
@@ -1564,38 +1435,6 @@
         `;
     }
 
-    // ── COMMANDS ──
-    async function refreshCommands() {
-        const statusFilter = document.getElementById('cmdStatusFilter').value;
-        let url = `${SERVER}/zp/commands`;
-        if (statusFilter) url += `?status=${statusFilter}`;
-        _saveState();
-        try {
-            const r = await fetch(url);
-            const cmds = await r.json();
-            renderCommands(cmds);
-            document.getElementById('cmdCount').textContent = cmds.length;
-        } catch (e) { console.error('Commands fetch failed:', e); }
-    }
-
-    function renderCommands(cmds) {
-        const container = document.getElementById('cmdList');
-        if (!cmds.length) { container.innerHTML = '<div class="empty-msg">No commands</div>'; return; }
-        container.innerHTML = cmds.slice(0, 100).map(c => {
-            const stClass = `cmd-status-${c.status || 'pending'}`;
-            const actClass = `cmd-action-${c.action || ''}`;
-            const taskName = allTasks.find(t => t.Id === c.task_id)?.Name || c.task_id || '—';
-            const time = c.created_at ? c.created_at.slice(11, 19) : '—';
-            return `<div class="cmd-row">
-                <span class="${stClass}">${c.status || '—'}</span>
-                <span class="${actClass}">${c.action || '—'}</span>
-                <span class="cmd-task" title="${escHtml(taskName)}">${escHtml(taskName.slice(0,12))}${taskName.length>12?'…':''}</span>
-                <span class="cmd-result">${escHtml(c.result || c.payload || '')}</span>
-                <span class="cmd-time">${time}</span>
-            </div>`;
-        }).join('');
-    }
-
     async function sendCommand(taskId, action, payload = '') {
         try {
             const machine = allTasks.find(t => t.Id === taskId)?.machine || '';
@@ -1606,7 +1445,6 @@
             });
             const result = await r.json();
             console.log(`Command sent: ${action} → ${taskId}`, result);
-            refreshCommands();
         } catch (e) { console.error('Send command failed:', e); }
     }
 
@@ -1622,205 +1460,6 @@
         await sendCommand(taskId, action, val.trim());
     }
 
-    // ── SETTINGS MODAL ──
-    let modalTaskId = null;
-    let modalMachine = null;
-    let modalFields = [];
-
-    async function openSettings(zpTaskId, taskName) {
-        modalTaskId  = zpTaskId;
-        modalMachine = allTasks.find(t => t.Id === zpTaskId)?.machine || '';
-        document.getElementById('modalTitle').textContent = `Settings: ${taskName}`;
-        document.getElementById('modalBody').innerHTML = '<div class="empty-msg">Loading...</div>';
-        document.getElementById('settingsModal').classList.add('open');
-        try {
-            const r = await fetch(`${SERVER}/zp/settings-xml?task_id=${encodeURIComponent(zpTaskId)}&machine=${encodeURIComponent(modalMachine)}`);
-            const data = await r.json();
-            modalFields = data.fields || [];
-            renderModalFields(modalFields);
-        } catch (e) {
-            document.getElementById('modalBody').innerHTML = `<div class="empty-msg" style="color:#f85149">Load failed: ${e.message}</div>`;
-        }
-    }
-
-    function closeModal() {
-        document.getElementById('settingsModal').classList.remove('open');
-        modalTaskId  = null;
-        modalMachine = null;
-        modalFields  = [];
-    }
-
-    // ── PM → Scheduler payload export ──
-    function _pmTypeToSchemaType(t) {
-        switch (t) {
-            case 'Tab':                 return 'tab';
-            case 'Comment':             return 'section';
-            case 'Boolean':             return 'boolean';
-            case 'DropDown':            return 'select';
-            case 'DropDownMultiSelect': return 'multiselect';
-            case 'Password':            return 'password';
-            default:                    return 'text';
-        }
-    }
-
-    async function copySettingsPayload() {
-        if (!modalFields.length) return;
-
-        // Build schema — strip {opts} from label, put in options field
-        const schema = modalFields.map(f => {
-            const type = _pmTypeToSchemaType(f.type);
-            const optMatch = (f.label || '').match(/\{([^}]+)\}/);
-            const cleanLabel = (f.label || '').replace(/\{[^}]+\}/g, '').trim() || f.key || '';
-            const item = { key: f.key || '', label: cleanLabel, type };
-            if (optMatch && (type === 'select' || type === 'multiselect'))
-                item.options = optMatch[1].split('|').map(function(s) { return s.trim(); }).join(', ');
-            if (f.help) item.help = f.help;
-            return item;
-        });
-
-        // Read current DOM values
-        const values = {};
-        document.querySelectorAll('#modalBody [data-key]').forEach(function(el) {
-            values[el.dataset.key] = el.type === 'checkbox' ? (el.checked ? 'True' : 'False') : el.value;
-        });
-        document.querySelectorAll('#modalBody [data-multi]').forEach(function(el) {
-            const k = el.dataset.multi;
-            if (!values[k]) values[k] = [];
-            if (el.checked) values[k].push(el.value);
-        });
-        for (const k in values) {
-            if (Array.isArray(values[k])) values[k] = values[k].join(', ');
-        }
-
-        const payload = { schema: JSON.stringify(schema), values: JSON.stringify(values) };
-        try {
-            await navigator.clipboard.writeText(JSON.stringify(payload));
-            const btn = document.getElementById('copyPayloadBtn');
-            const orig = btn.textContent;
-            btn.textContent = '✓ Copied';
-            setTimeout(function() { btn.textContent = orig; }, 1500);
-        } catch (e) {
-            await _dialog.error('Clipboard write failed: ' + e.message);
-        }
-    }
-
-    function renderModalFields(fields) {
-        const body = document.getElementById('modalBody');
-        const tabsEl = document.getElementById('modalTabs');
-
-        if (!fields.length) {
-            body.innerHTML = '<div class="empty-msg">No settings found</div>';
-            tabsEl.innerHTML = '';
-            return;
-        }
-
-        const tabs = [];
-        let currentTab = { name: 'Global', fields: [] };
-
-        for (const f of fields) {
-            if (f.type === 'Tab') {
-                if (currentTab.fields.length > 0 || tabs.length === 0) tabs.push(currentTab);
-                const tabLabel = f.label.replace(/[{}]/g, '').trim() || f.key || 'Tab';
-                currentTab = { name: tabLabel, fields: [] };
-            } else {
-                currentTab.fields.push(f);
-            }
-        }
-        tabs.push(currentTab);
-
-        tabsEl.innerHTML = tabs.map((t, i) =>
-            `<button class="modal-tab ${i === 0 ? 'active' : ''}" onclick="switchTab(${i})">${escHtml(t.name)}</button>`
-        ).join('');
-
-        body.innerHTML = tabs.map((t, i) =>
-            `<div class="tab-pane ${i === 0 ? 'active' : ''}" id="tab-pane-${i}">${renderFieldsHtml(t.fields)}</div>`
-        ).join('');
-    }
-
-    function switchTab(idx) {
-        document.querySelectorAll('.modal-tab').forEach((el, i) => el.classList.toggle('active', i === idx));
-        document.querySelectorAll('.tab-pane').forEach((el, i) => el.classList.toggle('active', i === idx));
-    }
-
-    function renderFieldsHtml(fields) {
-        let html = '';
-        for (const f of fields) {
-            if (f.type === 'Comment') {
-                const label = f.label.replace(/[▪◆►•]+/g, '').replace(/\s+/g, ' ').trim();
-                if (label.length > 2) html += `<div class="section-divider">${escHtml(label.slice(0, 100))}</div>`;
-                continue;
-            }
-            if (!f.key) continue;
-
-            const cleanLabel = f.label.replace(/\{[^}]+\}/g, '').trim() || f.key;
-            const labelHtml = `<span class="field-label">${escHtml(cleanLabel)}<span class="field-key">${escHtml(f.key)}</span></span>`;
-
-            if (f.type === 'Boolean') {
-                const checked = f.value === 'True' || f.value === 'true' ? 'checked' : '';
-                html += `<div class="field-group">${labelHtml}<div class="field-bool"><input type="checkbox" id="f_${escHtml(f.key)}" data-key="${escHtml(f.key)}" ${checked}><label for="f_${escHtml(f.key)}" style="color:#8b949e;font-size:10px;">${f.value || 'False'}</label></div></div>`;
-            } else if (f.type === 'DropDown') {
-                const optMatch = f.label.match(/\{([^}]+)\}/);
-                if (optMatch) {
-                    const opts = optMatch[1].split('|').map(o => o.trim());
-                    const optsHtml = opts.map(o => `<option value="${escHtml(o)}" ${o === f.value ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
-                    html += `<div class="field-group">${labelHtml}<select class="field-select" data-key="${escHtml(f.key)}">${optsHtml}</select></div>`;
-                } else {
-                    html += `<div class="field-group">${labelHtml}<input class="field-input" data-key="${escHtml(f.key)}" value="${escHtml(f.value)}"></div>`;
-                }
-            } else if (f.type === 'DropDownMultiSelect') {
-                const optMatch = f.label.match(/\{([^}]+)\}/);
-                const selected = (f.value || '').split(',').map(s => s.trim());
-                if (optMatch) {
-                    const opts = optMatch[1].split('|').map(o => o.trim());
-                    const checkboxes = opts.map(o =>
-                        `<label><input type="checkbox" data-multi="${escHtml(f.key)}" value="${escHtml(o)}" ${selected.includes(o) ? 'checked' : ''}><span>${escHtml(o)}</span></label>`
-                    ).join('');
-                    html += `<div class="field-group">${labelHtml}<div class="field-multiselect">${checkboxes}</div></div>`;
-                } else {
-                    html += `<div class="field-group">${labelHtml}<input class="field-input" data-key="${escHtml(f.key)}" value="${escHtml(f.value)}"></div>`;
-                }
-            } else if (f.type === 'FileName' || f.type === 'Label') {
-                html += `<div class="field-group">${labelHtml}<input class="field-input" data-key="${escHtml(f.key)}" value="${escHtml(f.value)}" placeholder="${escHtml(f.help || '')}"></div>`;
-            } else {
-                const isLong = (f.value || '').length > 60;
-                if (isLong) {
-                    html += `<div class="field-group">${labelHtml}<textarea class="field-textarea" data-key="${escHtml(f.key)}">${escHtml(f.value)}</textarea></div>`;
-                } else {
-                    html += `<div class="field-group">${labelHtml}<input class="field-input" data-key="${escHtml(f.key)}" value="${escHtml(f.value)}"></div>`;
-                }
-            }
-        }
-        return html || '<div class="empty-msg" style="padding:16px 0">No fields in this tab</div>';
-    }
-
-    async function saveSettings() {
-        if (!modalTaskId) return;
-        const fields = {};
-        document.querySelectorAll('#modalBody [data-key]').forEach(el => {
-            const key = el.dataset.key;
-            fields[key] = el.type === 'checkbox' ? (el.checked ? 'True' : 'False') : el.value;
-        });
-        document.querySelectorAll('#modalBody [data-multi]').forEach(el => {
-            const key = el.dataset.multi;
-            if (!fields[key]) fields[key] = [];
-            if (el.checked) fields[key].push(el.value);
-        });
-        for (const k in fields) {
-            if (Array.isArray(fields[k])) fields[k] = fields[k].join(', ');
-        }
-        try {
-            const r = await fetch(`${SERVER}/zp/settings-xml`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: modalTaskId, machine: modalMachine, fields })
-            });
-            const result = await r.json();
-            if (result.ok) { closeModal(); refreshCommands(); }
-            else await _dialog.error('Save failed: ' + JSON.stringify(result));
-        } catch (e) { await _dialog.error('Save failed: ' + e.message); }
-    }
-
-    document.getElementById('settingsModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
     document.getElementById('execModal').addEventListener('click', function(e) { if (e.target === this) closeExecModal(); });
     document.getElementById('schedulerModal').addEventListener('click', function(e) { if (e.target === this) closeSchedulerModal(); });
 
@@ -1994,19 +1633,6 @@
         if (lbl && show) lbl.firstChild.textContent = REPEAT_LABELS[val] || 'Attempts Range';
     }
 
-    async function clearCommands(scope) {
-        const label = scope === 'all' ? 'all commands' : 'done commands';
-        if (!await _dialog.confirm(`Clear ${label}?`, 'Clear commands', true)) return;
-        try {
-            await fetch(`${SERVER}/zp/commands/clear`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ scope })
-            });
-            refreshCommands();
-        } catch (e) { console.error('Clear failed:', e); }
-    }
-
     // ── Universal Dialog ──
     const _dialog = {
         _resolve: null, _overlay: null,
@@ -2104,7 +1730,6 @@
             <div class="zp7-heatmap-header">
                 <span class="zp7-heatmap-title">Projects</span>
                 <span class="zp7-heatmap-hint">← Select a task for details</span>
-                <span class="ai-info-icon" id="aiAllIcon" data-project="__all__" data-ai-report="" title="AI cross-project report">i</span>
                 <button class="zp7-heatmap-refresh" onclick="loadPmHeatmap(true)" title="Refresh">↺</button>
             </div>
             <div id="pmHeatmapContent" class="zp7-heatmap-content">
@@ -2196,25 +1821,6 @@
 
         container.innerHTML = active.map(project => pmRenderProjectBlock(project, maxIdx, today)).join('');
 
-        // load AI report cache and attach icon handlers
-        fetch(`${SERVER}/ai-report/api/cache`)
-            .then(r => r.ok ? r.json() : { entries: [] })
-            .then(data => {
-                const cache = {};
-                (data.entries || []).forEach(e => { cache[e.project] = e; });
-                container.querySelectorAll('.ai-info-icon').forEach(icon => {
-                    const project = icon.dataset.project;
-                    const entry   = cache[project];
-                    icon.dataset.aiReport = entry ? JSON.stringify(entry) : '';
-                });
-                // __all__ icon is outside container
-                const allIcon = document.getElementById('aiAllIcon');
-                if (allIcon) {
-                    const entry = cache['__all__'];
-                    allIcon.dataset.aiReport = entry ? JSON.stringify(entry) : '';
-                }
-            })
-            .catch(() => {});
     }
 
     function pmRenderProjectBlock(project, maxIndex, today) {
@@ -2254,10 +1860,7 @@
         <div class="heatmap-with-stats">
             <div class="heatmap-project-card">
                 <div class="project-card">
-                    <div class="project-name" style="display:flex;align-items:center;gap:0;">
-                        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(project.name)}</span>
-                        <span class="ai-info-icon" data-project="${escHtml(project.name)}" data-ai-report="" title="AI report">i</span>
-                    </div>
+                    <div class="project-name">${escHtml(project.name)}</div>
                     <div class="progress-bar">
                         <div style="display:flex;height:100%;width:100%;">
                             <div style="width:${rate}%;background:#238636;"></div>
@@ -2351,56 +1954,9 @@
         });
     })();
 
-    // AI report popup — delegated hover on .ai-info-icon
-    (function initAiReportPopup() {
-        const popup = () => document.getElementById('aiReportPopup');
-
-        document.addEventListener('mouseover', e => {
-            const icon = e.target.closest('.ai-info-icon');
-            if (!icon) return;
-            const p = popup(); if (!p) return;
-
-            const raw = icon.dataset.aiReport;
-            let html;
-            if (!raw) {
-                html = `<div class="ai-popup-none">Отчёт не сгенерирован</div>`;
-            } else {
-                let entry;
-                try { entry = JSON.parse(raw); } catch { entry = null; }
-                if (!entry) {
-                    html = `<div class="ai-popup-none">Отчёт не сгенерирован</div>`;
-                } else {
-                    const meta = [entry.model, entry.ts].filter(Boolean).join(' · ');
-                    html = `<div class="ai-popup-title">${escHtml(entry.project || icon.dataset.project)}</div>`
-                        + (meta ? `<div class="ai-popup-meta">${escHtml(meta)}</div>` : '')
-                        + `<div class="ai-popup-body">${escHtml(entry.analysis || '')}</div>`;
-                }
-            }
-
-            p.innerHTML = html;
-            p.classList.add('show');
-
-            const rect = icon.getBoundingClientRect();
-            let left = rect.right + 8;
-            let top  = rect.top + window.scrollY;
-            if (left + 350 > window.innerWidth) left = rect.left - 358;
-            if (left < 4) left = 4;
-            p.style.left = left + 'px';
-            p.style.top  = top  + 'px';
-        });
-
-        document.addEventListener('mouseout', e => {
-            const icon = e.target.closest('.ai-info-icon');
-            if (icon) { const p = popup(); if (p) p.classList.remove('show'); }
-        });
-    })();
-
     function toDateStr(d) { return d.toISOString().substring(0, 10); }
 
 </script>
-
-<!-- AI Report Popup -->
-<div id="aiReportPopup"></div>
 
 <!-- Universal Dialog -->
 <div id="dialogOverlay">

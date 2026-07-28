@@ -1,23 +1,13 @@
 ﻿using System.Text;
 using System.Text.Json;
 
-namespace z3nIO;
+namespace DevDeck;
 
 internal sealed class AiClient
 {
-    private readonly DbConnectionService _dbService;
-
-    private const string AiioCompletionsUrl = "https://api.intelligence.io.solutions/api/v1/chat/completions";
-    private const string AiioModelsUrl      = "https://api.intelligence.io.solutions/api/v1/models?page=1&page_size=200";
-
     private static List<string>? _modelsCache;
 
-    public AiClient(DbConnectionService dbService)
-    {
-        _dbService = dbService;
-    }
-
-    public bool IsEnabled => Config.AiConfig.Provider is "aiio" or "omniroute";
+    public bool IsEnabled => !string.IsNullOrWhiteSpace(Config.AiConfig.OmniRouteHost);
 
     // ── complete ───────────────────────────────────────────────────────────────
 
@@ -29,14 +19,7 @@ internal sealed class AiClient
         int    maxTokens = 800,
         int    timeoutSec = 90)
     {
-        var provider = Config.AiConfig.Provider;
-
-        var (url, apiKey) = provider switch
-        {
-            "aiio"       => (AiioCompletionsUrl,             GetAiioKey()),
-            "omniroute"  => (OmniRouteUrl("/v1/chat/completions"), ""),
-            _            => throw new InvalidOperationException("AI provider not configured")
-        };
+        var url = OmniRouteUrl("/v1/chat/completions");
 
         var body = JsonSerializer.Serialize(new
         {
@@ -50,8 +33,6 @@ internal sealed class AiClient
 
         using var http    = new HttpClient { Timeout = TimeSpan.FromSeconds(timeoutSec) };
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        if (!string.IsNullOrEmpty(apiKey))
-            request.Headers.Add("Authorization", $"Bearer {apiKey}");
         request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         
@@ -79,19 +60,8 @@ internal sealed class AiClient
     {
         if (_modelsCache != null) return _modelsCache;
 
-        var provider = Config.AiConfig.Provider;
-
-        var (url, apiKey) = provider switch
-        {
-            "aiio"      => (AiioModelsUrl,              GetAiioKey()),
-            "omniroute" => (OmniRouteUrl("/v1/models"),  ""),
-            _           => throw new InvalidOperationException("AI provider not configured")
-        };
-
         using var http    = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        if (!string.IsNullOrEmpty(apiKey))
-            request.Headers.Add("Authorization", $"Bearer {apiKey}");
+        using var request = new HttpRequestMessage(HttpMethod.Get, OmniRouteUrl("/v1/models"));
 
         using var response = await http.SendAsync(request);
         var raw = await response.Content.ReadAsStringAsync();
@@ -125,33 +95,6 @@ internal sealed class AiClient
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
-    }
-
-    public bool HasAiioKey()
-    {
-        if (!_dbService.TryGetDb(out var db)) return false;
-        return !string.IsNullOrEmpty(GetAiioKey(db!));
-    }
-
-    // ── internals ──────────────────────────────────────────────────────────────
-
-    private string GetAiioKey()
-    {
-        if (!_dbService.TryGetDb(out var db)) throw new Exception("DB not available");
-        var key = GetAiioKey(db!);
-        if (string.IsNullOrEmpty(key)) throw new Exception("No valid aiio key in __aiio table");
-        return key;
-    }
-
-    private static string? GetAiioKey(Db db)
-    {
-        var now  = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-        var keys = db.GetLines(
-                "api",
-                tableName: "__aiio",
-                where: $"(\"expire\" = '' OR \"expire\" IS NULL OR \"expire\" > '{now}')")
-            .Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
-        return keys.Count == 0 ? null : keys[new Random().Next(keys.Count)].Trim();
     }
 
     private static string OmniRouteUrl(string path) =>

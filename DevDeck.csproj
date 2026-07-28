@@ -8,7 +8,7 @@
 
         <ApplicationIcon Condition="'$(TargetFramework)' == 'net10.0-windows'">icon.ico</ApplicationIcon>
 
-        <RootNamespace>z3nIO</RootNamespace>
+        <RootNamespace>DevDeck</RootNamespace>
         <PublishSingleFile>true</PublishSingleFile>
         <SelfContained>true</SelfContained>
         <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
@@ -70,9 +70,9 @@
         <None Update="wwwroot\static\fonts\JetBrainsMonoNerdFont-Regular.ttf">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Remove="media\z3nIO__.mp4" />
-        <None Remove="media\z3nIO_done.mp4" />
-        <None Remove="media\z3nIOlogo.mp4" />
+        <None Remove="media\DevDeck__.mp4" />
+        <None Remove="media\DevDeck_done.mp4" />
+        <None Remove="media\DevDecklogo.mp4" />
         <None Remove="media\**" />
   
     </ItemGroup>
@@ -112,8 +112,6 @@
 
     <ItemGroup>
         <Folder Include="docs-vault\" />
-        <Folder Include="InternalTasks\" />
-        <Folder Include="scripts\" />
     </ItemGroup>
 
     <ItemGroup>

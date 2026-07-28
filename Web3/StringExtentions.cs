@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using System.Collections.Specialized;
 
-namespace z3nIO
+namespace DevDeck
 {
     public static partial class StringExtensions
     {

@@ -13,27 +13,9 @@
    ═══════════════════════════════════════════════════════ */
 
 const THEMES = [
-    // ── Base ──
     { id: 'dark',      label: '⬛  Dark' },
     { id: 'light',     label: '⬜  Light' },
     { id: 'hyper',     label: '🟩  Hyper' },
-    // ── Editor ──
-    { id: 'tokyo',     label: '🌆  Tokyo Night' },
-    { id: 'gruvbox',   label: '🟫  Gruvbox' },
-    { id: 'nord',      label: '🧊  Nord' },
-    { id: 'amber',     label: '🟡  Amber CRT' },
-    { id: 'amoled',    label: '🖤  AMOLED' },
-    // ── Blockchain ──
-    { id: 'ethereum',  label: '🔷  Ethereum' },
-    { id: 'optimism',  label: '🔴  Optimism' },
-    { id: 'arbitrum',  label: '🔵  Arbitrum' },
-    { id: 'polygon',   label: '🟣  Polygon' },
-    { id: 'base',      label: '🫐  Base' },
-    { id: 'solana',    label: '🟢  Solana' },
-    { id: 'avalanche', label: '🔺  Avalanche' },
-    { id: 'bnb',       label: '🟡  BNB Chain' },
-    { id: 'sui',       label: '🩵  Sui' },
-    { id: 'blast',     label: '⚡  Blast' },
 ];
 
 const THEME_IDS = THEMES.map(t => t.id);
@@ -101,24 +83,11 @@ function createThemeSelect(container) {
     const sel = document.createElement('select');
     sel.className = 'theme-select';
 
-    const groups = [
-        { label: 'Base',       ids: ['dark', 'light', 'hyper'] },
-        { label: 'Editor',     ids: ['tokyo', 'gruvbox', 'nord', 'amber', 'amoled'] },
-        { label: 'Blockchain', ids: ['ethereum', 'optimism', 'arbitrum', 'polygon', 'base', 'solana', 'avalanche', 'bnb', 'sui', 'blast'] },
-    ];
-
-    groups.forEach(group => {
-        const og = document.createElement('optgroup');
-        og.label = group.label;
-        group.ids.forEach(id => {
-            const t = THEMES.find(t => t.id === id);
-            if (!t) return;
-            const opt = document.createElement('option');
-            opt.value = t.id;
-            opt.textContent = t.label;
-            og.appendChild(opt);
-        });
-        sel.appendChild(og);
+    THEMES.forEach(theme => {
+        const option = document.createElement('option');
+        option.value = theme.id;
+        option.textContent = theme.label;
+        sel.appendChild(option);
     });
 
     sel.value = getTheme();

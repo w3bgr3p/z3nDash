@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace z3nIO;
+namespace DevDeck;
 
 // GET /report/api/projects-db
 // Возвращает данные по всем таблицам __* из БД в том же формате что и /report/api/all → projects

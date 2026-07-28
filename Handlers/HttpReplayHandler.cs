@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 
-namespace z3nIO;
+namespace DevDeck;
 
 internal sealed class HttpReplayHandler
 {

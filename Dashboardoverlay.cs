@@ -35,7 +35,7 @@ using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public class DashboardOverlay : Form
 {
@@ -88,7 +88,7 @@ public class DashboardOverlay : Form
 
     private static readonly (string Label, string Match, Func<string, string> Url)[] Tabs =
     [
-        ("⏻ z3nIO",  "page=scheduler", b => b + "/?page=scheduler"),
+        ("⏻ DevDeck",  "page=scheduler", b => b + "/?page=scheduler"),
         ("߷ ZP7",    "page=zp7",       b => b + "/?page=zp7"),
         ("🌍 ZB",    "page=zb",        b => b + "/?page=zb"),
         ("☰ Logs",   "page=logs",      b => b + "/?page=logs"),
@@ -98,7 +98,6 @@ public class DashboardOverlay : Form
         ("☻ Clips",  "/clips",          b => b + "/?page=clips"),
         ("⚙ Config", "/page=config",    b => b + "/?page=config"),
         ("❓ Docs",  "/docs",           b => b + "/docs"),
-        ("❓ Ai",    "/ai-report",      b => b + "/?page=ai-report"),
     ];
 
     // ── Поля ──────────────────────────────────────────────────────────────────
@@ -155,7 +154,7 @@ public class DashboardOverlay : Form
         BackColor       = Color.FromArgb(13, 15, 20);
         Opacity         = _opacity;
         ShowInTaskbar   = true;
-        Text            = "z3nIO";
+        Text            = "DevDeck";
         DoubleBuffered  = true;
         MinimumSize     = new Size(400, 300);
 
@@ -176,7 +175,7 @@ public class DashboardOverlay : Form
         if (!ok)
             MessageBox.Show(
                 $"Hotkey Ctrl+Alt+Z already in use (err {Marshal.GetLastWin32Error()})",
-                "z3nIO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                "DevDeck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
         Application.AddMessageFilter(new GlobalMouseFilter(this));
     }
@@ -197,7 +196,7 @@ public class DashboardOverlay : Form
 
     private void InitTray()
     {
-        _trayIcon = new NotifyIcon { Text = "z3nIO", Visible = false };
+        _trayIcon = new NotifyIcon { Text = "DevDeck", Visible = false };
 
         try
         {
@@ -291,7 +290,7 @@ public class DashboardOverlay : Form
         {
             MessageBox.Show(
                 $"WebView2 init failed:\n{ex.Message}\n\nInstall WebView2 Runtime.",
-                "z3nIO", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                "DevDeck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -327,7 +326,7 @@ public class DashboardOverlay : Form
 
         var title = new Label
         {
-            Text      = "z3nIO",
+            Text      = "DevDeck",
             ForeColor = Color.FromArgb(255, 255, 255),
             BackColor = Color.Transparent,
             Font      = new Font(family, 10f, FontStyle.Regular),

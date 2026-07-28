@@ -1,7 +1,7 @@
 ﻿using ZennoLab.CommandCenter;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public sealed class CsxZp7Globals
 {

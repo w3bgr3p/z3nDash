@@ -1,4 +1,4 @@
-﻿namespace z3nIO;
+﻿namespace DevDeck;
 
 /// <summary>
 /// Редиректит Console.Out в log sink на время блока using.

@@ -2,7 +2,7 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
-namespace z3nIO;
+namespace DevDeck;
 
 internal sealed class SqliteViewerHandler
 {

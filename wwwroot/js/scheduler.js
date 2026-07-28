@@ -12,7 +12,6 @@ var selectedId = null;
 var activeTab  = 'execution';
 var outputPoll = null;
 var formDirty  = false;
-var activeExecutorFilters = new Set();
 
 var _sseLog    = null;
 var _sseHttp   = null;
@@ -81,14 +80,6 @@ function startSse() {
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
-function execIcon(ex) {
-    if (typeof EXEC_ICONS === 'undefined') return '<span style="font-size:9px;opacity:0.5">' + (ex || '?') + '</span>';
-    var svg = EXEC_ICONS[ex];
-    if (!svg) return '<span style="font-size:9px;opacity:0.5">' + (ex || '?') + '</span>';
-    var sized = svg.replace('<svg ', '<svg width="14" height="14" ');
-    return '<span title="' + escHtml(ex) + '" style="display:inline-flex;align-items:center;opacity:0.7">' + sized + '</span>';
-}
-
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -126,42 +117,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('detailBody').addEventListener('change', function() { formDirty = true; });
 });
 
-// ── Executor tag filter ───────────────────────────────────────────────────────
-
-function renderExecutorTags() {
-    var bar = document.getElementById('execFilterBar');
-    if (!bar) return;
-    var counts = {};
-    schedules.forEach(function(s) {
-        var ex = s.executor || 'unknown';
-        counts[ex] = (counts[ex] || 0) + 1;
-    });
-    var keys = Object.keys(counts).sort();
-    if (keys.length <= 1) { bar.innerHTML = ''; return; }
-    var html = '<span class="tag-filter-label">Exec:</span>';
-    keys.forEach(function(ex) {
-        var active = activeExecutorFilters.has(ex);
-        html += '<span class="tag-chip' + (active ? ' active' : '') + '" onclick="toggleExecFilter(\'' + escHtml(ex) + '\')">'
-            + escHtml(ex) + ' <span style="opacity:0.55">' + counts[ex] + '</span></span>';
-    });
-    if (activeExecutorFilters.size > 0)
-        html += '<span class="tag-chip clear-chip" onclick="clearExecFilters()">✕</span>';
-    bar.innerHTML = html;
-}
-
-function toggleExecFilter(ex) {
-    if (activeExecutorFilters.has(ex)) activeExecutorFilters.delete(ex);
-    else activeExecutorFilters.add(ex);
-    renderExecutorTags();
-    renderList();
-}
-
-function clearExecFilters() {
-    activeExecutorFilters.clear();
-    renderExecutorTags();
-    renderList();
-}
-
 // ── Load list ─────────────────────────────────────────────────────────────────
 
 async function loadList() {
@@ -169,7 +124,6 @@ async function loadList() {
     if (!res.ok) throw new Error('/scheduler/list HTTP ' + res.status);
     schedules = await res.json();
     updateHeaderStats();
-    renderExecutorTags();
     renderList();
     if (selectedId && !formDirty) {
         var still = schedules.find(function(s) { return s.id === selectedId; });
@@ -227,7 +181,6 @@ function renderList() {
     var q  = document.getElementById('searchInput').value.toLowerCase();
     var el = document.getElementById('listScroll');
     var filtered = schedules.filter(function(s) {
-        if (activeExecutorFilters.size > 0 && !activeExecutorFilters.has(s.executor || 'unknown')) return false;
         return !q || (s.name && s.name.toLowerCase().indexOf(q) >= 0) ||
                (s.script_path && s.script_path.toLowerCase().indexOf(q) >= 0);
     });
@@ -306,10 +259,7 @@ function renderList() {
             + '<div class="row-sub">' + escHtml(trigger) + (lastRun ? ' · ' + lastRun : '') + '</div>'
             + '</div>'
             + '<div class="row-right">'
-            + '<div style="display:flex;align-items:center;gap:4px">'
             + '<span class="task-status ' + status + '">' + status + '</span>'
-            + '<span style="font-size:11px;" title="' + escHtml(s.executor || '') + '">' + execIcon(s.executor || '') + '</span>'
-            + '</div>'
             + '<span class="row-counts"><span class="row-done">' + done + '</span><span class="row-total"> / ' + total + '</span></span>'
             + '</div>'
             + '</div>';
@@ -334,9 +284,19 @@ function deselect() {
 
 // ── Nav / global stats ────────────────────────────────────────────────────────
 
+function _lastOutputLine(s) {
+    var raw = (s.last_output || '').replace(/\\n/g, '\n');
+    var lines = raw.split('\n');
+    for (var i = lines.length - 1; i >= 0; i--) {
+        var t = lines[i].trim();
+        if (t) return t;
+    }
+    return '';
+}
+
 function renderGlobalStats() {
     var NAV_PAGES = [
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.scheduler : ''), title: 'z3nIO',      desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)', url: '/scheduler.html', color: '#e3b341' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.scheduler : ''), title: 'DevDeck',      desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)', url: '/scheduler.html', color: '#e3b341' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.zp7       : ''), title: 'ZP7',        desc: 'Управление ZP7',                                                      url: '/?page=zp7',      color: '#58a6ff' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.logs       : ''), title: 'Logs',       desc: 'Логи приложения с фильтрацией по уровню, машине, проекту, аккаунту.', url: '/?page=logs',     color: '#3fb950' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.http       : ''), title: 'HTTP',       desc: 'Перехваченные HTTP-запросы и ответы из ZP-задач. Replay запросов.',   url: '/?page=http',     color: '#d29922' },
@@ -350,16 +310,74 @@ function renderGlobalStats() {
     document.getElementById('bottomPanels').style.display  = 'none';;
     var dp = document.getElementById('detailPanel');
     if (dp) { dp.style.flex = ''; dp.style.height = ''; }
-    var cards = NAV_PAGES.map(function(p) {
-        return '<a class="nav-card" href="' + p.url + '" style="--card-color:' + p.color + '">'
-            + '<div class="card-icon">' + p.icon + '</div>'
-            + '<div class="card-title">' + p.title + '</div>'
-            + '<div class="card-desc">'  + p.desc  + '</div>'
-            + '<div class="card-badge">Open &rarr;</div></a>';
+    var body = document.getElementById('detailBody');
+    var prevScroll = body.scrollTop;
+
+    var total = schedules.length, running = 0, scheduled = 0, errors = 0, off = 0;
+    schedules.forEach(function(s) {
+        var st = getTaskStatus(s);
+        if (st === 'running') running++;
+        if (st === 'planned') scheduled++;
+        if (st === 'fail')    errors++;
+        if (s.enabled === 'false') off++;
+    });
+
+    var statTiles =
+        '<div class="ov-summary">'
+        + '<div class="ov-stat"><span class="ov-stat-num">' + total + '</span><span class="ov-stat-label">Tasks</span></div>'
+        + '<div class="ov-stat"><span class="ov-stat-num green">' + running + '</span><span class="ov-stat-label">Running</span></div>'
+        + '<div class="ov-stat"><span class="ov-stat-num accent">' + scheduled + '</span><span class="ov-stat-label">Scheduled</span></div>'
+        + '<div class="ov-stat"><span class="ov-stat-num' + (errors ? ' red' : '') + '">' + errors + '</span><span class="ov-stat-label">Errors</span></div>'
+        + '<div class="ov-stat"><span class="ov-stat-num muted">' + off + '</span><span class="ov-stat-label">Disabled</span></div>'
+        + '</div>';
+
+    var ovOrder = { running: 0, fail: 1, planned: 2, newbie: 3, done: 4, paused: 5 };
+    var sorted = schedules.slice().sort(function(a, b) {
+        var sa = getTaskStatus(a), sb = getTaskStatus(b);
+        var oa = (sa in ovOrder) ? ovOrder[sa] : 9;
+        var ob = (sb in ovOrder) ? ovOrder[sb] : 9;
+        if (oa !== ob) return oa - ob;
+        return (a.name || '').localeCompare(b.name || '');
+    });
+
+    var rows = sorted.map(function(s) {
+        var st       = getTaskStatus(s);
+        var trigger  = triggerLabel(s);
+        var lastRun  = s.last_run ? s.last_run.slice(5, 16) : '—';
+        var doneN    = parseInt(s.runs_success) || 0;
+        var totalN   = parseInt(s.runs_total)   || 0;
+        var out      = _lastOutputLine(s);
+        var isErr    = /\[ERROR\]|\[ERR\]/i.test(out);
+        var disabled = s.enabled === 'false';
+        var dotCls   = st === 'running' ? ' run' : st === 'fail' ? ' fail' : disabled ? ' off' : '';
+        return '<div class="ov-row' + (disabled ? ' off' : '') + '" onclick="selectRow(\'' + s.id + '\')">'
+            + '<span class="ov-dot' + dotCls + '"></span>'
+            + '<span class="ov-name" title="' + escHtml(s.name || '') + '">' + escHtml(s.name || '(unnamed)') + '</span>'
+            + '<span><span class="task-status ' + st + '">' + st + '</span></span>'
+            + '<span class="ov-cell" title="' + escHtml(trigger) + '">' + escHtml(trigger) + '</span>'
+            + '<span class="ov-cell">' + escHtml(lastRun) + '</span>'
+            + '<span class="ov-cell"><span class="row-done">' + doneN + '</span> / ' + totalN + '</span>'
+            + (out
+                ? '<span class="ov-out' + (isErr ? ' err' : '') + '" title="' + escHtml(out) + '">' + escHtml(out) + '</span>'
+                : '<span class="ov-out empty">(no output)</span>')
+            + '</div>';
     }).join('');
-    document.getElementById('detailBody').innerHTML =
-        '<div style="padding:20px 14px;display:flex;justify-content:center;align-items:center;min-height:100%;box-sizing:border-box">'
-        + '<div class="nav-grid" style="max-width:860px;width:100%">' + cards + '</div></div>';
+
+    var head = '<div class="ov-head"><span></span><span>Task</span><span>Status</span><span>Schedule</span><span>Last run</span><span>Done</span><span>Last output</span></div>';
+
+    var links = NAV_PAGES.map(function(p) {
+        return '<a class="ov-link" href="' + p.url + '" style="--card-color:' + p.color + '">' + p.title + '</a>';
+    }).join('');
+
+    body.innerHTML =
+        '<div class="ov-wrap">'
+        + statTiles
+        + '<div class="ov-table">' + head
+        + (rows || '<div style="padding:16px;color:var(--text2);text-align:center;font-size:11px">No tasks yet</div>')
+        + '</div>'
+        + '<div class="ov-links">' + links + '</div>'
+        + '</div>';
+    body.scrollTop = prevScroll;
 }
 
 // ── Select / detail ───────────────────────────────────────────────────────────
@@ -395,27 +413,34 @@ function showDetailHeader(s) {
 
 function renderDetailActions(s) {
     var id         = s.id || '';
-    var pauseLabel = s.enabled === 'false' ? '▶ Resume' : '⏸ Pause';
+    var pauseLabel = s.enabled === 'false' ? '▶' : '⏸';
     var runLabel   = _isJs(s.executor) ? '▶ npm run' : '▶ Run';
 
     document.getElementById('detailActions').innerHTML =
         '<div class="action-group">'
         + '<button class="btn primary sm" onclick="runNow(\'' + id + '\')">' + runLabel + '</button>'
         + '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled || 'true') + '\')">' + pauseLabel + '</button>'
-        + '<button class="btn stop sm" onclick="stopNow(\'' + id + '\')">■ Interrupt</button>'
+        + '<button class="btn sm" title="Restart" onclick="restartNow(\'' + id + '\')" style="border-color:#d29922;color:#d29922;">↺</button>'
+        + '<button class="btn stop sm" title="Interrupt" onclick="stopNow(\'' + id + '\')">■</button>'
         + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🗑</button>'
-        + '<button class="btn sm" onclick="duplicateSchedule(\'' + id + '\')" style="border-color:#d29922;color:#d29922;">📋 Duplicate</button>'
+        + '<button class="btn sm" onclick="duplicateSchedule(\'' + id + '\')" style="border-color:#d29922;color:#d29922;">📋📋</button>'
         + '</div>'
         + '<div class="action-group">'
-        + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">⚙ Settings</button>'
-        + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🔧 Edit Settings</button>'
-        + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📥 Import</button>'
-        + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📤 Export</button>'
-        + (s.executor === 'csx-internal' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Build csx</button>' : '')
-        + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFile(this.dataset.fp)" style="border-color:#3fb950;color:#3fb950;">📄 Open File</button>' : '')
-        + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFolder(this.dataset.fp)" style="border-color:#3fb950;color:#3fb950;">📁 Open Folder</button>' : '')
-    + (s.script_path ? '<button class="btn sm" onclick="openAiForTask(\'' + escHtml(s.id) + '\')" style="border-color:var(--accent);color:var(--accent);">⟡ AI</button>' : '')
+        + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">⚙ </button>'
+        + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🔧 </button>'
+        + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📥 </button>'
+        + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📤 </button>'
+        + '</div>'
+        + '<div class="action-group">'
+        
+        + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFile(this.dataset.fp)" style="border-color:#3fb950;color:#3fb950;">📄</button>' : '')
+        + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFolder(this.dataset.fp)" style="border-color:#3fb950;color:#3fb950;">📁</button>' : '')
+
+        + '</div>'
+        + '<div class="action-group">'
+        + (s.script_path ? '<button class="btn sm" onclick="openAiForTask(\'' + escHtml(s.id) + '\')" style="border-color:var(--accent);color:var(--accent);">⟡ AI</button>' : '')
         + (s.script_path ? '<button class="btn sm" onclick="openInTerminal(\'' + escHtml(s.id) + '\')" style="border-color:#a371f7;color:#a371f7;">⌨ Terminal</button>' : '')
+        + (s.executor === 'csx-internal' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Build csx</button>' : '')
         + '</div>';
 
     // async: добавить кнопки config/install если нужно
@@ -760,7 +785,6 @@ function renderExecution(s) {
         + infoRow('Period',     trigger)
         + infoRow('On Overlap', s.on_overlap || '—')
         + (isParallel ? infoRow('Max Threads', s.max_threads || '1') : '')
-        + infoRow('Executor',   s.executor || '—')
         + '</div>'
         + (isRunning && isParallel
             ? '<div class="detail-section" id="instancesCard"><div class="info-card-title">Active instances</div><div id="instancesList">—</div></div>'
@@ -855,7 +879,7 @@ function renderSettings(s) {
         + '<input class="form-input" id="f_script_path" value="' + escHtml(s.script_path) + '" placeholder="/path/to/script or folder">'
         + '<div class="form-label">Executor</div>'
         + '<select class="form-input" id="f_executor">'
-        + ['python','node','ts-node','exe','bat','bash','ps1','internal'].map(function(e) {
+        + ['python','node','ts-node','npm','exe','cmd','bat','bash','ps1','internal'].map(function(e) {
             return '<option ' + (s.executor === e ? 'selected' : '') + '>' + e + '</option>';
         }).join('') + '</select>'
         + '<div class="form-label">Arguments</div>'
@@ -1533,6 +1557,14 @@ async function stopNow(id) {
         await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     }
     await loadList();
+}
+
+async function restartNow(id) {
+    await fetch('/scheduler/stop', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
+    await new Promise(function(r) { setTimeout(r, 800); });
+    await fetch('/scheduler/run', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
+    await loadList();
+    startSseOutput(id);
 }
 
 function _pickInstanceToKill(id, instances) {

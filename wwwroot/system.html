@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>z3nIO | System Snapshot</title>
+    <title>DevDeck | System Snapshot</title>
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
@@ -696,7 +696,7 @@
     // ── AI Audit ──────────────────────────────────────────────────────────────
     async function loadModels() {
         try {
-            const r   = await fetch(`${API}/ai-report/api/models`);
+        const r   = await fetch(`${API}/config/ai-models`);
             const d   = await r.json();
             const sel = document.getElementById('aiModel');
             if (d.models?.length) {

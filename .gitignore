@@ -1,50 +1,107 @@
-
+# Repository-local source and tooling
 Tasks/
-riderModule.iml
-appsettings.json
+PrivateTasks/
 Program.cs
 api-test.http
-# Secrets and local overrides
+riderModule.iml
+.claude/settings.local.json
+
+# Secrets and local configuration
+appsettings.json
 appsettings.Development.json
 appsettings.Local.json
+appsettings.*.local.json
+appsettings.secrets.json
 *.secrets.json
 priv.*
+.env
+.env.*
+!.env.example
+!.env.sample
+http-client.private.env.json
 
-# .NET Core #
-bin/
-obj/
+# Keys, certificates and credential stores
+*.key
+*.pem
+*.pfx
+*.p12
+*.jks
+*.keystore
+*.snk
+
+# Local databases
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# .NET build, test and publication output
+[Bb]in/
+[Oo]bj/
 /packages/
-TestResults/
-publish-new/
-PrivateTasks/
-media/
+[Tt]est[Rr]esults/
+[Aa]rtifacts/
+[Bb]enchmark[Dd]ot[Nn]et.[Aa]rtifacts/
+[Pp]ublish*/
+[Pp]ublication*/
+[Dd]ist/
+[Oo]ut/
 installer_output/
-# User-specific files
+
+# Generated installers, executables, packages and archives
+*.exe
+*.dll
+*.so
+*.dylib
+*.pyd
+*.jar
+*.msi
+*.msix
+*.pdb
+*.dmp
+*.nupkg
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+
+# Generated frontend debug artifacts
+*.map
+
+# User-specific IDE files
 *.user
 *.userosscache
 *.suo
 *.sln.docstates
-
-
-# Visual Studio / Rider
 .vs/
 .idea/
-.venv/
+**/.obsidian/workspace*.json
 /_ReSharper.Caches/
 *.iml
 
-# App-specific (Logs & Local settings)
+# Python tooling
+.venv/
+__pycache__/
+*.py[cod]
+
+# App runtime output
 logs/
 http-logs/
+media/
+*.log
 *.jsonl
-
-
-
-# Local runtime files
 safu.key
 crash.log
-*.key
 
-
-# Sensitive
-appsettings.secrets.json
+# Temporary and OS-generated files
+*.tmp
+*.temp
+*.bak
+*.orig
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

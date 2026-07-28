@@ -5,9 +5,9 @@ using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using z3nIO;
+using DevDeck;
 
-namespace z3nIO;
+namespace DevDeck;
 
 internal sealed class GraphHandler
 {

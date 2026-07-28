@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text;
 
-namespace z3nIO;
+namespace DevDeck;
 
 /// <summary>
 /// Центральный хаб SSE-подписок.

@@ -2,8 +2,9 @@
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Npgsql;
 
-namespace z3nIO
+namespace DevDeck
 {
     
     public enum dbMode
@@ -16,11 +17,7 @@ namespace z3nIO
     {
         
         private readonly string _sqLitePath;
-        private readonly string _pgHost;
-        private readonly string _pgPort;
-        private readonly string _pgDbName;
-        private readonly string _pgUser;
-        private readonly string _pgPass;
+        private readonly string _pgConnectionString;
         private readonly string _defaultTable;
         private readonly dbMode _dbMode;
         private Logger _log;
@@ -28,7 +25,7 @@ namespace z3nIO
         
         private const char RawSeparator = '·';
         private const char ColumnSeparator = '¦';
-        private const string SchemaName = "public";
+        private readonly string _defaultSchema;
 
         
         
@@ -46,13 +43,11 @@ namespace z3nIO
         {
             _dbMode = mode;
             _sqLitePath = sqLitePath;
-            _pgHost = pgHost;
-            _pgPort = pgPort;
-            _pgDbName = pgDbName;
-            _pgUser = pgUser;
-            _pgPass = pgPass;
+            _pgConnectionString = $"Host={pgHost};Port={pgPort};Database={pgDbName};Username={pgUser};Password={pgPass};Pooling=true;Connection Idle Lifetime=10;";
+            _defaultSchema = GetDefaultSchema(_pgConnectionString);
             _log = log ?? new Logger(logLevel: LogLevel.Error);
             _defaultTable = defaultTable;
+            EnsureSchema();
         }
         public Db(
             DbConfig config,
@@ -60,12 +55,10 @@ namespace z3nIO
         {
             _dbMode = config.Mode;
             _sqLitePath = config.SqlitePath;
-            _pgHost = config.PostgresHost;
-            _pgPort = config.PostgresPort;
-            _pgDbName = config.PostgresDatabase;
-            _pgUser = config.PostgresUser;
-            _pgPass = config.PostgresPassword;
+            _pgConnectionString = config.PostgresConnectionString;
+            _defaultSchema = GetDefaultSchema(_pgConnectionString);
            _log = log ?? new Logger(logLevel: LogLevel.Error);
+            EnsureSchema();
 
         }
         public void SetLogger(Logger log) => _log = log;
@@ -82,7 +75,7 @@ namespace z3nIO
             Random rnd = new Random();
 
             using (var db = _dbMode == dbMode.Postgre
-                       ? new Sql($"Host={_pgHost};Port={_pgPort};Database={_pgDbName};Username={_pgUser};Password={_pgPass};Pooling=true;Connection Idle Lifetime=10;")
+                       ? new Sql(_pgConnectionString)
                        : new Sql(_sqLitePath, null))
             {
                 if (_debug) query.Debug();
@@ -612,7 +605,7 @@ namespace z3nIO
                 try
                 {
                     var tempExists = _dbMode == dbMode.Postgre
-                        ? Query($"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = '{SchemaName}' AND table_name = '{UnQuote(tempTable)}')")
+                        ? Query($"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = '{Schema(tempTable)}' AND table_name = '{Table(tempTable)}')")
                         : Query($"SELECT name FROM sqlite_master WHERE type='table' AND name='{UnQuote(tempTable)}'");
 
                     if (!string.IsNullOrEmpty(tempExists) && tempExists != "0" && tempExists.ToLower() != "false")
@@ -633,8 +626,8 @@ namespace z3nIO
                 string getIdTypeQuery = $@"
                     SELECT data_type, is_identity 
                     FROM information_schema.columns 
-                    WHERE table_schema = '{SchemaName}' 
-                    AND table_name = '{UnQuote(tableName)}' 
+                    WHERE table_schema = '{Schema(tableName)}' 
+                    AND table_name = '{Table(tableName)}' 
                     AND column_name = 'id'";
 
                 var idInfo = Query(getIdTypeQuery, log);
@@ -691,8 +684,8 @@ namespace z3nIO
                 string getTypeQuery = $@"
                     SELECT data_type, character_maximum_length, column_default
                     FROM information_schema.columns 
-                    WHERE table_schema = '{SchemaName}' 
-                    AND table_name = '{UnQuote(tableName)}' 
+                    WHERE table_schema = '{Schema(tableName)}' 
+                    AND table_name = '{Table(tableName)}' 
                     AND column_name = '{col}'";
 
                 var typeInfo = Query(getTypeQuery, log);
@@ -756,7 +749,7 @@ namespace z3nIO
             string renameTableQuery;
             if (_dbMode == dbMode.Postgre)
             {
-                renameTableQuery = $"ALTER TABLE {tempTable} RENAME TO {quotedTable}";
+                renameTableQuery = $"ALTER TABLE {tempTable} RENAME TO {Quote(Table(tableName))}";
             }
             else
             {
@@ -808,26 +801,26 @@ namespace z3nIO
         }
         public bool TableExists(string tableName, bool log = false)
         {
-            tableName = UnQuote(tableName);
             string query;
 
             if (_dbMode == dbMode.Postgre)
             {
-                query = $"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '{SchemaName}' AND table_name = '{tableName}'";
+                query = $"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '{Schema(tableName)}' AND table_name = '{Table(tableName)}'";
             }
             else
             {
-                query = $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{tableName}'";
+                query = $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{UnQuote(tableName)}'";
             }
 
             string resp = Query(query, log);
             return resp != "0" && !string.IsNullOrEmpty(resp);
         }
 
-        public List<string> GetTables(bool log = false)
+        public List<string> GetTables(bool log = false, string schema = null)
         {
+            schema = string.IsNullOrWhiteSpace(schema) ? _defaultSchema : UnQuote(schema);
             string query = _dbMode == dbMode.Postgre
-                ? $"SELECT table_name FROM information_schema.tables WHERE table_schema = '{SchemaName}' AND table_type = 'BASE TABLE' ORDER BY table_name"
+                ? $"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema}' AND table_type = 'BASE TABLE' ORDER BY table_name"
                 : "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name";
 
             return Query(query, log)
@@ -840,7 +833,7 @@ namespace z3nIO
         public List<string> GetTableColumns(string tableName, bool log = false)
         {
             string query = _dbMode == dbMode.Postgre
-                ? $"SELECT column_name FROM information_schema.columns WHERE table_schema = '{SchemaName}' AND table_name = '{UnQuote(tableName)}'"
+                ? $"SELECT column_name FROM information_schema.columns WHERE table_schema = '{Schema(tableName)}' AND table_name = '{Table(tableName)}'"
                 : $"SELECT name FROM pragma_table_info('{UnQuote(tableName)}')";
 
             return Query(query, log)
@@ -858,7 +851,7 @@ namespace z3nIO
 
             if (_dbMode == dbMode.Postgre)
             {
-                query = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = '{SchemaName}' AND table_name = '{UnQuote(tableName)}' AND LOWER(column_name) = LOWER('{UnQuote(columnName)}')";
+                query = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = '{Schema(tableName)}' AND table_name = '{Table(tableName)}' AND LOWER(column_name) = LOWER('{UnQuote(columnName)}')";
             }
             else
             {
@@ -1092,7 +1085,47 @@ namespace z3nIO
 
         private static string Quote(string name)
         {
-            return $"\"{name.Replace("\"", "\"\"")}\"";
+            return string.Join(".", name.Split('.').Select(part => $"\"{part.Replace("\"", "\"\"")}\""));
+        }
+
+        private string Schema(string name)
+        {
+            var parts = UnQuote(name).Split('.');
+            return parts.Length > 1 ? parts[0] : _defaultSchema;
+        }
+
+        private static string Table(string name)
+        {
+            return UnQuote(name).Split('.').Last();
+        }
+
+        private static string GetDefaultSchema(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString))
+                return "public";
+
+            try
+            {
+                var searchPath = new NpgsqlConnectionStringBuilder(connectionString).SearchPath;
+                var schema = searchPath?
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(item => item.Trim().Trim('"'))
+                    .FirstOrDefault(item => !string.IsNullOrWhiteSpace(item));
+
+                return string.IsNullOrWhiteSpace(schema) ? "public" : schema;
+            }
+            catch
+            {
+                return "public";
+            }
+        }
+
+        private void EnsureSchema()
+        {
+            if (_dbMode != dbMode.Postgre)
+                return;
+
+            Query($"CREATE SCHEMA IF NOT EXISTS {Quote(_defaultSchema)}", thrw: true);
         }
 
         private static string QuoteColumns(string updateString)

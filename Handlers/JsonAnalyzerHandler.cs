@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Text.Json;
 
-namespace z3nIO;
+namespace DevDeck;
 
 internal sealed class JsonAnalyzerHandler
 {
@@ -9,7 +9,7 @@ internal sealed class JsonAnalyzerHandler
     private readonly AiClient _aiClient;
 
     private const string CacheKey   = "__json_last";
-    private const string CacheTable = "__ai_json_cache";
+    private static string CacheTable => DbSchema.JsonAnalyzerCache.Name;
     private const string Lang       = "russian";
 
     public JsonAnalyzerHandler(DbConnectionService dbService, AiClient aiClient)
@@ -37,13 +37,7 @@ internal sealed class JsonAnalyzerHandler
 
     private static void EnsureCacheTable(Db db)
     {
-        db.CreateTable(new Dictionary<string, string>
-        {
-            ["key"]      = "TEXT PRIMARY KEY",
-            ["analysis"] = "TEXT",
-            ["model"]    = "TEXT",
-            ["ts"]       = "TEXT"
-        }, CacheTable);
+        db.CreateTable(DbSchema.JsonAnalyzerCache.Columns, CacheTable);
     }
 
     private static void SaveCache(Db db, string model, string analysis)

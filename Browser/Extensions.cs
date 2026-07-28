@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using z3nIO;
-using z3nIO.Browser;
+using DevDeck;
+using DevDeck.Browser;
 
 /// <summary>
 /// Extension-методы для IBrowserInstance.

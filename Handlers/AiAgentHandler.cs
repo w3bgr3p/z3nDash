@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 
-namespace z3nIO;
+namespace DevDeck;
 
 /// <summary>
 /// AI Agent chat handler with SSE streaming support.
@@ -245,39 +245,34 @@ internal sealed class AiAgentHandler
             // Try to get models from omniroute
             var models = new List<object>();
 
-            if (Config.AiConfig.Provider == "omniroute")
+            try
             {
-                try
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                var url = Config.AiConfig.OmniRouteHost.TrimEnd('/') + "/api/models";
+                var response = await http.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
                 {
-                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                    var url = Config.AiConfig.OmniRouteHost.TrimEnd('/') + "/api/models";
-                    var response = await http.GetAsync(url);
+                    var json = await response.Content.ReadAsStringAsync();
+                    var data = JsonSerializer.Deserialize<JsonElement>(json);
 
-                    if (response.IsSuccessStatusCode)
+                    if (data.TryGetProperty("models", out var modelsArray))
                     {
-                        var json = await response.Content.ReadAsStringAsync();
-                        var data = JsonSerializer.Deserialize<JsonElement>(json);
-
-                        if (data.TryGetProperty("models", out var modelsArray))
+                        foreach (var model in modelsArray.EnumerateArray())
                         {
-                            foreach (var model in modelsArray.EnumerateArray())
-                            {
-                                var fullModel = model.TryGetProperty("fullModel", out var fm) ? fm.GetString() : "";
-                                var name = model.TryGetProperty("name", out var n) ? n.GetString() : fullModel;
-                                var available = model.TryGetProperty("available", out var a) && a.GetBoolean();
+                            var fullModel = model.TryGetProperty("fullModel", out var fm) ? fm.GetString() : "";
+                            var name = model.TryGetProperty("name", out var n) ? n.GetString() : fullModel;
+                            var available = model.TryGetProperty("available", out var a) && a.GetBoolean();
 
-                                if (!string.IsNullOrEmpty(fullModel))
-                                {
-                                    models.Add(new { fullModel, name, available });
-                                }
-                            }
+                            if (!string.IsNullOrEmpty(fullModel))
+                                models.Add(new { fullModel, name, available });
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[ai] failed to fetch models from omniroute: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ai] failed to fetch models from omniroute: {ex.Message}");
             }
 
             // Fallback to default models
@@ -303,7 +298,7 @@ internal sealed class AiAgentHandler
         var health = new
         {
             ok = _aiClient.IsEnabled,
-            provider = Config.AiConfig.Provider,
+            provider = "omniroute",
             activeSessions = _activeSessions.Count
         };
 

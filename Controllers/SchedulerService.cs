@@ -4,10 +4,10 @@ using System.Text;
 using System.Text.Json;
 using Cronos;
 using NBitcoin.Protocol;
-using z3nIO;
+using DevDeck;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace z3nIO;
+namespace DevDeck;
 
 public sealed class SchedulerService : IDisposable
 {
@@ -19,45 +19,8 @@ public sealed class SchedulerService : IDisposable
     public void RegisterTask(string name, Func<Dictionary<string, string>, CancellationToken, Action<string>, Task<string>> handler)
         => _internalTasks[name] = handler;
 
-    private const string Table = "_schedules";
-
-    private static readonly Dictionary<string, string> Schema = new()
-    {
-        { "id",               "TEXT PRIMARY KEY" },
-        { "name",             "TEXT DEFAULT ''" },
-        { "executor",         "TEXT DEFAULT 'internal'" },
-        { "script_path",      "TEXT DEFAULT ''" },
-        { "args",             "TEXT DEFAULT ''" },
-        { "enabled",          "TEXT DEFAULT 'true'" },
-        { "cron",             "TEXT DEFAULT ''" },
-        { "interval_minutes", "TEXT DEFAULT '0'" },
-        { "fixed_time",       "TEXT DEFAULT ''" },
-        { "on_overlap",       "TEXT DEFAULT 'skip'" },
-        { "max_threads",      "TEXT DEFAULT '1'" },
-        { "status",           "TEXT DEFAULT 'idle'" },
-        { "last_run",         "TEXT DEFAULT ''" },
-        { "last_exit",        "TEXT DEFAULT ''" },
-        { "last_output",      "TEXT DEFAULT ''" },
-        { "payload_schema",   "TEXT DEFAULT ''" },
-        { "payload_values",   "TEXT DEFAULT ''" },
-        { "runs_total",       "TEXT DEFAULT '0'" },
-        { "runs_success",     "TEXT DEFAULT '0'" },
-        { "schedule_tag",     "TEXT DEFAULT ''" },  // стабильный тег = имя задачи, фильтр логов
-        { "last_run_id",      "TEXT DEFAULT ''" },  // run_id последнего прогона
-    };
-
-    private const string QueueTable = "_schedule_queue";
-
-    private static readonly Dictionary<string, string> QueueSchema = new()
-    {
-        { "uuid",        "TEXT PRIMARY KEY" },
-        { "schedule_id", "TEXT DEFAULT ''" },
-        { "queued_at",   "TEXT DEFAULT ''" },
-        { "status",      "TEXT DEFAULT 'pending'" },  // pending | running | done | error
-        { "priority",    "TEXT DEFAULT '10'" },        // 0=explicit, 10=cron/interval
-        { "run_id",      "TEXT DEFAULT ''" },
-        { "args_b64",    "TEXT DEFAULT ''" },
-    };
+    private static string Table => DbSchema.Schedules.Name;
+    private static string QueueTable => DbSchema.ScheduleQueue.Name;
 
     public SchedulerService(DbConnectionService dbService, Logger? log = null)
     {
@@ -69,9 +32,62 @@ public sealed class SchedulerService : IDisposable
     public void Init()
     {
         if (!_dbService.TryGetDb(out var db) || db == null) return;
-        db.PrepareTable(Schema, Table);
-        db.PrepareTable(QueueSchema, QueueTable);
+        db.PrepareTable(DbSchema.Schedules.Columns, Table);
+        db.PrepareTable(DbSchema.ScheduleQueue.Columns, QueueTable);
+        RepairShiftedScheduleColumns(db);
         SeedDefaults(db);
+        RestoreRunningProcesses(db);
+    }
+
+    private void RepairShiftedScheduleColumns(Db db)
+    {
+        var repaired = db.Query($"""
+            UPDATE "{Table}"
+            SET
+                "max_threads"   = "last_run_id",
+                "status"        = "max_threads",
+                "last_run"      = "status",
+                "last_exit"     = "last_run",
+                "last_output"   = "last_exit",
+                "payload_schema" = "last_output",
+                "payload_values" = "payload_schema",
+                "runs_total"    = "payload_values",
+                "runs_success"  = "runs_total",
+                "schedule_tag"  = "runs_success",
+                "last_run_id"   = "schedule_tag"
+            WHERE "max_threads" IN ('idle', 'running', 'error')
+              AND "status" NOT IN ('idle', 'running', 'error')
+            """);
+
+        if (repaired != "0")
+            _log?.Info($"[SchedulerService] Repaired {repaired} shifted schedule rows");
+    }
+
+    private void RestoreRunningProcesses(Db db)
+    {
+        var columns = db.GetTableColumns(Table);
+        if (columns.Count == 0) return;
+
+        var rows = db.GetLines(string.Join(",", columns), Table, where: "\"status\" = 'running' AND \"enabled\" = 'true'");
+
+        if (rows.Count == 0) return;
+
+        _log?.Info($"[SchedulerService] Found {rows.Count} tasks with status=running, restarting...");
+
+        foreach (var row in rows)
+        {
+            var record = ParseRow(row, columns);
+            var id     = record.GetValueOrDefault("id", "");
+            var name   = record.GetValueOrDefault("name", id);
+
+            // Сбросить статус в idle и очистить last_run_id
+            db.Query($"UPDATE \"{Table}\" SET \"status\" = 'idle', \"last_run_id\" = '' WHERE \"id\" = '{id}'");
+
+            _log?.Info($"[SchedulerService] Restarting task: {name} (id={id})");
+
+            // Перезапустить процесс
+            _ = LaunchAsync(db, record, DateTime.UtcNow);
+        }
     }
 
 private static void SeedDefaults(Db db)
@@ -122,7 +138,7 @@ private static void SeedDefaults(Db db)
         var path   = r.scriptPath.Replace("'", "''");
         var schema = r.payloadSchema.Replace("'", "''");
         db.Query($"""
-            INSERT OR IGNORE INTO "_schedules"
+            INSERT OR IGNORE INTO "{Table}"
                 ("id","name","executor","script_path","enabled","on_overlap","status","payload_schema")
             VALUES
                 ('{r.id}','{r.name}','{r.executor}','{path}','true','skip','idle','{schema}')
@@ -276,8 +292,9 @@ private static void SeedDefaults(Db db)
         var scriptPath = record.GetValueOrDefault("script_path", "");
         var args       = record.GetValueOrDefault("args", "");
 
+        _log?.Info($"[{name}] executor='{executor}' (len={executor.Length}) scriptPath='{scriptPath}'");
 
-        if (executor != "internal" && !File.Exists(scriptPath))
+        if (executor != "internal" && executor != "cmd" && executor != "npm" && !File.Exists(scriptPath))
         {
             var errMsg = $"[ERR] no script file found at {scriptPath}";
             _log.Error(errMsg);
@@ -449,7 +466,7 @@ private static void SeedDefaults(Db db)
                     ? new ZB(Config.ApiConfig.ZB)
                     : null;
 
-                z3nIO.Browser.PlaywrightInstance? instance = null;
+                DevDeck.Browser.PlaywrightInstance? instance = null;
 
                 if (zb != null)
                 {
@@ -461,7 +478,7 @@ private static void SeedDefaults(Db db)
                         var context = browser.Contexts[0];
                         var page    = context.Pages.FirstOrDefault()
                                       ?? await context.NewPageAsync();
-                        instance    = new z3nIO.Browser.PlaywrightInstance(page);
+                        instance    = new DevDeck.Browser.PlaywrightInstance(page);
                     }
                 }
 
@@ -602,6 +619,7 @@ private static void SeedDefaults(Db db)
             CreateNoWindow         = true,
         };
         psi.Environment["PYTHONIOENCODING"] = "utf-8";
+        psi.Environment["PYTHONUNBUFFERED"] = "1";
 
         var process = new System.Diagnostics.Process { StartInfo = psi, EnableRaisingEvents = true };
         var rp2     = new RunningProcess(process, firedAt, null, broadcast);
@@ -617,7 +635,7 @@ private static void SeedDefaults(Db db)
             _running[instanceKey] = rp2;
 
             var stdoutTask = ReadStreamAsync(process.StandardOutput.BaseStream, rp2, prefix: "");
-            var stderrTask = ReadStreamAsync(process.StandardError.BaseStream,  rp2, prefix: "[ERR] ");
+            var stderrTask = ReadStreamAsync(process.StandardError.BaseStream,  rp2, prefix: "");
 
             await Task.WhenAll(stdoutTask, stderrTask, process.WaitForExitAsync());
 
@@ -783,8 +801,10 @@ private static void SeedDefaults(Db db)
             "python"  => ("python",   $"\"{scriptPath}\" {args}".Trim()),
             "node"    => ("node",     $"\"{scriptPath}\" {args}".Trim()),
             "ts-node" => ("cmd.exe",  TsNodeArgs(scriptPath, args)),
+            "npm"     => ("cmd.exe",  $"/c cd /d \"{Path.GetDirectoryName(scriptPath)}\" && npm {args}".Trim()),
             "csx"     => ("cmd.exe",  $"/c dotnet-script \"{scriptPath}\" {args}".Trim()),
             "exe"     => (scriptPath, args),
+            "cmd"     => ("cmd.exe",  $"/c {scriptPath} {args}".Trim()),
             "bat"     => ("cmd.exe",  $"/c \"{scriptPath}\" {args}".Trim()),
             "bash" => (ResolveGitBash(), $"\"{scriptPath}\" {args}".Trim()),
             "ps1" => ("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" {args}".Trim()),

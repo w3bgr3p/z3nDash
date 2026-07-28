@@ -6,7 +6,7 @@ using ZennoLab.InterfacesLibrary.ProjectModel;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace z3nIO
+namespace DevDeck
 {
     public class FirstMail
     {
