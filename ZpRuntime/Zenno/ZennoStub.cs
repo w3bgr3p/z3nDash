@@ -37,29 +37,63 @@ namespace ZennoLab.InterfacesLibrary.Enums.Http
 
 namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
 {
+    // Имена типов совпадают с реальным SDK (ZennoLab.InterfacesLibrary.dll).
+    // Реализованы только члены, которые вызывает переносимый код.
+
     public interface IVariable
     {
         string Value { get; set; }
     }
 
-    public interface IVariableList
+    /// <summary>Реальный тип свойства <c>IZennoPosterProjectModel.Variables</c>.</summary>
+    public interface ILocalVariables
     {
         IVariable this[string name] { get; }
     }
 
-    public interface IGlobalVariableList
+    /// <summary>Реальный тип свойства <c>IZennoPosterProjectModel.GlobalVariables</c>.</summary>
+    public interface IGlobalVariables
     {
         IVariable this[string ns, string key] { get; }
         void SetVariable(string ns, string key, string value);
     }
 
+    public interface IZennoList : IList<string>
+    {
+        void AddRange(IEnumerable<string> items);
+    }
+
+    public interface ILists
+    {
+        IZennoList this[string name] { get; }
+        bool ContainsKey(string name);
+    }
+
+    public interface IZennoTable
+    {
+        int RowCount    { get; }
+        int ColumnCount { get; }
+        string GetCell(int column, int row);
+        void   SetCell(int column, int row, string value);
+    }
+
+    public interface ITables
+    {
+        IZennoTable this[string name] { get; }
+        bool ContainsKey(string name);
+    }
+
     public interface IProfile
     {
-        string UserAgent          { get; set; }
-        string Login              { get; set; }
-        string NickName           { get; set; }
-        object CookieContainer    { get; }
-        // Остальные члены IProfile не используются в z3nCore — заглушены интерфейсом
+        string UserAgent       { get; set; }
+        string Login           { get; set; }
+        string NickName        { get; set; }
+        object CookieContainer { get; }
+    }
+
+    public interface IContext
+    {
+        string SessionId { get; }
     }
 }
 
@@ -72,27 +106,52 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
     using ZennoLab.InterfacesLibrary.Enums.Log;
     using ZennoLab.InterfacesLibrary.ProjectModel.Collections;
 
+    /// <summary>
+    /// Сигнатуры сняты с реальной ZennoLab.InterfacesLibrary.dll. Члены, не нужные
+    /// переносимому коду, опущены — но всё, что объявлено, объявлено точно.
+    /// </summary>
     public interface IZennoPosterProjectModel
     {
-        // ── Identity ──────────────────────────────────────────────────────────
-        string Name   { get; }
-        string Path   { get; }
-        string TaskId { get; }
+        // ── Identity / пути ───────────────────────────────────────────────────
+        string Name      { get; }
+        string Path      { get; }
+        string Directory { get; }
+        string TaskId    { get; }
 
         // ── Storage ───────────────────────────────────────────────────────────
-        IVariableList       Variables       { get; }
-        IGlobalVariableList GlobalVariables { get; }
-        IProfile            Profile         { get; }
+        ILocalVariables  Variables       { get; }
+        IGlobalVariables GlobalVariables { get; }
+        ILists           Lists           { get; }
+        ITables          Tables          { get; }
+        IProfile         Profile         { get; }
+        IContext         Context         { get; }
 
-        // ── Dynamic JSON ──────────────────────────────────────────────────────
-        dynamic Json { get; }
+        // ── Сериализация ──────────────────────────────────────────────────────
+        // В SDK объявлены как object; dynamic-обращения работают через рантайм.
+        object Json { get; }
+        object Xml  { get; }
 
-        // ── ZennoPoster helpers ───────────────────────────────────────────────
-        string ExecuteMacro(string macro);
-        void   SendToLog(string message, LogType type, bool show, LogColor color);
-        void   SendInfoToLog(string message,    bool show = false);
-        void   SendWarningToLog(string message, bool show = false);
-        void   SendErrorToLog(string message,   bool show = false);
+        // ── Диагностика ───────────────────────────────────────────────────────
+        string LastExecutedActionId { get; }
+        string LastErrorComment     { get; }
+
+        // ── Прокси ────────────────────────────────────────────────────────────
+        string GetProxy();
+        void   SetProxy(string proxy);
+
+        // ── Макросы и вложенные проекты ───────────────────────────────────────
+        string ExecuteMacro(string text);
+        bool   ExecuteProject(string pathToProject,
+                              IEnumerable<Tuple<string, string>> varibleMapping,
+                              bool mapOnBadExist, bool passProjectContext, bool useBrowser);
+
+        // ── Лог. Перегрузки повторяют SDK один в один ─────────────────────────
+        void SendToLog(string message, LogType type);
+        void SendToLog(string message, LogType type, bool showInPoster);
+        void SendToLog(string message, LogType type, bool showInPoster, LogColor color);
+        void SendInfoToLog(string message,    bool showInPoster = false);
+        void SendWarningToLog(string message, bool showInPoster = false);
+        void SendErrorToLog(string message,   bool showInPoster = false);
     }
 }
 
@@ -164,7 +223,7 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
         }
     }
 
-    internal sealed class VariableList : IVariableList
+    internal sealed class VariableList : ILocalVariables
     {
         private readonly ConcurrentDictionary<string, string> _store
             = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -179,7 +238,7 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
             => _store[name] = value ?? "";
     }
 
-    internal sealed class GlobalVariableList : IGlobalVariableList
+    internal sealed class GlobalVariableList : IGlobalVariables
     {
         // ключ: "ns::key"
         private readonly ConcurrentDictionary<string, string> _store
@@ -192,6 +251,53 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
 
         public void SetVariable(string ns, string key, string value)
             => _store[Key(ns, key)] = value ?? "";
+    }
+
+    internal sealed class ZennoList : List<string>, IZennoList
+    {
+        void IZennoList.AddRange(IEnumerable<string> items) => base.AddRange(items);
+    }
+
+    internal sealed class ListCollection : ILists
+    {
+        private readonly ConcurrentDictionary<string, ZennoList> _store
+            = new ConcurrentDictionary<string, ZennoList>(StringComparer.OrdinalIgnoreCase);
+
+        public IZennoList this[string name] => _store.GetOrAdd(name, _ => new ZennoList());
+        public bool ContainsKey(string name) => _store.ContainsKey(name);
+    }
+
+    internal sealed class ZennoTable : IZennoTable
+    {
+        private readonly List<List<string>> _rows = new List<List<string>>();
+
+        public int RowCount    => _rows.Count;
+        public int ColumnCount => _rows.Count == 0 ? 0 : _rows.Max(r => r.Count);
+
+        public string GetCell(int column, int row)
+            => row < _rows.Count && column < _rows[row].Count ? _rows[row][column] : "";
+
+        public void SetCell(int column, int row, string value)
+        {
+            while (_rows.Count <= row) _rows.Add(new List<string>());
+            var line = _rows[row];
+            while (line.Count <= column) line.Add("");
+            line[column] = value ?? "";
+        }
+    }
+
+    internal sealed class TableCollection : ITables
+    {
+        private readonly ConcurrentDictionary<string, ZennoTable> _store
+            = new ConcurrentDictionary<string, ZennoTable>(StringComparer.OrdinalIgnoreCase);
+
+        public IZennoTable this[string name] => _store.GetOrAdd(name, _ => new ZennoTable());
+        public bool ContainsKey(string name) => _store.ContainsKey(name);
+    }
+
+    internal sealed class StubContext : IContext
+    {
+        public string SessionId { get; } = Guid.NewGuid().ToString("N");
     }
 
     internal sealed class StubProfile : IProfile
@@ -277,14 +383,38 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         public Logger? Logger { get; set; }
         public Action<string>? OnLog { get; set; }
 
-        public string Name   { get; set; } = "stub.zp";
-        public string Path   { get; set; } = System.IO.Directory.GetCurrentDirectory();
-        public string TaskId { get; } = Guid.NewGuid().ToString("N").Substring(0, 8);
+        private readonly ListCollection  _lists   = new ListCollection();
+        private readonly TableCollection _tables  = new TableCollection();
+        private readonly StubContext     _context = new StubContext();
 
-        public IVariableList       Variables       => _variables;
-        public IGlobalVariableList GlobalVariables => _globals;
-        public IProfile            Profile         => _profile;
-        public dynamic             Json            => _json;
+        public string Name      { get; set; } = "stub.zp";
+        public string Path      { get; set; } = System.IO.Directory.GetCurrentDirectory();
+        public string Directory => System.IO.Path.GetDirectoryName(Path) ?? Path;
+        public string TaskId    { get; } = Guid.NewGuid().ToString("N").Substring(0, 8);
+
+        public ILocalVariables  Variables       => _variables;
+        public IGlobalVariables GlobalVariables => _globals;
+        public ILists           Lists           => _lists;
+        public ITables          Tables          => _tables;
+        public IProfile         Profile         => _profile;
+        public IContext         Context         => _context;
+        public object           Json            => _json;
+        public object           Xml             => _json;
+
+        /// <summary>Проставляется исполнителем шаблона перед каждым действием.</summary>
+        public string LastExecutedActionId { get; set; } = "";
+        /// <summary>Проставляется исполнителем при переходе по ветке OnError.</summary>
+        public string LastErrorComment     { get; set; } = "";
+
+        private string _proxy = "";
+        public string GetProxy()            => _proxy;
+        public void   SetProxy(string proxy) => _proxy = proxy ?? "";
+
+        public bool ExecuteProject(string pathToProject,
+                                   IEnumerable<Tuple<string, string>> varibleMapping,
+                                   bool mapOnBadExist, bool passProjectContext, bool useBrowser)
+            => throw new NotSupportedException(
+                "ExecuteProject: вложенные шаблоны пока не поддержаны ZpRuntime");
 
         // ── Загрузка данных аккаунта из JSON-файла ────────────────────────────
         // Формат: { "acc0": "1", "proxy": "user:pass@host:port",
@@ -316,7 +446,13 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         
         
 
-        public void SendToLog(string message, LogType type, bool show, LogColor color)
+        public void SendToLog(string message, LogType type)
+            => SendToLog(message, type, false, LogColor.Default);
+
+        public void SendToLog(string message, LogType type, bool showInPoster)
+            => SendToLog(message, type, showInPoster, LogColor.Default);
+
+        public void SendToLog(string message, LogType type, bool showInPoster, LogColor color)
         {
             WriteConsole(message, type);
             OnLog?.Invoke(message);
@@ -560,7 +696,8 @@ namespace DevDeck
                     return respBody;
                 }).GetAwaiter().GetResult();
 
-                if (parse) project.Json.FromString(result);
+                // Json в SDK объявлен как object — обращение к нему всегда позднее.
+                if (parse) ((dynamic)project.Json).FromString(result);
                 return result;
             }
             catch (Exception ex)

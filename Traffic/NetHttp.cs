@@ -49,7 +49,7 @@ namespace DevDeck
         {
             try
             {
-                _project.Json.FromString(json);
+                ((dynamic)_project.Json).FromString(json);
             }
             catch (Exception ex)
             {
