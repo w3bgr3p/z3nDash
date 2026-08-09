@@ -112,8 +112,16 @@ namespace DevDeck.Browser
             }
         }
 
+        /// <summary>
+        /// Разбирает ZP-шный Finder в Playwright-локатор.
+        /// searchKind в ZP принимает "text", "notext" и "regexp"; теги, если их
+        /// несколько, перечисляются через ';'.
+        /// </summary>
         internal static ILocator BuildLocator(IPage page, string tag, string attr, string pattern, string mode)
         {
+            bool negate = mode == "notext";
+            bool regexp = mode == "regexp";
+
             // fulltagname: ZP-специфика — ищем по типу тега
             // "input:password" → input[type="password"]
             if (attr == "fulltagname")
@@ -125,22 +133,63 @@ namespace DevDeck.Browser
             }
 
             if (attr is "innertext" or "text")
-                return mode == "regexp"
-                    ? page.Locator(tag).Filter(new LocatorFilterOptions { HasTextRegex = new Regex(pattern, RegexOptions.IgnoreCase) })
-                    : page.Locator(tag).Filter(new LocatorFilterOptions { HasTextString = pattern });
-
-            if (mode == "regexp")
             {
+                var byText = page.Locator(CssTags(tag));
+                if (regexp)
+                {
+                    var rx = new Regex(pattern, RegexOptions.IgnoreCase);
+                    return byText.Filter(negate
+                        ? new LocatorFilterOptions { HasNotTextRegex = rx }
+                        : new LocatorFilterOptions { HasTextRegex    = rx });
+                }
+                return byText.Filter(negate
+                    ? new LocatorFilterOptions { HasNotTextString = pattern }
+                    : new LocatorFilterOptions { HasTextString    = pattern });
+            }
+
+            if (regexp)
+            {
+                // XPath 1.0 регулярок не знает, поэтому это осознанное приближение:
+                // из регулярки берётся самый длинный литеральный кусок и ищется
+                // через contains(). Для якорей и альтернатив ('^btn-(a|b)$') поиск
+                // выйдет шире, чем задумано.
                 var literal = new Regex(@"[^\\.()\[\]{}+*?^$|]+")
                     .Matches(pattern)
                     .Cast<System.Text.RegularExpressions.Match>()
                     .OrderByDescending(m => m.Length)
                     .FirstOrDefault()?.Value ?? pattern;
-                return page.Locator($"xpath=//{tag}[contains(@{attr}, '{literal.Replace("'", "\\'")}')]");
+
+                string cond = $"contains(@{attr}, '{literal.Replace("'", "\\'")}')";
+                if (negate) cond = $"not({cond})";
+                return page.Locator(XPathTags(tag, cond));
             }
 
-            return page.Locator($"{tag}[{attr}='{pattern}']");
+            // Точное совпадение оставляем на CSS: в отличие от XPath его движок
+            // пробивает открытый shadow DOM, и терять это поведение нельзя.
+            string escaped = pattern.Replace("\\", "\\\\").Replace("'", "\\'");
+            string clause  = negate ? $":not([{attr}='{escaped}'])" : $"[{attr}='{escaped}']";
+            var    tags    = SplitTags(tag);
+            if (tags.Length == 0) tags = new[] { "*" };
+            return page.Locator(string.Join(", ", tags.Select(t => t + clause)));
         }
+
+        /// <summary>Список тегов ZP ("a;div") → CSS-селектор ("a, div"). Пустой тег → "*".</summary>
+        private static string CssTags(string tag)
+        {
+            var tags = SplitTags(tag);
+            return tags.Length == 0 ? "*" : string.Join(", ", tags);
+        }
+
+        /// <summary>Список тегов ZP + условие → XPath-объединение ("//a[c]|//div[c]").</summary>
+        private static string XPathTags(string tag, string condition)
+        {
+            var tags = SplitTags(tag);
+            if (tags.Length == 0) tags = new[] { "*" };
+            return "xpath=" + string.Join("|", tags.Select(t => $"//{t}[{condition}]"));
+        }
+
+        private static string[] SplitTags(string tag)
+            => (tag ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         private static T    Sync<T>(Task<T> t) => t.GetAwaiter().GetResult();
         private static void Sync(Task t)        => t.GetAwaiter().GetResult();
