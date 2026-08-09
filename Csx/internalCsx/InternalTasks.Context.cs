@@ -1,6 +1,7 @@
 ﻿// InternalTasks.Context.cs
 
 using ZennoLab.InterfacesLibrary.ProjectModel;
+using z3n7;   // VarsFromDict и прочие расширения, перенесённые из эталона
 
 namespace DevDeck;
 

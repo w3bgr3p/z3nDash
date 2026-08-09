@@ -103,5 +103,80 @@ namespace z3n7
                 project.Int("ErrCounter", 1);
             }
         }
+
+        public static string VarRnd(this IZennoPosterProjectModel project, string var)
+        {
+            string value = string.Empty;
+            try
+            {
+                value = project.Variables[var].Value;
+            }
+            catch (Exception e)
+            {
+                project.SendInfoToLog(e.Message);
+            }
+            if (value == string.Empty) project.SendInfoToLog($"no Value from [{var}] `w");
+
+            if (value.Contains("-"))
+            {
+                var min = int.Parse(value.Split('-')[0].Trim());
+                var max = int.Parse(value.Split('-')[1].Trim());
+                return new Random().Next(min, max).ToString();
+            }
+            return value.Trim();
+        }
+
+        public static int VarCounter(this IZennoPosterProjectModel project, string varName, int input)
+        {
+            var counter = project.Int(varName) + input;
+            project.Var(varName, counter);
+            return counter;
+        }
+
+        public static decimal VarsMath(this IZennoPosterProjectModel project, string varA, string operation, string varB, string resultVar = null)
+        {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            decimal a = decimal.Parse(project.Var(varA));
+            decimal b = decimal.Parse(project.Var(varB));
+            decimal result;
+            switch (operation)
+            {
+                case "+":
+                    result = a + b;
+                    break;
+                case "-":
+                    result = a - b;
+                    break;
+                case "*":
+                    result = a * b;
+                    break;
+                case "/":
+                    result = a / b;
+                    break;
+                default:
+                    throw new Exception($"unsupported operation {operation}");
+            }
+            // Условие в эталоне инвертировано: запись идёт при ПУСТОМ resultVar,
+            // из-за чего Var(null, ..) уходит в catch и результат не сохраняется.
+            // Оставлено как есть — z3n7 эталон, расхождение чинится на его стороне.
+            if (string.IsNullOrEmpty(resultVar))
+                try { project.Var(resultVar, $"{result}"); } catch { }
+            return result;
+        }
+
+        public static void VarsFromDict(this IZennoPosterProjectModel project, Dictionary<string, string> dict)
+        {
+            foreach (var pair in dict)
+            {
+                project.Var(pair.Key, pair.Value);
+            }
+        }
+
+        public static void VarsFromJson(this IZennoPosterProjectModel project, string json = "jVars")
+        {
+            if (json == "jVars") json = project.Var("jVars");
+            var jVar = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+            project.VarsFromDict(jVar);
+        }
     }
 }

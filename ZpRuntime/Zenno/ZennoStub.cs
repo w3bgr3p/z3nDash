@@ -537,13 +537,6 @@ namespace DevDeck
             if (thrw) throw ex;
         }
 
-        public static void VarsFromDict(this IZennoPosterProjectModel project,
-            System.Collections.Generic.Dictionary<string, string> dict)
-        {
-            foreach (var kv in dict)
-                project.Variables[kv.Key].Value = kv.Value ?? "";
-        }
-
         // ListSync/RndFromList/ListFromFile живут в Z3n7/ListExtentions.cs —
         // перенесены из эталона дословно. Здесь их держать нельзя: два
         // ProjectExtensions в разных namespace дают неоднозначность вызова.
