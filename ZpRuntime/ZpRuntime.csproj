@@ -12,6 +12,8 @@
 
     <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
         <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+        <!-- ZennoLab.Emulation.Emulator.SendKey принимает System.Windows.Forms.Keys -->
+        <UseWindowsForms>true</UseWindowsForms>
     </PropertyGroup>
 
     <ItemGroup>

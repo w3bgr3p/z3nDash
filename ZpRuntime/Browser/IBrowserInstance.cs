@@ -102,6 +102,12 @@ namespace DevDeck.Browser
         /// <summary>ZP-совместимая перегрузка: RiseEvent("click", new Rectangle(x,y,1,1), "Left")</summary>
         void RiseEvent(string eventName, Rectangle area, string button);
 
+        /// <summary>
+        /// Запросы вкладки, накопленные с момента включения захвата.
+        /// Захват не бесплатный, поэтому включается первым обращением, а не всегда.
+        /// </summary>
+        IList<ITrafficItem> GetTraffic(IEnumerable<string> urlFilters);
+
         IHeElement            FindElementById(string id);
         IHeElement            FindElementByName(string name);
         IHeElement            FindElementByXPath(string xpath, int index);
@@ -118,6 +124,21 @@ namespace DevDeck.Browser
     public interface IDocument
     {
         string EvaluateScript(string js);
+    }
+
+    /// <summary>Один запрос из трафика вкладки. Поля соответствуют ZP-шному TrafficItem.</summary>
+    public interface ITrafficItem
+    {
+        string Url             { get; }
+        string Method          { get; }
+        uint   ResultCode      { get; }
+        bool   HasResponse     { get; }
+        string RequestHeaders  { get; }
+        string RequestQuery    { get; }
+        string RequestBody     { get; }
+        string ResponseHeaders { get; }
+        byte[] ResponseBody    { get; }
+        string ResponseContentType { get; }
     }
 
     public interface IHeElement

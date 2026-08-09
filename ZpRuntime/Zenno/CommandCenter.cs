@@ -17,6 +17,18 @@ using System.Drawing;
 using System.Linq;
 using DevDeck.Browser;
 
+namespace ZennoLab.CommandCenter.Classes
+{
+    /// <summary>ZP-шные настройки сбора трафика.</summary>
+    public sealed class GetTrafficSettings
+    {
+        public System.Collections.Generic.IEnumerable<string> UrlFilters    { get; set; }
+        public System.Collections.Generic.IEnumerable<string> HeaderFilters { get; set; }
+        public System.Collections.Generic.IEnumerable<string> BodyFilters   { get; set; }
+        public bool GatherAllTraffic { get; set; }
+    }
+}
+
 namespace ZennoLab.CommandCenter
 {
     /// <summary>
@@ -280,6 +292,30 @@ namespace ZennoLab.CommandCenter
             => _doc.EvaluateScript(script);
     }
 
+    /// <summary>ZP-шный TrafficItem. Обёртка над <see cref="ITrafficItem"/>.</summary>
+    public sealed class TrafficItem
+    {
+        private readonly ITrafficItem _t;
+        internal TrafficItem(ITrafficItem t) => _t = t;
+
+        public string Url             => _t.Url;
+        public string Method          => _t.Method;
+        public uint   ResultCode      => _t.ResultCode;
+        public bool   HasResponse     => _t.HasResponse;
+        public bool   IsBlocked       => false;
+        public string RequestHeaders  => _t.RequestHeaders;
+        public string RequestQuery    => _t.RequestQuery;
+        public string RequestBody     => _t.RequestBody;
+        public string ResponseHeaders => _t.ResponseHeaders;
+        public byte[] ResponseBody    => _t.ResponseBody;
+        public string ResponseContentType => _t.ResponseContentType;
+
+        public override string ToString() => $"{Method} {Url} → {ResultCode}";
+
+        /// <summary>Подписка отдаёт ответ уже завершённым, ждать нечего.</summary>
+        public void WaitResponse(int timeout, int delayBetweenChecks) { }
+    }
+
     /// <summary>ZP-шный TouchSimulation.</summary>
     public sealed class TouchSimulation
     {
@@ -350,6 +386,16 @@ namespace ZennoLab.CommandCenter
         public HtmlElementCollection FindElementsByAttribute(string tags, string attrName,
                                                              string attrValue, string searchKind)
             => new HtmlElementCollection(T.FindElementsByAttribute(tags, attrName, attrValue, searchKind));
+
+        // ── Трафик ────────────────────────────────────────────────────────────
+
+        public IEnumerable<TrafficItem> GetTraffic(IEnumerable<string> urlFilters,
+                                                   IEnumerable<string> headerFilters,
+                                                   IEnumerable<string> bodyFilters)
+            => T.GetTraffic(urlFilters).Select(x => new TrafficItem(x));
+
+        public IEnumerable<TrafficItem> GetTraffic(Classes.GetTrafficSettings settings)
+            => GetTraffic(settings?.UrlFilters, settings?.HeaderFilters, settings?.BodyFilters);
     }
 
     /// <summary>

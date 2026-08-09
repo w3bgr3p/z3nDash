@@ -279,6 +279,9 @@ namespace DevDeck.Browser
                     $"document.elementFromPoint({x},{y})?.dispatchEvent(new MouseEvent('{eventName}',{{bubbles:true,clientX:{x},clientY:{y}}}))"));
         }
 
+        public IList<ITrafficItem> GetTraffic(IEnumerable<string> urlFilters)
+            => TrafficCapture.Get(_page, urlFilters);
+
         public IHeElement FindElementById(string id)
             => new PlaywrightElement(_page.Locator($"#{id}"));
 
