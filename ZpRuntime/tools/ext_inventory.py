@@ -36,13 +36,21 @@ PORTED_DIR = 'ZpRuntime/Z3n7'
 
 DEFAULT_Z3N7 = 'W:/code_hard/.net/z3n7/z3n7'
 
+# Файлы эталона, которые переносить не нужно, — иначе они вечно висят в остатке.
+# MethodExtensions/ProjectExtencions.cs: Help — просмотр методов ZennoLab через
+# рефлексию, инструмент разработки. В скомпилированных рабочих скриптах его нет.
+SKIP_FILES = {
+    'ProjectExtencions.cs',
+}
+
 
 def cs_files(root):
     found = []
     for path, _, names in os.walk(root):
         if any(part in path for part in ('\\obj', '\\bin', '/obj', '/bin')):
             continue
-        found += [os.path.join(path, n) for n in names if n.endswith('.cs')]
+        found += [os.path.join(path, n) for n in names
+                  if n.endswith('.cs') and n not in SKIP_FILES]
     return found
 
 
