@@ -548,11 +548,29 @@ namespace DevDeck
                 project.Variables[kv.Key].Value = kv.Value ?? "";
         }
 
-        public static void ListSync(this IZennoPosterProjectModel project,
-            string listName, System.Collections.Generic.List<string> list)
+        // Сигнатуры и поведение — как в z3n7 (MethodExtensions/ListExtentions.cs).
+        // Прежняя версия сериализовала список в переменную и project.Lists вообще
+        // не трогала: расхождение проявлялось бы не на сборке, а на исполнении.
+
+        /// <summary>Прочитать список проекта в новый List.</summary>
+        public static System.Collections.Generic.List<string> ListSync(
+            this IZennoPosterProjectModel project, string listName)
         {
-            // В standalone нет ZennoPoster-списков — сохраняем как JSON-переменную
-            project.Variables[listName].Value = JsonConvert.SerializeObject(list);
+            var projectList = project.Lists[listName];
+            var localList   = new System.Collections.Generic.List<string>();
+            foreach (var item in projectList) localList.Add(item);
+            return localList;
+        }
+
+        /// <summary>Записать List в список проекта, заменив его содержимое.</summary>
+        public static System.Collections.Generic.List<string> ListSync(
+            this IZennoPosterProjectModel project, string listName,
+            System.Collections.Generic.List<string> localList)
+        {
+            var projectList = project.Lists[listName];
+            projectList.Clear();
+            foreach (var item in localList) projectList.Add(item);
+            return localList;
         }
 
         public static string ProjectName(this IZennoPosterProjectModel project)
