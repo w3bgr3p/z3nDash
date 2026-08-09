@@ -326,7 +326,27 @@ namespace DevDeck.Browser
             get { try { return Sync(_loc.CountAsync()) == 0; } catch { return true; } }
         }
 
+        /// <summary>В ZP IsNull и IsVoid различаются нюансами; у нас источник один.</summary>
+        public bool IsNull => IsVoid;
+
         public string InnerText => Sync(_loc.InnerTextAsync());
+        public string InnerHtml => Sync(_loc.InnerHTMLAsync());
+        public string OuterHtml => Sync(_loc.EvaluateAsync<string>("el => el.outerHTML")) ?? "";
+        public string TagName   => (Sync(_loc.EvaluateAsync<string>("el => el.tagName")) ?? "").ToLower();
+
+        public int Width  => (int)(Sync(_loc.BoundingBoxAsync())?.Width  ?? 0);
+        public int Height => (int)(Sync(_loc.BoundingBoxAsync())?.Height ?? 0);
+
+        public System.Drawing.Point DisplacementInBrowser
+        {
+            get
+            {
+                var box = Sync(_loc.BoundingBoxAsync());
+                return box == null
+                    ? System.Drawing.Point.Empty
+                    : new System.Drawing.Point((int)box.X, (int)box.Y);
+            }
+        }
 
         public string GetAttribute(string attr) => attr.ToLower() switch
         {
@@ -334,6 +354,40 @@ namespace DevDeck.Browser
             "value"     => Sync(_loc.InputValueAsync()),
             _           => Sync(_loc.GetAttributeAsync(attr)) ?? ""
         };
+
+        public void SetAttribute(string attr, string value)
+        {
+            // value у input/select — это свойство, а не атрибут: правка атрибута
+            // не двинет реальное значение поля, поэтому разводим случаи.
+            if (attr.Equals("value", StringComparison.OrdinalIgnoreCase))
+            {
+                SetValue(value, "None", false);
+                return;
+            }
+            Sync(_loc.EvaluateAsync(
+                "(el, a) => el.setAttribute(a.name, a.value)",
+                new { name = attr, value }));
+        }
+
+        public void RemoveAttribute(string attr)
+            => Sync(_loc.EvaluateAsync("(el, a) => el.removeAttribute(a)", attr));
+
+        public void Focus()          => Sync(_loc.FocusAsync());
+        public void ScrollIntoView() => Sync(_loc.ScrollIntoViewIfNeededAsync());
+
+        public string DrawToBitmap()
+            => Convert.ToBase64String(Sync(_loc.ScreenshotAsync()));
+
+        public IHeElement FindChildByAttribute(string tag, string attr, string pattern, string mode, int index)
+        {
+            var tags = (tag ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (tags.Length == 0) tags = new[] { "*" };
+            bool negate = mode == "notext";
+            string escaped = pattern.Replace("\\", "\\\\").Replace("'", "\\'");
+            string clause  = negate ? $":not([{attr}='{escaped}'])" : $"[{attr}='{escaped}']";
+            return new PlaywrightElement(
+                _loc.Locator(string.Join(", ", tags.Select(t => t + clause))).Nth(index));
+        }
 
         public void RiseEvent(string eventName, string emulationLevel)
         {

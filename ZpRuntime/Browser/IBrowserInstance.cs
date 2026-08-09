@@ -123,12 +123,30 @@ namespace DevDeck.Browser
     public interface IHeElement
     {
         bool      IsVoid    { get; }
+        /// <summary>ZP-шный HtmlElement.IsNull. Для нас совпадает с IsVoid.</summary>
+        bool      IsNull    { get; }
         string    InnerText { get; }
+        string    InnerHtml { get; }
+        string    OuterHtml { get; }
+        string    TagName   { get; }
+        int       Width     { get; }
+        int       Height    { get; }
+        /// <summary>Координаты элемента в окне браузера (ZP: DisplacementInBrowser).</summary>
+        Point     DisplacementInBrowser { get; }
+
         string    GetAttribute(string attr);
+        void      SetAttribute(string attr, string value);
+        void      RemoveAttribute(string attr);
         void      RiseEvent(string eventName, string emulationLevel);
         void      SetValue(string value, string mode, bool clear);
+        void      Focus();
+        void      ScrollIntoView();
         string    GetXPath();
+        /// <summary>Скриншот элемента в base64 (ZP: DrawToBitmap).</summary>
+        string    DrawToBitmap();
+
         IHeElement ParentElement { get; }
+        IHeElement FindChildByAttribute(string tag, string attr, string pattern, string mode, int index);
         void      RemoveChild(IHeElement child);
     }
 }
