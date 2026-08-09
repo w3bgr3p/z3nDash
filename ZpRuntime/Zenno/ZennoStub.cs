@@ -530,15 +530,10 @@ namespace DevDeck
         // перенесены из эталона дословно. Здесь их держать нельзя: два
         // ProjectExtensions в разных namespace дают неоднозначность вызова.
 
-        public static string ProjectName(this IZennoPosterProjectModel project)
-            => System.IO.Path.GetFileNameWithoutExtension(project.Name);
-
-        public static string ProjectTable(this IZennoPosterProjectModel project)
-        {
-            string table = "__" + project.ProjectName();
-            project.Var("projectTable", table);
-            return table;
-        }
+        // ProjectName/ProjectTable/Path*/SecureVar перенесены в Z3n7/Constantes.cs.
+        // Наши сняты: ProjectName давал другой результат — GetFileNameWithoutExtension
+        // против Split('.')[0] у эталона, то есть "numlex.casino_" против "numlex",
+        // а значит и другое имя таблицы в ProjectTable.
 
         public static string TableName(this IZennoPosterProjectModel project, string tableName)
             => string.IsNullOrEmpty(tableName) ? project.ProjectTable() : tableName;
