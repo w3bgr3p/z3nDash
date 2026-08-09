@@ -19,6 +19,177 @@ using DevDeck.Browser;
 
 namespace ZennoLab.CommandCenter
 {
+    /// <summary>
+    /// ZP-шный статик ZennoPoster. Здесь два разных сорта членов, и путать их
+    /// нельзя: HTTP работает по-настоящему, а управление задачами ZP-сервера в
+    /// standalone смысла не имеет и явно отказывает.
+    /// </summary>
+    public static class ZennoPoster
+    {
+        // ── HTTP: реальная реализация ─────────────────────────────────────────
+
+        public static class HTTP
+        {
+            private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Net.Http.HttpClient> _clients = new();
+
+            public static string Request(
+                InterfacesLibrary.Enums.Http.HttpMethod method,
+                string url, string body, string contentType,
+                string proxy, string encoding,
+                InterfacesLibrary.Enums.Http.ResponceType responseType,
+                int timeout, string cookies, string userAgent,
+                bool followRedirects, int maxRedirects,
+                string[] headers, string cert, bool ignoreErrors,
+                bool sendBody, object cookieContainer)
+            {
+                var client = _clients.GetOrAdd($"{proxy}|{followRedirects}", _ => Build(proxy, followRedirects));
+
+                var req = new System.Net.Http.HttpRequestMessage(
+                    new System.Net.Http.HttpMethod(method.ToString().ToUpper()), url);
+
+                if (sendBody && !string.IsNullOrEmpty(body))
+                    req.Content = new System.Net.Http.StringContent(
+                        body, System.Text.Encoding.UTF8,
+                        string.IsNullOrEmpty(contentType) ? "application/x-www-form-urlencoded" : contentType);
+
+                if (!string.IsNullOrEmpty(userAgent)) req.Headers.TryAddWithoutValidation("User-Agent", userAgent);
+                if (!string.IsNullOrEmpty(cookies))   req.Headers.TryAddWithoutValidation("Cookie", cookies);
+
+                foreach (var h in headers ?? Array.Empty<string>())
+                {
+                    int i = h.IndexOf(':');
+                    if (i <= 0) continue;
+                    req.Headers.TryAddWithoutValidation(h[..i].Trim(), h[(i + 1)..].Trim());
+                }
+
+                try
+                {
+                    using var cts = new System.Threading.CancellationTokenSource(
+                        TimeSpan.FromSeconds(timeout <= 0 ? 30 : timeout));
+                    var resp = client.Send(req, cts.Token);
+                    string respBody = new System.IO.StreamReader(
+                        resp.Content.ReadAsStream(), System.Text.Encoding.UTF8).ReadToEnd();
+
+                    if (!ignoreErrors && !resp.IsSuccessStatusCode)
+                        throw new Exception($"{(int)resp.StatusCode}: {respBody}");
+
+                    string head = $"HTTP/{resp.Version} {(int)resp.StatusCode} {resp.ReasonPhrase}\r\n"
+                        + string.Join("\r\n", resp.Headers.Concat(resp.Content.Headers)
+                            .Select(h => $"{h.Key}: {string.Join("; ", h.Value)}"));
+
+                    return responseType switch
+                    {
+                        InterfacesLibrary.Enums.Http.ResponceType.HeaderOnly    => head,
+                        InterfacesLibrary.Enums.Http.ResponceType.HeaderAndBody => head + "\r\n\r\n" + respBody,
+                        _                                                       => respBody,
+                    };
+                }
+                catch when (ignoreErrors) { return ""; }
+            }
+
+            private static System.Net.Http.HttpClient Build(string proxy, bool followRedirects)
+            {
+                var h = new System.Net.Http.HttpClientHandler { AllowAutoRedirect = followRedirects };
+                if (!string.IsNullOrWhiteSpace(proxy))
+                {
+                    // ZP допускает "user:pass@host:port" и "host:port", со схемой и без.
+                    string p = proxy.Contains("//") ? proxy.Split('/')[2] : proxy;
+                    var wp = new System.Net.WebProxy();
+                    if (p.Contains('@'))
+                    {
+                        var parts = p.Split('@');
+                        var creds = parts[0].Split(':');
+                        wp.Address     = new Uri("http://" + parts[1]);
+                        wp.Credentials = new System.Net.NetworkCredential(creds[0], creds.Length > 1 ? creds[1] : "");
+                    }
+                    else wp.Address = new Uri("http://" + p);
+                    h.Proxy    = wp;
+                    h.UseProxy = true;
+                }
+                return new System.Net.Http.HttpClient(h);
+            }
+        }
+
+        public static string HttpGet(string url, string proxy = "", string encoding = "UTF-8",
+            InterfacesLibrary.Enums.Http.ResponceType respType = InterfacesLibrary.Enums.Http.ResponceType.BodyOnly,
+            int timeout = 30000, string cookies = "", string userAgent = "", bool useRedirect = true,
+            int maxRedirectCount = 5, string[] additionalHeaders = null, string downloadPath = "",
+            bool useOriginalUrl = false)
+            => HTTP.Request(InterfacesLibrary.Enums.Http.HttpMethod.Get, url, "", "", proxy, encoding,
+                respType, timeout / 1000, cookies, userAgent, useRedirect, maxRedirectCount,
+                additionalHeaders, "", false, false, null);
+
+        public static string HttpPost(string url, string content, string contentPostingType = "application/x-www-form-urlencoded",
+            string proxy = "", string encoding = "UTF-8",
+            InterfacesLibrary.Enums.Http.ResponceType respType = InterfacesLibrary.Enums.Http.ResponceType.BodyOnly,
+            int timeout = 30000, string cookies = "", string userAgent = "", bool useRedirect = true,
+            int maxRedirectCount = 5, string[] additionalHeaders = null, string downloadPath = "",
+            bool useOriginalUrl = false)
+            => HTTP.Request(InterfacesLibrary.Enums.Http.HttpMethod.Post, url, content, contentPostingType,
+                proxy, encoding, respType, timeout / 1000, cookies, userAgent, useRedirect,
+                maxRedirectCount, additionalHeaders, "", false, true, null);
+
+        // ── Управление задачами ZP-сервера ────────────────────────────────────
+        // Планировщик здесь свой (DevDeck), очереди ZennoPoster нет. Отказываем
+        // явно: тихая заглушка увела бы вызывающий код на неверных данных.
+
+        private static Exception NoServer(string member) => new NotSupportedException(
+            $"ZennoPoster.{member}: очереди задач ZennoPoster в standalone нет. " +
+            "Управление задачами — на стороне планировщика DevDeck.");
+
+        public static IEnumerable<string> TasksList => throw NoServer(nameof(TasksList));
+        public static int[] AllInstances            => throw NoServer(nameof(AllInstances));
+
+        public static void   AddTask(string task)                  => throw NoServer(nameof(AddTask));
+        public static void   RemoveTask(Guid id)                   => throw NoServer(nameof(RemoveTask));
+        public static void   StartTask(Guid id)                    => throw NoServer(nameof(StartTask));
+        public static void   StartTask(string name)                => throw NoServer(nameof(StartTask));
+        public static void   StopTask(Guid id)                     => throw NoServer(nameof(StopTask));
+        public static void   StopTask(string name)                 => throw NoServer(nameof(StopTask));
+        public static void   InterruptTask(Guid id)                => throw NoServer(nameof(InterruptTask));
+        public static void   InterruptTask(string name)            => throw NoServer(nameof(InterruptTask));
+        public static void   AddTries(Guid id, int count)          => throw NoServer(nameof(AddTries));
+        public static void   AddTries(string name, int count)      => throw NoServer(nameof(AddTries));
+        public static void   SetTries(Guid id, int count)          => throw NoServer(nameof(SetTries));
+        public static void   SetTries(string name, int count)      => throw NoServer(nameof(SetTries));
+        public static void   SetMaxThreads(Guid id, int count)     => throw NoServer(nameof(SetMaxThreads));
+        public static void   SetMaxThreads(string name, int count) => throw NoServer(nameof(SetMaxThreads));
+        public static void   ClearSuccess(Guid id)                 => throw NoServer(nameof(ClearSuccess));
+        public static void   ClearSuccess(string name)             => throw NoServer(nameof(ClearSuccess));
+        public static void   ClearFails(Guid id)                   => throw NoServer(nameof(ClearFails));
+        public static void   ClearFails(string name)               => throw NoServer(nameof(ClearFails));
+        public static string ExportInputSettings(Guid id)          => throw NoServer(nameof(ExportInputSettings));
+        public static void   ImportInputSettings(Guid id, string source) => throw NoServer(nameof(ImportInputSettings));
+        public static string GetTaskInfo(Guid id)                  => throw NoServer(nameof(GetTaskInfo));
+        public static string GetTaskInfo(string projectPath)       => throw NoServer(nameof(GetTaskInfo));
+        public static int    GetThreadsCount()                     => throw NoServer(nameof(GetThreadsCount));
+        public static int    GetThreadsCount(Guid id)              => throw NoServer(nameof(GetThreadsCount));
+        public static int    GetThreadsCount(string name)          => throw NoServer(nameof(GetThreadsCount));
+        public static void   SetExecutionSettings(Guid id, string settings) => throw NoServer(nameof(SetExecutionSettings));
+        public static void   SetSchedulerSettings(Guid id, string settings) => throw NoServer(nameof(SetSchedulerSettings));
+
+        // ── Обработка изображений ─────────────────────────────────────────────
+        // Перегрузки FromScreenshot адресуют инстанс по порту ZP — такой адресации
+        // у нас нет. FromFile реализуемы, но требуют System.Drawing, недоступного
+        // в net10.0 без Windows, поэтому пока тоже отказ.
+
+        private static Exception NoImaging(string member) => new NotSupportedException(
+            $"ZennoPoster.{member}: обработка изображений в ZpRuntime не реализована.");
+
+        public static void ImageProcessingWaterMarkTextFromScreenshot(int instancePort, string savePath,
+            string imposition, string location, string text, int transparency, string style,
+            int offsetLeft, int offsetTop, int quality, string exif)
+            => throw NoImaging(nameof(ImageProcessingWaterMarkTextFromScreenshot));
+
+        public static void ImageProcessingCropFromScreenshot(int instancePort, string savePath,
+            int leftBorder, int topBorder, int cropWidth, int cropHeight, string units, int quality, string exif)
+            => throw NoImaging(nameof(ImageProcessingCropFromScreenshot));
+
+        public static void ImageProcessingResizeFromFile(string filePath, string savePath,
+            int width, int height, string units, bool keep, bool notIncImage, int quality, string exif)
+            => throw NoImaging(nameof(ImageProcessingResizeFromFile));
+    }
+
     /// <summary>ZP-шный HtmlElement. Обёртка над <see cref="IHeElement"/>.</summary>
     public sealed class HtmlElement
     {

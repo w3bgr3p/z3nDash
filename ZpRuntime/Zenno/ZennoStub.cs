@@ -164,28 +164,8 @@ namespace ZennoLab.CommandCenter
     // Instance/Tab/HtmlElement живут в CommandCenter.cs — там они не заглушки,
     // а адаптеры поверх IBrowserInstance.
 
-    /// <summary>
-    /// Stub ZennoPoster — только HTTP.Request используется в Rqst.cs через ExecuteViaZennoPoster.
-    /// В standalone-режиме всегда используется NetHttp (useNetHttp=true), поэтому достаточно throw.
-    /// </summary>
-    public static class ZennoPoster
-    {
-        public static class HTTP
-        {
-            public static string Request(
-                ZennoLab.InterfacesLibrary.Enums.Http.HttpMethod method,
-                string url, string body, string contentType,
-                string proxy, string encoding,
-                ZennoLab.InterfacesLibrary.Enums.Http.ResponceType responseType,
-                int timeout, string cookies, string userAgent,
-                bool followRedirects, int maxRedirects,
-                string[] headers, string cert, bool ignoreErrors,
-                bool sendBody, object cookieContainer)
-                => throw new NotImplementedException(
-                    "ZennoPoster.HTTP.Request is not available in standalone mode. " +
-                    "Use useNetHttp=true in all API calls.");
-        }
-    }
+    // Статик ZennoPoster живёт в CommandCenter.cs: HTTP там работает
+    // по-настоящему, управление задачами ZP-сервера явно отказывает.
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
