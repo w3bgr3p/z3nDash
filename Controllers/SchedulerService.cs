@@ -479,6 +479,8 @@ private static void SeedDefaults(Db db)
                         var page    = context.Pages.FirstOrDefault()
                                       ?? await context.NewPageAsync();
                         instance    = new DevDeck.Browser.PlaywrightInstance(page);
+                        // чтобы ZennoPoster.HTTP.Request мог уйти с сессией браузера
+                        ZennoLab.CommandCenter.ZennoPoster.AttachBrowser(instance);
                     }
                 }
 

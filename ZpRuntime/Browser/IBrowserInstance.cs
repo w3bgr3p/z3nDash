@@ -68,6 +68,14 @@ namespace DevDeck.Browser
 
         // ── HTTP ──────────────────────────────────────────────────────────────
         void SaveRequestHeadersToVariable(IBrowserInstance instance, string url, bool includeBody);
+
+        /// <summary>
+        /// Запрос от имени браузера: делит cookie с его контекстом, поэтому уходит
+        /// с той же сессией, а выставленные сервером cookie возвращаются в браузер.
+        /// Это то, что под ZennoPoster даёт передача CookieContainer профиля.
+        /// </summary>
+        IBrowserHttpResponse SendFromBrowser(string method, string url, string body,
+            string contentType, IDictionary<string, string> headers, int timeoutSec);
     }
 
     public interface IBrowserProfile
@@ -124,6 +132,15 @@ namespace DevDeck.Browser
     public interface IDocument
     {
         string EvaluateScript(string js);
+    }
+
+    /// <summary>Ответ на запрос, отправленный от имени браузера.</summary>
+    public interface IBrowserHttpResponse
+    {
+        int    Status { get; }
+        string Reason { get; }
+        string Body   { get; }
+        IDictionary<string, string> Headers { get; }
     }
 
     /// <summary>Один запрос из трафика вкладки. Поля соответствуют ZP-шному TrafficItem.</summary>

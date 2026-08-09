@@ -86,6 +86,44 @@ namespace DevDeck.Browser
                 .ToList();
         }
 
+        /// <summary>
+        /// Через IBrowserContext.APIRequest — он делит хранилище cookie с браузером,
+        /// поэтому вручную переносить сессию не нужно.
+        /// </summary>
+        public IBrowserHttpResponse SendFromBrowser(string method, string url, string body,
+            string contentType, IDictionary<string, string> headers, int timeoutSec)
+        {
+            var opts = new APIRequestContextOptions
+            {
+                Method  = method,
+                Timeout = (timeoutSec <= 0 ? 30 : timeoutSec) * 1000,
+            };
+
+            if (!string.IsNullOrEmpty(body))
+            {
+                opts.Data = body;
+                var hdrs = headers == null
+                    ? new Dictionary<string, string>()
+                    : new Dictionary<string, string>(headers);
+                if (!hdrs.Keys.Any(k => k.Equals("content-type", StringComparison.OrdinalIgnoreCase)))
+                    hdrs["Content-Type"] = string.IsNullOrEmpty(contentType)
+                        ? "application/x-www-form-urlencoded"
+                        : contentType;
+                opts.Headers = hdrs;
+            }
+            else if (headers != null)
+            {
+                opts.Headers = headers;
+            }
+
+            var resp = Sync(_context.APIRequest.FetchAsync(url, opts));
+            return new PlaywrightHttpResponse(
+                resp.Status,
+                resp.StatusText,
+                Sync(resp.TextAsync()),
+                resp.Headers);
+        }
+
         public void CFSolve(int timeoutSeconds = 30)
         {
             var deadline = DateTime.Now.AddSeconds(timeoutSeconds);
@@ -305,6 +343,23 @@ namespace DevDeck.Browser
 
         private static T    Sync<T>(Task<T> t) => t.GetAwaiter().GetResult();
         private static void Sync(Task t)        => t.GetAwaiter().GetResult();
+    }
+
+    internal sealed class PlaywrightHttpResponse : IBrowserHttpResponse
+    {
+        internal PlaywrightHttpResponse(int status, string reason, string body,
+                                        IDictionary<string, string> headers)
+        {
+            Status  = status;
+            Reason  = reason ?? "";
+            Body    = body ?? "";
+            Headers = headers ?? new Dictionary<string, string>();
+        }
+
+        public int    Status { get; }
+        public string Reason { get; }
+        public string Body   { get; }
+        public IDictionary<string, string> Headers { get; }
     }
 
     public sealed class PlaywrightDocument : IDocument

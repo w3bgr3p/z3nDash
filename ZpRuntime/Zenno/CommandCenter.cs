@@ -40,9 +40,17 @@ namespace ZennoLab.CommandCenter
     {
         // ── HTTP: реальная реализация ─────────────────────────────────────────
 
+        /// <summary>
+        /// Активный браузер для запросов «от имени браузера». Проставляется хостом,
+        /// как Emulator.Attach — статик сам браузер не поднимает.
+        /// </summary>
+        public static void AttachBrowser(IBrowserInstance browser) => HTTP.Browser = browser;
+
         public static class HTTP
         {
             private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Net.Http.HttpClient> _clients = new();
+
+            internal static IBrowserInstance Browser { get; set; }
 
             public static string Request(
                 InterfacesLibrary.Enums.Http.HttpMethod method,
@@ -54,6 +62,43 @@ namespace ZennoLab.CommandCenter
                 string[] headers, string cert, bool ignoreErrors,
                 bool sendBody, object cookieContainer)
             {
+                // Под ZennoPoster переданный CookieContainer профиля означает
+                // «уйти с сессией браузера». Воспроизводим это через
+                // IBrowserContext.APIRequest, который делит cookie с браузером.
+                // Молча слать без сессии нельзя: вернётся 401 там, где ожидались
+                // данные, и без всякого сигнала — поэтому явный отказ.
+                if (cookieContainer != null)
+                {
+                    var br = Browser ?? throw new NotSupportedException(
+                        "ZennoPoster.HTTP.Request: передан cookieContainer, то есть запрос должен " +
+                        "уйти с сессией браузера, но браузер не привязан. Вызовите " +
+                        "ZennoPoster.AttachBrowser(instance.Browser) или не передавайте cookieContainer.");
+
+                    var hdrs = new Dictionary<string, string>();
+                    foreach (var h in headers ?? Array.Empty<string>())
+                    {
+                        int idx = h.IndexOf(':');
+                        if (idx > 0) hdrs[h[..idx].Trim()] = h[(idx + 1)..].Trim();
+                    }
+                    if (!string.IsNullOrEmpty(userAgent)) hdrs["User-Agent"] = userAgent;
+
+                    var br_resp = br.SendFromBrowser(method.ToString().ToUpper(), url,
+                        sendBody ? body : null, contentType, hdrs, timeout);
+
+                    if (!ignoreErrors && (br_resp.Status < 200 || br_resp.Status >= 300))
+                        throw new Exception($"{br_resp.Status}: {br_resp.Body}");
+
+                    string brHead = $"HTTP {br_resp.Status} {br_resp.Reason}\r\n"
+                        + string.Join("\r\n", br_resp.Headers.Select(h => $"{h.Key}: {h.Value}"));
+
+                    return responseType switch
+                    {
+                        InterfacesLibrary.Enums.Http.ResponceType.HeaderOnly    => brHead,
+                        InterfacesLibrary.Enums.Http.ResponceType.HeaderAndBody => brHead + "\r\n\r\n" + br_resp.Body,
+                        _                                                       => br_resp.Body,
+                    };
+                }
+
                 var client = _clients.GetOrAdd($"{proxy}|{followRedirects}", _ => Build(proxy, followRedirects));
 
                 var req = new System.Net.Http.HttpRequestMessage(
