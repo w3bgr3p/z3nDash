@@ -205,8 +205,56 @@ namespace DevDeck.Browser
         public IDocument MainDocument => new PlaywrightDocument(_page);
         public ITouch    Touch        => new PlaywrightTouch(_page);
 
+        public string Domain
+        {
+            get { try { return new Uri(_page.Url).Host; } catch { return ""; } }
+        }
+
+        /// <summary>Домен второго уровня: "a.b.example.com" → "example.com".</summary>
+        public string MainDomain
+        {
+            get
+            {
+                var parts = Domain.Split('.');
+                return parts.Length < 2 ? Domain : string.Join(".", parts[^2..]);
+            }
+        }
+
+        /// <summary>
+        /// В ZP это HWND окна вкладки, нужный для Emulator.SendKey. У CDP-страницы
+        /// окна нет, поэтому отдаём стабильный суррогат — он годится как ключ, но
+        /// не как настоящий хендл. Реальные нажатия идут через Keyboard.
+        /// </summary>
+        public int Handle => _page.GetHashCode();
+
+        // System.Drawing.Point — у Microsoft.Playwright есть одноимённый тип.
+        private System.Drawing.Point _mousePos;
+        public System.Drawing.Point FullEmulationMouseCurrentPosition
+        {
+            get => _mousePos;
+            set { _mousePos = value; Sync(_page.Mouse.MoveAsync(value.X, value.Y)); }
+        }
+
         public void Navigate(string url, string referer = "")
             => Sync(_page.GotoAsync(url, new PageGotoOptions { Referer = referer == "" ? null : referer }));
+
+        public void MouseClick(int x, int y, string button, string mouseEvent, bool considerScroll)
+        {
+            var btn = button?.ToLower() switch
+            {
+                "right"  => MouseButton.Right,
+                "middle" => MouseButton.Middle,
+                _        => MouseButton.Left,
+            };
+            Sync(_page.Mouse.ClickAsync(x, y, new MouseClickOptions { Button = btn }));
+            _mousePos = new System.Drawing.Point(x, y);
+        }
+
+        public void FullEmulationMouseMove(int toX, int toY)
+        {
+            Sync(_page.Mouse.MoveAsync(toX, toY));
+            _mousePos = new System.Drawing.Point(toX, toY);
+        }
 
         public void WaitDownloading()
             => Sync(_page.WaitForLoadStateAsync(LoadState.NetworkIdle));
@@ -236,6 +284,9 @@ namespace DevDeck.Browser
 
         public IHeElement FindElementByName(string name)
             => new PlaywrightElement(_page.Locator($"[name='{name}']"));
+
+        public IHeElement FindElementByXPath(string xpath, int index)
+            => new PlaywrightElement(_page.Locator($"xpath={xpath}").Nth(index));
 
         public IHeElement FindElementByAttribute(string tag, string attr, string pattern, string mode, int index)
             => new PlaywrightElement(PlaywrightInstance.BuildLocator(_page, tag, attr, pattern, mode).Nth(index));

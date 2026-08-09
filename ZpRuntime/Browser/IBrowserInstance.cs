@@ -78,11 +78,22 @@ namespace DevDeck.Browser
     public interface IBrowserTab
     {
         string    URL          { get; }
+        /// <summary>Хост текущей страницы, как ZP-шный Tab.Domain.</summary>
+        string    Domain       { get; }
+        /// <summary>Домен второго уровня, как ZP-шный Tab.MainDomain.</summary>
+        string    MainDomain   { get; }
+        /// <summary>ZP отдаёт HWND вкладки. Оконных хендлов у нас нет — см. реализацию.</summary>
+        int       Handle       { get; }
         bool      IsBusy       { get; }
         IDocument MainDocument { get; }
         ITouch    Touch        { get; }
 
+        /// <summary>Текущая позиция курсора при полной эмуляции мыши.</summary>
+        Point FullEmulationMouseCurrentPosition { get; set; }
+
         void Navigate(string url, string referer = "");
+        void MouseClick(int x, int y, string button, string mouseEvent, bool considerScroll);
+        void FullEmulationMouseMove(int toX, int toY);
         void WaitDownloading();
         void Close();
         void KeyEvent(string key, string type, string modifier = "");
@@ -93,6 +104,7 @@ namespace DevDeck.Browser
 
         IHeElement            FindElementById(string id);
         IHeElement            FindElementByName(string name);
+        IHeElement            FindElementByXPath(string xpath, int index);
         IHeElement            FindElementByAttribute(string tag, string attr, string pattern, string mode, int index);
         IList<IHeElement>     FindElementsByAttribute(string tag, string attr, string pattern, string mode);
     }
