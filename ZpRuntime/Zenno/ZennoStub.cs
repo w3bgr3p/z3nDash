@@ -161,19 +161,8 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
 
 namespace ZennoLab.CommandCenter
 {
-    /// <summary>
-    /// Stub Instance. Методы, требующие браузера, бросают NotImplementedException.
-    /// </summary>
-    public class Instance
-    {
-        public string FormTitle { get; set; } = "";
-
-        public void SetCookie(string cookies)
-            => throw new NotImplementedException("Instance.SetCookie requires ZennoPoster browser");
-
-        public void F5()
-            => throw new NotImplementedException("Instance.F5 requires ZennoPoster browser");
-    }
+    // Instance/Tab/HtmlElement живут в CommandCenter.cs — там они не заглушки,
+    // а адаптеры поверх IBrowserInstance.
 
     /// <summary>
     /// Stub ZennoPoster — только HTTP.Request используется в Rqst.cs через ExecuteViaZennoPoster.
