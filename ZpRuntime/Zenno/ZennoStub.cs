@@ -502,18 +502,7 @@ namespace DevDeck
         // Наши версии удалены: два ProjectExtensions с одинаковой сигнатурой в
         // разных namespace дают неоднозначность в точке вызова.
 
-        public static string GVar(this IZennoPosterProjectModel project, string name)
-        {
-            string ns = project.ExecuteMacro("{-Environment.CurrentUser-}");
-            return project.GlobalVariables[ns, name].Value;
-        }
-
-        public static string GVar(this IZennoPosterProjectModel project, string name, object value)
-        {
-            string ns = project.ExecuteMacro("{-Environment.CurrentUser-}");
-            project.GlobalVariables.SetVariable(ns, name, value?.ToString() ?? "");
-            return "";
-        }
+        // GVar/GGetBusyList перенесены в Z3n7/GVars.cs из эталона.
 
         public static void log(this IZennoPosterProjectModel project, object msg,
             [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
