@@ -1,10 +1,7 @@
-﻿#if !ZENNOPOSTER
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ZennoStub.cs  —  эмуляция ZennoPoster SDK для standalone-запуска z3nCore
-// Компилируется только при отсутствии символа ZENNOPOSTER.
-// Namespace'ы и типы совпадают с оригинальным SDK — конфликтов нет,
-// т.к. реальные dll не подключаются в этой конфигурации.
+﻿// ══════════════════════════════════════════════════════════════════════════════
+// ZennoStub.cs  —  эмуляция ZennoPoster SDK для standalone-запуска ZpRuntime.
+// Namespace'ы и типы совпадают с оригинальным SDK, поэтому код, написанный под
+// ZennoPoster, компилируется без правок. Реальные ZennoLab.dll не подключаются.
 // ══════════════════════════════════════════════════════════════════════════════
 
 using System;
@@ -484,7 +481,7 @@ namespace DevDeck
 
             return _clients.GetOrAdd(clientKey, _ =>
             {
-                string logHost = Config.LogsConfig.TrafficHost is { Length: > 0 } h
+                string logHost = ZpRuntimeOptions.TrafficHost is { Length: > 0 } h
                     ? h
                     : "http://localhost:38109/http-log";
 
@@ -926,5 +923,3 @@ namespace DevDeck
         
     }
 }
-
-#endif // !ZENNOPOSTER

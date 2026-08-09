@@ -9,11 +9,10 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>
-        <!-- ZENNOPOSTER не определён → ZennoStub.cs компилируется вместо ZP SDK -->
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="..\..\Essentials\ZennoStub.cs" />
+        <Compile Include="..\..\ZpRuntime\Zenno\ZennoStub.cs" />
         <Compile Include="..\..\Controllers\Internal\InternalTasks.cs" />
         <Compile Include="..\..\Controllers\Internal\InternalTasks.Context.cs" />
         <Compile Include="..\..\Essentials\Logger.cs" />

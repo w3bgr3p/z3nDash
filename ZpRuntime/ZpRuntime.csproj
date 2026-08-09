@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
+        <OutputType>Library</OutputType>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>DevDeck</RootNamespace>
+        <AssemblyName>ZpRuntime</AssemblyName>
+        <NoWarn>$(NoWarn);8625;8618;8604;8603;8602;8600;8601;8619</NoWarn>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+        <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Playwright"                    Version="1.58.0" />
+        <PackageReference Include="Newtonsoft.Json"                         Version="13.0.4" />
+        <PackageReference Include="Npgsql"                                  Version="10.0.1" />
+        <PackageReference Include="System.Data.Odbc"                        Version="10.0.2" />
+        <PackageReference Include="Microsoft.Data.Sqlite"                   Version="9.0.*" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.13.0" />
+        <PackageReference Include="Nethereum.Web3"                          Version="4.29.0.0" />
+        <PackageReference Include="Otp.NET"                                 Version="1.4.0" />
+        <PackageReference Include="OpenCvSharp4"                            Version="4.9.0.20240103" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+        <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
+        <PackageReference Include="System.Management"        Version="10.0.0-rc.2.25502.107" />
+    </ItemGroup>
+
+</Project>

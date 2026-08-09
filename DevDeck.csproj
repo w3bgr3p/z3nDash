@@ -100,6 +100,7 @@
 
     <ItemGroup>
         <Compile Remove="Controllers\ZpOrchestratorHandler.cs" />
+        <Compile Remove="ZpRuntime\**" />
         <Compile Remove="z3nStub\**" />
         <Compile Remove="installer_output\**" />
         <Compile Remove="publish-new\**" />
@@ -112,6 +113,10 @@
 
     <ItemGroup>
         <Folder Include="docs-vault\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="ZpRuntime\ZpRuntime.csproj" />
     </ItemGroup>
 
     <ItemGroup>
