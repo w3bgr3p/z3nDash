@@ -1,15 +1,11 @@
 // Перенесено из z3n7/Essentials/Safu8.cs. Копия дословная.
 //
-// ШАГ 1 из 3. Safu8 и Constantes в эталоне зависят друг от друга:
+// Перенос завершён. Safu8 и Constantes в эталоне зависят друг от друга:
 //   SAFU.Decode/Encode/HWPass (статические, 2 аргумента) -> project.SecureVar
 //   Constantes.SecureVar                                 -> SAFU.DecryptHWID
-// Цикл разрывается порядком. Здесь перенесено всё, что в него не входит:
-// криптоядро, HWID и пара EncodeHWID/DecodeHWID. Сам Z3n8SAFU в цикле не
-// участвует — pin и acc он получает параметрами.
-//
-// Отложено до шага 3 (после переноса Constantes):
-//   ISAFU.Encode/Decode/HWPass и их реализация в Z3n8SAFU
-//   статические SAFU.Decode/Encode/HWPass
+// Поэтому шли в три шага: сначала криптоядро без статических обёрток, затем
+// Constantes, затем обёртки. Сам Z3n8SAFU в цикле не участвует — pin и acc он
+// получает параметрами.
 //
 // Совместимость с DevDeck.SAFU проверена: одинаковый HWID и одинаковый вывод
 // ключа, см. ZpRuntime/tools/HwidCheck и коммит 32947d8.
@@ -39,6 +35,9 @@ namespace z3n7
 
     public interface ISAFU
     {
+        string Encode(IZennoPosterProjectModel project, string toEncrypt, string pin, string acc);
+        string Decode(IZennoPosterProjectModel project, string toDecrypt, string pin, string acc);
+        string HWPass(IZennoPosterProjectModel project, string pin, string acc);
         string EncodeHWID(IZennoPosterProjectModel project, string toEncrypt);
         string DecodeHWID(IZennoPosterProjectModel project, string toDecrypt);
     }
@@ -269,6 +268,59 @@ namespace z3n7
 
         // ── ISAFU implementation ──────────────────────────────────────────────
 
+        public string Encode(IZennoPosterProjectModel project, string toEncrypt, string pin, string acc)
+        {
+            if (string.IsNullOrEmpty(toEncrypt)) return string.Empty;
+            var hwid = GetServerHwid(project) ?? GetStableHWId();
+            var key = DeriveSecureKey(pin, hwid, acc);
+            return AesEncrypt(toEncrypt, key);
+        }
+
+        public string Decode(IZennoPosterProjectModel project, string toDecrypt, string pin, string acc)
+        {
+            if (string.IsNullOrEmpty(toDecrypt)) return string.Empty;
+            var hwid = GetServerHwid(project) ?? GetStableHWId();
+            var key = DeriveSecureKey(pin, hwid, acc);
+            return AesDecrypt(toDecrypt, key);
+        }
+
+        public string HWPass(IZennoPosterProjectModel project, string pin, string acc)
+        {
+            var hwid = GetServerHwid(project) ?? GetStableHWId();
+            var secureKey = DeriveSecureKey(pin, hwid, acc);
+            using (var hmac = new HMACSHA256(secureKey))
+            {
+                var seedBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes("PASSWORD_SEED"));
+
+                var sb      = new StringBuilder();
+                string lo   = "abcdefghijklmnopqrstuvwxyz";
+                string up   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                string dg   = "0123456789";
+                string sp   = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+                var sets    = new string[] { lo, up, dg, sp };
+
+                for (int i = 0; i < 4; i++)
+                    sb.Append(sets[i][seedBytes[i] % sets[i].Length]);
+
+                string all = lo + up + dg + sp;
+                for (int i = 4; i < 24; i++)
+                {
+                    int si  = (i * 2) % seedBytes.Length;
+                    int idx = Math.Abs((seedBytes[si] << 8) | seedBytes[(si + 1) % seedBytes.Length]) % all.Length;
+                    sb.Append(all[idx]);
+                }
+
+                var chars = sb.ToString().ToCharArray();
+                for (int i = chars.Length - 1; i > 0; i--)
+                {
+                    int j = Math.Abs(BitConverter.ToInt32(seedBytes, (i * 4) % (seedBytes.Length - 3))) % (i + 1);
+                    char tmp = chars[i]; chars[i] = chars[j]; chars[j] = tmp;
+                }
+
+                return new string(chars);
+            }
+        }
+
         public string EncodeHWID(IZennoPosterProjectModel project, string toEncrypt)
         {
             if (string.IsNullOrEmpty(toEncrypt)) return string.Empty;
@@ -292,6 +344,12 @@ namespace z3n7
         {
             var impl = new Z3n8SAFU(keyFilePath);
 
+            FunctionStorage.Functions["SAFU_Encode"] =
+                (Func<IZennoPosterProjectModel, string, string, string, string>)impl.Encode;
+            FunctionStorage.Functions["SAFU_Decode"] =
+                (Func<IZennoPosterProjectModel, string, string, string, string>)impl.Decode;
+            FunctionStorage.Functions["SAFU_HWPass"] =
+                (Func<IZennoPosterProjectModel, string, string, string>)impl.HWPass;
             FunctionStorage.Functions["SAFU_EncryptHWID"] =
                 (Func<IZennoPosterProjectModel, string, string>)impl.EncodeHWID;
             FunctionStorage.Functions["SAFU_DecryptHWID"] =
@@ -314,6 +372,35 @@ namespace z3n7
             var func = (Func<IZennoPosterProjectModel, string, string>)
                 FunctionStorage.Functions["SAFU_EncryptHWID"];
             return func(project, toEncrypt);
+        }
+
+        public static string Decode(IZennoPosterProjectModel project, string toDecrypt)
+        {
+            if (string.IsNullOrEmpty(toDecrypt)) return string.Empty;
+            string pin = project.SecureVar("cfgPin");
+            string acc = project.Var("acc0");
+            var func = (Func<IZennoPosterProjectModel, string, string, string, string>)
+                FunctionStorage.Functions["SAFU_Decode"];
+            return func(project, toDecrypt, pin, acc);
+        }
+
+        public static string Encode(IZennoPosterProjectModel project, string toEncrypt)
+        {
+            if (string.IsNullOrEmpty(toEncrypt)) return string.Empty;
+            string pin = project.SecureVar("cfgPin");
+            string acc = project.Var("acc0");
+            var func = (Func<IZennoPosterProjectModel, string, string, string, string>)
+                FunctionStorage.Functions["SAFU_Encode"];
+            return func(project, toEncrypt, pin, acc);
+        }
+
+        public static string HWPass(this IZennoPosterProjectModel project)
+        {
+            string pin = project.SecureVar("cfgPin");
+            string acc = project.Var("acc0");
+            var func = (Func<IZennoPosterProjectModel, string, string, string>)
+                FunctionStorage.Functions["SAFU_HWPass"];
+            return func(project, pin, acc);
         }
     }
 }
