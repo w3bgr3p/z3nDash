@@ -39,6 +39,7 @@ public static class CsxExecutor
                 "Newtonsoft.Json",
                 "Newtonsoft.Json.Linq",
                 "DevDeck",
+                "z3n7",
                 "ZennoLab.InterfacesLibrary.ProjectModel",
                 "ZennoLab.InterfacesLibrary.Enums.Log",
                 "ZennoLab.InterfacesLibrary.Enums.Http",

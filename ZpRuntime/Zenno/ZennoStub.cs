@@ -548,30 +548,9 @@ namespace DevDeck
                 project.Variables[kv.Key].Value = kv.Value ?? "";
         }
 
-        // Сигнатуры и поведение — как в z3n7 (MethodExtensions/ListExtentions.cs).
-        // Прежняя версия сериализовала список в переменную и project.Lists вообще
-        // не трогала: расхождение проявлялось бы не на сборке, а на исполнении.
-
-        /// <summary>Прочитать список проекта в новый List.</summary>
-        public static System.Collections.Generic.List<string> ListSync(
-            this IZennoPosterProjectModel project, string listName)
-        {
-            var projectList = project.Lists[listName];
-            var localList   = new System.Collections.Generic.List<string>();
-            foreach (var item in projectList) localList.Add(item);
-            return localList;
-        }
-
-        /// <summary>Записать List в список проекта, заменив его содержимое.</summary>
-        public static System.Collections.Generic.List<string> ListSync(
-            this IZennoPosterProjectModel project, string listName,
-            System.Collections.Generic.List<string> localList)
-        {
-            var projectList = project.Lists[listName];
-            projectList.Clear();
-            foreach (var item in localList) projectList.Add(item);
-            return localList;
-        }
+        // ListSync/RndFromList/ListFromFile живут в Z3n7/ListExtentions.cs —
+        // перенесены из эталона дословно. Здесь их держать нельзя: два
+        // ProjectExtensions в разных namespace дают неоднозначность вызова.
 
         public static string ProjectName(this IZennoPosterProjectModel project)
             => System.IO.Path.GetFileNameWithoutExtension(project.Name);

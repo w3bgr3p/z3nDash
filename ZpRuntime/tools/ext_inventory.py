@@ -30,6 +30,10 @@ OURS = [
     'ZpRuntime/Browser/CanvasExtensions.cs',
 ]
 
+# Дословные копии из эталона. Расходиться с z3n7 не могут по построению, поэтому
+# считаются отдельно — как сделанная часть переноса, а не как наша реализация.
+PORTED_DIR = 'ZpRuntime/Z3n7'
+
 DEFAULT_Z3N7 = 'W:/code_hard/.net/z3n7/z3n7'
 
 
@@ -75,12 +79,16 @@ def main():
 
     ours = scan(OURS)
     theirs = scan(cs_files(args.z3n7))
+    ported = scan(cs_files(PORTED_DIR)) if os.path.isdir(PORTED_DIR) else {}
 
     shared = sorted(set(ours) & set(theirs))
     only_ours = sorted(set(ours) - set(theirs))
-    only_theirs = sorted(set(theirs) - set(ours))
+    # перенесённое из остатка вычитаем: оно уже на месте
+    only_theirs = sorted(set(theirs) - set(ours) - set(ported))
 
-    print(f'наши: {len(ours)}   z3n7: {len(theirs)}   пересечение: {len(shared)}')
+    done = len(set(ported) & set(theirs))
+    print(f'наши: {len(ours)}   z3n7: {len(theirs)}   пересечение: {len(shared)}'
+          f'   перенесено: {done}')
 
     print(f'\n=== ПЕРЕСЕЧЕНИЕ ({len(shared)}) — при копировании конфликтует ===')
     divergent = 0
