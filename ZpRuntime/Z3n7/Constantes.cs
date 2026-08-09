@@ -3,14 +3,9 @@
 // ШАГ 2 из 3 переноса Safu8/Constantes — цикл описан в шапке Safu8.cs.
 // SecureVar здесь опирается на SAFU.DecryptHWID, перенесённый шагом 1.
 //
-// Два отступления от дословности, оба помечены на месте:
-//   SecureVar под #if WINDOWS — он тянет SAFU.DecryptHWID, а тот собирает HWID
-//   через WMI. Остальные методы класса от этого не зависят и доступны всегда.
-//
-//   FromBase64 вызван статически через DevDeck.StringExtensions, а не как
-//   extension. Эталонная версия лежит в StringExtentions.cs, который ещё не
-//   перенесён; писать using DevDeck нельзя — при переносе Rqst.cs в обоих
-//   namespace окажется GET/POST и вызовы станут неоднозначными.
+// Одно отступление от дословности: SecureVar под #if WINDOWS — он тянет
+// SAFU.DecryptHWID, а тот собирает HWID через WMI. Остальные методы класса от
+// этого не зависят и доступны на обеих целях.
 
 using System;
 using System.Collections.Generic;
@@ -116,9 +111,8 @@ namespace z3n7
             string decrypted = SAFU.DecryptHWID(project, encrypted);
             if (string.IsNullOrEmpty(decrypted)) return string.Empty;
 
-            // Эталон: decrypted.FromBase64() — см. шапку файла.
             var dict = JsonConvert.DeserializeObject<Dictionary<string, string>>(
-                DevDeck.StringExtensions.FromBase64(decrypted));
+                decrypted.FromBase64());
             return dict.TryGetValue(key, out var val) ? val : string.Empty;
         }
 #endif

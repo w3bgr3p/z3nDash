@@ -721,48 +721,10 @@ namespace DevDeck
 
     public static partial class StringExtensions
     {
-        public static string ToBase64(this string s)
-        {
-            if (string.IsNullOrEmpty(s))
-                return string.Empty;
-        
-            byte[] bytes = Encoding.UTF8.GetBytes(s);
-            return Convert.ToBase64String(bytes);
-        }
-
-        public static string FromBase64(this string s)
-        {
-            try   { return Encoding.UTF8.GetString(Convert.FromBase64String(s)); }
-            catch { return s; }
-        }
-
-        public static System.Collections.Generic.Dictionary<string, object> ParseJwt(this string token)
-        {
-            var result = new System.Collections.Generic.Dictionary<string, object>();
-            if (string.IsNullOrEmpty(token)) { result["is_expired"] = true; return result; }
-            try
-            {
-                var parts = token.Split('.');
-                if (parts.Length < 2) { result["is_expired"] = true; return result; }
-                var payload = parts[1].Replace('-', '+').Replace('_', '/');
-                switch (payload.Length % 4)
-                {
-                    case 2: payload += "=="; break;
-                    case 3: payload += "=";  break;
-                }
-                var claims = JsonConvert.DeserializeObject<
-                    System.Collections.Generic.Dictionary<string, object>>(
-                    Encoding.UTF8.GetString(Convert.FromBase64String(payload)));
-                foreach (var kv in claims) result[kv.Key] = kv.Value;
-                if (claims.TryGetValue("exp", out var expObj))
-                    result["is_expired"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                                           >= Convert.ToInt64(expObj);
-                else
-                    result["is_expired"] = false;
-            }
-            catch { result["is_expired"] = true; }
-            return result;
-        }
+        // ToBase64/FromBase64/ParseJwt перенесены в Z3n7/StringExtentions.cs.
+        // Наши сняты. ParseJwt различался существенно: наш возвращал плоские
+        // claims плюс is_expired, эталон — структурированные alg/typ/kid/iss/
+        // sub/aud/iat/exp/ttl_seconds/is_expired и сырые header_json/payload_json.
     }
 
     // ── Time (копия из z3nCore/Time.cs без изменений) ─────────────────────────
