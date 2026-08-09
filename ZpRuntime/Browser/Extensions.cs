@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using DevDeck;
 using DevDeck.Browser;
+using z3n7;   // Time.Sleeper — перенесён из эталона
 
 /// <summary>
 /// Extension-методы для IBrowserInstance.
