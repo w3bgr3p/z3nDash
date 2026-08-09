@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using DevDeck;
+using z3n7;   // Var/Int и прочие перенесённые из эталона расширения
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZennoLab.InterfacesLibrary.Enums
@@ -497,14 +498,9 @@ namespace DevDeck
 
     public static partial class ProjectExtensions
     {
-        public static string Var(this IZennoPosterProjectModel project, string name)
-            => project.Variables[name].Value;
-
-        public static string Var(this IZennoPosterProjectModel project, string name, object value)
-        {
-            project.Variables[name].Value = value?.ToString() ?? "";
-            return "";
-        }
+        // Var/Int/Decimal/Bool/MaxErr перенесены в Z3n7/Vars.cs из эталона.
+        // Наши версии удалены: два ProjectExtensions с одинаковой сигнатурой в
+        // разных namespace дают неоднозначность в точке вызова.
 
         public static string GVar(this IZennoPosterProjectModel project, string name)
         {
