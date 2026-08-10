@@ -26,6 +26,11 @@ namespace ZennoLab.InterfacesLibrary.Enums.Log
     public enum LogColor { Default, Red, Green, Yellow, Blue, Orange }
 }
 
+namespace ZennoLab.InterfacesLibrary.Enums.Db
+{
+    public enum DbProvider { Odbc, OleDb, SqlServer, MySql, Postgre, SQLite }
+}
+
 namespace ZennoLab.InterfacesLibrary.Enums.Http
 {
     public enum HttpMethod { Get, Post, Put, Delete, Head, Patch }
@@ -393,7 +398,10 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         // Формат: { "acc0": "1", "proxy": "user:pass@host:port",
         //           "secp256k1": "<plaintext_pk>", ... }
 
-        public Db Db { get; set; }
+        // Квалифицировано: после переноса z3n7.Db имя стало неоднозначным.
+        // Здесь нужен именно приложенческий — его настраивает DbConnectionService,
+        // и приложенческий код зовёт его методы напрямую, мимо расширений.
+        public DevDeck.Db Db { get; set; }
 
         public void LoadAccount(string jsonFilePath)
         {

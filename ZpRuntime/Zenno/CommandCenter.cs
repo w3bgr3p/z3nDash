@@ -167,6 +167,51 @@ namespace ZennoLab.CommandCenter
             }
         }
 
+        // ── Db: реальная реализация ───────────────────────────────────────────
+        // ZP-шный ZennoPoster.Db.ExecuteQuery. Из переносимого кода его зовёт
+        // только FastDb, и только через ODBC-DSN к SQLite, поэтому реализован
+        // именно этот провайдер; остальные отказывают явно.
+
+        public static class Db
+        {
+            public static string ExecuteQuery(
+                string query, string[] parameters,
+                InterfacesLibrary.Enums.Db.DbProvider provider,
+                string connectionString,
+                string columnDelimiter, string rowDelimiter,
+                bool useTransaction)
+            {
+                if (provider != InterfacesLibrary.Enums.Db.DbProvider.Odbc)
+                    throw new NotSupportedException(
+                        $"ZennoPoster.Db.ExecuteQuery: провайдер {provider} в ZpRuntime не реализован — " +
+                        "поддержан только Odbc, через него ходит FastDb.");
+
+                using var conn = new System.Data.Odbc.OdbcConnection(connectionString);
+                conn.Open();
+
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = query;
+
+                // Отличать SELECT по тексту запроса приходится и здесь: ODBC не
+                // даёт узнать заранее, вернёт ли команда набор строк.
+                if (!System.Text.RegularExpressions.Regex.IsMatch(
+                        query.TrimStart(), @"^\s*(SELECT|PRAGMA|WITH)\b",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    return cmd.ExecuteNonQuery().ToString();
+
+                using var reader = cmd.ExecuteReader();
+                var rows = new List<string>();
+                while (reader.Read())
+                {
+                    var cells = new string[reader.FieldCount];
+                    for (int i = 0; i < reader.FieldCount; i++)
+                        cells[i] = reader.IsDBNull(i) ? "" : reader.GetValue(i).ToString();
+                    rows.Add(string.Join(columnDelimiter, cells));
+                }
+                return string.Join(rowDelimiter, rows);
+            }
+        }
+
         public static string HttpGet(string url, string proxy = "", string encoding = "UTF-8",
             InterfacesLibrary.Enums.Http.ResponceType respType = InterfacesLibrary.Enums.Http.ResponceType.BodyOnly,
             int timeout = 30000, string cookies = "", string userAgent = "", bool useRedirect = true,
