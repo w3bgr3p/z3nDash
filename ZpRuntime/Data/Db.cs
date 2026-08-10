@@ -75,8 +75,8 @@ namespace DevDeck
             Random rnd = new Random();
 
             using (var db = _dbMode == dbMode.Postgre
-                       ? new Sql(_pgConnectionString)
-                       : new Sql(_sqLitePath, null))
+                       ? new z3n7.Sql(_pgConnectionString)
+                       : new z3n7.Sql(_sqLitePath, null))
             {
                 if (_debug) query.Debug();
                 for (int i = 0; i < maxRetries; i++)

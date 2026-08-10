@@ -24,6 +24,14 @@ SIGNATURE = re.compile(
     r'public\s+static\s+([\w<>\[\],\s\.\?]+?)\s+(\w+)\s*\(\s*this\s+([\w\.]+)\s'
 )
 
+# Типы: class/interface/enum/struct. Нужны потому, что дубли бывают не только
+# среди extension-методов — за один заход мимо прежней версии скрипта прошли
+# Time, NetHttpAsync и FunctionStorage.
+TYPE_DECL = re.compile(
+    r'public\s+(?:static\s+|sealed\s+|abstract\s+|partial\s+)*'
+    r'(class|interface|enum|struct)\s+(\w+)'
+)
+
 OURS = [
     'ZpRuntime/Zenno/ZennoStub.cs',
     'ZpRuntime/Browser/Extensions.cs',

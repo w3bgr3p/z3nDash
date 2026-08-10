@@ -1,11 +1,21 @@
 ﻿
+// Перенесено из z3n7/Db/Sql.cs. Файл уже был дословной копией эталона в
+// namespace DevDeck — сверка diff дала только namespace и четыре using,
+// опущенных у нас из-за ImplicitUsings. Поэтому перенос свёлся к git mv.
+//
+// Единственный потребитель на нашей стороне — DevDeck.Db, там тип
+// квалифицирован как z3n7.Sql.
+
 using Npgsql;
+using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.Odbc;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 
-
-namespace DevDeck
+namespace z3n7
 {
     public enum DatabaseType
     {
