@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
-Инвентарь extension-методов: ZpRuntime против ядра z3n7.
+Инвентарь extension-методов: весь DevDeck против ядра z3n7.
 
 z3n7 — эталон поведения: скрипты пишутся под него, наша задача его воспроизводить.
 Поэтому при пересечении выигрывает z3n7, а наша версия удаляется. Скрипт показывает,
 где пересечение есть и где расходятся возвращаемые типы — то есть где поведение
 разъедется не на сборке, а на исполнении.
+
+Сканируется весь репозиторий, а не только ZpRuntime. Прежняя версия смотрела три
+файла из ZpRuntime и из-за этого пропустила StringToHex/HexToString в
+Web3/StringExtentions.cs — дословные копии эталонных, простоявшие дублем весь
+перенос. Дубль может лежать где угодно: язык разводит методы по namespace, а не
+по каталогу.
 
 Запуск из корня репозитория:
     python ZpRuntime/tools/ext_inventory.py
@@ -32,15 +38,21 @@ TYPE_DECL = re.compile(
     r'(class|interface|enum|struct)\s+(\w+)'
 )
 
-OURS = [
-    'ZpRuntime/Zenno/ZennoStub.cs',
-    'ZpRuntime/Browser/Extensions.cs',
-    'ZpRuntime/Browser/CanvasExtensions.cs',
-]
+# Наша сторона — весь репозиторий, кроме перенесённого и артефактов сборки.
+OURS_ROOT = '.'
 
 # Дословные копии из эталона. Расходиться с z3n7 не могут по построению, поэтому
 # считаются отдельно — как сделанная часть переноса, а не как наша реализация.
 PORTED_DIR = 'ZpRuntime/Z3n7'
+
+# Каталоги, которые в обход не попадают. obj/bin — вывод сборки, там лежат копии
+# исходников из SDK-генераторов и они дают фантомные дубли. installer_output и
+# publish-new — упакованные сборки. PORTED_DIR исключён отдельно: он считается
+# не «нашим», а сделанной частью переноса.
+SKIP_DIRS = {
+    'obj', 'bin', '.git', '.idea', '.vs', 'node_modules',
+    'installer_output', 'publish-new',
+}
 
 DEFAULT_Z3N7 = 'W:/code_hard/.net/z3n7/z3n7'
 
@@ -52,10 +64,15 @@ SKIP_FILES = {
 }
 
 
-def cs_files(root):
+def cs_files(root, exclude=()):
+    """Все .cs под root, кроме SKIP_DIRS, SKIP_FILES и путей из exclude."""
+    excluded = [os.path.normpath(p) for p in exclude]
     found = []
-    for path, _, names in os.walk(root):
-        if any(part in path for part in ('\\obj', '\\bin', '/obj', '/bin')):
+    for path, dirs, names in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        here = os.path.normpath(path)
+        if any(here == e or here.startswith(e + os.sep) for e in excluded):
+            dirs[:] = []
             continue
         found += [os.path.join(path, n) for n in names
                   if n.endswith('.cs') and n not in SKIP_FILES]
@@ -79,6 +96,21 @@ def scan(paths):
     return table
 
 
+def scan_types(paths):
+    """{имя типа: файл} — первое вхождение."""
+    table = {}
+    for path in paths:
+        try:
+            with open(path, encoding='utf-8', errors='replace') as fh:
+                text = fh.read()
+        except OSError as err:
+            print(f'  пропущен {path}: {err}', file=sys.stderr)
+            continue
+        for m in TYPE_DECL.finditer(text):
+            table.setdefault(m.group(2), os.path.basename(path))
+    return table
+
+
 def normalize(type_name):
     """System.Collections.Generic.Dictionary<..> и Dictionary<..> — одно и то же."""
     return re.sub(r'[\w\.]*\.(\w+<)', r'\1', type_name).replace(' ', '')
@@ -93,9 +125,13 @@ def main():
         print(f'не найден каталог z3n7: {args.z3n7}', file=sys.stderr)
         return 2
 
-    ours = scan(OURS)
+    if not os.path.isdir(PORTED_DIR):
+        print(f'запускать из корня репозитория: не найден {PORTED_DIR}', file=sys.stderr)
+        return 2
+
+    ours = scan(cs_files(OURS_ROOT, exclude=[PORTED_DIR]))
     theirs = scan(cs_files(args.z3n7))
-    ported = scan(cs_files(PORTED_DIR)) if os.path.isdir(PORTED_DIR) else {}
+    ported = scan(cs_files(PORTED_DIR))
 
     shared = sorted(set(ours) & set(theirs))
     only_ours = sorted(set(ours) - set(theirs))
@@ -120,14 +156,33 @@ def main():
             print(f'      наша версия в {our_file}')
 
     print(f'\n=== только у нас ({len(only_ours)}) ===')
-    for recv, name in only_ours:
-        print(f'  {recv}.{name}')
+    for key in only_ours:
+        print(f'  {key[0] + "." + key[1]:<40} {ours[key][1]}')
 
     print(f'\n=== только в z3n7 ({len(only_theirs)}) — переносится как есть ===')
     for recv, name in only_theirs:
         print(f'  {recv}.{name}')
 
-    print(f'\nитого к разрешению: {len(shared)}, из них с расхождением типа: {divergent}')
+    # Типы. Одноимённый класс в другом namespace сам по себе не ошибка — так у нас
+    # сосуществуют Logger, SAFU, Db. Но если тип есть с обеих сторон и при этом не
+    # перенесён, это кандидат: скорее всего наша самостоятельная реализация того же,
+    # что уже написано в эталоне. Так в своё время нашлись Time и NetHttpAsync.
+    our_types = scan_types(cs_files(OURS_ROOT, exclude=[PORTED_DIR]))
+    their_types = scan_types(cs_files(args.z3n7))
+    ported_types = scan_types(cs_files(PORTED_DIR))
+
+    candidates = sorted(set(our_types) & set(their_types) - set(ported_types))
+    coexist = sorted(set(our_types) & set(their_types) & set(ported_types))
+
+    print(f'\n=== одноимённые типы, не перенесённые ({len(candidates)}) — проверить ===')
+    for name in candidates:
+        print(f'  {name:<24} наш:{our_types[name]:<26} z3n7:{their_types[name]}')
+
+    print(f'\n=== одноимённые типы, уже сосуществуют ({len(coexist)}) ===')
+    print('  ' + ', '.join(coexist) if coexist else '  —')
+
+    print(f'\nитого к разрешению: {len(shared)}, из них с расхождением типа: {divergent}'
+          f'; типов под вопросом: {len(candidates)}')
     return 0
 
 
