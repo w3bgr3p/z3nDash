@@ -576,44 +576,10 @@ namespace DevDeck
         public const string Linea     = "https://rpc.linea.build";
     }
 
-    public static partial class Tools
-    {
-        public static string OtpCode(string keyString, int waitIfTimeLess = 5)
-        {
-            if (string.IsNullOrEmpty(keyString))
-                throw new Exception($"invalid input:[{keyString}]");
-            
-            var key = OtpNet.Base32Encoding.ToBytes(keyString.Trim());
-            var otp = new OtpNet.Totp(key);
-            string code = otp.ComputeTotp();
-            int remainingSeconds = otp.RemainingSeconds();
-
-            if (remainingSeconds <= waitIfTimeLess)
-            {
-                Thread.Sleep(remainingSeconds * 1000 + 1);
-                code = otp.ComputeTotp();
-            }
-
-            return code;
-        }
-        public static string OtpCode(this IZennoPosterProjectModel project,  string keyString, int waitIfTimeLess = 5)
-        {
-            if (string.IsNullOrEmpty(keyString))
-                throw new Exception($"invalid input:[{keyString}]");
-            
-            var key = OtpNet.Base32Encoding.ToBytes(keyString.Trim());
-            var otp = new OtpNet.Totp(key);
-            string code = otp.ComputeTotp();
-            int remainingSeconds = otp.RemainingSeconds();
-
-            if (remainingSeconds <= waitIfTimeLess)
-            {
-                Thread.Sleep(remainingSeconds * 1000 + 1);
-                code = otp.ComputeTotp();
-            }
-
-            return code;
-        }
-        
-    }
+    // Класс Tools снят целиком: единственным его содержимым были две версии
+    // OtpCode, а это тот же код, что в эталонном z3n7.Tools.Otp.Offline.
+    // Перенесён он в Z3n7/Otp.cs, вместе с ProjectExtensions.OtpCode из
+    // Z3n7/FirstMail.cs — тот выбирает между почтой и офлайн-TOTP по входу.
+    // Имя убрано и по второй причине: у эталона Tools — пространство имён,
+    // и одноимённый класс делал бы его неоднозначным.
 }
