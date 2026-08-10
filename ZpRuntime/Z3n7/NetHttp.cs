@@ -1,3 +1,7 @@
+// Перенесено из z3n7/Requests/NetHttp.cs. Файл уже был дословной копией
+// эталона в namespace DevDeck — сверка diff дала всего два отличия, оба
+// помечены на месте. Поэтому перенос свёлся к смене namespace.
+
 ﻿
 using System;
 using System.Collections.Concurrent;
@@ -12,7 +16,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace DevDeck
+namespace z3n7
 {
     /// <summary>
     /// ИСПРАВЛЕНО: Основной класс для HTTP запросов с ASYNC методами
@@ -49,6 +53,9 @@ namespace DevDeck
         {
             try
             {
+                // Каст нужен потому, что наш IZennoPosterProjectModel объявляет
+                // Json как object. В реальном SDK это, судя по всему, dynamic —
+                // metadata их не различает без DynamicAttribute. См. отчёт.
                 ((dynamic)_project.Json).FromString(json);
             }
             catch (Exception ex)
@@ -104,7 +111,11 @@ namespace DevDeck
             
 
             if (proxyString == "+")
-                proxyString = _project.DbGet("proxy", "_instance");
+                // Эталон здесь зовёт project.SqlGet — он в DbExtencions.cs,
+                // который ещё не перенесён. Пока остаётся наш DbGet.
+                // Квалифицировано: using DevDeck здесь поставить нельзя — имя
+                // Logger стало бы неоднозначным с z3n7.Logger.
+                proxyString = DevDeck.ProjectExtensions.DbGet(_project, "proxy", "_instance");
 
             try
             {

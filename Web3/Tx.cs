@@ -53,7 +53,9 @@ namespace DevDeck
 
             if (_useNetHttp)
             {
-                var http = new NetHttpAsync(_project, _logger);
+                // NetHttpAsync теперь эталонный и ждёт z3n7.Logger, а _logger у нас
+                // приложенческий. Отдаём проектный логгер эталона.
+                var http = new NetHttpAsync(_project, z3n7.Logger.Get(_project));
                 var headers = new Dictionary<string, string>();
                 
                 response = await http.PostAsync(
