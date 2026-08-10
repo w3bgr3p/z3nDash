@@ -509,140 +509,15 @@ namespace DevDeck
 
         // log/warn перенесены в Z3n7/Logger.cs из эталона.
 
-        private static readonly ConcurrentDictionary<string, HttpClient> _clients = new();
-
-        private static HttpClient GetClient(IZennoPosterProjectModel project)
-        {
-            string proxy       = project.Variables["proxy"].Value;
-            string projectName = project.ProjectName();
-            string taskId      = project.Variables["__scheduleTag"].Value is { Length: > 0 } tag ? tag : project.TaskId;
-            string account     = project.Variables["acc0"].Value ?? "";
-            string clientKey = $"{projectName}::{proxy}::{account}::{taskId}";
-
-            return _clients.GetOrAdd(clientKey, _ =>
-            {
-                string logHost = ZpRuntimeOptions.TrafficHost is { Length: > 0 } h
-                    ? h
-                    : "http://localhost:38109/http-log";
-
-                var innerHandler = new HttpClientHandler();
-
-                if (!string.IsNullOrEmpty(proxy))
-                {
-                    try
-                    {
-                        string proxyUrl = proxy.StartsWith("http") ? proxy : $"http://{proxy}";
-                        var uri         = new Uri(proxyUrl);
-                        var webProxy    = new System.Net.WebProxy(uri);
-
-                        if (!string.IsNullOrEmpty(uri.UserInfo))
-                        {
-                            var parts = uri.UserInfo.Split(':');
-                            webProxy.Credentials = new System.Net.NetworkCredential(parts[0], parts[1]);
-                        }
-
-                        innerHandler.Proxy           = webProxy;
-                        innerHandler.UseProxy        = true;
-                        innerHandler.PreAuthenticate = true;
-                    }
-                    catch { }
-                }
-
-                var handler = new HttpDebugHandler(
-                    projectName: projectName, 
-                    logHost : logHost, 
-                    proxy : proxy,
-                    taskId:taskId,
-                    account:account)
-                {
-                    InnerHandler = innerHandler
-                };
-                return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(60) };
-            });
-        }
-        private static string SendHttp(string method, string url, string body,
-            string[] headers, string cookies, string proxy,
-            bool parse, bool thrw, int deadline, IZennoPosterProjectModel project)
-        {
-            try
-            {
-                var result = Task.Run(async () =>
-                {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(deadline));
-                    using var req = new HttpRequestMessage(new System.Net.Http.HttpMethod(method), url);
-
-                    req.Headers.TryAddWithoutValidation("User-Agent", project.Profile.UserAgent);
-
-                    if (headers != null)
-                        foreach (var h in headers)
-                        {
-                            var ci = h.IndexOf(':');
-                            if (ci < 0) continue;
-                            req.Headers.TryAddWithoutValidation(h.Substring(0, ci).Trim(), h.Substring(ci + 1).Trim());
-                        }
-
-                    if (!string.IsNullOrEmpty(cookies))
-                        req.Headers.TryAddWithoutValidation("Cookie", cookies);
-
-                    if (body != null)
-                    {
-                        req.Content = new StringContent(body, Encoding.UTF8);
-                        req.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
-                    }
-
-                    using var resp = await GetClient(project).SendAsync(req, cts.Token);
-                    var respBody = await resp.Content.ReadAsStringAsync();
-
-                    if (!resp.IsSuccessStatusCode)
-                        throw new Exception($"{(int)resp.StatusCode}: {respBody}");
-
-                    return respBody;
-                }).GetAwaiter().GetResult();
-
-                if (parse) project.Json.FromString(result);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                if (thrw) throw;
-                return $"Error: {ex.Message}";
-            }
-        }
-
 
         // Эталонной версии нет: в z3n7 TableName объявлен internal внутри
         // DbExtencions.cs, который ещё не перенесён. Остаётся нашим.
         public static string TableName(this IZennoPosterProjectModel project, string tableName)
             => string.IsNullOrEmpty(tableName) ? project.ProjectTable() : tableName;
 
-        public static string GET(this IZennoPosterProjectModel project,
-            string url, string proxy = "", string[] headers = null,
-            string cookies = null, bool log = false, bool parse = false,
-            int deadline = 30, bool thrw = false, bool useNetHttp = true,
-            bool returnSuccessWithStatus = false, bool bodyOnly = false)
-            => SendHttp("GET", url, null, headers, cookies, proxy, parse, thrw, deadline, project);
-
-        public static string POST(this IZennoPosterProjectModel project,
-            string url, string body, string proxy = "", string[] headers = null,
-            string cookies = null, bool log = false, bool parse = false,
-            int deadline = 30, bool thrw = false, bool useNetHttp = true,
-            bool returnSuccessWithStatus = false, bool bodyOnly = false)
-            => SendHttp("POST", url, body, headers, cookies, proxy, parse, thrw, deadline, project);
-
-        public static string PUT(this IZennoPosterProjectModel project,
-            string url, string body, string proxy = "", string[] headers = null,
-            string cookies = null, bool log = false, bool parse = false,
-            int deadline = 30, bool thrw = false, bool useNetHttp = true,
-            bool returnSuccessWithStatus = false)
-            => SendHttp("PUT", url, body, headers, cookies, proxy, parse, thrw, deadline, project);
-
-        public static string DELETE(this IZennoPosterProjectModel project,
-            string url, string proxy = "", string[] headers = null,
-            string cookies = null, bool log = false, int deadline = 30,
-            bool thrw = false, bool useNetHttp = true, bool returnSuccessWithStatus = false)
-            => SendHttp("DELETE", url, null, headers, cookies, proxy, false, thrw, deadline, project);
-
-       
+        // GET/POST/PUT/DELETE перенесены в Z3n7/Rqst.cs из эталона
+        // (RqstExtensions). Наши версии удалены вместе с SendHttp/GetClient:
+        // они были самостоятельной реализацией, а не обёрткой над эталонной.
     }
 
     // ── DbKey (plaintext — без SAFU) ──────────────────────────────────────────

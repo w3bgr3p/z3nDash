@@ -5,6 +5,7 @@ using ZennoLab.InterfacesLibrary.ProjectModel;
 
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using z3n7;   // GET/POST — эталонные RqstExtensions
 
 namespace DevDeck
 {
