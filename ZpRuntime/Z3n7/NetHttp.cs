@@ -53,10 +53,7 @@ namespace z3n7
         {
             try
             {
-                // Каст нужен потому, что наш IZennoPosterProjectModel объявляет
-                // Json как object. В реальном SDK это, судя по всему, dynamic —
-                // metadata их не различает без DynamicAttribute. См. отчёт.
-                ((dynamic)_project.Json).FromString(json);
+                _project.Json.FromString(json);
             }
             catch (Exception ex)
             {

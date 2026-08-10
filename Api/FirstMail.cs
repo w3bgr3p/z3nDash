@@ -82,10 +82,8 @@ namespace DevDeck
         public string GetLink(string email)
         {
             
-            // Json в SDK объявлен как object — обращение к полям только через dynamic.
-            dynamic json = _project.Json;
-            string deliveredTo = json.to[0];
-            string text = json.text;
+            string deliveredTo = _project.Json.to[0];
+            string text = _project.Json.text;
 
             if (!deliveredTo.Contains(email))
                 throw new Exception($"Fmail: Email {email} not found in last message");

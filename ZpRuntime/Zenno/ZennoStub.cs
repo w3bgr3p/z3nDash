@@ -128,9 +128,10 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         IContext         Context         { get; }
 
         // ── Сериализация ──────────────────────────────────────────────────────
-        // В SDK объявлены как object; dynamic-обращения работают через рантайм.
-        object Json { get; }
-        object Xml  { get; }
+        // В SDK это dynamic: в метаданных хранится как object плюс
+        // DynamicAttribute, поэтому дамп показывал object.
+        dynamic Json { get; }
+        dynamic Xml  { get; }
 
         // ── Диагностика ───────────────────────────────────────────────────────
         string LastExecutedActionId { get; }
@@ -370,8 +371,8 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         public ITables          Tables          => _tables;
         public IProfile         Profile         => _profile;
         public IContext         Context         => _context;
-        public object           Json            => _json;
-        public object           Xml             => _json;
+        public dynamic          Json            => _json;
+        public dynamic          Xml             => _json;
 
         /// <summary>Проставляется исполнителем шаблона перед каждым действием.</summary>
         public string LastExecutedActionId { get; set; } = "";
@@ -598,8 +599,7 @@ namespace DevDeck
                     return respBody;
                 }).GetAwaiter().GetResult();
 
-                // Json в SDK объявлен как object — обращение к нему всегда позднее.
-                if (parse) ((dynamic)project.Json).FromString(result);
+                if (parse) project.Json.FromString(result);
                 return result;
             }
             catch (Exception ex)
