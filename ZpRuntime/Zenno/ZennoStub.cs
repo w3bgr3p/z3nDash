@@ -350,7 +350,9 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         private readonly GlobalVariableList _globals   = new GlobalVariableList();
         private readonly StubProfile        _profile   = new StubProfile();
         private readonly DynamicJson        _json      = new DynamicJson();
-        public Logger? Logger { get; set; }
+        // Квалифицировано: после переноса z3n7.Logger имя стало неоднозначным.
+        // Здесь именно приложенческий логгер DevDeck, а не проектный из эталона.
+        public DevDeck.Logger? Logger { get; set; }
         public Action<string>? OnLog { get; set; }
 
         private readonly ListCollection  _lists   = new ListCollection();
@@ -504,46 +506,8 @@ namespace DevDeck
 
         // GVar/GGetBusyList перенесены в Z3n7/GVars.cs из эталона.
 
-        public static void log(this IZennoPosterProjectModel project, object msg,
-            [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-            bool show = true, bool thrw = false, bool toZp = true)
-            => project.SendInfoToLog($"[{caller}] {msg}", show);
+        // log/warn перенесены в Z3n7/Logger.cs из эталона.
 
-        public static void warn(this IZennoPosterProjectModel project, string msg,
-            bool thrw = false, bool show = true, bool toZp = true,
-            [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
-        {
-            project.SendWarningToLog($"[{caller}] {msg}", show);
-            if (thrw) throw new Exception(msg);
-        }
-
-        public static void warn(this IZennoPosterProjectModel project, Exception ex,
-            bool thrw = false, bool withStack = false, bool toZp = true,
-            [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
-        {
-            var msg = withStack ? ex.Message + "\n" + ex.StackTrace : ex.Message;
-            project.SendWarningToLog($"[{caller}] {msg}", true);
-            if (thrw) throw ex;
-        }
-
-        // ListSync/RndFromList/ListFromFile живут в Z3n7/ListExtentions.cs —
-        // перенесены из эталона дословно. Здесь их держать нельзя: два
-        // ProjectExtensions в разных namespace дают неоднозначность вызова.
-
-        // ProjectName/ProjectTable/Path*/SecureVar перенесены в Z3n7/Constantes.cs.
-        // Наши сняты: ProjectName давал другой результат — GetFileNameWithoutExtension
-        // против Split('.')[0] у эталона, то есть "numlex.casino_" против "numlex",
-        // а значит и другое имя таблицы в ProjectTable.
-
-        public static string TableName(this IZennoPosterProjectModel project, string tableName)
-            => string.IsNullOrEmpty(tableName) ? project.ProjectTable() : tableName;
-    }
-
-    // ── HTTP (Rqst-совместимый API) ───────────────────────────────────────────
-
-    
-    public static partial class ProjectExtensions
-    {
         private static readonly ConcurrentDictionary<string, HttpClient> _clients = new();
 
         private static HttpClient GetClient(IZennoPosterProjectModel project)
@@ -595,7 +559,6 @@ namespace DevDeck
                 return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(60) };
             });
         }
-
         private static string SendHttp(string method, string url, string body,
             string[] headers, string cookies, string proxy,
             bool parse, bool thrw, int deadline, IZennoPosterProjectModel project)
@@ -645,11 +608,13 @@ namespace DevDeck
                 return $"Error: {ex.Message}";
             }
         }
-    }
-    
-    public static partial class ProjectExtensions
-    {
-        
+
+
+        // Эталонной версии нет: в z3n7 TableName объявлен internal внутри
+        // DbExtencions.cs, который ещё не перенесён. Остаётся нашим.
+        public static string TableName(this IZennoPosterProjectModel project, string tableName)
+            => string.IsNullOrEmpty(tableName) ? project.ProjectTable() : tableName;
+
         public static string GET(this IZennoPosterProjectModel project,
             string url, string proxy = "", string[] headers = null,
             string cookies = null, bool log = false, bool parse = false,

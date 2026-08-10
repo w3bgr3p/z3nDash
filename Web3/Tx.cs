@@ -3,6 +3,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using z3n7;   // warn — перенесённое из эталона расширение
 using System.Threading;
 using System.Globalization;
 using ZennoLab.InterfacesLibrary.ProjectModel;
