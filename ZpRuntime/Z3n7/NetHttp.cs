@@ -1,6 +1,8 @@
 // Перенесено из z3n7/Requests/NetHttp.cs. Файл уже был дословной копией
-// эталона в namespace DevDeck — сверка diff дала всего два отличия, оба
-// помечены на месте. Поэтому перенос свёлся к смене namespace.
+// эталона в namespace DevDeck, поэтому перенос свёлся к смене namespace.
+//
+// Отступление осталось одно: ((dynamic)_project.Json).FromString — каст ниже.
+// Обход SqlGet, стоявший здесь при переносе, снят вместе с DbExtencions.
 
 ﻿
 using System;
@@ -108,11 +110,7 @@ namespace z3n7
             
 
             if (proxyString == "+")
-                // Эталон здесь зовёт project.SqlGet — он в DbExtencions.cs,
-                // который ещё не перенесён. Пока остаётся наш DbGet.
-                // Квалифицировано: using DevDeck здесь поставить нельзя — имя
-                // Logger стало бы неоднозначным с z3n7.Logger.
-                proxyString = DevDeck.ProjectExtensions.DbGet(_project, "proxy", "_instance");
+                proxyString = _project.SqlGet("proxy", "_instance");
 
             try
             {

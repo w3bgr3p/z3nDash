@@ -1,4 +1,4 @@
-// Перенесено из z3n7/Essentials/Vars.cs. Копия дословная — z3n7 эталон
+﻿// Перенесено из z3n7/Essentials/Vars.cs. Копия дословная — z3n7 эталон
 // поведения, и расхождения должны быть видны как diff, а не как разбор двух
 // реализаций. Namespace сохранён: ProjectExtensions и соседи объявлены в z3n7.
 
@@ -177,6 +177,53 @@ namespace z3n7
             if (json == "jVars") json = project.Var("jVars");
             var jVar = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
             project.VarsFromDict(jVar);
+        }
+
+        public static List<string> Range(this IZennoPosterProjectModel project, string accRange = null,
+            string output = null, bool log = false)
+        {
+            if (string.IsNullOrEmpty(accRange)) accRange = project.Var("cfgAccRange");
+            if (string.IsNullOrEmpty(accRange))
+            {
+                project.warn("range is not provided by input or project setting [cfgAccRange]");
+                return null;
+            }
+            
+            if (accRange.Contains(":"))
+            {
+                accRange = accRange.Split(':')[0];
+            }
+            
+            int rangeS, rangeE;
+            string range;
+
+            if (accRange.Contains(","))
+            {
+                range = accRange;
+                var rangeParts = accRange.Split(',').Select(int.Parse).ToArray();
+                rangeS = rangeParts.Min();
+                rangeE = rangeParts.Max();
+            }
+            else if (accRange.Contains("-"))
+            {
+                var rangeParts = accRange.Split('-').Select(int.Parse).ToArray();
+                rangeS = rangeParts[0];
+                rangeE = rangeParts[1];
+                range = string.Join(",", Enumerable.Range(rangeS, rangeE - rangeS + 1));
+            }
+            else
+            {
+                rangeE = int.Parse(accRange);
+                rangeS = int.Parse(accRange);
+                range = accRange;
+            }
+
+            project.Variables["rangeStart"].Value = $"{rangeS}";
+            project.Variables["rangeEnd"].Value = $"{rangeE}";
+            project.Variables["range"].Value = range;
+
+            return range.Split(',').ToList();
+            //project.L0g($"{rangeS}-{rangeE}\n{range}");
         }
     }
 }

@@ -36,6 +36,7 @@ internal static class StubSmokeTest
 
         var stub = (StubProject)project;
         stub.Db = dbPg;
+        project.Var("dbSource", dbPg.Source);
 
         IVariableList vars   = project.Variables;
         IProfile      profile = project.Profile;

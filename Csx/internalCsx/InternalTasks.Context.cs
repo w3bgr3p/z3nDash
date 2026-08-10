@@ -88,6 +88,9 @@ public static partial class InternalTasks
 
             var project = new StubProject();
             project.Db = db;
+            // Перенесённые из эталона Db-расширения соединение берут не из
+            // StubProject.Db, а из переменной dbSource — прокидываем её.
+            project.Var("dbSource", db.Source);
             project.Name = payload.GetValueOrDefault("__taskName", "").Split('.')[0] + ".zp";
 
             foreach (var kv in account)

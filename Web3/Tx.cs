@@ -212,6 +212,19 @@ namespace DevDeck
             _logger = logger;
         }
 
+        // Раньше здесь звался наш DbKey, работавший на обеих целях сборки. После
+        // переноса DbExtencions действует эталонный z3n7.Get.DbKey, а он через
+        // SAFU.Decode упирается в HWID по WMI и доступен только под Windows.
+        // Отказ явный: молча вернуть пустой ключ значило бы подписать транзакцию
+        // мусором.
+#if WINDOWS
+        private string WalletKey(string chainType = "evm") => _project.DbKey(chainType);
+#else
+        private string WalletKey(string chainType = "evm") => throw new PlatformNotSupportedException(
+            "Tx: приватный ключ достаётся через SAFU/HWID, а тот собирается только под Windows. " +
+            "Соберите цель net10.0-windows или передайте ключ явным аргументом.");
+#endif
+
         #region READ
 
         public string Read(string contract, string functionName, string abi, string rpc, params object[] parameters)
@@ -282,7 +295,7 @@ namespace DevDeck
                     throw new ArgumentException("Chain RPC is null or empty");
 
                 if (string.IsNullOrEmpty(walletKey))
-                    walletKey = _project.DbKey("evm");
+                    walletKey = WalletKey("evm");
 
                 if (string.IsNullOrEmpty(walletKey))
                     throw new ArgumentException("Wallet key is null or empty");
@@ -579,7 +592,7 @@ namespace DevDeck
         {
             contract = contract.NormalizeAddress();
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            string key = _project.DbKey("evm");
+            string key = WalletKey("evm");
 
             string abi = @"[{""inputs"":[{""name"":""from"",""type"":""address""},{""name"":""to"",""type"":""address""},{""name"":""tokenId"",""type"":""uint256""}],""name"":""safeTransferFrom"",""outputs"":[],""stateMutability"":""nonpayable"",""type"":""function""}]";
             string[] types = { "address", "address", "uint256" };

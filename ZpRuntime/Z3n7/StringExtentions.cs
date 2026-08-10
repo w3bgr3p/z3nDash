@@ -1,4 +1,4 @@
-// Перенесено из z3n7/MethodExtensions/StringExtentions.cs. Копии дословные.
+﻿// Перенесено из z3n7/MethodExtensions/StringExtentions.cs. Копии дословные.
 //
 // ЧАСТИЧНО: здесь только три метода, которые дублировали наши —
 // ToBase64, FromBase64, ParseJwt. Остальные ~380 строк эталонного файла
@@ -123,6 +123,55 @@ namespace z3n7
             {
                 result["error"] = ex.Message;
                 return result;
+            }
+        }
+
+        public static Dictionary<string, string> JsonToDic(this string json, bool ignoreEmpty = true)
+        {
+            var result = new Dictionary<string, string>();
+    
+            if (string.IsNullOrWhiteSpace(json)) return result;
+
+            var jObject = JObject.Parse(json);
+
+            FlattenJson(jObject, "", result);
+
+            return result;
+
+            void FlattenJson(JToken token, string prefix, Dictionary<string, string> dict)
+            {
+                switch (token.Type)
+                {
+                    case JTokenType.Object:
+                        foreach (var property in token.Children<JProperty>())
+                        {
+                            var key = string.IsNullOrEmpty(prefix) 
+                                ? property.Name 
+                                : $"{prefix}_{property.Name}";
+                            FlattenJson(property.Value, key, dict);
+                        }
+                        break;
+        
+                    case JTokenType.Array:
+                        var index = 0;
+                        foreach (var item in token.Children())
+                        {
+                            FlattenJson(item, $"{prefix}_{index}", dict);
+                            index++;
+                        }
+                        break;
+        
+                    default:
+                        var value = token.ToString();
+
+                        if (ignoreEmpty && string.IsNullOrEmpty(value))
+                        {
+                            return;
+                        }
+
+                        dict[prefix] = value;
+                        break;
+                }
             }
         }
     }

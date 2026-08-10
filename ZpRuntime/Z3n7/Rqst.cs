@@ -4,10 +4,8 @@
 // написаны самостоятельно поверх приватного SendHttp. Они удалены — вместо них
 // теперь эталонные RqstExtensions, поэтому вызывающий код перешёл на using z3n7.
 //
-// Три отступления, все помечены на месте: DbGet квалифицирован как
-// DevDeck.ProjectExtensions.DbGet (эталонный DbGet лежит в непереносённом
-// DbExtencions.cs, а поставить using DevDeck нельзя — Logger станет
-// неоднозначным с z3n7.Logger).
+// Отступлений нет. Три обхода DbGet, стоявшие здесь при переносе, сняты вместе
+// с переносом DbExtencions — теперь эталонный DbGet на месте.
 
 using System;
 using System.Collections.Generic;
@@ -291,8 +289,7 @@ namespace z3n7
 
             if (string.IsNullOrEmpty(cookiesJson))
             {
-                // Отступление: DbGet — наш, из DevDeck.ProjectExtensions.
-                string cookiesBase64 = DevDeck.ProjectExtensions.DbGet(_project, "cookies", "_instance");
+                string cookiesBase64 = _project.DbGet("cookies", "_instance");
                 if (!string.IsNullOrEmpty(cookiesBase64))
                 {
                     cookiesJson = cookiesBase64.FromBase64();
@@ -468,12 +465,11 @@ namespace z3n7
                 string projectProxy = _project.Var("proxy");
                 proxyString = !string.IsNullOrEmpty(projectProxy)
                     ? projectProxy
-                    // Отступление: DbGet — наш, из DevDeck.ProjectExtensions.
-                    : DevDeck.ProjectExtensions.DbGet(_project, "proxy", "_instance");
+                    : _project.DbGet("proxy", "_instance");
             }
             else if (proxyString == "z")
             {
-                proxyString = DevDeck.ProjectExtensions.DbGet(_project, "z_proxy", "_instance");
+                proxyString = _project.DbGet("z_proxy", "_instance");
             }
 
             try

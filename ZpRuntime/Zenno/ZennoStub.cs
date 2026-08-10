@@ -23,7 +23,7 @@ using z3n7;   // Var/Int и прочие перенесённые из этал�
 namespace ZennoLab.InterfacesLibrary.Enums.Log
 {
     public enum LogType  { Info, Warning, Error }
-    public enum LogColor { Default, Red, Green, Yellow, Blue }
+    public enum LogColor { Default, Red, Green, Yellow, Blue, Orange }
 }
 
 namespace ZennoLab.InterfacesLibrary.Enums.Http
@@ -510,52 +510,20 @@ namespace DevDeck
         // log/warn перенесены в Z3n7/Logger.cs из эталона.
 
 
-        // Эталонной версии нет: в z3n7 TableName объявлен internal внутри
-        // DbExtencions.cs, который ещё не перенесён. Остаётся нашим.
-        public static string TableName(this IZennoPosterProjectModel project, string tableName)
-            => string.IsNullOrEmpty(tableName) ? project.ProjectTable() : tableName;
+        // TableName перенесён в Z3n7/DbExtencions.cs (DbHelpers, internal).
 
         // GET/POST/PUT/DELETE перенесены в Z3n7/Rqst.cs из эталона
         // (RqstExtensions). Наши версии удалены вместе с SendHttp/GetClient:
         // они были самостоятельной реализацией, а не обёрткой над эталонной.
     }
 
-    // ── DbKey (plaintext — без SAFU) ──────────────────────────────────────────
+    // ── DbKey ─────────────────────────────────────────────────────────────────
 
-    public static partial class ProjectExtensions
-    {
-        /// <summary>
-        /// Возвращает приватный ключ из переменной напрямую (plaintext, без расшифровки).
-        /// Переменная должна быть загружена через StubProject.LoadAccount().
-        /// evm  → secp256k1
-        /// sol  → base58
-        /// seed → bip39
-        /// </summary>
-        public static string DbKey(this IZennoPosterProjectModel project, string chainType = "evm")
-        {
-            string column = chainType.ToLower().Trim() switch
-            {
-                "evm"  => "secp256k1",
-                "sol"  => "base58",
-                "seed" => "bip39",
-                _      => throw new ArgumentException($"DbKey: unexpected chainType '{chainType}'")
-            };
-
-            string acc    = project.Variables["acc0"].Value;
-            string raw    = GetDb(project).Get(column, "_wlt", key: "id", id: acc);
-
-            string jVarsJson = SAFU.DecryptHWIDOnly(project.Variables["jVars"].Value);
-            
-            if (string.IsNullOrEmpty(jVarsJson))
-                throw new Exception($"DecryptHWIDOnly returned empty. jVars starts with: '{project.Variables["jVars"].Value?[..Math.Min(20, project.Variables["jVars"].Value?.Length??0)]}'");
-            var json = jVarsJson.TrimStart().StartsWith("{") ? jVarsJson : jVarsJson.FromBase64();
-
-            var vars = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-            string pin       = vars.GetValueOrDefault("cfgPin", "");
-            return SAFU.Decode(raw, pin, acc);
-        }
-
-    }
+    // DbKey перенесён в Z3n7/DbExtencions.cs (класс Get) из эталона. Наш снят.
+    // Он работал иначе: брал plaintext-ключ и расшифровывал через
+    // DevDeck.SAFU.Decode(raw, pin, acc), то есть на обеих целях сборки.
+    // Эталонный зовёт z3n7.SAFU.Decode(project, resp), а тот под #if WINDOWS —
+    // поэтому и Get.DbKey там доступен только в net10.0-windows.
 
     // ── String helpers (используются в z3nCore) ───────────────────────────────
 
@@ -572,96 +540,14 @@ namespace DevDeck
     // Класс Time перенесён в Z3n7/Time.cs из эталона.
 
 
-    // ── Db extensions — делегируют в StubProject.Db ──────────────────────────
-    // Воспроизводят API из DbExtencions.cs (z3nCore) поверх класса Db (DevDeck)
+    // ── Db extensions ────────────────────────────────────────────────────────
 
     public static partial class ProjectExtensions
     {
-        private static Db GetDb(IZennoPosterProjectModel project)
-        {
-            var stub = project as global::ZennoLab.InterfacesLibrary.ProjectModel.StubProject;
-            if (stub?.Db == null)
-                throw new InvalidOperationException(
-                    "StubProject.Db is not initialized. Set project.Db = new Db(...) before use.");
-            return stub.Db;
-        }
-
-        public static void DicToDb(this IZennoPosterProjectModel project,
-            Dictionary<string, string> data,
-            string tableName = null,
-            bool log = false,
-            bool thrw = false,
-            string where = "")
-            => GetDb(project).DicToDb(data, tableName ?? project.ProjectTable(), log, thrw, where);
-
-        public static void JsonToDb(this IZennoPosterProjectModel project,
-            string json,
-            string tableName = null,
-            bool log = false,
-            bool thrw = false,
-            string where = "",
-            bool saveStructure = false)
-            => GetDb(project).JsonToDb(json, tableName ?? project.ProjectTable(), log, thrw, where);
-
-        public static void DbUpd(this IZennoPosterProjectModel project,
-            string setClause,
-            string tableName = null,
-            bool log = false,
-            bool thrw = false,
-            string key = "id",
-            object acc = null,
-            string where = "",
-            string saveToVar = "lastQuery")
-        {
-            if (!string.IsNullOrEmpty(saveToVar))
-                project.Variables[saveToVar].Value = setClause;
-            string id = acc?.ToString() ?? project.Variables["acc0"].Value;
-            GetDb(project).Upd(setClause, tableName ?? project.ProjectTable(), log, thrw, key, id, where);
-        }
-
-        public static string DbQ(this IZennoPosterProjectModel project,
-            string query,
-            bool log = false,
-            string sqLitePath = null,
-            string pgHost = null,
-            string pgPort = null,
-            string pgDbName = null,
-            string pgUser = null,
-            string pgPass = null,
-            bool thrw = false,
-            bool unSafe = false)
-            => GetDb(project).Query(query, thrw, unSafe);
-
-        public static string DbGet(this IZennoPosterProjectModel project,
-            string column,
-            string tableName = null,
-            bool log = false,
-            bool thrw = false,
-            string key = "id",
-            string acc = null,
-            string where = "")
-        {
-            string id = acc?.ToString() ?? project.Variables["acc0"].Value;
-            return GetDb(project).Get(column, tableName ?? project.ProjectTable(), log, thrw, key, id, where);
-        }
-        public static Dictionary<string, string> DbGetColumns(this IZennoPosterProjectModel project,
-            string column,
-            string tableName = null,
-            bool log = false,
-            bool thrw = false,
-            string key = "id",
-            string acc = null,
-            string where = "")
-        {
-            string id = acc?.ToString() ?? project.Variables["acc0"].Value;
-            return GetDb(project).GetColumns(column, tableName ?? project.ProjectTable(), log, thrw, key, id, where);
-        }
-        
-        public static void DbDone(this IZennoPosterProjectModel project, string task = "daily", int cooldownMin = 0, string tableName = null, bool log = false, bool thrw = false, string key = "id", object acc = null, string where = "")
-        {
-            var cd = (cooldownMin == 0) ? Time.Cd() : Time.Cd(cooldownMin);
-            project.DbUpd($"{task} = '{cd}'", tableName, log, thrw);
-        }
+        // Db-расширения (GetDb/DicToDb/JsonToDb/DbUpd/DbQ/DbGet/DbGetColumns/
+        // DbDone) перенесены в Z3n7/DbExtencions.cs из эталона. Наши удалены:
+        // они ходили в DevDeck.Db через StubProject.Db, эталон поднимает Sql по
+        // строке подключения из переменной dbSource.
         
     }
     

@@ -64,6 +64,15 @@ namespace DevDeck
         public void SetLogger(Logger log) => _log = log;
         public void ClearLogger() => _log = null;
         public dbMode Mode => _dbMode;
+
+        /// <summary>
+        /// Строка подключения в том виде, в каком её ждёт перенесённый
+        /// z3n7.DbCore: "Host=..." включает pgSQL, всё остальное считается
+        /// путём к файлу SQLite. Нужна, чтобы прокинуть настроенное соединение
+        /// в project.Var("dbSource") — эталонные Db-расширения берут его оттуда,
+        /// а не из StubProject.Db.
+        /// </summary>
+        public string Source => _dbMode == dbMode.Postgre ? _pgConnectionString : _sqLitePath;
         public void SetDebug(bool debug) => _debug = debug;
         
         #region Core Query

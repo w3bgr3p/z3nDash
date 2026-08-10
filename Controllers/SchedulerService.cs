@@ -554,6 +554,9 @@ private static void SeedDefaults(Db db)
             try
             {
                 var project = new StubProject { Name = name, OnLog = rp.AddLine };
+                // Скрипты csx-zp7 ходят в базу через перенесённые из эталона
+                // Db-расширения, а те берут соединение из переменной dbSource.
+                project.Variables["dbSource"].Value = db.Source;
 
                 var globals = new CsxZp7Globals
                 {
