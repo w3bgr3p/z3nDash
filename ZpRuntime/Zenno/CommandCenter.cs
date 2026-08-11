@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // CommandCenter.cs — адаптеры ZennoLab.CommandCenter поверх IBrowserInstance.
 //
 // Имена типов и сигнатуры совпадают с реальным SDK (сняты с ZennoLab.dll), но
@@ -19,6 +19,26 @@ using DevDeck.Browser;
 
 namespace ZennoLab.CommandCenter.Classes
 {
+    /// <summary>
+    /// ZP-шные настройки запуска встроенного браузера. Запуском у нас управляет
+    /// хост, поэтому объект только переносит поля до Instance.Launch, который
+    /// отказывает явно.
+    /// </summary>
+    public class BuiltInBrowserLaunchSettings
+    {
+        public InterfacesLibrary.Enums.Browser.BrowserType BrowserType { get; set; }
+        public string CachePath            { get; set; }
+        public bool   ConvertProfileFolder { get; set; }
+        public bool   UseProfile           { get; set; }
+    }
+
+    public static class BrowserLaunchSettingsFactory
+    {
+        public static BuiltInBrowserLaunchSettings Create(
+            InterfacesLibrary.Enums.Browser.BrowserType browserType)
+            => new BuiltInBrowserLaunchSettings { BrowserType = browserType };
+    }
+
     /// <summary>ZP-шные настройки сбора трафика.</summary>
     public sealed class GetTrafficSettings
     {
@@ -332,6 +352,10 @@ namespace ZennoLab.CommandCenter
         public void SetValue(string value, string emulation, bool useSelectedItems, bool append)
             => He.SetValue(value, emulation, clear: !append);
 
+        /// <summary>Трёхаргументная перегрузка SDK — её зовёт перенесённый HeSet.</summary>
+        public void SetValue(string value, string emulation, bool append)
+            => He.SetValue(value, emulation, clear: !append);
+
         public string GetValue(bool useSelectedItems) => He.GetAttribute("value");
 
         public string DrawToBitmap(bool isImage, string hash) => He.DrawToBitmap();
@@ -536,7 +560,8 @@ namespace ZennoLab.CommandCenter
         public bool   UseTrafficMonitoring { get; set; }
         public string BrowserType          { get; set; } = "Chromium";
         public string WebGLPreferences     { get; set; } = "";
-        public string TimezoneWorkMode     { get; set; } = "Emulate";
+        public InterfacesLibrary.Enums.Browser.TimezoneMode TimezoneWorkMode { get; set; }
+            = InterfacesLibrary.Enums.Browser.TimezoneMode.Emulate;
 
         // ── Вкладки и состояние ───────────────────────────────────────────────
 
@@ -570,8 +595,15 @@ namespace ZennoLab.CommandCenter
         // Браузер поднимает хост (планировщик или свой лаунчер) и передаёт готовый
         // IBrowserInstance, поэтому instance им не управляет.
 
-        public void Launch(string browserType, bool useProfile) => throw new NotSupportedException(
-            "Instance.Launch: браузер поднимает хост и передаёт готовый IBrowserInstance");
+        // Сигнатура как в SDK: BrowserType, а не string — её ждёт перенесённый
+        // InstanceExtencions.UpFromFolder/UpEmpty.
+        public void Launch(InterfacesLibrary.Enums.Browser.BrowserType browserType, bool useProfile)
+            => throw new NotSupportedException(
+                "Instance.Launch: браузер поднимает хост и передаёт готовый IBrowserInstance");
+
+        public void Launch(Classes.BuiltInBrowserLaunchSettings settings)
+            => throw new NotSupportedException(
+                "Instance.Launch: браузер поднимает хост и передаёт готовый IBrowserInstance");
 
         public void SetProxy(string proxyString, bool useProxifier = false,
                              bool emulateGeolocation = false, bool emulateTimezone = false,

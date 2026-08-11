@@ -1,16 +1,17 @@
 ﻿using DevDeck;
-using DevDeck.Browser;
+using z3n7;                    // HeSet/HeClick/Go — эталонные расширения
+using ZennoLab.CommandCenter;  // Instance — приёмник этих расширений
 
 public class Rabby
 {
     private readonly string          _extId;
-    private readonly IBrowserInstance _instance;
+    private readonly Instance        _instance;
     private readonly string          _password;
     private readonly int             _delay = 108;
 
     private const string DefaultExtId = "acmacodkjbdgmoleebolmdjonilkdbch";
 
-    public Rabby(IBrowserInstance instance, Db db, int acc = 0, string extId = null)
+    public Rabby(Instance instance, DevDeck.Db db, int acc = 0, string extId = null)
     {
         _instance = instance;
         _password = db.Get("evm", "_addresses", where: $"id = {acc}");

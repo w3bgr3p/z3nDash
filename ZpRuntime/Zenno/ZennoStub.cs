@@ -26,6 +26,12 @@ namespace ZennoLab.InterfacesLibrary.Enums.Log
     public enum LogColor { Default, Red, Green, Yellow, Blue, Orange }
 }
 
+namespace ZennoLab.InterfacesLibrary.Enums.Browser
+{
+    public enum BrowserType   { Chromium, ChromiumFromZB, WithoutBrowser }
+    public enum TimezoneMode  { Disable, Emulate, Manual }
+}
+
 namespace ZennoLab.InterfacesLibrary.Enums.Db
 {
     public enum DbProvider { Odbc, OleDb, SqlServer, MySql, Postgre, SQLite }

@@ -16,6 +16,15 @@
         <UseWindowsForms>true</UseWindowsForms>
     </PropertyGroup>
 
+    <!-- UseWindowsForms добавляет global using System.Windows.Forms, и тогда
+         HtmlElement становится неоднозначным: он есть и там, и в нашем
+         ZennoLab.CommandCenter. Переносимый код пишется под ZP, где второго
+         варианта нет, поэтому неявный using снимаем. Emulation.cs, которому
+         WinForms действительно нужен, объявляет using явно. -->
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+        <Using Remove="System.Windows.Forms" />
+    </ItemGroup>
+
     <!-- tools/ — диагностические раннеры со своими csproj, в библиотеку не входят -->
     <ItemGroup>
         <Compile Remove="tools\**" />
