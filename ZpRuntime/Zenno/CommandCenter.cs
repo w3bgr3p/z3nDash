@@ -479,6 +479,10 @@ namespace ZennoLab.CommandCenter
 
         // ── Трафик ────────────────────────────────────────────────────────────
 
+        /// <summary>Перегрузка с одним фильтром — её зовёт перенесённый Traffic.</summary>
+        public IEnumerable<TrafficItem> GetTraffic(IEnumerable<string> urlFilters)
+            => T.GetTraffic(urlFilters).Select(x => new TrafficItem(x));
+
         public IEnumerable<TrafficItem> GetTraffic(IEnumerable<string> urlFilters,
                                                    IEnumerable<string> headerFilters,
                                                    IEnumerable<string> bodyFilters)
