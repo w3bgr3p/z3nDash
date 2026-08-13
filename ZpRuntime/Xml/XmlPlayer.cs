@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // XmlPlayer.cs — обход графа шаблона.
 //
 // Правила перехода сняты с формата, а не выдуманы:
@@ -69,6 +69,12 @@ public sealed class XmlPlayer
             _log($"[xml] недостижимо узлов: {dead.Count} — артефакты разработки, в маршрут не входят");
 
         SeedVariables(tpl);
+
+        // Личность нужна до первой ветки: {-Profile.Name-} встречается уже в
+        // SetAttribute, а ветки присваивают Profile.Password напрямую.
+        ProfileGenerator.Fill(_project, tpl.Profile);
+        _log($"[xml] профиль: {_project.Profile.Name} {_project.Profile.Surname}, " +
+             $"{_project.Profile.Gender}, {_project.Profile.BirthDate}, login {_project.Profile.Login}");
 
         XmlCodeRunner code;
         try

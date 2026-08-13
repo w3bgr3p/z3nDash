@@ -170,16 +170,32 @@ namespace ZennoLab.CommandCenter
                 if (!string.IsNullOrWhiteSpace(proxy))
                 {
                     // ZP допускает "user:pass@host:port" и "host:port", со схемой и без.
-                    string p = proxy.Contains("//") ? proxy.Split('/')[2] : proxy;
+                    //
+                    // Схему обязательно сохранять: раньше здесь всё приводилось к
+                    // http://, и socks5-прокси молча уходил как http. Запрос при
+                    // этом не падал — он просто шёл мимо прокси, и проверка IP
+                    // показывала домашний адрес. HttpClient умеет socks4/4a/5 с
+                    // .NET 6, отдельного клиента не нужно.
+                    string scheme = "http";
+                    string p      = proxy.Trim();
+
+                    int sep = p.IndexOf("://", StringComparison.Ordinal);
+                    if (sep > 0)
+                    {
+                        scheme = p[..sep].ToLowerInvariant();
+                        p      = p[(sep + 3)..];
+                    }
+
                     var wp = new System.Net.WebProxy();
                     if (p.Contains('@'))
                     {
-                        var parts = p.Split('@');
-                        var creds = parts[0].Split(':');
-                        wp.Address     = new Uri("http://" + parts[1]);
+                        var at    = p.LastIndexOf('@');
+                        var creds = p[..at].Split(':', 2);
+                        wp.Address     = new Uri($"{scheme}://{p[(at + 1)..]}");
                         wp.Credentials = new System.Net.NetworkCredential(creds[0], creds.Length > 1 ? creds[1] : "");
                     }
-                    else wp.Address = new Uri("http://" + p);
+                    else wp.Address = new Uri($"{scheme}://{p}");
+
                     h.Proxy    = wp;
                     h.UseProxy = true;
                 }
@@ -612,13 +628,53 @@ namespace ZennoLab.CommandCenter
             => throw new NotSupportedException(
                 "Instance.Launch: браузер поднимает хост и передаёт готовый IBrowserInstance");
 
+        /// <summary>
+        /// Под ZennoPoster прокси переключается на живом инстансе. У нас он
+        /// задаётся при запуске браузера: и Chromium, и persistent context
+        /// Patchright принимают его только в параметрах запуска, менять на лету
+        /// нечем.
+        ///
+        /// Поэтому здесь не отказ и не тихая заглушка, а сверка: если браузер
+        /// уже поднят с этим прокси — всё в порядке; если с другим — явная
+        /// ошибка, потому что дальше шаблон пойдёт с чужим IP и будет уверен,
+        /// что сменил его.
+        /// </summary>
         public void SetProxy(string proxyString, bool useProxifier = false,
                              bool emulateGeolocation = false, bool emulateTimezone = false,
-                             bool emulateWebrtc = false) => throw new NotSupportedException(
-            "Instance.SetProxy: прокси задаётся при создании профиля, а не на живом инстансе");
+                             bool emulateWebrtc = false)
+        {
+            if (string.IsNullOrWhiteSpace(proxyString)) return;
 
-        public string GetProxy() => throw new NotSupportedException(
-            "Instance.GetProxy: прокси известен хосту, а не инстансу");
+            var current = Br.Proxy;
+
+            if (string.IsNullOrEmpty(current))
+                throw new NotSupportedException(
+                    "Instance.SetProxy: браузер поднят без прокси, а сменить его на живом " +
+                    "инстансе нельзя — Playwright принимает прокси только при запуске. " +
+                    $"Передайте [{proxyString}] в BrowserSession при создании сессии.");
+
+            if (!SameProxy(current, proxyString))
+                throw new NotSupportedException(
+                    $"Instance.SetProxy: браузер поднят с прокси [{current}], " +
+                    $"запрошен [{proxyString}] — сменить на живом инстансе нельзя.");
+        }
+
+        public string GetProxy() => Br.Proxy ?? "";
+
+        /// <summary>Сравнение без схемы и учёта регистра: socks5://a:b@h:p и h:p — одно.</summary>
+        private static bool SameProxy(string a, string b)
+        {
+            static string Norm(string s)
+            {
+                var v = s.Trim();
+                int i = v.IndexOf("//", StringComparison.Ordinal);
+                if (i >= 0) v = v[(i + 2)..];
+                int at = v.LastIndexOf('@');
+                if (at >= 0) v = v[(at + 1)..];
+                return v.Trim().ToLowerInvariant();
+            }
+            return Norm(a) == Norm(b);
+        }
 
         // ── Поиск на активной вкладке ─────────────────────────────────────────
 

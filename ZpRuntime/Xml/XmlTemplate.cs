@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // XmlTemplate.cs — модель проекта ZennoPoster и её разбор из .xml.
 //
 // Формат снят с реальных шаблонов (xml_example/). Устроен так:
@@ -120,6 +120,9 @@ public sealed class XmlTemplate
 
     public OwnCodeContext OwnCode { get; init; } = new();
 
+    /// <summary>Правила генерации личности из &lt;Profile&gt;.</summary>
+    public ProfileRules Profile { get; init; } = new();
+
     private readonly Dictionary<string, Step>   _byStep   = new();
     private readonly Dictionary<BranchRef, int> _position = new();
 
@@ -218,6 +221,7 @@ public sealed class XmlTemplate
                         ?? new Dictionary<string, string>(),
 
             OwnCode = ParseOwnCode(stat),
+            Profile = ProfileRules.From(stat?.Element("Profile")),
         };
 
         foreach (var s in steps)

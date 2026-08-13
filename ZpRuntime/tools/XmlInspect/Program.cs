@@ -9,6 +9,7 @@ if (args.Length == 0)
     Console.WriteLine("  --attach ws подключиться по CDP к уже поднятому браузеру, например к профилю ZennoBrowser");
     Console.WriteLine("  --profile   каталог профиля: куки, localStorage, отпечаток");
     Console.WriteLine("  --headless  только для разбора шаблона: headless видно по десятку признаков");
+    Console.WriteLine("  --proxy     прокси браузера; задаётся при запуске, на живом инстансе не меняется");
     return 2;
 }
 
@@ -23,6 +24,7 @@ var wantLocal  = args.Contains("--browser");
 var headless   = args.Contains("--headless");
 var attachTo   = Arg("--attach");
 var profileDir = Arg("--profile");
+var proxy      = Arg("--proxy");
 var path       = args[0];
 if (!File.Exists(path))
 {
@@ -111,7 +113,8 @@ else if (wantLocal)
     Console.WriteLine($"[br] Patchright{(headless ? " (headless)" : "")}, профиль {profileDir}");
     if (headless)
         Console.WriteLine("[br] headless видно по десятку признаков — для живых аккаунтов запускайте без него");
-    session = await DevDeck.Browser.BrowserSession.LaunchAsync(profileDir, headless);
+    if (proxy is not null) Console.WriteLine($"[br] прокси {proxy}");
+    session = await DevDeck.Browser.BrowserSession.LaunchAsync(profileDir, headless, proxy);
 }
 
 var instance = session?.Instance ?? new ZennoLab.CommandCenter.Instance();

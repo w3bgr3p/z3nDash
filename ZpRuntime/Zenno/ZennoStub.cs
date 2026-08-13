@@ -95,11 +95,35 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
         bool ContainsKey(string name);
     }
 
+    /// <summary>
+    /// Личность профиля. У ZP это сгенерированный человек — им заполняются формы
+    /// через макросы {-Profile.Name-} и им же пользуется код веток
+    /// (project.Profile.Password = …). Поля перечислены те, что встречаются в
+    /// шаблонах; все на запись, потому что ветки их присваивают.
+    /// </summary>
     public interface IProfile
     {
-        string UserAgent       { get; set; }
-        string Login           { get; set; }
-        string NickName        { get; set; }
+        string UserAgent  { get; set; }
+
+        string Name       { get; set; }
+        string Surname    { get; set; }
+        string MiddleName { get; set; }
+        string NickName   { get; set; }
+        string Gender     { get; set; }
+        string BirthDate  { get; set; }
+
+        string Login          { get; set; }
+        string Password       { get; set; }
+        string Email          { get; set; }
+        string EmailPassword  { get; set; }
+
+        string Country { get; set; }
+        string Region  { get; set; }
+        string City    { get; set; }
+        string Zip     { get; set; }
+        string Address { get; set; }
+        string Phone   { get; set; }
+
         object CookieContainer { get; }
     }
 
@@ -294,8 +318,25 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
             "AppleWebKit/537.36 (KHTML, like Gecko) " +
             "Chrome/124.0.0.0 Safari/537.36";
 
-        public string Login    { get; set; } = "";
-        public string NickName { get; set; } = "";
+        public string Name       { get; set; } = "";
+        public string Surname    { get; set; } = "";
+        public string MiddleName { get; set; } = "";
+        public string NickName   { get; set; } = "";
+        public string Gender     { get; set; } = "";
+        public string BirthDate  { get; set; } = "";
+
+        public string Login         { get; set; } = "";
+        public string Password      { get; set; } = "";
+        public string Email         { get; set; } = "";
+        public string EmailPassword { get; set; } = "";
+
+        public string Country { get; set; } = "";
+        public string Region  { get; set; } = "";
+        public string City    { get; set; } = "";
+        public string Zip     { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string Phone   { get; set; } = "";
+
         public object CookieContainer => null;
     }
 

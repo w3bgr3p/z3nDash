@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // BrowserSession.cs — получение живого браузера и обёртка его в ZP-шный Instance.
 //
 // До сих пор браузер в проекте поднимался ровно в одном месте — в csx-пути
@@ -50,7 +50,7 @@ public sealed class BrowserSession : IAsyncDisposable
     public IPage                       Page     { get; }
 
     private BrowserSession(IPlaywright? pw, IBrowser? browser, IBrowserContext? ownedContext,
-                           IPage page, bool owned)
+                           IPage page, bool owned, string proxy = "")
     {
         _pw           = pw;
         _browser      = browser;
@@ -58,7 +58,7 @@ public sealed class BrowserSession : IAsyncDisposable
         _owned        = owned;
 
         Page     = page;
-        Browser  = new PlaywrightInstance(page);
+        Browser  = new PlaywrightInstance(page) { Proxy = proxy };
         Instance = new ZennoLab.CommandCenter.Instance(Browser);
 
         // Чтобы ZennoPoster.HTTP.Request умел уйти с сессией браузера — та самая
@@ -125,7 +125,7 @@ public sealed class BrowserSession : IAsyncDisposable
             });
 
         var page = ctx.Pages.FirstOrDefault() ?? await ctx.NewPageAsync();
-        return new BrowserSession(pw, null, ctx, page, owned: true);
+        return new BrowserSession(pw, null, ctx, page, owned: true, proxy: proxy ?? "");
     }
 
     public async ValueTask DisposeAsync()

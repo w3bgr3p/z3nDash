@@ -26,6 +26,9 @@ namespace DevDeck.Browser
         public IList<IBrowserTab> AllTabs
             => _context.Pages.Select(p => (IBrowserTab)new PlaywrightTab(p)).ToList();
 
+        /// <summary>Проставляется тем, кто поднял браузер, — см. BrowserSession.</summary>
+        public string Proxy { get; internal set; } = "";
+
         public bool   UseFullMouseEmulation { get; set; } = false;
         public string EmulationLevel => UseFullMouseEmulation ? "superEmulation" : "none";
 

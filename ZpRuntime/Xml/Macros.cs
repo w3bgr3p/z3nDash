@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // Macros.cs — раскрытие ZP-шных подстановок {-Область.Имя-} в параметрах веток.
 //
 // В шаблоне значения почти всегда написаны через них: Value ветки SetAttribute
@@ -51,17 +51,32 @@ public static class Macros
         };
 
     private static string? ProfileField(IZennoPosterProjectModel project, string name)
-        => name switch
+    {
+        var p = project.Profile;
+        return name switch
         {
-            "UserAgent" => project.Profile.UserAgent,
-            "Login"     => project.Profile.Login,
-            "NickName"  => project.Profile.NickName,
-            // Остальные поля профиля (Name, Surname, BirthDate…) наш IProfile не
-            // держит: профиль у нас заводит браузерный слой, а не проект. Пока
-            // отдаём как переменную с тем же именем — так шаблон хотя бы можно
-            // прокормить руками, не правя его.
-            _           => project.Variables[$"Profile.{name}"].Value is { Length: > 0 } v ? v : null,
+            "UserAgent"     => p.UserAgent,
+            "Name"          => p.Name,
+            "Surname"       => p.Surname,
+            "MiddleName"    => p.MiddleName,
+            "NickName"      => p.NickName,
+            "Gender"        => p.Gender,
+            "BirthDate"     => p.BirthDate,
+            "Login"         => p.Login,
+            "Password"      => p.Password,
+            "Email"         => p.Email,
+            "EmailPassword" => p.EmailPassword,
+            "Country"       => p.Country,
+            "Region"        => p.Region,
+            "City"          => p.City,
+            "Zip"           => p.Zip,
+            "Address"       => p.Address,
+            "Phone"         => p.Phone,
+            // Поле, которого у нас нет, ищем среди переменных с тем же именем —
+            // шаблон можно прокормить руками, не правя его.
+            _ => project.Variables[$"Profile.{name}"].Value is { Length: > 0 } v ? v : null,
         };
+    }
 
     /// <summary>
     /// Имя переменной из OutputVariable. В XML это "{-Variable.otp-}", а нужно

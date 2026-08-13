@@ -27,6 +27,14 @@ namespace DevDeck.Browser
         void WaitFieldEmulationDelay();
         void InstallCrxExtension(string path);
 
+        // ── Прокси ────────────────────────────────────────────────────────────
+        /// <summary>
+        /// Прокси, с которым браузер поднят. Меняться на живом браузере не может:
+        /// Playwright принимает его только в параметрах запуска. Нужен, чтобы
+        /// Instance.SetProxy мог сверить запрошенный прокси с фактическим.
+        /// </summary>
+        string Proxy { get; }
+
         // ── Временная зона ────────────────────────────────────────────────────
         void SetTimezone(int offsetMinutes, int unused);
         void SetIanaTimezone(string ianaName);
