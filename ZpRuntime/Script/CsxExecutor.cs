@@ -15,6 +15,14 @@ public static class CsxExecutor
 
     private static readonly ConcurrentDictionary<CacheKey, CacheEntry> _cache = new();
 
+    /// <summary>
+    /// Окружение скрипта: ссылки и usings. Публично, потому что тем же набором
+    /// компилируются ветки OwnCode из XML-шаблонов (Xml/XmlCodeRunner.cs) —
+    /// скрипт, написанный в ZennoPoster, не знает, чем его запустят, и видеть
+    /// должен одно и то же.
+    /// </summary>
+    public static ScriptOptions ScriptOptionsFor(string scriptPath) => BuildOptions(scriptPath);
+
     private static ScriptOptions BuildOptions(string scriptPath)
     {
         var scriptDir = Path.GetDirectoryName(scriptPath)!;
