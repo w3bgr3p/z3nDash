@@ -300,6 +300,9 @@ namespace DevDeck.Browser
         public void KeyEvent(string key, string type, string modifier = "")
             => Sync(_page.Keyboard.PressAsync(string.IsNullOrEmpty(modifier) ? key : $"{modifier}+{key}"));
 
+        public void InsertText(string text)
+            => Sync(_page.Keyboard.InsertTextAsync(text));
+
         public void FullEmulationMouseWheel(int x, int y)
             => Sync(_page.Mouse.WheelAsync(x, y));
 

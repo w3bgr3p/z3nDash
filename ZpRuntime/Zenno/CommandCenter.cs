@@ -473,6 +473,13 @@ namespace ZennoLab.CommandCenter
         public void KeyEvent(string key, string keyEvent, string keyModifer = "")
             => T.KeyEvent(key, keyEvent, keyModifer);
 
+        /// <summary>
+        /// Вставка текста в элемент под фокусом. В SDK ZennoPoster такого члена
+        /// нет — там то же делали через системный буфер и Ctrl+V. Здесь метод
+        /// добавлен, чтобы перенесённый CtrlV обходился без буфера.
+        /// </summary>
+        public void InsertText(string text) => T.InsertText(text);
+
         public void RiseEvent(string eventName, Rectangle rectangle, string clickType)
             => T.RiseEvent(eventName, rectangle, clickType);
 

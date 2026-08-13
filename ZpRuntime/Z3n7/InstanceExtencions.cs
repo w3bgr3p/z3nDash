@@ -11,7 +11,9 @@
 // обёртка над IBrowserInstance, так что нижний слой не изменился. Единственный
 // вызывающий, Web3/Wallets/Rabby.cs, переведён на Instance.
 //
-// Отступление одно: CtrlV под #if WINDOWS — буфер обмена из System.Windows.Forms.
+// Отступление одно — CtrlV, разобрано на месте: эталонный буфер обмена заменён
+// на Playwright Keyboard.InsertText. Это тот случай, когда чинить в z3n7 нечего:
+// там обход отсутствия примитива в ZennoPoster, а у нас примитив есть.
 
 using System;
 using System.Collections.Generic;
@@ -455,29 +457,22 @@ namespace z3n7
             instance.UseFullMouseEmulation = emu;
         }
         
-        // Отступление: #if WINDOWS. Буфер обмена берётся из System.Windows.Forms,
-        // а его нет в цели net10.0.
-#if WINDOWS
+        // Отступление от дословности, единственное в файле и намеренное.
+        //
+        // Эталон кладёт текст в системный буфер обмена и жмёт Ctrl+V, потому что
+        // в ZennoPoster другого способа вставить длинный текст нет: SetValue на
+        // больших строках работает плохо. Механизм чужой самой задаче — он
+        // затирает буфер пользователя, требует WinForms (то есть цели
+        // net10.0-windows) и сериализуется глобальной блокировкой.
+        //
+        // У Playwright для ровно этого есть Keyboard.InsertText: один input-event
+        // в элемент под фокусом, без клавиатуры и без буфера. Через
+        // IBrowserInstance он проброшен как Tab.InsertText. Поведение то же,
+        // побочных эффектов нет, и метод доступен на обеих целях сборки.
         public static void CtrlV(this Instance instance, string ToPaste)
         {
-            lock (_clipboardLock)
-            {
-                string originalClipboard = null;
-                try
-                {
-                    if (System.Windows.Forms.Clipboard.ContainsText())
-                        originalClipboard = System.Windows.Forms.Clipboard.GetText();
-
-                    System.Windows.Forms.Clipboard.SetText(ToPaste);
-                    instance.ActiveTab.KeyEvent("v", "press", "ctrl");
-
-                    if (!string.IsNullOrEmpty(originalClipboard))
-                        System.Windows.Forms.Clipboard.SetText(originalClipboard);
-                }
-                catch { }
-            }
+            instance.ActiveTab.InsertText(ToPaste);
         }
-#endif
 
         public static void UpFromFolder(this Instance instance, string pathProfile, bool useProfile = false, BrowserType browserType = BrowserType.Chromium)
         {

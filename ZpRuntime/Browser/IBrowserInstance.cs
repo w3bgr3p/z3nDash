@@ -105,6 +105,13 @@ namespace DevDeck.Browser
         void WaitDownloading();
         void Close();
         void KeyEvent(string key, string type, string modifier = "");
+
+        /// <summary>
+        /// Вставить текст в элемент, который сейчас в фокусе, одним событием —
+        /// без посимвольного набора. Под ZennoPoster того же добивались через
+        /// системный буфер и Ctrl+V, здесь для этого есть прямой примитив.
+        /// </summary>
+        void InsertText(string text);
         void FullEmulationMouseWheel(int x, int y);
 
         /// <summary>ZP-совместимая перегрузка: RiseEvent("click", new Rectangle(x,y,1,1), "Left")</summary>
