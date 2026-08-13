@@ -47,8 +47,21 @@ namespace DevDeck.Browser
                 Sync(p.CloseAsync());
         }
 
+        /// <summary>
+        /// ZP чистит кеш; у нас это делалось через ClearCookies, то есть метод
+        /// назывался «очистить кеш», а сносил cookie — и делал это независимо от
+        /// domain, который молча игнорировался. Кеш чистится через CDP.
+        /// </summary>
         public void ClearCache(string domain = null)
-            => Sync(_context.ClearCookiesAsync());
+        {
+            if (!string.IsNullOrEmpty(domain))
+                throw new NotSupportedException(
+                    "ClearCache: очистка кеша по домену не поддерживается — " +
+                    "CDP чистит его целиком. Для cookie конкретного домена есть ClearCookie.");
+
+            var cdp = Sync(_context.NewCDPSessionAsync(_activePage));
+            Sync(cdp.SendAsync("Network.clearBrowserCache"));
+        }
 
         public void ClearCookie(string domain = null)
         {
@@ -66,10 +79,48 @@ namespace DevDeck.Browser
 
         public void WaitFieldEmulationDelay() => Thread.Sleep(new Random().Next(1337, 2077));
 
-        public void InstallCrxExtension(string path) { /* pre-installed in ZB profile */ }
+        /// <summary>
+        /// Chromium ставит расширения только флагом при запуске, на живом браузере
+        /// их не добавить. Раньше метод был пустым телом с комментарием «уже стоит
+        /// в профиле ZB» — то есть шаблон, ставящий расширение сам, считал что
+        /// поставил, и падал потом в непонятном месте.
+        /// </summary>
+        public void InstallCrxExtension(string path) => throw new NotSupportedException(
+            "InstallCrxExtension: расширение подключается при запуске браузера " +
+            $"(--load-extension), на живом инстансе нельзя. Путь: [{path}]");
 
-        public void SetTimezone(int offsetMinutes, int unused) { }
-        public void SetIanaTimezone(string ianaName)           { }
+        /// <summary>
+        /// Часовой пояс страницы через CDP. Раньше оба метода были пустыми телами:
+        /// перенесённый SetTimeFromDb отрабатывал «успешно» и не делал ничего, а
+        /// расхождение пояса с прокси — первое, на что смотрит антифрод.
+        ///
+        /// Playwright задаёт TimezoneId только при создании контекста, но
+        /// Emulation.setTimezoneOverride работает и на живой странице.
+        /// </summary>
+        public void SetTimezone(int offsetMinutes, int unused)
+        {
+            // CDP принимает только имя зоны, не смещение. Берём любую зону с
+            // нужным смещением — для JS-кода страницы важно именно оно.
+            var zone = TimeZoneInfo.GetSystemTimeZones()
+                .FirstOrDefault(z => (int)z.BaseUtcOffset.TotalMinutes == offsetMinutes);
+
+            if (zone is null)
+                throw new NotSupportedException(
+                    $"SetTimezone: не нашлось зоны со смещением {offsetMinutes} минут — " +
+                    "передайте имя зоны через SetIanaTimezone");
+
+            SetIanaTimezone(zone.HasIanaId ? zone.Id
+                : TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out var iana) ? iana : zone.Id);
+        }
+
+        public void SetIanaTimezone(string ianaName)
+        {
+            if (string.IsNullOrWhiteSpace(ianaName)) return;
+
+            var cdp = Sync(_context.NewCDPSessionAsync(_activePage));
+            Sync(cdp.SendAsync("Emulation.setTimezoneOverride",
+                new Dictionary<string, object> { ["timezoneId"] = ianaName }));
+        }
 
         public IHeElement FindElementById(string id)
             => new PlaywrightElement(_activePage.Locator($"#{id}"));
@@ -491,18 +542,52 @@ namespace DevDeck.Browser
                 _loc.Locator(string.Join(", ", tags.Select(t => t + clause))).Nth(index));
         }
 
+        private static readonly Random _rnd = new();
+
+        /// <summary>
+        /// Клик всегда настоящий, мышью. Раньше здесь при уровне эмуляции ниже
+        /// superEmulation уходил DispatchEvent("click") — синтетическое событие
+        /// без isTrusted, которое и детектируется, и на половине сайтов просто
+        /// не срабатывает: обработчики висят на mousedown/mouseup. А уровень по
+        /// умолчанию как раз "none", то есть так кликало всё.
+        ///
+        /// DispatchEvent остаётся только для событий, которые мышью не изобразить.
+        /// </summary>
         public void RiseEvent(string eventName, string emulationLevel)
         {
             if (eventName != "click") { Sync(_loc.DispatchEventAsync(eventName)); return; }
-            if (emulationLevel == "superEmulation") Sync(_loc.ClickAsync());
-            else Sync(_loc.DispatchEventAsync("click"));
+
+            Sync(_loc.ScrollIntoViewIfNeededAsync());
+            Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = _rnd.Next(40, 140) }));
         }
 
+        /// <summary>
+        /// Ввод посимвольный, со случайными паузами. Раньше режим "Full" уходил в
+        /// FillAsync — тот проставляет value одним присваиванием и шлёт один
+        /// input. Для ZP "Full" означает полную эмуляцию набора, и весь расчёт
+        /// перенесённого HeSet на человеческие задержки этим сводился на нет:
+        /// поля с посимвольной валидацией такого ввода не принимают, а антибот
+        /// видит мгновенно заполненную форму.
+        /// </summary>
         public void SetValue(string value, string mode, bool clear)
         {
+            // Не "Full" — ZP-шное присваивание без эмуляции, оставляем как есть.
+            if (mode != "Full")
+            {
+                if (clear) Sync(_loc.ClearAsync());
+                Sync(_loc.EvaluateAsync($"el => el.value = '{value.Replace("'", "\\'")}'"));
+                return;
+            }
+
+            Sync(_loc.ScrollIntoViewIfNeededAsync());
+            Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = _rnd.Next(40, 140) }));
             if (clear) Sync(_loc.ClearAsync());
-            if (mode == "Full") Sync(_loc.FillAsync(value));
-            else Sync(_loc.EvaluateAsync($"el => el.value = '{value.Replace("'", "\\'")}'"));
+
+            foreach (var ch in value)
+            {
+                Sync(_loc.PressAsync(ch.ToString(), new LocatorPressOptions { Delay = _rnd.Next(20, 70) }));
+                Thread.Sleep(_rnd.Next(35, 145));
+            }
         }
 
         public string GetXPath() => Sync(_loc.EvaluateAsync<string>(@"el => {

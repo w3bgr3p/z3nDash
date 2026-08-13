@@ -114,7 +114,11 @@ public sealed class BranchExecutor
         var url = _project.Expand(branch.Param("Value"));
         if (string.IsNullOrWhiteSpace(url))
             throw new InvalidOperationException("CMD_NAVIGATE без адреса");
-        _instance.ActiveTab.Navigate(url, "");
+
+        // Через эталонный Go, а не ActiveTab.Navigate: там ожидание загрузки и
+        // проверка, что адрес действительно сменился. Своя короткая дорога здесь
+        // ровно та же ошибка, что была с однократным поиском элемента.
+        _instance.Go(url);
         return BranchResult.Empty;
     }
 
