@@ -181,8 +181,27 @@ def main():
     print(f'\n=== одноимённые типы, уже сосуществуют ({len(coexist)}) ===')
     print('  ' + ', '.join(coexist) if coexist else '  —')
 
+    # Файлы. Секции выше видят только extension-методы и объявления типов, а
+    # обычный класс без того и другого в них не попадает вовсе. Так был пропущен
+    # Api/AnyMessage.cs: ветка шаблона зовёт его по имени, а инвентарь молчал,
+    # и я успел объявить перенос законченным. Здесь остаток считается по файлам.
+    ported_files = {os.path.basename(f) for f in cs_files(PORTED_DIR)}
+    their_files  = {os.path.basename(f): f for f in cs_files(args.z3n7)}
+    missing = sorted(n for n in their_files if n not in ported_files)
+
+    print(f'\n=== файлы ядра z3n7 без пары ({len(missing)} из {len(their_files)}) ===')
+    for name in missing:
+        path = their_files[name]
+        try:
+            with open(path, encoding='utf-8', errors='replace') as fh:
+                lines = sum(1 for _ in fh)
+        except OSError:
+            lines = 0
+        rel = os.path.relpath(path, args.z3n7).replace(os.sep, '/')
+        print(f'  {lines:>5} строк  {rel}')
+
     print(f'\nитого к разрешению: {len(shared)}, из них с расхождением типа: {divergent}'
-          f'; типов под вопросом: {len(candidates)}')
+          f'; типов под вопросом: {len(candidates)}; файлов без пары: {len(missing)}')
     return 0
 
 

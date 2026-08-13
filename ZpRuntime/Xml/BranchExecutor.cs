@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // BranchExecutor.cs — исполнение одной ветки шаблона.
 //
 // Каждый Type/Action ложится на уже перенесённый из z3n7 слой: Finder ветки
@@ -11,6 +11,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 using System.Xml.Linq;
+using z3n7;                 // GetHe/HeClick/HeSet/HeGet — перенесённые из эталона
 using ZennoLab.CommandCenter;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
@@ -66,38 +67,42 @@ public sealed class BranchExecutor
 
     private BranchResult RiseEvent(Branch branch)
     {
-        var he = Find(branch);
         var ev = _project.Expand(branch.Param("EventName")) is { Length: > 0 } e ? e : "click";
-        he.RiseEvent(ev, EmulationLevel(branch));
+
+        // Эталонный HeClick умеет только click — остальные события шлём сами,
+        // но через тот же GetHe, чтобы ожидание элемента было общим.
+        if (ev.Equals("click", StringComparison.OrdinalIgnoreCase))
+            _instance.HeClick(Selector(branch), deadline: Deadline(branch));
+        else
+            _instance.GetHe(Selector(branch)).RiseEvent(ev, EmulationLevel(branch));
+
         return BranchResult.Empty;
     }
 
     private BranchResult SetAttribute(Branch branch)
     {
-        var he    = Find(branch);
         var attr  = branch.Param("Attribute") ?? "value";
         var value = _project.Expand(branch.Param("Value"));
 
-        // ZP пишет любой атрибут, но value вводится с эмуляцией, а не присвоением:
-        // на нём висят обработчики, которые от простого SetAttribute не сработают.
+        // ZP пишет любой атрибут, но value вводится с эмуляцией, а не
+        // присвоением: на нём висят обработчики, которые от SetAttribute не
+        // сработают. Эталонный HeSet это и делает — заодно ждёт элемент.
         if (attr.Equals("value", StringComparison.OrdinalIgnoreCase))
-            he.SetValue(value, EmulationLevel(branch), false, false);
+            _instance.HeSet(Selector(branch), value, deadline: Deadline(branch));
         else
-            he.SetAttribute(attr, value);
+            _instance.GetHe(Selector(branch)).SetAttribute(attr, value);
 
         return BranchResult.Empty;
     }
 
     private BranchResult GetAttribute(Branch branch)
     {
-        var he   = Find(branch);
         var attr = branch.Param("Attribute");
 
         // Пустой Attribute у ZP означает innertext — так стоит в шаблоне для
         // чтения капчи.
-        var value = string.IsNullOrWhiteSpace(attr) || attr.Equals("innertext", StringComparison.OrdinalIgnoreCase)
-            ? he.InnerText
-            : he.GetAttribute(attr);
+        var atr = string.IsNullOrWhiteSpace(attr) ? "innertext" : attr;
+        var value = _instance.HeGet(Selector(branch), deadline: Deadline(branch), atr: atr);
 
         return new BranchResult(value ?? "");
     }
@@ -115,17 +120,22 @@ public sealed class BranchExecutor
 
     private BranchResult UpdateProfile(Branch branch)
     {
-        // Профиль у нас заводит браузерный слой при создании контекста, отдельной
-        // операции «пересобрать и сохранить» нет. Ветка встречается в шаблонах
-        // как первое действие, поэтому пропускаем её с записью в лог, а не падаем:
-        // иначе ни один реальный шаблон не стартует.
-        _log($"Profile/Update пропущена: профиль задаётся при создании браузера");
+        // Личность генерируется плеером до старта по правилам из <Profile>, а
+        // отпечаток задаётся при создании браузера. Отдельной операции
+        // «пересобрать профиль» у нас нет, поэтому ветка только отмечается.
+        _log($"Profile/Update пропущена: личность уже сгенерирована, отпечаток задан браузером");
         return BranchResult.Empty;
     }
 
     // ── Finder ────────────────────────────────────────────────────────────────
 
-    private HtmlElement Find(Branch branch)
+    /// <summary>
+    /// Finder ветки в том виде, в каком его ждёт эталонный GetHe: кортеж из пяти
+    /// полей. Благодаря этому поиск, ожидание и эмуляция берутся из
+    /// перенесённого слоя, а не пишутся здесь заново — своя реализация искала
+    /// элемент однократно и роняла ветку на странице, которая ещё грузится.
+    /// </summary>
+    private (string, string, string, string, int) Selector(Branch branch)
     {
         var f = branch.ParamNode("Finder")
                 ?? throw new InvalidOperationException($"{branch} без Finder");
@@ -137,19 +147,17 @@ public sealed class BranchExecutor
         var cond = f.Element("SearchCondition")
                    ?? throw new InvalidOperationException($"{branch}: Finder без SearchCondition");
 
-        var tag       = _project.Expand(f.Element("Tag")?.Value);
-        var attrName  = _project.Expand(cond.Attribute("AttrName")?.Value);
-        var attrValue = _project.Expand(cond.Attribute("AttrValue")?.Value);
-        var kind      = cond.Attribute("SearchKind")?.Value ?? "text";
         _ = int.TryParse(cond.Attribute("Number")?.Value, out var number);
 
-        var he = _instance.ActiveTab.FindElementByAttribute(tag, attrName, attrValue, kind, number);
-        if (he.IsVoid)
-            throw new InvalidOperationException(
-                $"элемент не найден: tag=[{tag}] {attrName}=[{attrValue}] kind=[{kind}] №{number}");
-
-        return he;
+        return (_project.Expand(f.Element("Tag")?.Value),
+                _project.Expand(cond.Attribute("AttrName")?.Value),
+                _project.Expand(cond.Attribute("AttrValue")?.Value),
+                cond.Attribute("SearchKind")?.Value ?? "text",
+                number);
     }
+
+    /// <summary>Сколько ждать элемент. В XML срока нет — берём ZP-шный по умолчанию.</summary>
+    private static int Deadline(Branch branch) => 10;
 
     /// <summary>ZP-шный EmulationLevel ветки; по умолчанию как у инстанса.</summary>
     private string EmulationLevel(Branch branch)
