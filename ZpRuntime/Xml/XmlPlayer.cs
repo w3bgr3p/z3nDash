@@ -58,23 +58,71 @@ public sealed class XmlPlayer
 
     public PlayResult Play(XmlTemplate tpl, string templateDir, CancellationToken ct = default)
     {
-        var entry = tpl.EntryStep();
-        if (entry is null)
-            return new PlayResult(false, "в шаблоне нет ни одного Step", 0, null, null);
+        if (tpl.Start.IsNone)
+            return new PlayResult(false, "в шаблоне нет <Start> — это не проект ZennoPoster", 0, null, null);
+
+        if (tpl.Locate(tpl.Start) is not { } entry)
+            return new PlayResult(false, $"<Start> ведёт в никуда: {tpl.Start}", 0, null, null);
 
         var dead = tpl.UnreachableSteps();
         if (dead.Count > 0)
-            _log($"[xml] {dead.Count} узлов недостижимы из точки входа — заготовки на холсте, пропускаю");
+            _log($"[xml] недостижимо узлов: {dead.Count} — артефакты разработки, в маршрут не входят");
 
-        var code = new XmlCodeRunner(
-            new XmlCodeGlobals { project = _project, instance = _instance }, templateDir);
+        SeedVariables(tpl);
+
+        XmlCodeRunner code;
+        try
+        {
+            code = new XmlCodeRunner(
+                new XmlCodeGlobals { project = _project, instance = _instance }, templateDir, tpl.OwnCode);
+        }
+        catch (Exception ex)
+        {
+            // Общий код и ссылки готовятся один раз до старта. Если они не
+            // сложились, маршрут не начинается вовсе — это не ошибка ветки.
+            _log($"[xml] окружение шаблона не собрано: {ex.Message}");
+            return new PlayResult(false, ex.Message, 0, null, ex);
+        }
+
+        if (code.UnknownUsings.Count > 0)
+            _log($"[xml] usings без пространства имён, пропущены: {string.Join(", ", code.UnknownUsings)} " +
+                 "— ветки, которые ими пользуются, упадут на именах");
+
         var exec = new BranchExecutor(_project, _instance, code, _log);
 
-        _log($"[xml] {tpl.Name}: старт с узла {entry.Id[..8]}, веток в нём {entry.Branches.Count}");
+        _log($"[xml] {tpl.Name}: старт с {tpl.Start}");
 
-        var    step  = entry;
-        int    index = 0;
-        int    run   = 0;
+        var result = Walk(tpl, exec, entry, ct);
+
+        // Обработчики конца — тоже обычные цепочки веток, просто вход в них
+        // задан не стрелкой, а узлом холста.
+        var ending = result.Success ? tpl.GoodEnd : tpl.BadEnd;
+        if (!ending.IsNone && tpl.Locate(ending) is { } endEntry)
+        {
+            _log($"[xml] {(result.Success ? "GoodEnd" : "BadEnd")} → {ending}");
+            var tail = Walk(tpl, exec, endEntry, ct);
+            if (!tail.Success)
+                _log($"[xml] обработчик конца сам упал: {tail.Message}");
+        }
+
+        return result;
+    }
+
+    private void SeedVariables(XmlTemplate tpl)
+    {
+        // ZP заводит объявленные переменные до старта. Без этого первое же
+        // обращение к необъявленной переменной в ветке даёт пустоту там, где
+        // шаблон рассчитывает на значение по умолчанию из настроек проекта.
+        foreach (var (name, value) in tpl.Variables)
+            if (string.IsNullOrEmpty(_project.Variables[name].Value))
+                _project.Variables[name].Value = value;
+    }
+
+    private PlayResult Walk(XmlTemplate tpl, BranchExecutor exec,
+                            (Step Step, int Index) from, CancellationToken ct)
+    {
+        var (step, index) = from;
+        int run = 0;
 
         while (true)
         {

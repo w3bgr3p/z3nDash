@@ -1,4 +1,4 @@
-using DevDeck.Xml;
+﻿using DevDeck.Xml;
 
 if (args.Length == 0)
 {
@@ -17,14 +17,18 @@ if (!File.Exists(path))
     return 2;
 }
 
-var tpl   = XmlTemplate.Load(path);
-var entry = tpl.EntryStep();
-var dead  = tpl.UnreachableSteps().Select(s => s.Id).ToHashSet();
+var tpl  = XmlTemplate.Load(path);
+var dead = tpl.UnreachableSteps().Select(s => s.Id).ToHashSet();
 
-Console.WriteLine($"шаблон : {tpl.Name}");
-Console.WriteLine($"узлов  : {tpl.Steps.Count}, веток: {tpl.Steps.Sum(s => s.Branches.Count)}");
-Console.WriteLine($"вход   : {(entry is null ? "не найден" : entry.Id[..8])}");
-Console.WriteLine($"мёртвых узлов: {dead.Count}");
+Console.WriteLine($"шаблон   : {tpl.Name}");
+Console.WriteLine($"узлов    : {tpl.Steps.Count}, веток: {tpl.Steps.Sum(s => s.Branches.Count)}");
+Console.WriteLine($"Start    : {tpl.Start}");
+Console.WriteLine($"GoodEnd  : {tpl.GoodEnd}");
+Console.WriteLine($"BadEnd   : {tpl.BadEnd}");
+Console.WriteLine($"артефактов (недостижимых узлов): {dead.Count}");
+Console.WriteLine($"переменных: {tpl.Variables.Count}, usings: {tpl.OwnCode.Usings.Length}, "
+                  + $"CommonCode: {tpl.OwnCode.CommonCode.Length} симв., "
+                  + $"References: {string.Join(", ", tpl.OwnCode.References)}");
 Console.WriteLine();
 
 // Ветки, которые плеер не умеет. Считаем только по достижимым: заготовки на
@@ -44,7 +48,10 @@ var gaps = tpl.Steps
 
 foreach (var s in tpl.Steps)
 {
-    var mark = dead.Contains(s.Id) ? "  (недостижим)" : s.Id == entry?.Id ? "  ← вход" : "";
+    var mark = dead.Contains(s.Id)      ? "  (артефакт)"
+             : s.Id == tpl.Start.StepId  ? "  ← Start"
+             : s.Id == tpl.GoodEnd.StepId? "  ← GoodEnd"
+             : s.Id == tpl.BadEnd.StepId ? "  ← BadEnd" : "";
     Console.WriteLine($"Step {s.Id[..8]}{mark}");
 
     foreach (var b in s.Branches)

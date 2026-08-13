@@ -16,6 +16,19 @@
 // OnSuccess/OnError последней ветки. Пустой OnSuccess у последней ветки означает
 // конец маршрута, а не переход к следующему Step по порядку в файле — на холсте
 // порядок задаётся стрелками, а не позицией в XML.
+//
+// Всё, что не является узлом холста, лежит в <StaticTechnologies>:
+//
+//   <Start    nextAction="stepId|branchId">  ← точка входа, всегда есть
+//   <GoodEnd  nextAction="...">              ← что выполнить при успехе маршрута
+//   <BadEnd   nextAction="...">              ← и при провале; оба необязательны
+//   <Variables><Variable Name= Value= .../>  ← объявленные переменные проекта
+//   <References><Reference Include="[external]z3n7[external]"/>
+//   <OwnCodeUsings Text="…" CommonCode="…">  ← usings и общий код всех веток
+//
+// CommonCode — это целый C#-файл с классами проекта (в simroute_test 33 КБ), и
+// без него ветки OwnCode не компилируются: они зовут именно эти классы. То есть
+// шаблон самодостаточен, внешняя сборка нужна только под <Reference>.
 // ══════════════════════════════════════════════════════════════════════════════
 
 using System.Xml.Linq;
@@ -79,10 +92,33 @@ public sealed class Step
     public required List<Branch>  Branches { get; init; }
 }
 
+/// <summary>Общий код и окружение веток OwnCode — из &lt;OwnCodeUsings&gt;.</summary>
+public sealed class OwnCodeContext
+{
+    /// <summary>Строки using, которые ZP подставляет каждой ветке.</summary>
+    public string[] Usings     { get; init; } = [];
+    /// <summary>Классы проекта: целый C#-файл, общий для всех веток.</summary>
+    public string   CommonCode { get; init; } = "";
+    /// <summary>Сборки из &lt;References&gt;, уже без обёртки [external].</summary>
+    public string[] References { get; init; } = [];
+}
+
 public sealed class XmlTemplate
 {
     public required string      Name  { get; init; }
     public required List<Step>  Steps { get; init; }
+
+    /// <summary>Точка входа из &lt;Start nextAction&gt;. В шаблоне есть всегда.</summary>
+    public BranchRef Start   { get; init; } = BranchRef.None;
+    /// <summary>Ветка, которой ZP заканчивает удачный маршрут. Может отсутствовать.</summary>
+    public BranchRef GoodEnd { get; init; } = BranchRef.None;
+    /// <summary>То же для провала.</summary>
+    public BranchRef BadEnd  { get; init; } = BranchRef.None;
+
+    /// <summary>Объявленные переменные проекта с начальными значениями.</summary>
+    public Dictionary<string, string> Variables { get; init; } = new();
+
+    public OwnCodeContext OwnCode { get; init; } = new();
 
     private readonly Dictionary<string, Step>   _byStep   = new();
     private readonly Dictionary<BranchRef, int> _position = new();
@@ -97,38 +133,30 @@ public sealed class XmlTemplate
     }
 
     /// <summary>
-    /// Точка входа: узел, на который никто не ссылается. Явного признака старта
-    /// в XML нет — на холсте это просто узел без входящих стрелок. Если таких
-    /// несколько (обычное дело: на холсте валяются заготовки), берём тот, что
-    /// раньше в файле, — ZP рисует его первым.
+    /// Узлы, до которых не дойти ни из Start, ни из обработчиков конца. Это
+    /// артефакты разработки — заготовки, оставленные на холсте.
+    ///
+    /// Считать их только от Start было бы неверно: GoodEnd и BadEnd ведут в свои
+    /// цепочки, и в numlex.casino_ обработчик BadEnd — это как раз тот узел, на
+    /// который прежняя эвристика «узел без входящих стрелок» показывала как на
+    /// точку входа.
     /// </summary>
-    public Step? EntryStep()
-    {
-        var targets = Steps
-            .SelectMany(s => s.Branches)
-            .SelectMany(b => new[] { b.OnSuccess, b.OnError })
-            .Where(t => !t.IsNone)
-            .Select(t => t.StepId)
-            .ToHashSet();
-
-        return Steps.FirstOrDefault(s => !targets.Contains(s.Id)) ?? Steps.FirstOrDefault();
-    }
-
-    /// <summary>Узлы, до которых из точки входа не дойти. На холсте это мусор.</summary>
     public List<Step> UnreachableSteps()
     {
-        var entry = EntryStep();
-        if (entry is null) return [];
+        var seen  = new HashSet<string>();
+        var queue = new Queue<string>();
 
-        var seen = new HashSet<string>();
-        var queue = new Queue<Step>([entry]);
+        foreach (var r in new[] { Start, GoodEnd, BadEnd })
+            if (!r.IsNone) queue.Enqueue(r.StepId);
+
         while (queue.Count > 0)
         {
-            var s = queue.Dequeue();
-            if (!seen.Add(s.Id)) continue;
+            var id = queue.Dequeue();
+            if (!seen.Add(id) || StepById(id) is not { } s) continue;
             foreach (var t in s.Branches.SelectMany(b => new[] { b.OnSuccess, b.OnError }))
-                if (!t.IsNone && StepById(t.StepId) is { } next) queue.Enqueue(next);
+                if (!t.IsNone) queue.Enqueue(t.StepId);
         }
+
         return Steps.Where(s => !seen.Contains(s.Id)).ToList();
     }
 
@@ -172,10 +200,24 @@ public sealed class XmlTemplate
             steps.Add(new Step { Id = stepId, Branches = branches });
         }
 
+        var stat = root.Element("StaticTechnologies");
+
         var tpl = new XmlTemplate
         {
             Name  = root.Attribute("Name")?.Value is { Length: > 0 } n ? n : name,
             Steps = steps,
+
+            Start   = NextAction(stat, "Start"),
+            GoodEnd = NextAction(stat, "GoodEnd"),
+            BadEnd  = NextAction(stat, "BadEnd"),
+
+            Variables = stat?.Element("Variables")?.Elements("Variable")
+                            .Where(v => v.Attribute("Name") is not null)
+                            .ToDictionary(v => v.Attribute("Name")!.Value,
+                                          v => v.Attribute("Value")?.Value ?? "")
+                        ?? new Dictionary<string, string>(),
+
+            OwnCode = ParseOwnCode(stat),
         };
 
         foreach (var s in steps)
@@ -186,5 +228,40 @@ public sealed class XmlTemplate
         }
 
         return tpl;
+    }
+
+    private static BranchRef NextAction(XElement? stat, string node)
+        => BranchRef.Parse(stat?.Element(node)?.Attribute("nextAction")?.Value);
+
+    private static OwnCodeContext ParseOwnCode(XElement? stat)
+    {
+        var oc = stat?.Element("OwnCodeUsings");
+
+        // Usings и общий код лежат в атрибутах, а не в теле узла.
+        var usings = (oc?.Attribute("Text")?.Value ?? "")
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => l.Trim().TrimEnd(';'))
+            .Where(l => l.StartsWith("using ", StringComparison.Ordinal))
+            .Select(l => l["using ".Length..].Trim())
+            .Distinct()
+            .ToArray();
+
+        // ZP оборачивает имя сборки в [external]…[external]. Иногда там простое
+        // имя ("z3n7"), иногда полное строгое ("System.Management, Version=4.0.0.0,
+        // Culture=neutral, PublicKeyToken=…") — берём часть до первой запятой,
+        // сопоставлять всё равно по простому имени.
+        var refs = stat?.Element("References")?.Elements("Reference")
+            .Select(r => r.Attribute("Include")?.Value ?? "")
+            .Select(v => v.Replace("[external]", "").Split(',')[0].Trim())
+            .Where(v => v.Length > 0)
+            .Distinct()
+            .ToArray() ?? [];
+
+        return new OwnCodeContext
+        {
+            Usings     = usings,
+            CommonCode = oc?.Attribute("CommonCode")?.Value ?? "",
+            References = refs,
+        };
     }
 }
