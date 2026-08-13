@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
@@ -32,7 +32,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Playwright"                    Version="1.58.0" />
+        <!-- Patchright — пропатченный Playwright: тот же namespace Microsoft.Playwright
+             и тот же API, но драйвер без следов Runtime.enable и командных флагов,
+             по которым автоматизацию узнают. Ставится вместо Microsoft.Playwright,
+             не рядом: пакеты дают одни и те же типы. -->
+        <PackageReference Include="Patchright"                              Version="1.61.0" />
         <PackageReference Include="Newtonsoft.Json"                         Version="13.0.4" />
         <PackageReference Include="Npgsql"                                  Version="10.0.1" />
         <PackageReference Include="System.Data.Odbc"                        Version="10.0.2" />

@@ -9,11 +9,24 @@
 // Здесь два способа получить страницу и один результат — Instance, поверх
 // которого работает весь перенесённый из z3n7 слой:
 //
-//   Attach — подключиться по CDP к уже поднятому браузеру. Это рабочий путь:
-//            профиль ZennoBrowser со своим отпечатком, прокси и куками.
-//   Launch — поднять локальный Chromium самим. Путь для разработки: отпечаток
-//            обычный, антидетекта нет. Гнать через него реальные аккаунты —
-//            способ их сжечь, о чём сессия предупреждает в логе.
+//   Attach — подключиться по CDP к уже поднятому браузеру: профиль
+//            ZennoBrowser со своим отпечатком, прокси и куками.
+//   Launch — поднять браузер самим, через Patchright.
+//
+// Patchright — пропатченный Playwright под тем же namespace: те же типы, тот же
+// API, но драйвер без следов, по которым узнают автоматизацию. Из-за этого у
+// запуска есть требования, и они не косметические — нарушив их, теряешь ровно то,
+// ради чего он взят:
+//
+//   Channel = "chrome"        настоящий Chrome, а не Chromium из поставки;
+//   LaunchPersistentContext   обычный Launch + NewContext детектируется;
+//   ViewportSize.NoViewport   окно как у человека, без принудительного размера;
+//   без своих UserAgent и заголовков — они и выдают;
+//   Headless = false          headless виден по десятку признаков.
+//
+// Поэтому профиль здесь не опция, а условие: без каталога профиля persistent
+// context не поднять. Headless оставлен, но с предупреждением — он полезен на
+// разборе шаблона и вреден на живых аккаунтах.
 // ══════════════════════════════════════════════════════════════════════════════
 
 using Microsoft.Playwright;
@@ -74,35 +87,45 @@ public sealed class BrowserSession : IAsyncDisposable
     }
 
     /// <summary>
-    /// Поднять локальный Chromium. Отпечаток обычный — для разработки и разбора
-    /// шаблонов, не для боевых аккаунтов.
+    /// Поднять браузер через Patchright. Каталог профиля обязателен: без него не
+    /// собрать persistent context, а обычный Launch + NewContext детектируется.
     /// </summary>
+    /// <param name="profileDir">Каталог профиля — куки, localStorage, отпечаток.</param>
+    /// <param name="headless">Только для разбора шаблонов: headless виден.</param>
+    /// <param name="proxy">Прокси в виде host:port или схема://user:pass@host:port.</param>
+    /// <param name="channel">
+    /// Канал Chrome. Patchright просит настоящий "chrome"; пустая строка оставит
+    /// Chromium из поставки — тогда часть патчей теряет смысл.
+    /// </param>
     public static async Task<BrowserSession> LaunchAsync(
-        bool headless = false, string? profileDir = null, string? proxy = null)
+        string profileDir, bool headless = false, string? proxy = null, string? channel = "chrome")
     {
+        if (string.IsNullOrWhiteSpace(profileDir))
+            throw new ArgumentException(
+                "нужен каталог профиля: Patchright работает через persistent context, " +
+                "обычный Launch с отдельным контекстом детектируется", nameof(profileDir));
+
         var pw = await Playwright.CreateAsync();
 
         var proxySettings = string.IsNullOrWhiteSpace(proxy)
             ? null
             : new Proxy { Server = proxy.Contains("://") ? proxy : $"http://{proxy}" };
 
-        // С profileDir берём persistent context: у него свои куки и localStorage,
-        // как у профиля ZP. Без него — обычный одноразовый браузер.
-        if (!string.IsNullOrWhiteSpace(profileDir))
-        {
-            Directory.CreateDirectory(profileDir);
-            var ctx = await pw.Chromium.LaunchPersistentContextAsync(profileDir,
-                new BrowserTypeLaunchPersistentContextOptions { Headless = headless, Proxy = proxySettings });
-            var p = ctx.Pages.FirstOrDefault() ?? await ctx.NewPageAsync();
-            return new BrowserSession(pw, null, ctx, p, owned: true);
-        }
+        Directory.CreateDirectory(profileDir);
 
-        var browser = await pw.Chromium.LaunchAsync(
-            new BrowserTypeLaunchOptions { Headless = headless, Proxy = proxySettings });
-        var context = await browser.NewContextAsync();
-        var page    = await context.NewPageAsync();
+        var ctx = await pw.Chromium.LaunchPersistentContextAsync(profileDir,
+            new BrowserTypeLaunchPersistentContextOptions
+            {
+                Channel      = string.IsNullOrWhiteSpace(channel) ? null : channel,
+                Headless     = headless,
+                Proxy        = proxySettings,
+                // Свой UserAgent и принудительный размер окна — те самые признаки,
+                // которые Patchright и убирает. Не задаём ни того, ни другого.
+                ViewportSize = ViewportSize.NoViewport,
+            });
 
-        return new BrowserSession(pw, browser, context, page, owned: true);
+        var page = ctx.Pages.FirstOrDefault() ?? await ctx.NewPageAsync();
+        return new BrowserSession(pw, null, ctx, page, owned: true);
     }
 
     public async ValueTask DisposeAsync()

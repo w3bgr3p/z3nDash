@@ -5,9 +5,10 @@ if (args.Length == 0)
     Console.WriteLine("использование: XmlInspect <шаблон.xml> [--run] [--browser|--attach <ws>] [--headless] [--profile <dir>]");
     Console.WriteLine("  без --run   печатает граф и пробелы в поддержке, ничего не исполняя");
     Console.WriteLine("  --run       проигрывает шаблон; без браузера ветки со страницей откажут");
-    Console.WriteLine("  --browser   поднять локальный Chromium (отпечаток обычный, не для боевых аккаунтов)");
+    Console.WriteLine("  --browser   поднять браузер через Patchright; нужен --profile");
     Console.WriteLine("  --attach ws подключиться по CDP к уже поднятому браузеру, например к профилю ZennoBrowser");
-    Console.WriteLine("  --profile   каталог профиля для локального запуска: свои куки и localStorage");
+    Console.WriteLine("  --profile   каталог профиля: куки, localStorage, отпечаток");
+    Console.WriteLine("  --headless  только для разбора шаблона: headless видно по десятку признаков");
     return 2;
 }
 
@@ -105,10 +106,12 @@ if (attachTo is not null)
 }
 else if (wantLocal)
 {
-    Console.WriteLine($"[br] поднимаю локальный Chromium{(headless ? " (headless)" : "")}"
-                      + (profileDir is null ? "" : $", профиль {profileDir}"));
-    Console.WriteLine("[br] отпечаток обычный — для боевых аккаунтов используйте --attach к профилю антидетекта");
-    session = await DevDeck.Browser.BrowserSession.LaunchAsync(headless, profileDir);
+    // Профиль обязателен: Patchright работает через persistent context.
+    profileDir ??= Path.Combine(Path.GetTempPath(), "devdeck-xml", "profile-" + tpl.Name);
+    Console.WriteLine($"[br] Patchright{(headless ? " (headless)" : "")}, профиль {profileDir}");
+    if (headless)
+        Console.WriteLine("[br] headless видно по десятку признаков — для живых аккаунтов запускайте без него");
+    session = await DevDeck.Browser.BrowserSession.LaunchAsync(profileDir, headless);
 }
 
 var instance = session?.Instance ?? new ZennoLab.CommandCenter.Instance();
