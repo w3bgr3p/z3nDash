@@ -2,15 +2,27 @@
 
 if (args.Length == 0)
 {
-    Console.WriteLine("использование: XmlInspect <шаблон.xml> [--run]");
-    Console.WriteLine("  без --run печатает граф и пробелы в поддержке, ничего не исполняя");
-    Console.WriteLine("  --run проигрывает шаблон безбраузерным Instance: ветки OwnCode");
-    Console.WriteLine("        отработают, обращение к вкладке даст внятный отказ");
+    Console.WriteLine("использование: XmlInspect <шаблон.xml> [--run] [--browser|--attach <ws>] [--headless] [--profile <dir>]");
+    Console.WriteLine("  без --run   печатает граф и пробелы в поддержке, ничего не исполняя");
+    Console.WriteLine("  --run       проигрывает шаблон; без браузера ветки со страницей откажут");
+    Console.WriteLine("  --browser   поднять локальный Chromium (отпечаток обычный, не для боевых аккаунтов)");
+    Console.WriteLine("  --attach ws подключиться по CDP к уже поднятому браузеру, например к профилю ZennoBrowser");
+    Console.WriteLine("  --profile   каталог профиля для локального запуска: свои куки и localStorage");
     return 2;
 }
 
-var run  = args.Contains("--run");
-var path = args[0];
+string? Arg(string name)
+{
+    var i = Array.IndexOf(args, name);
+    return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+}
+
+var run        = args.Contains("--run");
+var wantLocal  = args.Contains("--browser");
+var headless   = args.Contains("--headless");
+var attachTo   = Arg("--attach");
+var profileDir = Arg("--profile");
+var path       = args[0];
 if (!File.Exists(path))
 {
     Console.WriteLine($"нет файла: {path}");
@@ -84,8 +96,29 @@ Console.WriteLine("── запуск ─────────────�
 // SendInfoToLog из веток задваиваются.
 var project = new ZennoLab.InterfacesLibrary.ProjectModel.StubProject { Name = tpl.Name };
 
-var player = new XmlPlayer(project, new ZennoLab.CommandCenter.Instance(), Console.WriteLine);
+DevDeck.Browser.BrowserSession? session = null;
+
+if (attachTo is not null)
+{
+    Console.WriteLine($"[br] подключаюсь по CDP: {attachTo}");
+    session = await DevDeck.Browser.BrowserSession.AttachAsync(attachTo);
+}
+else if (wantLocal)
+{
+    Console.WriteLine($"[br] поднимаю локальный Chromium{(headless ? " (headless)" : "")}"
+                      + (profileDir is null ? "" : $", профиль {profileDir}"));
+    Console.WriteLine("[br] отпечаток обычный — для боевых аккаунтов используйте --attach к профилю антидетекта");
+    session = await DevDeck.Browser.BrowserSession.LaunchAsync(headless, profileDir);
+}
+
+var instance = session?.Instance ?? new ZennoLab.CommandCenter.Instance();
+if (session is null)
+    Console.WriteLine("[br] браузера нет: ветки со страницей откажут (--browser или --attach)");
+
+var player = new XmlPlayer(project, instance, Console.WriteLine);
 var result = player.Play(tpl, Path.GetDirectoryName(Path.GetFullPath(path))!);
+
+if (session is not null) await session.DisposeAsync();
 
 Console.WriteLine();
 Console.WriteLine(result.Success
