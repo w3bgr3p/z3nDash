@@ -370,8 +370,46 @@ namespace DevDeck.Browser
         private readonly IPage _page;
         public PlaywrightDocument(IPage page) => _page = page;
 
+        /// <summary>
+        /// ZP-шный EvaluateScript принимает две формы, и переносимый код пользуется
+        /// обеими: тело функции с <c>return</c> (JsGet, GetViewportSize) и выражение,
+        /// значение которого нужно вернуть (JsClick и JsSet шлют IIFE, JsPost —
+        /// произвольный скрипт пользователя).
+        ///
+        /// Одним вызовом Playwright их не покрыть: сырая строка идёт как выражение и
+        /// отдаёт значение, но <c>return</c> на верхнем уровне для неё — синтаксическая
+        /// ошибка; обёртка <c>() =&gt; {…}</c> делает <c>return</c> рабочим, зато
+        /// значение выражения глотает.
+        ///
+        /// Поэтому сначала пробуем как выражение, а на синтаксической ошибке
+        /// оборачиваем и повторяем. Повтор безопасен: разбор падает до выполнения,
+        /// побочных эффектов от первой попытки не остаётся. Строку компилирует CDP,
+        /// а не страница, так что CSP тут ни при чём — eval мы не зовём.
+        /// </summary>
         public string EvaluateScript(string js)
-            => _page.EvaluateAsync<string>($"() => {{ {js} }}").GetAwaiter().GetResult() ?? "";
+        {
+            try
+            {
+                return Stringify(_page.EvaluateAsync(js).GetAwaiter().GetResult());
+            }
+            catch (PlaywrightException ex) when (ex.Message.Contains("SyntaxError"))
+            {
+                return Stringify(_page.EvaluateAsync($"() => {{ {js} }}").GetAwaiter().GetResult());
+            }
+        }
+
+        /// <summary>ZP отдаёт результат строкой, объекты — их JSON-представлением.</summary>
+        private static string Stringify(System.Text.Json.JsonElement? value)
+        {
+            if (value is not { } el) return "";
+            return el.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.Undefined => "",
+                System.Text.Json.JsonValueKind.Null      => "",
+                System.Text.Json.JsonValueKind.String    => el.GetString() ?? "",
+                _                                        => el.GetRawText(),
+            };
+        }
     }
 
     public sealed class PlaywrightElement : IHeElement
