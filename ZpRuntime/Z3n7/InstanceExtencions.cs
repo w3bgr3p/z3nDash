@@ -11,9 +11,9 @@
 // обёртка над IBrowserInstance, так что нижний слой не изменился. Единственный
 // вызывающий, Web3/Wallets/Rabby.cs, переведён на Instance.
 //
-// Отступление одно — CtrlV, разобрано на месте: эталонный буфер обмена заменён
-// на Playwright Keyboard.InsertText. Это тот случай, когда чинить в z3n7 нечего:
-// там обход отсутствия примитива в ZennoPoster, а у нас примитив есть.
+// Отличие от z3n7 одно — CtrlV: там вставка идёт через системный буфер и Ctrl+V,
+// здесь через Playwright Keyboard.InsertText. Контракт тот же, реализация наша;
+// заодно ушли поля под буфер, которые в z3n7 остаются нужны, а тут ни при чём.
 
 using System;
 using System.Collections.Generic;
@@ -29,13 +29,9 @@ namespace z3n7
 {
     public static partial class InstanceExtensions
     {
-        private static readonly object _clipboardLock = new object();
-        private static readonly SemaphoreSlim ClipboardSemaphore = new SemaphoreSlim(1, 1);
-        private static readonly object LockObject = new object();
         private static readonly Time.Sleeper _clickSleep = new Time.Sleeper(1008, 1337);
         private static readonly Time.Sleeper _inputSleep = new Time.Sleeper(1337, 2077);
-        private static Random _random = new Random();
-        
+
         private class ElementNotFoundException : Exception
         {
             public ElementNotFoundException(string message) : base(message) { }
@@ -457,18 +453,10 @@ namespace z3n7
             instance.UseFullMouseEmulation = emu;
         }
         
-        // Отступление от дословности, единственное в файле и намеренное.
-        //
-        // Эталон кладёт текст в системный буфер обмена и жмёт Ctrl+V, потому что
-        // в ZennoPoster другого способа вставить длинный текст нет: SetValue на
-        // больших строках работает плохо. Механизм чужой самой задаче — он
-        // затирает буфер пользователя, требует WinForms (то есть цели
-        // net10.0-windows) и сериализуется глобальной блокировкой.
-        //
-        // У Playwright для ровно этого есть Keyboard.InsertText: один input-event
-        // в элемент под фокусом, без клавиатуры и без буфера. Через
-        // IBrowserInstance он проброшен как Tab.InsertText. Поведение то же,
-        // побочных эффектов нет, и метод доступен на обеих целях сборки.
+        // Вставка длинного текста. Контракт тот же, реализация своя: под
+        // ZennoPoster приходится идти через системный буфер и Ctrl+V, потому что
+        // SetValue на больших строках работает плохо, а у Playwright для этого
+        // есть Keyboard.InsertText — один input-event в элемент под фокусом.
         public static void CtrlV(this Instance instance, string ToPaste)
         {
             instance.ActiveTab.InsertText(ToPaste);
