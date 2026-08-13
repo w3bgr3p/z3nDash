@@ -44,18 +44,20 @@ public sealed class BrowserSession : IAsyncDisposable
     private readonly IBrowser?        _browser;
     private readonly IBrowserContext? _ownedContext;
     private readonly bool             _owned;
+    private readonly ProxyRelay?      _relay;
 
     public PlaywrightInstance          Browser  { get; }
     public ZennoLab.CommandCenter.Instance Instance { get; }
     public IPage                       Page     { get; }
 
     private BrowserSession(IPlaywright? pw, IBrowser? browser, IBrowserContext? ownedContext,
-                           IPage page, bool owned, string proxy = "")
+                           IPage page, bool owned, string proxy = "", ProxyRelay? relay = null)
     {
         _pw           = pw;
         _browser      = browser;
         _ownedContext = ownedContext;
         _owned        = owned;
+        _relay        = relay;
 
         Page     = page;
         Browser  = new PlaywrightInstance(page) { Proxy = proxy };
@@ -107,9 +109,14 @@ public sealed class BrowserSession : IAsyncDisposable
 
         var pw = await Playwright.CreateAsync();
 
-        var proxySettings = string.IsNullOrWhiteSpace(proxy)
+        // Chromium не умеет авторизацию SOCKS5, поэтому такой прокси уходит
+        // браузеру через локальный релей — то же, что делает ZP-шный proxifier.
+        var relay = ProxyRelay.StartIfNeeded(proxy);
+        var forBrowser = relay?.Endpoint ?? proxy;
+
+        var proxySettings = string.IsNullOrWhiteSpace(forBrowser)
             ? null
-            : new Proxy { Server = proxy.Contains("://") ? proxy : $"http://{proxy}" };
+            : new Proxy { Server = forBrowser.Contains("://") ? forBrowser : $"http://{forBrowser}" };
 
         Directory.CreateDirectory(profileDir);
 
@@ -125,7 +132,32 @@ public sealed class BrowserSession : IAsyncDisposable
             });
 
         var page = ctx.Pages.FirstOrDefault() ?? await ctx.NewPageAsync();
-        return new BrowserSession(pw, null, ctx, page, owned: true, proxy: proxy ?? "");
+        // Proxy держим исходный, с авторизацией: SetProxy сверяет то, что просит
+        // шаблон, а не адрес нашей петли.
+        return new BrowserSession(pw, null, ctx, page, owned: true, proxy: proxy ?? "", relay: relay);
+    }
+
+    /// <summary>
+    /// Привести ZP-шную строку прокси к виду, который понимает Playwright.
+    /// В шаблонах она чаще всего записана как host:port:user:pass — так лежит и
+    /// в переменной proxy у simroute_test. Схема по умолчанию socks5: именно её
+    /// подставляют ветки, разбирая ту же строку.
+    /// </summary>
+    public static string NormalizeProxy(string? raw, string defaultScheme = "socks5")
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+
+        var v = raw.Trim();
+        if (v.Contains("://")) return v;          // уже готовая строка
+        if (v.Contains('@'))   return $"{defaultScheme}://{v}";
+
+        var p = v.Split(':', 4);
+        return p.Length switch
+        {
+            >= 4 => $"{defaultScheme}://{p[2]}:{p[3]}@{p[0]}:{p[1]}",
+            2    => $"{defaultScheme}://{p[0]}:{p[1]}",
+            _    => "",
+        };
     }
 
     public async ValueTask DisposeAsync()
@@ -136,6 +168,7 @@ public sealed class BrowserSession : IAsyncDisposable
             if (_browser      is not null) { try { await _browser.CloseAsync();      } catch { } }
         }
 
+        _relay?.Dispose();
         _pw?.Dispose();
     }
 }

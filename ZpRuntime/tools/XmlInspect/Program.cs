@@ -113,8 +113,17 @@ else if (wantLocal)
     Console.WriteLine($"[br] Patchright{(headless ? " (headless)" : "")}, профиль {profileDir}");
     if (headless)
         Console.WriteLine("[br] headless видно по десятку признаков — для живых аккаунтов запускайте без него");
-    if (proxy is not null) Console.WriteLine($"[br] прокси {proxy}");
-    session = await DevDeck.Browser.BrowserSession.LaunchAsync(profileDir, headless, proxy);
+    // Прокси браузера задаётся при запуске и на живом инстансе не меняется,
+    // поэтому берём его до старта: из флага, а иначе из переменной шаблона —
+    // ветки разбирают ту же строку и потом сверяют её через SetProxy.
+    var launchProxy = DevDeck.Browser.BrowserSession.NormalizeProxy(
+        proxy ?? tpl.Variables.GetValueOrDefault("proxy"));
+
+    if (launchProxy.Length > 0) Console.WriteLine($"[br] прокси {launchProxy}");
+    else Console.WriteLine("[br] без прокси — ветки с ProxySet откажут");
+
+    session = await DevDeck.Browser.BrowserSession.LaunchAsync(
+        profileDir, headless, launchProxy.Length > 0 ? launchProxy : null);
 }
 
 var instance = session?.Instance ?? new ZennoLab.CommandCenter.Instance();
