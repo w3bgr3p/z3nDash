@@ -32,32 +32,9 @@ namespace DevDeck.Browser
                 _activePage = pages[0];
         }
 
-        // ── SetCookie ─────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Принимает строку в формате ZP (tab-separated Netscape cookie format).
-        /// Каждая строка: domain \t includeSubdomains \t path \t secure \t expires \t name \t value
-        /// </summary>
-        public void SetCookie(string cookieString)
-        {
-            var cookies = new List<Cookie>();
-            foreach (var line in cookieString.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var p = line.Split('\t');
-                if (p.Length < 7) continue;
-                cookies.Add(new Cookie
-                {
-                    Domain  = p[0],
-                    Path    = p[2],
-                    Secure  = p[3].Equals("TRUE", StringComparison.OrdinalIgnoreCase),
-                    Name    = p[5],
-                    Value   = p[6],
-                    SameSite = SameSiteAttribute.None
-                });
-            }
-            if (cookies.Count > 0)
-                Sync(_context.AddCookiesAsync(cookies));
-        }
+        // SetCookie перенесён к SaveCookie в PlaywrightInstance.cs: там он
+        // разбирает и Netscape, и JSON, а держать половину формата отдельно от
+        // выгрузки — способ снова их развести.
 
         // ── SaveRequestHeadersToVariable ──────────────────────────────────────
 

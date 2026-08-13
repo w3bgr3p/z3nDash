@@ -71,10 +71,110 @@ namespace DevDeck.Browser
                 Sync(_context.ClearCookiesAsync(new BrowserContextClearCookiesOptions { Domain = domain }));
         }
 
+        /// <summary>
+        /// Выгрузка cookie в том же виде, в каком их ждёт перенесённый код: JSON-массив
+        /// с domain, path, сроком и флагами.
+        ///
+        /// Раньше сюда писалась строка "name=value; name=value". Она не падала, но
+        /// не читалась ничем: Rqst.GetCookiesForRequest разбирает переменную cookies
+        /// как JArray и берёт cookie["domain"], а Cookies.ConvertCookieFormat на такой
+        /// строке бросает «Unknown input format». То есть SaveCookies отрабатывал
+        /// «успешно», а сессия терялась — вместе с доменом, сроком и httpOnly.
+        /// </summary>
         public void SaveCookie(string path)
         {
             var cookies = Sync(_context.CookiesAsync());
-            File.WriteAllText(path, string.Join("; ", cookies.Select(c => $"{c.Name}={c.Value}")));
+
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(
+                cookies.Select(c => new
+                {
+                    domain         = c.Domain,
+                    expirationDate = c.Expires < 0 ? (double?)null : c.Expires,
+                    hostOnly       = !c.Domain.StartsWith("."),
+                    httpOnly       = c.HttpOnly,
+                    name           = c.Name,
+                    path           = c.Path,
+                    sameSite       = c.SameSite.ToString(),
+                    secure         = c.Secure,
+                    session        = c.Expires < 0,
+                    value          = c.Value,
+                }),
+                Newtonsoft.Json.Formatting.Indented);
+
+            File.WriteAllText(path, json);
+        }
+
+        /// <summary>
+        /// Обратная операция: восстановить cookie из того же JSON. В ZP это
+        /// Instance.SetCookie, и им пользуются шаблоны, поднимающие сохранённую
+        /// сессию. Принимается и строка "name=value; …" — с ней домен берётся из
+        /// текущей вкладки, потому что в самой строке его нет.
+        /// </summary>
+        public void SetCookie(string cookies)
+        {
+            if (string.IsNullOrWhiteSpace(cookies)) return;
+
+            var list = new List<Cookie>();
+            var text = cookies.Trim();
+
+            if (text.StartsWith("["))
+            {
+                foreach (var c in Newtonsoft.Json.Linq.JArray.Parse(text))
+                {
+                    var name = c["name"]?.ToString();
+                    if (string.IsNullOrEmpty(name)) continue;
+
+                    list.Add(new Cookie
+                    {
+                        Name     = name,
+                        Value    = c["value"]?.ToString() ?? "",
+                        Domain   = c["domain"]?.ToString(),
+                        Path     = c["path"]?.ToString() ?? "/",
+                        Expires  = c["expirationDate"] is { } exp && exp.Type != Newtonsoft.Json.Linq.JTokenType.Null
+                                       ? (float)exp.ToObject<double>() : -1,
+                        HttpOnly = c["httpOnly"]?.ToObject<bool>(),
+                        Secure   = c["secure"]?.ToObject<bool>(),
+                    });
+                }
+            }
+            else if (text.Contains('\t'))
+            {
+                // Netscape: domain, includeSubdomains, path, secure, expires,
+                // name, value — через табуляцию. Этот разбор лежал отдельно в
+                // CanvasExtensions.cs; держать половину формата в стороне от
+                // выгрузки — способ снова их развести.
+                foreach (var line in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var f = line.Split('\t');
+                    if (f.Length < 7) continue;
+                    list.Add(new Cookie
+                    {
+                        Domain = f[0],
+                        Path   = f[2],
+                        Secure = f[3].Equals("TRUE", StringComparison.OrdinalIgnoreCase),
+                        Name   = f[5],
+                        Value  = f[6],
+                    });
+                }
+            }
+            else
+            {
+                var host = new Uri(_activePage.Url).Host;
+                foreach (var pair in text.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var kv = pair.Split('=', 2);
+                    if (kv.Length < 2) continue;
+                    list.Add(new Cookie
+                    {
+                        Name   = kv[0].Trim(),
+                        Value  = kv[1].Trim(),
+                        Domain = host,
+                        Path   = "/",
+                    });
+                }
+            }
+
+            if (list.Count > 0) Sync(_context.AddCookiesAsync(list));
         }
 
         public void WaitFieldEmulationDelay() => Thread.Sleep(new Random().Next(1337, 2077));
