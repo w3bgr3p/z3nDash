@@ -20,6 +20,22 @@ namespace DevDeck.Browser
         {
             _context    = page.Context;
             _activePage = page;
+
+            // Новые вкладки тоже должны попадать под сбор, если он включён.
+            _context.Page += (_, p) => { if (_useTraffic) TrafficCapture.Enable(p); };
+        }
+
+        private bool _useTraffic;
+
+        public bool UseTrafficMonitoring
+        {
+            get => _useTraffic;
+            set
+            {
+                _useTraffic = value;
+                if (!value) return;
+                foreach (var p in _context.Pages) TrafficCapture.Enable(p);
+            }
         }
 
         public IBrowserTab ActiveTab => new PlaywrightTab(_activePage);

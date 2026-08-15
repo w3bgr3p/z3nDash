@@ -11,6 +11,13 @@ namespace DevDeck.Browser
 
         // ── Эмуляция ──────────────────────────────────────────────────────────
         bool   UseFullMouseEmulation { get; set; }
+
+        /// <summary>
+        /// Копить трафик вкладок. В ZP это свойство инстанса, и перенесённый
+        /// z3n7.Traffic включает его в конструкторе — значит включение обязано
+        /// начинать сбор, а не просто запоминать флаг.
+        /// </summary>
+        bool   UseTrafficMonitoring  { get; set; }
         string EmulationLevel        { get; }   // "none" | "superEmulation"
 
         // ── Профиль ───────────────────────────────────────────────────────────

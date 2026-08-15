@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +22,14 @@ namespace DevDeck.Browser
         private const int MaxItems = 500;
 
         private static readonly ConditionalWeakTable<IPage, ConcurrentQueue<TrafficEntry>> _buffers = new();
+
+        /// <summary>
+        /// Начать копить трафик страницы. Зовётся из UseTrafficMonitoring: до этой
+        /// правки подписка ставилась только первым обращением к Get, и всё, что
+        /// произошло раньше, терялось — а перенесённый z3n7.Traffic именно так и
+        /// устроен: включает мониторинг в конструкторе, а спрашивает потом.
+        /// </summary>
+        internal static void Enable(IPage page) => Subscribe(page);
 
         internal static IList<ITrafficItem> Get(IPage page, IEnumerable<string> urlFilters)
         {

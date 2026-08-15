@@ -580,7 +580,15 @@ namespace ZennoLab.CommandCenter
 
         // Свойства эмуляции: у нас за отпечаток отвечает профиль браузера, а не
         // instance, поэтому здесь они хранятся, но ни на что не влияют.
-        public bool   UseTrafficMonitoring { get; set; }
+        /// <summary>
+        /// Делегируется в браузер: раньше значение просто хранилось здесь, и
+        /// z3n7.Traffic, включающий сбор в конструкторе, не включал ничего.
+        /// </summary>
+        public bool UseTrafficMonitoring
+        {
+            get => Br.UseTrafficMonitoring;
+            set => Br.UseTrafficMonitoring = value;
+        }
         public string BrowserType          { get; set; } = "Chromium";
         public string WebGLPreferences     { get; set; } = "";
         public InterfacesLibrary.Enums.Browser.TimezoneMode TimezoneWorkMode { get; set; }
