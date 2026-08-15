@@ -393,7 +393,28 @@ namespace DevDeck.Browser
         public PlaywrightTab(IPage page) => _page = page;
 
         public string    URL          => _page.Url;
-        public bool      IsBusy       => false;
+
+        /// <summary>
+        /// Страница ещё грузится. Раньше здесь стояло «всегда false», и из-за
+        /// этого перенесённые Go и F5 не ждали загрузку вовсе: у них написано
+        /// «if (ActiveTab.IsBusy) ActiveTab.WaitDownloading()», и условие никогда
+        /// не выполнялось. То же в Canvas.cs перед каждым скриншотом.
+        ///
+        /// readyState — то же, на что смотрит ZP: complete значит загрузка
+        /// закончена. Обращение к странице, которая как раз меняет документ,
+        /// бросает — в этот момент она точно занята.
+        /// </summary>
+        public bool IsBusy
+        {
+            get
+            {
+                try
+                {
+                    return Sync(_page.EvaluateAsync<string>("() => document.readyState")) != "complete";
+                }
+                catch { return true; }
+            }
+        }
         public IDocument MainDocument => new PlaywrightDocument(_page);
         public ITouch    Touch        => new PlaywrightTouch(_page);
 
@@ -442,9 +463,20 @@ namespace DevDeck.Browser
             _mousePos = new System.Drawing.Point(x, y);
         }
 
+        /// <summary>
+        /// Движение мыши с промежуточными точками. Один MoveAsync без Steps даёт
+        /// телепорт: курсор оказывается в цели, не побывав между — а метод
+        /// называется FullEmulation, и вызывающий код на эту эмуляцию
+        /// рассчитывает. Число шагов берём от расстояния, чтобы короткий сдвиг не
+        /// растягивался на десятки событий.
+        /// </summary>
         public void FullEmulationMouseMove(int toX, int toY)
         {
-            Sync(_page.Mouse.MoveAsync(toX, toY));
+            int dx = toX - _mousePos.X, dy = toY - _mousePos.Y;
+            int distance = (int)Math.Sqrt(dx * dx + dy * dy);
+            int steps = Math.Clamp(distance / 12, 6, 40);
+
+            Sync(_page.Mouse.MoveAsync(toX, toY, new MouseMoveOptions { Steps = steps }));
             _mousePos = new System.Drawing.Point(toX, toY);
         }
 
