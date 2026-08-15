@@ -49,7 +49,15 @@ public readonly record struct BranchRef(string StepId, string BranchId)
         return parts.Length < 2 ? None : new BranchRef(parts[0].Trim(), parts[1].Trim());
     }
 
-    public override string ToString() => IsNone ? "—" : $"{StepId[..8]}|{BranchId[..8]}";
+    /// <summary>
+    /// Короткая запись для лога. Обрезка обязана переживать короткий
+    /// идентификатор: ZP пишет GUID, но шаблон может быть собран руками, и
+    /// падать в строке лога — худшее, что может делать диагностика.
+    /// </summary>
+    public override string ToString()
+        => IsNone ? "—" : $"{Short(StepId)}|{Short(BranchId)}";
+
+    private static string Short(string id) => id.Length <= 8 ? id : id[..8];
 }
 
 /// <summary>
