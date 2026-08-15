@@ -57,10 +57,22 @@ namespace DevDeck.Browser
 
         public void SetActivePage(IPage page) => _activePage = page;
 
+        /// <summary>
+        /// Закрыть лишние вкладки, оставив первую.
+        ///
+        /// Раньше активная вкладка не переставлялась: если активной была одна из
+        /// закрытых, инстанс продолжал на неё смотреть. URL при этом ещё
+        /// возвращался — Playwright держит его на своей стороне, — а любое
+        /// действие падало с «Target page, context or browser has been closed»,
+        /// причём уже далеко от места, где вкладку закрыли.
+        /// </summary>
         public void CloseAllTabs()
         {
-            foreach (var p in _context.Pages.Skip(1).ToList())
+            var pages = _context.Pages.ToList();
+            foreach (var p in pages.Skip(1))
                 Sync(p.CloseAsync());
+
+            if (pages.Count > 0) _activePage = pages[0];
         }
 
         /// <summary>

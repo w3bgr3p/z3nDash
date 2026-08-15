@@ -54,8 +54,8 @@ python ZpRuntime/tools/ext_inventory.py
 | `RiseEvent(event, emulation)` | клик мышью с эмуляцией уровня инстанса | **проверено** | 2026-08-13: обработчик на странице видит `isTrusted: true` |
 | `SetValue(value, mode, clear)` | `Full` — посимвольный набор с задержками | **проверено** | 2026-08-13: на ввод пяти символов страница получила шесть `keydown`, значение верное |
 | `Focus`, `ScrollIntoView` | как в ZP | не проверено | — |
-| `KeyEvent(key, type, modifier)` | нажатие клавиши | не проверено | — |
-| `InsertText(text)` | нашего контракта, под `CtrlV` | не проверено | — |
+| `KeyEvent(key, type, modifier)` | нажатие клавиши | **проверено** | 2026-08-13: `a` дописалась в поле |
+| `InsertText(text)` | нашего контракта, под `CtrlV` | **проверено** | 2026-08-13: текст оказался в поле под фокусом |
 | `FullEmulationMouseMove` | движение с промежуточными точками | **проверено** | 2026-08-13: 41 событие `mousemove` за один вызов вместо одного |
 | `MouseClick`, `FullEmulationMouseWheel` | клик и колесо по координатам | не проверено | — |
 
@@ -71,10 +71,11 @@ python ZpRuntime/tools/ext_inventory.py
 | `InstallCrxExtension` | поставить расширение | отказ | было пустым телом |
 | `Tab.IsBusy` | страница ещё грузится | **проверено** | 2026-08-13: `document.open()` → `true`, `close()` → `false` |
 | `Tab.Handle` | в ZP это HWND окна вкладки | **известно неверный** | суррогат из `GetHashCode`; годится как ключ, но `Emulator.SendKey` с ним работать не будет. Зовёт его `ChromeExt.cs`, который ещё не перенесён |
-| `Tab.Domain`, `Tab.MainDomain` | хост и домен второго уровня | не проверено | `MainDomain` на `example.co.uk` даст `co.uk` |
+| `Tab.Domain`, `Tab.MainDomain` | хост и домен второго уровня | **проверено** | 2026-08-13 на `example.com`. Остаётся известный изъян: `example.co.uk` даст `co.uk` |
 | `Touch.Touch(x,y)` | тап | **проверено** | 2026-08-13: страница получила `touchstart`+`touchend` |
 | `Touch.SwipeBetween` | свайп | **проверено** | 2026-08-13: 34 `touchmove` между `touchstart` и `touchend` |
-| `NewTab`, `CloseAllTabs`, `SetActivePage` | вкладки | не проверено | — |
+| `NewTab`, `CloseAllTabs` | вкладки | **проверено** | 2026-08-13: `CloseAllTabs` оставлял активной закрытую вкладку — исправлено |
+| `SetActivePage` | сменить активную | не проверено | — |
 | `WaitDownloading` | дождаться загрузки страницы | **проверено** | 2026-08-13: на странице с опросом было 30 с и падение, стало 22 мс |
 | `WaitFieldEmulationDelay` | пауза между полями | не проверено | — |
 
@@ -84,7 +85,8 @@ python ZpRuntime/tools/ext_inventory.py
 |---|---|---|---|
 | `FindElementsByAttribute` с `SearchKind=regexp` | поиск по атрибуту регуляркой | **проверено** | 2026-08-13: `^btn-(a|b)$` находит ровно 2 из 4, `^btn-` — 3, `btn-c$` — 1 |
 | `FindElementById`, `FindElementByName`, `FindElementByXPath`, `FindChildByAttribute`, точный и `notext` поиск | остальные виды Finder | не проверено | — |
-| `GetAttribute`, `SetAttribute`, `RemoveAttribute`, `GetXPath`, `DrawToBitmap`, `RemoveChild` | доступ к элементу | не проверено | — |
+| `GetAttribute`, `SetAttribute`, `RemoveAttribute`, `GetXPath`, `DrawToBitmap`, `InnerText` | доступ к элементу | **проверено** | 2026-08-13: атрибут читается, пишется, удаляется; XPath `/html[1]/body[1]/div[1]`; скриншот отдаёт base64 |
+| `RemoveChild`, `FindChildByAttribute` | доступ к элементу | не проверено | — |
 | `EvaluateScript` | выполнить JS, вернуть результат | не проверено | переписан c0f5639: покрывал только одну из двух форм |
 
 ### Сеть
@@ -140,6 +142,37 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-13 — вкладки, атрибуты, клавиатура
+
+**`CloseAllTabs` оставлял активной закрытую вкладку.** Лишние закрывались верно,
+но `_activePage` продолжал смотреть на одну из них. URL при этом ещё
+возвращался — Playwright держит его у себя, — а первое же действие падало с
+«Target page, context or browser has been closed», причём далеко от места, где
+вкладку закрыли, и без всякой связи с ним.
+
+```
+до:    после CloseAllTabs → активная https://example.com/?t2   (закрыта)
+после: после CloseAllTabs → активная https://example.com/
+```
+
+Соседний `CloseExtraTabs` переставлял активную правильно — то есть один и тот же
+недосмотр был сделан в одном методе и не сделан в другом.
+
+**Остальное в блоке отработало верно** и переведено в «проверено»: `Domain`,
+`MainDomain`, `NewTab`, `GetAttribute`, `SetAttribute`, `RemoveAttribute`,
+`InnerText`, `GetXPath`, `DrawToBitmap`, `InsertText`, `KeyEvent`.
+
+```
+GetAttribute(data-x) = old → SetAttribute → new → RemoveAttribute → []
+InnerText=текст  XPath=/html[1]/body[1]/div[1]
+DrawToBitmap: 784 симв. base64
+после InsertText: [вставка]   после KeyEvent a: [вставкаa]
+```
+
+Известный изъян, чинить не стал: `MainDomain` берёт две последние части хоста,
+поэтому на `example.co.uk` вернёт `co.uk`. Правильно это решается списком
+публичных суффиксов, а его надо откуда-то брать.
 
 ### 2026-08-13 — макросы и ожидание загрузки
 
