@@ -341,7 +341,20 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
     }
 
     // Dynamic JSON — project.Json.FromString / project.Json.field
-    internal sealed class DynamicJson : System.Dynamic.DynamicObject
+    /// <summary>
+    /// ZP-шный project.Json — дерево разобранного ответа, по которому ходят через
+    /// dynamic: project.Json.user.name, project.Json.to[0].
+    ///
+    /// Класс был internal, а обращаются к нему через dynamic — и связывание
+    /// уважает доступность в точке вызова. Из другой сборки, то есть из любого
+    /// скрипта csx и из веток шаблона, project.Json.FromString падал с
+    /// «DynamicObject does not contain a definition for FromString». Внутри
+    /// ZpRuntime всё работало, поэтому Rqst с parse:true проблемы не показывал.
+    ///
+    /// Индексатора не было вовсе: project.Json.to[0] — так читает адрес письма
+    /// перенесённый FirstMail — не работал ни откуда.
+    /// </summary>
+    public sealed class DynamicJson : System.Dynamic.DynamicObject
     {
         private Newtonsoft.Json.Linq.JToken _root
             = Newtonsoft.Json.Linq.JValue.CreateNull();
@@ -355,15 +368,45 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
         public override bool TryGetMember(
             System.Dynamic.GetMemberBinder binder, out object result)
         {
-            result = null;
-            if (_root is Newtonsoft.Json.Linq.JObject obj)
+            // Отсутствующее поле отдаём пустым узлом, а не отказом: в ZP чтение
+            // несуществующего ключа не бросает, и код веток на это опирается.
+            var token = _root is Newtonsoft.Json.Linq.JObject obj ? obj[binder.Name] : null;
+
+            result = token is null ? new DynamicJson() : Wrap(token);
+            return true;
+        }
+
+        public override bool TryGetIndex(
+            System.Dynamic.GetIndexBinder binder, object[] indexes, out object result)
+        {
+            result = new DynamicJson();
+            if (indexes.Length != 1) return true;
+
+            if (_root is Newtonsoft.Json.Linq.JArray arr
+                && int.TryParse(indexes[0]?.ToString(), out var i)
+                && i >= 0 && i < arr.Count)
             {
-                var token = obj[binder.Name];
-                result = token == null ? (object)new DynamicJson() : Wrap(token);
-                return true;
+                result = Wrap(arr[i]);
             }
+            else if (_root is Newtonsoft.Json.Linq.JObject obj
+                     && obj[indexes[0]?.ToString() ?? ""] is { } byKey)
+            {
+                result = Wrap(byKey);
+            }
+
+            return true;
+        }
+
+        /// <summary>Чтобы string x = project.Json.field работало и на пустом узле.</summary>
+        public override bool TryConvert(System.Dynamic.ConvertBinder binder, out object result)
+        {
+            if (binder.Type == typeof(string)) { result = ToString(); return true; }
+            result = null;
             return false;
         }
+
+        /// <summary>Длина массива — ZP отдаёт её как Count.</summary>
+        public int Count => _root is Newtonsoft.Json.Linq.JArray a ? a.Count : 0;
 
         private static object Wrap(Newtonsoft.Json.Linq.JToken t)
         {
@@ -376,7 +419,7 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
                 case Newtonsoft.Json.Linq.JTokenType.Null:    return null;
                 default:
                     var d = new DynamicJson();
-                    d.FromString(t.ToString());
+                    d._root = t;
                     return d;
             }
         }

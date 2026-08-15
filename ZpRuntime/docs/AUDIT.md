@@ -75,19 +75,19 @@ python ZpRuntime/tools/ext_inventory.py
 | `Touch.Touch(x,y)` | тап | **проверено** | 2026-08-13: страница получила `touchstart`+`touchend` |
 | `Touch.SwipeBetween` | свайп | **проверено** | 2026-08-13: 34 `touchmove` между `touchstart` и `touchend` |
 | `NewTab`, `CloseAllTabs` | вкладки | **проверено** | 2026-08-13: `CloseAllTabs` оставлял активной закрытую вкладку — исправлено |
-| `SetActivePage` | сменить активную | не проверено | — |
+| `SetActivePage` | сменить активную | **проверено** | 2026-08-13 |
 | `WaitDownloading` | дождаться загрузки страницы | **проверено** | 2026-08-13: на странице с опросом было 30 с и падение, стало 22 мс |
-| `WaitFieldEmulationDelay` | пауза между полями | не проверено | — |
+| `WaitFieldEmulationDelay` | пауза между полями | **проверено** | 2026-08-13: 1793 мс, диапазон эталона |
 
 ### Поиск и чтение DOM
 
 | метод | что значит в ZP | статус | чем |
 |---|---|---|---|
 | `FindElementsByAttribute` с `SearchKind=regexp` | поиск по атрибуту регуляркой | **проверено** | 2026-08-13: `^btn-(a|b)$` находит ровно 2 из 4, `^btn-` — 3, `btn-c$` — 1 |
-| `FindElementById`, `FindElementByName`, `FindElementByXPath`, `FindChildByAttribute`, точный и `notext` поиск | остальные виды Finder | не проверено | — |
+| `FindElementById`, `FindElementByName`, `FindElementByXPath`, точный, `notext`, `fulltagname`, `innertext` | остальные виды Finder | **проверено** | 2026-08-13: каждый вид даёт ожидаемое число элементов |
 | `GetAttribute`, `SetAttribute`, `RemoveAttribute`, `GetXPath`, `DrawToBitmap`, `InnerText` | доступ к элементу | **проверено** | 2026-08-13: атрибут читается, пишется, удаляется; XPath `/html[1]/body[1]/div[1]`; скриншот отдаёт base64 |
 | `RemoveChild`, `FindChildByAttribute` | доступ к элементу | **проверено** | 2026-08-13: `RemoveChild` сносил родителя вместо потомка — исправлено |
-| `EvaluateScript` | выполнить JS, вернуть результат | не проверено | переписан c0f5639: покрывал только одну из двух форм |
+| `EvaluateScript` | выполнить JS, вернуть результат | **проверено** | 2026-08-13: обе формы (`return` и выражение), объект и `undefined`. Лишний ключ `$id` от сериализатора Playwright теперь снимается |
 
 ### Сеть
 
@@ -120,11 +120,11 @@ python ZpRuntime/tools/ext_inventory.py
 
 | метод | статус | чем |
 |---|---|---|
-| `StubProject.Variables/Lists/Tables` | не проверено | — |
+| `StubProject.Variables/Lists/Tables` | **проверено** | 2026-08-13: чтение, запись, `AddRange`, `Remove`, индексатор, `ContainsKey`, ячейки таблицы, `ListSync` в обе стороны |
 | `StubProject.Profile` | не проверено | расширен до личности целиком 4b9d9ac |
 | `StubProject.ExecuteMacro` | **проверено** | 2026-08-13: раскрывает Variable, Profile, Project, Environment — раньше знал одну подстановку |
 | `SendToLog` и перегрузки | не проверено | — |
-| `DynamicJson` | не проверено | — |
+| `DynamicJson` | **проверено** | 2026-08-13: был `internal`, из скриптов `FromString` падал; индексатора не было вовсе — исправлено |
 
 ## 5. Плеер — `ZpRuntime/Xml/`
 
@@ -142,6 +142,47 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-13 — project.Json был недоступен скриптам
+
+Главное здесь — `DynamicJson`, и дефект ровно того сорта, что ищет этот дневник,
+только наизнанку: он не молчал, он падал, но падал **не там, где проверяли**.
+
+**Класс был `internal`.** Обращаются к нему через `dynamic`, а связывание
+уважает доступность в точке вызова: из другой сборки — то есть из любого скрипта
+csx и из веток шаблона — `project.Json.FromString(json)` бросал
+«DynamicObject does not contain a definition for FromString». Внутри самого
+ZpRuntime всё работало, поэтому ни `Rqst` с `parse:true`, ни прогон шаблона
+проблемы не показывали.
+
+**Индексатора не было вовсе.** `project.Json.to[0]` — так перенесённый
+`FirstMail` читает адрес письма — не работал ниоткуда: `TryGetIndex` не
+реализован.
+
+Заодно: чтение отсутствующего ключа возвращало отказ связывания вместо пустого
+узла (в ZP оно не бросает), не было `TryConvert` в строку и `Count` для массива.
+
+```
+Json.user.name = Иван
+Json.n         = 42
+Json.user.tags[1] = b
+```
+
+**Списки и таблицы отработали верно**, включая `ListSync` из эталона в обе
+стороны и обращение к незаполненной ячейке.
+
+**Все виды Finder проверены**: точный, `notext`, `fulltagname`, `innertext` и
+текстом, и регуляркой, поиск по имени и по XPath.
+
+**`EvaluateScript` проверен в обеих формах** — с `return` и выражением. Нашлась
+мелочь: Playwright, отдавая объект, подмешивает свой служебный ключ `$id`,
+которого в объекте страницы нет. Скрипт, разбирающий результат через
+`JSON.parse` и перебирающий ключи, увидел бы лишнее поле. Снимается.
+
+```
+форма с return  → [2]        форма-выражение → [иифэ]
+объект          → [{"a":1}]  было [{"$id":"1","a":1}]
+```
 
 ### 2026-08-13 — пояс, прокрутка, потомки
 

@@ -645,8 +645,38 @@ namespace DevDeck.Browser
                 System.Text.Json.JsonValueKind.Undefined => "",
                 System.Text.Json.JsonValueKind.Null      => "",
                 System.Text.Json.JsonValueKind.String    => el.GetString() ?? "",
-                _                                        => el.GetRawText(),
+                _                                        => Clean(el.GetRawText()),
             };
+        }
+
+        /// <summary>
+        /// Playwright, отдавая объект, подмешивает служебный ключ "$id" своего
+        /// сериализатора. В исходном объекте страницы его нет, а скрипт, который
+        /// разберёт результат через JSON.parse, увидит лишнее поле и может на нём
+        /// споткнуться — например перебирая ключи. Убираем.
+        /// </summary>
+        private static string Clean(string json)
+        {
+            try
+            {
+                var token = Newtonsoft.Json.Linq.JToken.Parse(json);
+                Strip(token);
+                return token.ToString(Newtonsoft.Json.Formatting.None);
+            }
+            catch { return json; }
+
+            static void Strip(Newtonsoft.Json.Linq.JToken t)
+            {
+                if (t is Newtonsoft.Json.Linq.JObject o)
+                {
+                    o.Remove("$id");
+                    foreach (var prop in o.Properties().ToList()) Strip(prop.Value);
+                }
+                else if (t is Newtonsoft.Json.Linq.JArray a)
+                {
+                    foreach (var item in a) Strip(item);
+                }
+            }
         }
     }
 
