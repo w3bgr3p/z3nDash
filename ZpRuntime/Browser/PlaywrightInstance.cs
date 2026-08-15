@@ -25,6 +25,23 @@ namespace DevDeck.Browser
             _context.Page += (_, p) => { if (_useTraffic) TrafficCapture.Enable(p); };
         }
 
+        /// <summary>
+        /// CDP-сессия на страницу, одна и та же. Заводить новую на каждый вызов
+        /// нельзя: Emulation.setTimezoneOverride привязан к сессии, и второй
+        /// вызов с новой сессией падает с «Timezone override is already in
+        /// effect» — то есть SetTimezone работал ровно один раз за жизнь
+        /// страницы, а SetTimeFromDb зовут на каждом запуске.
+        /// </summary>
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IPage, ICDPSession> _cdp = new();
+
+        private ICDPSession Cdp()
+        {
+            if (_cdp.TryGetValue(_activePage, out var existing)) return existing;
+            var session = Sync(_context.NewCDPSessionAsync(_activePage));
+            _cdp.Add(_activePage, session);
+            return session;
+        }
+
         private bool _useTraffic;
 
         public bool UseTrafficMonitoring
@@ -87,8 +104,7 @@ namespace DevDeck.Browser
                     "ClearCache: очистка кеша по домену не поддерживается — " +
                     "CDP чистит его целиком. Для cookie конкретного домена есть ClearCookie.");
 
-            var cdp = Sync(_context.NewCDPSessionAsync(_activePage));
-            Sync(cdp.SendAsync("Network.clearBrowserCache"));
+            Sync(Cdp().SendAsync("Network.clearBrowserCache"));
         }
 
         public void ClearCookie(string domain = null)
@@ -245,7 +261,12 @@ namespace DevDeck.Browser
         {
             if (string.IsNullOrWhiteSpace(ianaName)) return;
 
-            var cdp = Sync(_context.NewCDPSessionAsync(_activePage));
+            var cdp = Cdp();
+
+            // Пустая строка снимает прежнюю подмену. Без этого повторный вызов
+            // отвергается: CDP считает, что подмена уже действует.
+            Sync(cdp.SendAsync("Emulation.setTimezoneOverride",
+                new Dictionary<string, object> { ["timezoneId"] = "" }));
             Sync(cdp.SendAsync("Emulation.setTimezoneOverride",
                 new Dictionary<string, object> { ["timezoneId"] = ianaName }));
         }
@@ -634,6 +655,9 @@ namespace DevDeck.Browser
         private readonly ILocator _loc;
         public PlaywrightElement(ILocator loc) => _loc = loc;
 
+        /// <summary>Нужен соседнему элементу в RemoveChild.</summary>
+        internal ILocator Locator => _loc;
+
         private static T    Sync<T>(Task<T> t) => t.GetAwaiter().GetResult();
         private static void Sync(Task t)        => t.GetAwaiter().GetResult();
 
@@ -766,6 +790,24 @@ namespace DevDeck.Browser
         }"));
 
         public IHeElement ParentElement  => new PlaywrightElement(_loc.Locator("xpath=.."));
-        public void RemoveChild(IHeElement child) => Sync(_loc.EvaluateAsync("el => el.remove()"));
+        /// <summary>
+        /// Удалить из этого элемента переданного потомка.
+        ///
+        /// Раньше аргумент просто игнорировался, а выполнялось el.remove() на
+        /// самом элементе — то есть вызов parent.RemoveChild(child) сносил
+        /// родителя вместе со всем содержимым. Молча: ошибки нет, дерево уже
+        /// другое, и падает потом совсем другой код, не нашедший родителя.
+        /// </summary>
+        public void RemoveChild(IHeElement child)
+        {
+            if (child is not PlaywrightElement pe)
+                throw new ArgumentException("ожидается элемент этого же браузера", nameof(child));
+
+            var handle = Sync(pe.Locator.ElementHandleAsync());
+            if (handle is null) return;
+
+            Sync(_loc.EvaluateAsync(
+                "(parent, c) => { if (c && parent.contains(c)) c.remove(); }", handle));
+        }
     }
 }

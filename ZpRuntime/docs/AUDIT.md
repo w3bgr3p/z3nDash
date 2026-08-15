@@ -53,17 +53,17 @@ python ZpRuntime/tools/ext_inventory.py
 |---|---|---|---|
 | `RiseEvent(event, emulation)` | клик мышью с эмуляцией уровня инстанса | **проверено** | 2026-08-13: обработчик на странице видит `isTrusted: true` |
 | `SetValue(value, mode, clear)` | `Full` — посимвольный набор с задержками | **проверено** | 2026-08-13: на ввод пяти символов страница получила шесть `keydown`, значение верное |
-| `Focus`, `ScrollIntoView` | как в ZP | не проверено | — |
+| `Focus`, `ScrollIntoView` | как в ZP | **проверено** | 2026-08-13: `activeElement` сменился, `scrollY` 0→2705 |
 | `KeyEvent(key, type, modifier)` | нажатие клавиши | **проверено** | 2026-08-13: `a` дописалась в поле |
 | `InsertText(text)` | нашего контракта, под `CtrlV` | **проверено** | 2026-08-13: текст оказался в поле под фокусом |
 | `FullEmulationMouseMove` | движение с промежуточными точками | **проверено** | 2026-08-13: 41 событие `mousemove` за один вызов вместо одного |
-| `MouseClick`, `FullEmulationMouseWheel` | клик и колесо по координатам | не проверено | — |
+| `MouseClick`, `FullEmulationMouseWheel` | клик и колесо по координатам | **проверено** | 2026-08-13: клик с `isTrusted: true`, колесо прокрутило на 500 |
 
 ### Состояние браузера
 
 | метод | что значит в ZP | статус | чем |
 |---|---|---|---|
-| `SetTimezone`, `SetIanaTimezone` | подменить пояс страницы | не проверено | исправлены 8c03be8: были **пустыми телами** |
+| `SetTimezone`, `SetIanaTimezone` | подменить пояс страницы | **проверено** | 2026-08-13: `Asia/Tokyo` даёт offset −540, затем −300 мин переключает на `America/Bogota`. Повторный вызов падал — исправлено |
 | `ClearCache` | очистить кеш | отказ по домену | исправлен 8c03be8: чистил cookie вместо кеша |
 | `ClearCookie(domain)` | удалить cookie | **проверено** | круговой прогон 2026-08-13: после вызова `document.cookie` пуст |
 | `SaveCookie(path)` | выгрузить cookie в файл | **проверено** | круговой прогон 2026-08-13 |
@@ -86,7 +86,7 @@ python ZpRuntime/tools/ext_inventory.py
 | `FindElementsByAttribute` с `SearchKind=regexp` | поиск по атрибуту регуляркой | **проверено** | 2026-08-13: `^btn-(a|b)$` находит ровно 2 из 4, `^btn-` — 3, `btn-c$` — 1 |
 | `FindElementById`, `FindElementByName`, `FindElementByXPath`, `FindChildByAttribute`, точный и `notext` поиск | остальные виды Finder | не проверено | — |
 | `GetAttribute`, `SetAttribute`, `RemoveAttribute`, `GetXPath`, `DrawToBitmap`, `InnerText` | доступ к элементу | **проверено** | 2026-08-13: атрибут читается, пишется, удаляется; XPath `/html[1]/body[1]/div[1]`; скриншот отдаёт base64 |
-| `RemoveChild`, `FindChildByAttribute` | доступ к элементу | не проверено | — |
+| `RemoveChild`, `FindChildByAttribute` | доступ к элементу | **проверено** | 2026-08-13: `RemoveChild` сносил родителя вместо потомка — исправлено |
 | `EvaluateScript` | выполнить JS, вернуть результат | не проверено | переписан c0f5639: покрывал только одну из двух форм |
 
 ### Сеть
@@ -142,6 +142,40 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-13 — пояс, прокрутка, потомки
+
+Два дефекта, и первый — мой собственный, из позавчерашней правки.
+
+**`SetTimezone` работал ровно один раз за жизнь страницы.** Я заводил новую
+CDP-сессию на каждый вызов, а `Emulation.setTimezoneOverride` привязан к сессии:
+второй вызов падал с «Timezone override is already in effect». `SetTimeFromDb`
+зовут на каждом запуске, так что до второго дошло бы сразу. Теперь сессия одна на
+страницу, и перед новым значением снимается прежняя подмена.
+
+```
+пояс до      : America/Cancun
+после Iana   : Asia/Tokyo      offset=-540
+после -300мин: America/Bogota  offset=300
+```
+
+**`RemoveChild` сносил родителя вместо потомка.** Аргумент просто игнорировался,
+а выполнялось `el.remove()` на самом элементе: вызов `parent.RemoveChild(child)`
+удалял `parent` со всем содержимым. Ошибки при этом нет — падает потом совсем
+другой код, не нашедший родителя, и связать одно с другим по симптому нельзя.
+
+**Остальное отработало верно:** `Focus`, `ScrollIntoView`, `MouseClick`,
+`FullEmulationMouseWheel`, `FindChildByAttribute`.
+
+```
+activeElement после Focus: i
+scrollY после ScrollIntoView: 2705      после колеса: 500
+MouseClick → isTrusted: true
+FindChildByAttribute: [ребёнок]   после RemoveChild: []
+```
+
+Второй раз за проверку находится дефект в том, что я сам недавно чинил. Правка
+без внешней проверки — это не правка, а предположение.
 
 ### 2026-08-13 — вкладки, атрибуты, клавиатура
 
