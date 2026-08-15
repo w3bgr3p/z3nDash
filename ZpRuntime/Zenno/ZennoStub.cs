@@ -464,13 +464,14 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
 
         // ── IZennoPosterProjectModel ──────────────────────────────────────────
 
-        public string ExecuteMacro(string macro)
-        {
-            // {-Environment.CurrentUser-} → имя текущего пользователя ОС
-            if (macro == "{-Environment.CurrentUser-}")
-                return Environment.UserName;
-            return macro;
-        }
+        /// <summary>
+        /// Раскрытие ZP-шных подстановок. Раньше здесь знали ровно один макрос,
+        /// {-Environment.CurrentUser-}, а всё прочее возвращалось текстом: код,
+        /// зовущий ExecuteMacro("{-Variable.acc0-}"), получал обратно саму строку
+        /// и работал с ней как со значением. Теперь тот же раскрыватель, что у
+        /// плеера шаблонов, — он один на оба входа.
+        /// </summary>
+        public string ExecuteMacro(string macro) => Macros.Expand(this, macro);
         
         
 

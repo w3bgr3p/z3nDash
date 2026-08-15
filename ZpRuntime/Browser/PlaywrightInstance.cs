@@ -490,8 +490,17 @@ namespace DevDeck.Browser
             _mousePos = new System.Drawing.Point(toX, toY);
         }
 
+        /// <summary>
+        /// Дождаться, пока страница догрузится. В ZP это именно загрузка
+        /// документа, а не тишина в сети.
+        ///
+        /// Раньше здесь стоял NetworkIdle, и на любой странице с опросом или
+        /// вебсокетом он не наступал никогда: вызов висел 30 секунд и падал по
+        /// таймауту. Пока IsBusy врал «не занята», путь был мёртвый и это не
+        /// проявлялось — а после его починки Go и F5 начали сюда заходить.
+        /// </summary>
         public void WaitDownloading()
-            => Sync(_page.WaitForLoadStateAsync(LoadState.NetworkIdle));
+            => Sync(_page.WaitForLoadStateAsync(LoadState.Load));
 
         public void KeyEvent(string key, string type, string modifier = "")
             => Sync(_page.Keyboard.PressAsync(string.IsNullOrEmpty(modifier) ? key : $"{modifier}+{key}"));
