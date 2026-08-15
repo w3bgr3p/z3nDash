@@ -77,7 +77,9 @@ public sealed class BrowserSession : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(wsEndpoint))
             throw new ArgumentException("пустой CDP-эндпоинт", nameof(wsEndpoint));
 
-        var pw      = await Playwright.CreateAsync();
+        var pw = await Playwright.CreateAsync();
+        RegexSelector.Register(pw);
+
         var browser = await pw.Chromium.ConnectOverCDPAsync(wsEndpoint);
 
         var context = browser.Contexts.FirstOrDefault()
@@ -108,6 +110,7 @@ public sealed class BrowserSession : IAsyncDisposable
                 "обычный Launch с отдельным контекстом детектируется", nameof(profileDir));
 
         var pw = await Playwright.CreateAsync();
+        RegexSelector.Register(pw);
 
         // Chromium не умеет авторизацию SOCKS5, поэтому такой прокси уходит
         // браузеру через локальный релей — то же, что делает ZP-шный proxifier.

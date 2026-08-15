@@ -82,7 +82,8 @@ python ZpRuntime/tools/ext_inventory.py
 
 | метод | что значит в ZP | статус | чем |
 |---|---|---|---|
-| `FindElementByAttribute`, `FindElementById`, `FindElementByName`, `FindElementByXPath`, `FindElementsByAttribute`, `FindChildByAttribute` | разбор ZP-шного Finder в локатор | не проверено | `BuildLocator` содержит осознанное приближение для `regexp` — помечено в коде |
+| `FindElementsByAttribute` с `SearchKind=regexp` | поиск по атрибуту регуляркой | **проверено** | 2026-08-13: `^btn-(a|b)$` находит ровно 2 из 4, `^btn-` — 3, `btn-c$` — 1 |
+| `FindElementById`, `FindElementByName`, `FindElementByXPath`, `FindChildByAttribute`, точный и `notext` поиск | остальные виды Finder | не проверено | — |
 | `GetAttribute`, `SetAttribute`, `RemoveAttribute`, `GetXPath`, `DrawToBitmap`, `RemoveChild` | доступ к элементу | не проверено | — |
 | `EvaluateScript` | выполнить JS, вернуть результат | не проверено | переписан c0f5639: покрывал только одну из двух форм |
 
@@ -139,6 +140,34 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-13 — поиск регуляркой
+
+**Поиск по `SearchKind="regexp"` был приближением, и приближением грубым.** XPath
+1.0 регулярок не знает, поэтому из шаблона брался самый длинный литеральный кусок
+и подставлялся в `contains()`. Для `^btn-(a|b)$` это «любой элемент, где в class
+есть btn-», то есть находились и `btn-c`, и `xbtn-a`.
+
+Само по себе это не падает — и потому опаснее всего: находится не тот элемент, а
+вместе с лишними совпадениями сдвигается `Number`, по которому ветка выбирает
+нужный. Клик уходит не туда молча.
+
+Насколько это важно, видно по самим шаблонам: `regexp` — не редкий случай, а
+половина поисков в `simroute_test` (6 из 12) и две трети в `numlex` (23 из 34),
+причём в основном по `class`.
+
+Теперь регулярка выполняется там, где ей и место — в самой странице. Playwright
+позволяет зарегистрировать свой движок селекторов; он живёт наравне с `css` и
+`xpath`, поэтому `Locator` остаётся ленивым и переживает перерисовку DOM
+(`RegexSelector.cs`).
+
+Проверено на четырёх `div` с классами `btn-a`, `btn-b`, `btn-c`, `xbtn-a`:
+
+```
+^btn-(a|b)$   → 2: A,B      (приближение дало бы 4)
+^btn-         → 3: A,B,C    (приближение дало бы 4)
+btn-c$        → 1: C
+```
 
 ### 2026-08-13 — касания
 

@@ -357,19 +357,13 @@ namespace DevDeck.Browser
 
             if (regexp)
             {
-                // XPath 1.0 регулярок не знает, поэтому это осознанное приближение:
-                // из регулярки берётся самый длинный литеральный кусок и ищется
-                // через contains(). Для якорей и альтернатив ('^btn-(a|b)$') поиск
-                // выйдет шире, чем задумано.
-                var literal = new Regex(@"[^\\.()\[\]{}+*?^$|]+")
-                    .Matches(pattern)
-                    .Cast<System.Text.RegularExpressions.Match>()
-                    .OrderByDescending(m => m.Length)
-                    .FirstOrDefault()?.Value ?? pattern;
-
-                string cond = $"contains(@{attr}, '{literal.Replace("'", "\\'")}')";
-                if (negate) cond = $"not({cond})";
-                return page.Locator(XPathTags(tag, cond));
+                // Регулярка выполняется в самой странице — см. RegexSelector.cs.
+                // Раньше здесь из шаблона брался самый длинный литеральный кусок
+                // и подставлялся в XPath contains(): "^btn-(a|b)$" находил и
+                // btn-c, и xbtn-a. Ветка при этом не падала — просто кликала не
+                // туда, потому что вместе с лишними совпадениями сдвигался
+                // Number, по которому выбирается нужный элемент.
+                return page.Locator(RegexSelector.Build(tag, attr, pattern, negate));
             }
 
             // Точное совпадение оставляем на CSS: в отличие от XPath его движок
