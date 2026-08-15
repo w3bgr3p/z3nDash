@@ -72,6 +72,8 @@ python ZpRuntime/tools/ext_inventory.py
 | `Tab.IsBusy` | страница ещё грузится | **проверено** | 2026-08-13: `document.open()` → `true`, `close()` → `false` |
 | `Tab.Handle` | в ZP это HWND окна вкладки | **известно неверный** | суррогат из `GetHashCode`; годится как ключ, но `Emulator.SendKey` с ним работать не будет. Зовёт его `ChromeExt.cs`, который ещё не перенесён |
 | `Tab.Domain`, `Tab.MainDomain` | хост и домен второго уровня | не проверено | `MainDomain` на `example.co.uk` даст `co.uk` |
+| `Touch.Touch(x,y)` | тап | **проверено** | 2026-08-13: страница получила `touchstart`+`touchend` |
+| `Touch.SwipeBetween` | свайп | **проверено** | 2026-08-13: 34 `touchmove` между `touchstart` и `touchend` |
 | `NewTab`, `CloseAllTabs`, `SetActivePage` | вкладки | не проверено | — |
 | `WaitDownloading` | дождаться загрузки файла | не проверено | — |
 | `WaitFieldEmulationDelay` | пауза между полями | не проверено | — |
@@ -137,6 +139,40 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-13 — касания
+
+**`Touch` вообще не работал.** Шёл через `Touchscreen.TapAsync`, а тот требует
+`HasTouch` у контекста — без него Playwright бросает
+«hasTouch must be enabled on the browser context». Наш persistent context его не
+включает, значит весь перенесённый код с `TapCenter`, `TapImg` и
+`SwipeFromCenter` падал на первом же вызове.
+
+**`SwipeBetween` слал мышь вместо касания.** Вызов проходил, ошибки не было, и в
+этом вся беда: страница, слушающая `touchstart` и `touchmove`, не получала
+ничего — свайп «отрабатывал» вхолостую. Счётчики до правки:
+
+```
+touchstart:0 touchmove:0 touchend:0   mousedown:1 mousemove:31 mouseup:1
+```
+
+Оба переведены на CDP `Input.dispatchTouchEvent` — настоящие события касания, и
+он не зависит от `HasTouch`. Сам флаг остаётся делом профиля: включать его на
+десктопном отпечатке нельзя, у обычного Chrome `maxTouchPoints` нулевой, и
+расхождение видно.
+
+```
+после Touch:        touchstart:1 touchmove:0  touchend:1
+после SwipeBetween: touchstart:2 touchmove:34 touchend:2
+```
+
+Мышиные события после тапа остались — их синтезирует сам браузер, как и при
+настоящем касании.
+
+Два раза пришлось переделывать сам тест, и оба раза он ломался о реальное
+поведение браузера, а не о код: первый тап попал в ссылку на `example.com` и увёл
+страницу, потом горизонтальный свайп от левого края Chrome принял за жест
+«назад». Заменено на свой документ без ссылок и вертикальный свайп.
 
 ### 2026-08-13 — трафик и запросы с сессией браузера
 

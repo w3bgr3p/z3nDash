@@ -238,30 +238,67 @@ namespace DevDeck.Browser
 
     // ── PlaywrightTouch ───────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Касания. Оба метода раньше врали по-разному.
+    ///
+    /// `Touch` шёл через `Touchscreen.TapAsync`, а тот требует `HasTouch` у
+    /// контекста — без него Playwright просто бросает. То есть весь перенесённый
+    /// код с `TapCenter`, `TapImg` и `SwipeFromCenter` падал на первом же вызове.
+    ///
+    /// `SwipeBetween` слал события **мыши**: `mousedown`, `mousemove`, `mouseup`.
+    /// Вызов проходил, ошибки не было, но страница, слушающая `touchstart` и
+    /// `touchmove`, не получала ничего — свайп «отрабатывал» вхолостую.
+    ///
+    /// Оба переведены на CDP `Input.dispatchTouchEvent`: он шлёт настоящие
+    /// события касания и не зависит от `HasTouch`. Сам флаг остаётся делом
+    /// профиля — включать его на десктопном отпечатке нельзя, `maxTouchPoints`
+    /// у обычного Chrome нулевой, и расхождение видно.
+    /// </summary>
     public sealed class PlaywrightTouch : ITouch
     {
         private readonly IPage _page;
         public PlaywrightTouch(IPage page) => _page = page;
 
         private static void Sync(System.Threading.Tasks.Task t) => t.GetAwaiter().GetResult();
+        private static T    Sync<T>(System.Threading.Tasks.Task<T> t) => t.GetAwaiter().GetResult();
+
+        private ICDPSession Cdp() => Sync(_page.Context.NewCDPSessionAsync(_page));
+
+        private static void Send(ICDPSession cdp, string type, int? x = null, int? y = null)
+        {
+            var points = x is null
+                ? new List<object>()
+                : [new Dictionary<string, object> { ["x"] = x, ["y"] = y }];
+
+            Sync(cdp.SendAsync("Input.dispatchTouchEvent", new Dictionary<string, object>
+            {
+                ["type"]        = type,
+                ["touchPoints"] = points,
+            }));
+        }
 
         public void Touch(int x, int y)
-            => Sync(_page.Touchscreen.TapAsync(x, y));
+        {
+            var cdp = Cdp();
+            Send(cdp, "touchStart", x, y);
+            System.Threading.Thread.Sleep(Random.Shared.Next(40, 110));
+            Send(cdp, "touchEnd");
+        }
 
         public void SwipeBetween(int x1, int y1, int x2, int y2)
         {
-            Sync(_page.Mouse.MoveAsync(x1, y1));
-            Sync(_page.Mouse.DownAsync());
+            var cdp = Cdp();
+            Send(cdp, "touchStart", x1, y1);
+
             int steps = Math.Max(10, (int)(Math.Sqrt(Math.Pow(x2 - x1, 2) + Math.Pow(y2 - y1, 2)) / 10));
             for (int i = 1; i <= steps; i++)
             {
-                double t  = (double)i / steps;
-                int    mx = (int)(x1 + (x2 - x1) * t);
-                int    my = (int)(y1 + (y2 - y1) * t);
-                Sync(_page.Mouse.MoveAsync(mx, my));
+                double t = (double)i / steps;
+                Send(cdp, "touchMove", (int)(x1 + (x2 - x1) * t), (int)(y1 + (y2 - y1) * t));
                 System.Threading.Thread.Sleep(5);
             }
-            Sync(_page.Mouse.UpAsync());
+
+            Send(cdp, "touchEnd");
         }
     }
 }
