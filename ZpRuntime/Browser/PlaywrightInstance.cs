@@ -327,7 +327,13 @@ namespace DevDeck.Browser
                 resp.Headers);
         }
 
-        public void CFSolve(int timeoutSeconds = 30)
+        /// <summary>
+        /// Нажать чекбокс Cloudflare, если он есть. Возвращает, удалось ли:
+        /// раньше метод был void и по истечении срока просто выходил, так что
+        /// вызывающий не отличал решённую капчу от несделанной и шёл дальше на
+        /// странице, которая его не пустила.
+        /// </summary>
+        public bool CFSolve(int timeoutSeconds = 30)
         {
             var deadline = DateTime.Now.AddSeconds(timeoutSeconds);
             while (DateTime.Now < deadline)
@@ -339,18 +345,20 @@ namespace DevDeck.Browser
                     try
                     {
                         var cb = cfFrame.Locator("input[type='checkbox']");
-                        if (Sync(cb.CountAsync()) > 0) { Sync(cb.ClickAsync()); Thread.Sleep(3000); return; }
+                        if (Sync(cb.CountAsync()) > 0) { Sync(cb.ClickAsync()); Thread.Sleep(3000); return true; }
                     }
                     catch { }
                 }
                 try
                 {
                     var verify = _activePage.Locator("text=Verify you are human");
-                    if (Sync(verify.CountAsync()) > 0) { Sync(verify.ClickAsync()); Thread.Sleep(3000); return; }
+                    if (Sync(verify.CountAsync()) > 0) { Sync(verify.ClickAsync()); Thread.Sleep(3000); return true; }
                 }
                 catch { }
                 Thread.Sleep(1000);
             }
+
+            return false;
         }
 
         /// <summary>

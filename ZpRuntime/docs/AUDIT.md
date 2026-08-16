@@ -39,8 +39,8 @@ python ZpRuntime/tools/ext_inventory.py
 
 | файл | отступление | статус | чем |
 |---|---|---|---|
-| `InstanceExtencions.cs` | `CtrlV` через `Keyboard.InsertText` вместо буфера обмена | не проверено | — |
-| `DbExtencions.cs` | `DbKey`, `TableCopy` под `#if WINDOWS` | не проверено | — |
+| `InstanceExtencions.cs` | `CtrlV` через `Keyboard.InsertText` вместо буфера обмена | **проверено** | 2026-08-13: длинный текст оказался в поле целиком |
+| `DbExtencions.cs` | `DbKey`, `TableCopy` под `#if WINDOWS` | **частично** | 2026-08-13: под net10.0-windows `DbKey` вызывается и доходит до запроса. Полная проверка требует базы с `_wlt` и ключами — не делал |
 | `Rqst.cs`, `NetHttp.cs` | отступлений нет | копия | diff |
 
 ## 2. Подложка — `ZpRuntime/Browser/PlaywrightInstance.cs`
@@ -96,7 +96,7 @@ python ZpRuntime/tools/ext_inventory.py
 | `SendFromBrowser` | запрос с сессией браузера | **проверено** | 2026-08-13: локальный сервер получил `Cookie: sess=zp7`, выставленный браузером |
 | `GetTraffic(filters)` | собранный трафик вкладки | **проверено** | 2026-08-13: после включения мониторинга видны запросы, сделанные до вызова |
 | `UseTrafficMonitoring` | включить сбор | **проверено** | 2026-08-13: было 0 запросов, стало 1 |
-| `CFSolve` | нашего контракта, обход Cloudflare | не проверено | — |
+| `CFSolve` | нашего контракта, обход Cloudflare | **проверено** | 2026-08-13: перехватом маршрута подставлен фрейм `challenges.cloudflare.com` — чекбокс нажат; текстовый вариант тоже. Был `void` и молчал о неудаче — теперь возвращает `bool` |
 
 ## 3. Подложка — `ZpRuntime/Zenno/CommandCenter.cs`
 
@@ -110,7 +110,7 @@ python ZpRuntime/tools/ext_inventory.py
 | `Instance.SetProxy` | **проверено** | 2026-08-13: тот же прокси принят, чужой отвергнут с указанием обоих, запись без схемы сверяется по host:port |
 | `Instance.GetProxy` | **проверено** | 2026-08-13 |
 | `Tab.*`, `HtmlElement.*` | **проверено через использование** | все прогоны с `HeClick`/`HeSet`/`HeGet` идут через эти обёртки — прямой проверки не делал |
-| `HtmlElementCollection.*` | не проверено | — |
+| `HtmlElementCollection.*` | **проверено** | 2026-08-13: `Count`, `IsVoid`, индексатор, `GetByNumber`, `IndexOf`, `AttributesToString` |
 | `ZennoPoster.AddTask`/`StartTask`/`TasksList` и прочее управление задачами | отказ | очереди ZP нет, планировщик свой |
 | `ZennoPoster.ImageProcessing*` | отказ | не реализовано |
 | `Instance.Launch`, `Reload`, `GetCookie`, `SetCookie`, `Tab.Stop` | отказ | — |
@@ -143,6 +143,59 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-13 — CFSolve, коллекция, CtrlV и находка в слое данных
+
+**`CFSolve` воспроизводится без живого Cloudflare** — я зря написал обратное.
+Перехват маршрута Playwright подставляет содержимое по адресу
+`challenges.cloudflare.com`, и фрейм получает нужный URL. Оба пути метода
+работают: и чекбокс во фрейме, и кнопка «Verify you are human».
+
+Дефект всё же нашёлся: метод был `void`. По истечении срока он просто выходил, и
+вызывающий не отличал решённую капчу от несделанной — шёл дальше на странице,
+которая его не пустила. Теперь возвращает `bool`.
+
+```
+фрейм-капча: чекбокс нажат=1 вернул=True  за 3430 мс
+текстовая:   кнопка нажата=1 вернул=True  за 7039 мс
+капчи нет:   вернул=False               за 10101 мс
+```
+
+**`HtmlElementCollection`** проверена целиком: `Count`, `IsVoid`, индексатор,
+`GetByNumber`, `IndexOf`, `AttributesToString`. **`CtrlV`** — отступление от
+эталона — вставляет длинный текст целиком.
+
+### ВАЖНО: в режиме SQLite запись уходит в никуда
+
+Это баг **эталона**, перенесённый дословно, и чинить его надо в z3n7. Но знать о
+нём нужно сейчас, потому что он тихий и полный.
+
+`DbCore.DbQ` открывает соединение так:
+
+```csharp
+using (var db = dbMode == "pgSQL" ? new Sql(dbSource) : new Sql(sqLitePath, null))
+```
+
+Путь к файлу берётся из **параметра** `sqLitePath`, а не из `dbSource`. Параметр
+по умолчанию `null`, и весь перенесённый слой — `DbGet`, `DbUpd`, `SqlGet`,
+`DbInsert` — зовёт `DbQ` без него. В результате каждый вызов открывает пустую
+безымянную базу, которая умирает вместе с соединением.
+
+Проверено прямо:
+
+```
+dbSource = …/devdeck-dbsource-check.sqlite
+CREATE TABLE probe → ошибки нет
+INSERT           → ошибки нет
+SELECT id FROM probe → [] и «no such table: probe»
+файл существует: False          ← база так и не создана
+
+тот же запрос с явным sqLitePath → [7], файл создан, размер 8192
+probe виден в реальной базе: 0   ← созданного там нет
+```
+
+То есть на SQLite запись молча уходит в никуда, а чтение сообщает «нет такой
+таблицы». В pgSQL всё в порядке: там строка подключения берётся из `dbSource`.
 
 ### 2026-08-13 — плеер: все типы веток на живой странице
 
