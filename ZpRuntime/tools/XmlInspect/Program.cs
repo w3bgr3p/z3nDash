@@ -1,4 +1,5 @@
-﻿using DevDeck.Xml;
+﻿using DevDeck;        // Macros переехал сюда вместе с ExecuteMacro
+using DevDeck.Xml;
 
 if (args.Length == 0)
 {
@@ -10,6 +11,8 @@ if (args.Length == 0)
     Console.WriteLine("  --profile   каталог профиля: куки, localStorage, отпечаток");
     Console.WriteLine("  --headless  только для разбора шаблона: headless видно по десятку признаков");
     Console.WriteLine("  --proxy     прокси браузера; задаётся при запуске, на живом инстансе не меняется");
+    Console.WriteLine("  --compile   компилирует общий код и каждую достижимую ветку OwnCode,");
+    Console.WriteLine("              ничего не исполняя: показывает, что шаблону не хватает");
     return 2;
 }
 
@@ -88,6 +91,74 @@ if (gaps.Count > 0)
     Console.WriteLine("не реализовано в плеере (достижимые ветки):");
     foreach (var g in gaps)
         Console.WriteLine($"  {g.Key.Type}/{g.Key.Action} — {g.Count()} шт.");
+}
+
+if (args.Contains("--compile"))
+{
+    Console.WriteLine();
+    Console.WriteLine("── компиляция ──────────────────────────────────────────");
+
+    var proj = new ZennoLab.InterfacesLibrary.ProjectModel.StubProject { Name = tpl.Name };
+    DevDeck.Xml.XmlCodeRunner runner;
+    try
+    {
+        runner = new DevDeck.Xml.XmlCodeRunner(
+            new DevDeck.Xml.XmlCodeGlobals { project = proj, instance = new ZennoLab.CommandCenter.Instance() },
+            Path.GetDirectoryName(Path.GetFullPath(path))!, tpl.OwnCode);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("общий код (CommonCode) не компилируется:");
+        Console.WriteLine(ex.Message);
+        return 1;
+    }
+
+    Console.WriteLine($"общий код: {(tpl.OwnCode.CommonCode.Length == 0 ? "пуст" : "компилируется")}");
+    if (runner.UnknownUsings.Count > 0)
+        Console.WriteLine($"нет пространств имён: {string.Join(", ", runner.UnknownUsings)}");
+    if (runner.Missing.Count > 0)
+        Console.WriteLine($"нет сборок из <References>: {string.Join(", ", runner.Missing)}");
+
+    int okCount = 0;
+    var bad = new List<(DevDeck.Xml.Branch b, string err)>();
+
+    foreach (var b in tpl.Steps.Where(x => !dead.Contains(x.Id)).SelectMany(x => x.Branches)
+                        .Where(x => x is { Type: "OwnCode", Action: "CSharp" }))
+    {
+        var src = b.Param("Code") ?? "";
+        if (string.IsNullOrWhiteSpace(src)) { okCount++; continue; }
+        try { runner.Compile(src); okCount++; }
+        catch (Exception ex) { bad.Add((b, ex.Message)); }
+    }
+
+    Console.WriteLine($"веток OwnCode: компилируется {okCount}, не компилируется {bad.Count}");
+
+    // Имена, которых не хватает, интереснее самих ошибок: они и есть остаток переноса.
+    var names = new SortedSet<string>(StringComparer.Ordinal);
+    foreach (var (_, err) in bad)
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                     err, @"name '([\w\.]+)' (?:could not be found|does not exist)"))
+            names.Add(m.Groups[1].Value);
+    var joined = string.Join(Environment.NewLine, bad.Select(x => x.err));
+    foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                 joined, @"namespace '([\w\.]+)'"))
+        names.Add(m.Groups[1].Value);
+
+    if (names.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("не хватает имён:");
+        foreach (var n in names) Console.WriteLine("   " + n);
+    }
+
+    foreach (var (b, err) in bad)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"  ветка «{b.Title}» {b.Ref}:");
+        foreach (var line in err.Split('\n')) Console.WriteLine("     " + line.TrimEnd());
+    }
+
+    return bad.Count == 0 ? 0 : 1;
 }
 
 if (!run) return gaps.Count == 0 ? 0 : 1;

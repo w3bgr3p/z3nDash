@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // XmlCodeRunner.cs — исполнение <Code> из веток OwnCode.
 //
 // Отличие от CsxExecutor только в источнике: там файл на диске и кеш по его
@@ -164,6 +164,33 @@ public sealed class XmlCodeRunner
         System.Reflection.Assembly.LoadFrom(dll);
 
         return Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(dll);
+    }
+
+    /// <summary>
+    /// Скомпилировать код ветки, не исполняя его. Нужен диагностике: так видно,
+    /// чего шаблону не хватает, без побочных действий — а они у веток настоящие,
+    /// вплоть до покупки номера и регистрации аккаунта.
+    /// </summary>
+    public void Compile(string source) => Prepare(source);
+
+    private Script<object> Prepare(string source)
+    {
+        return _cache.GetOrAdd(source, src =>
+        {
+            var s = CSharpScript.Create<object>(src, _options, globalsType: typeof(XmlCodeGlobals));
+
+            var errors = s.Compile()
+                .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                .Select(d => d.ToString())
+                .ToList();
+
+            if (errors.Count > 0)
+                throw new InvalidOperationException(
+                    "не компилируется:" + Environment.NewLine
+                    + string.Join(Environment.NewLine, errors));
+
+            return s;
+        });
     }
 
     public object? Run(string source, CancellationToken ct)
