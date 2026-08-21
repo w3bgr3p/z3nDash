@@ -1,4 +1,4 @@
-// scheduler.js
+﻿// scheduler.js
 
 // Safe wrappers for PageState (may not exist in standalone mode)
 var _PS = {
@@ -879,7 +879,11 @@ function renderSettings(s) {
         + '<input class="form-input" id="f_script_path" value="' + escHtml(s.script_path) + '" placeholder="/path/to/script or folder">'
         + '<div class="form-label">Executor</div>'
         + '<select class="form-input" id="f_executor">'
-        + ['python','node','ts-node','npm','exe','cmd','bat','bash','ps1','internal'].map(function(e) {
+        // csx, csx-internal и csx-zp7 планировщик умеет давно, но в списке их не было —
+        // задачу такого типа нельзя было завести из интерфейса. xml проигрывает
+        // шаблон ZennoPoster: путь указывается на .xml, браузер поднимается сам.
+        + ['python','node','ts-node','npm','exe','cmd','bat','bash','ps1',
+           'csx','csx-internal','csx-zp7','xml','internal'].map(function(e) {
             return '<option ' + (s.executor === e ? 'selected' : '') + '>' + e + '</option>';
         }).join('') + '</select>'
         + '<div class="form-label">Arguments</div>'

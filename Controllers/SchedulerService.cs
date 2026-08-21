@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -527,6 +527,111 @@ private static void SeedDefaults(Db db)
                 try { if (zb != null && !keepBrowser) await zb.ProfileDown(zbId); } catch { }
                 try { if (!keepBrowser) pw?.Dispose(); } catch { }
                 if (!released) try { ctx?.Release("fail"); } catch { }
+                cts.Dispose();
+                TryDrainOne(db, id);
+            }
+
+            return;
+        }
+        if (executor == "xml")
+        {
+            // Проигрывание шаблона ZennoPoster. Ветка стоит рядом с csx-zp7 не
+            // случайно: у них одна модель проекта и один слой z3n7, отличается
+            // только источник — там файл со скриптом, здесь граф из XML.
+            if (!File.Exists(scriptPath))
+            {
+                _log?.Error($"[{name}] xml template not found: {scriptPath}");
+                UpdateStatus(db, id, "error", firedAt, "-1", $"template not found: {scriptPath}", runId);
+                return;
+            }
+
+            UpdateStatus(db, id, "running", firedAt, "", "", runId);
+            var cts = new CancellationTokenSource();
+            var rp  = new RunningProcess(null, firedAt, cts, broadcast);
+            _running[instanceKey] = rp;
+
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine($"[LIVE] xml started id={id} name={name} run={runId} template={Path.GetFileName(scriptPath)}");
+            Console.ResetColor();
+
+            DevDeck.Browser.BrowserSession? session = null;
+            try
+            {
+                var project = new StubProject { Name = name, OnLog = rp.AddLine };
+                project.Variables["dbSource"].Value = db.Source;
+
+                var tpl = DevDeck.Xml.XmlTemplate.Load(scriptPath);
+
+                // Прокси задаётся при запуске браузера и на живом инстансе не
+                // меняется, поэтому берём его до старта — из поля задачи, а иначе
+                // из переменной самого шаблона.
+                var payload = string.IsNullOrWhiteSpace(args)
+                    ? record
+                    : JsonSerializer.Deserialize<Dictionary<string, string>>(
+                        Encoding.UTF8.GetString(Convert.FromBase64String(args))) ?? record;
+
+                var rawProxy = payload.GetValueOrDefault("proxy", "");
+                if (string.IsNullOrWhiteSpace(rawProxy))
+                    rawProxy = tpl.Variables.GetValueOrDefault("proxy", "");
+                var proxy = DevDeck.Browser.BrowserSession.NormalizeProxy(rawProxy);
+
+                var zbId = payload.GetValueOrDefault("zb_id", "");
+                if (!string.IsNullOrWhiteSpace(zbId))
+                {
+                    // Боевой путь: профиль ZennoBrowser со своим отпечатком.
+                    var ws = await new ZB(Config.ApiConfig.ZB).RunProfile(zbId);
+                    if (!string.IsNullOrWhiteSpace(ws))
+                        session = await DevDeck.Browser.BrowserSession.AttachAsync(ws);
+                }
+
+                if (session is null)
+                {
+                    // Профиль на задачу: имя может содержать точки и пробелы,
+                    // поэтому в путь идёт очищенное.
+                    var safe = string.Concat(name.Select(
+                        c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+                    var profileDir = Path.Combine(Path.GetTempPath(), "devdeck-xml", "profile-" + safe);
+                    rp.AddLine($"[br] Patchright, профиль {profileDir}"
+                               + (proxy.Length > 0 ? $", прокси {proxy}" : ", без прокси"));
+                    session = await DevDeck.Browser.BrowserSession.LaunchAsync(
+                        profileDir, headless: false, proxy: proxy.Length > 0 ? proxy : null);
+                }
+
+                var player = new DevDeck.Xml.XmlPlayer(project, session.Instance, rp.AddLine);
+                var res    = player.Play(tpl, Path.GetDirectoryName(Path.GetFullPath(scriptPath))!, cts.Token);
+
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+
+                if (!res.Success)
+                {
+                    rp.AddLine($"[ERR] прервано на ветке {res.FailedAt}: {res.Message}");
+                    RunLogger(scheduleTag, runId)?.Error($"[{name}] xml failed: {res.Message}");
+                    rp.Result = res.Message;
+                    _running.TryRemove(instanceKey, out _);
+                    UpdateStatus(db, id, "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
+                    FinishQueueEntry(db, queueUuid, "error", runId);
+                    return;
+                }
+
+                rp.Result = "ok";
+                RunLogger(scheduleTag, runId)?.Info($"[{name}] xml done run={runId}, веток {res.BranchesRun}");
+                _running.TryRemove(instanceKey, out _);
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
+                FinishQueueEntry(db, queueUuid, "done", runId);
+            }
+            catch (Exception ex)
+            {
+                rp.AddLine("[ERR] " + ex.Message);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                RunLogger(scheduleTag, runId)?.Error($"[{name}] xml failed: {ex.Message}");
+                rp.Result = ex.Message;
+                _running.TryRemove(instanceKey, out _);
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
+                FinishQueueEntry(db, queueUuid, "error", runId);
+            }
+            finally
+            {
+                if (session is not null) await session.DisposeAsync();
                 cts.Dispose();
                 TryDrainOne(db, id);
             }
