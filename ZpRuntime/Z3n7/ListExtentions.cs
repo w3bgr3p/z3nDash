@@ -1,8 +1,7 @@
-// Перенесено из z3n7/MethodExtensions/ListExtentions.cs.
+﻿// Перенесено из z3n7/MethodExtensions/ListExtentions.cs.
 // z3n7 — эталон поведения, поэтому копия дословная: так последующие сверки с
 // эталоном остаются механическими. Namespace тоже сохранён — код шаблонов
 // подключает z3n7 через using, и это должно продолжать работать.
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,33 +14,34 @@ namespace z3n7
     {
         [ThreadStatic]
         private static Random _random;
-
+        
         private static Random Random => _random ?? (_random = new Random());
 
         public static T Rnd<T>(this IList<T> list, bool remove = false)
         {
-            if (list.Count == 0)
+            if (list.Count == 0) 
                 throw new InvalidOperationException("List is empty");
 
-            var index = Random.Next(list.Count);
+            var index = Random.Next(list.Count); // ← используй property Random, не _random!
             var result = list[index];
             if (remove) list.RemoveAt(index);
             return result;
         }
     }
-
+    
     public static partial class ProjectExtensions
     {
+
         public static string RndFromList(this IZennoPosterProjectModel project, string listName, bool remove = false)
         {
             var localList = project.ListSync(listName);
-
+            
             var item = localList.Rnd(remove);
             if (remove)
                 project.ListSync(listName, localList);
             return item;
+          
         }
-
         public static List<string> ListSync(this IZennoPosterProjectModel project, string listName)
         {
             var projectList = project.Lists[listName];
@@ -51,8 +51,8 @@ namespace z3n7
                 localList.Add(item);
             }
             return localList;
+            
         }
-
         public static List<string> ListSync(this IZennoPosterProjectModel project, string listName, List<string> localList)
         {
             var projectList = project.Lists[listName];
@@ -61,15 +61,16 @@ namespace z3n7
             {
                 projectList.Add(item);
             }
-
+    
             return localList;
         }
-
+        
         public static List<string> ListFromFile(this IZennoPosterProjectModel project, string listName, string fileName)
         {
+            string web3prompts = $"{project.Path}.data\\web3prompts.txt";
             var prjList = project.Lists[listName];
             prjList.Clear();
-
+            
             var lines = File.ReadAllLines(fileName).ToList();
             try
             {
@@ -80,5 +81,9 @@ namespace z3n7
             }
             return lines;
         }
+
     }
+    
+   
+
 }

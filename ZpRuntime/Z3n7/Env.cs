@@ -2,7 +2,6 @@
 //
 // Понадобился под XML-плеер: CommonCode шаблона simroute_test зовёт
 // project.ReadEnv, и без него общий код проекта не компилируется.
-
 using System;
 using System.IO;
 using ZennoLab.InterfacesLibrary.ProjectModel;

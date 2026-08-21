@@ -1,4 +1,4 @@
-// Перенесено из z3n7/Essentials/Time.cs. Копия дословная.
+﻿// Перенесено из z3n7/Essentials/Time.cs. Копия дословная.
 //
 // ШАГ 1 из 2. Time и Logger в эталоне зависят друг от друга:
 //   ProjectExtensions.Deadline -> project.log   (расширение из Logger.cs)
@@ -7,9 +7,10 @@
 //
 // Заменяет наш класс Time из ZennoStub.cs: тот использовался только внутри
 // ZpRuntime, поэтому замена полная, а не сосуществование.
-
 using System;
+using System.CodeDom;
 using System.Globalization;
+using System.Linq.Expressions;
 using System.Threading;
 
 using ZennoLab.InterfacesLibrary.ProjectModel;
@@ -49,6 +50,7 @@ namespace z3n7
             private readonly int _max;
             private readonly Random _random;
 
+
             /// <param name="min">Min ms</param>
             /// <param name="max">Max ms</param>
             public Sleeper(int min, int max)
@@ -62,9 +64,10 @@ namespace z3n7
                 _min = min;
                 _max = max;
 
+
                 _random = new Random(Guid.NewGuid().GetHashCode());
             }
-
+            
             /// <param name="multiplier">Множитель для задержки (например, 2.0 = в 2 раза дольше)</param>
             public void Sleep(double multiplier = 1.0)
             {
@@ -73,13 +76,13 @@ namespace z3n7
             }
 
         }
-
+        
         public static string Now(string format = "unix") // unix|iso
         {
             if (format == "unix")
                 return ((long)((DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalMilliseconds))
                     .ToString(); //Unix Epoch
-            else if (format == "iso") return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"); // ISO 8601
+            else if (format == "iso") return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"); // ISO 8601 
             else if (format == "short") return DateTime.UtcNow.ToString("MM-ddTHH:mm");
             else if (format == "utcToId") return (DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ToString();
             throw new ArgumentException("Invalid format. Use: 'unix|iso|short|UtcNow'");
@@ -94,7 +97,7 @@ namespace z3n7
             }
             else if (input is string s && s == "nextH")
             {
-                t = new DateTime(t.Year, t.Month, t.Day, t.Hour, 0, 0).AddHours(1).AddMinutes(1);
+                t  = new DateTime(t.Year, t.Month, t.Day, t.Hour, 0, 0).AddHours(1).AddMinutes(1);
             }
             else if (input is decimal || input is int)
             {
@@ -163,8 +166,8 @@ namespace z3n7
 
         public static T Age<T>(this IZennoPosterProjectModel project, string var = null)
         {
-            var var0 = var ?? "varSessionId";
-
+            var var0 =  var ?? "varSessionId";
+            
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             long start;
             try
@@ -197,20 +200,37 @@ namespace z3n7
 
         public static void TimeOut(this IZennoPosterProjectModel project, int min = 0)
         {
-            if (min == 0)
+            if (min == 0) 
             {
                 try { min = int.Parse(project.Var("timeOut")); }
                 catch { throw new ArgumentException("timeout value not provided in project vars"); }
             }
-
+            
             if (project.TimeElapsed() > 60 * min)
                 throw new Exception($"GlobalTimeout {min}min, after {project.LastExecutedActionId}");
         }
 
-        // ProjectExtensions.Deadline перенесётся вместе с Logger — он вызывает
-        // project.log, а это расширение из Logger.cs.
+        public static int Deadline(this IZennoPosterProjectModel project, int sec = 0, bool log = false)
+        {
 
-        public static void StartSession(this IZennoPosterProjectModel project)
+            if (sec != 0)
+            {
+                var start = project.Variables["t0"].Value;
+                long currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                long startTime = long.Parse(start);
+                int difference = (int)(currentTime - startTime);
+                
+                if (difference > sec) throw new Exception($"Deadline Exception: {sec}s, after {project.LastExecutedActionId}");
+                if (log) project.log($"{difference}s");
+                return difference;
+            }
+            else
+            {
+                project.Variables["t0"].Value = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+                return 0;
+            }
+        }
+        public static void StartSession(this IZennoPosterProjectModel project) 
         {
             Thread.Sleep(new Random(Guid.NewGuid().GetHashCode()).Next(1000));
             project.Var("varSessionId", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString());

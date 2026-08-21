@@ -8,7 +8,6 @@
 //
 // Под перенос в Zenno/CommandCenter.cs добавлена перегрузка Tab.GetTraffic с
 // одним фильтром: эталон зовёт именно её.
-
 using System;
 using System.Collections.Generic;
 using System.Linq;

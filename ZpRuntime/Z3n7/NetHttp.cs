@@ -1,10 +1,9 @@
-// Перенесено из z3n7/Requests/NetHttp.cs. Файл уже был дословной копией
+﻿// Перенесено из z3n7/Requests/NetHttp.cs. Файл уже был дословной копией
 // эталона в namespace DevDeck, поэтому перенос свёлся к смене namespace.
 //
 // Отступление осталось одно: ((dynamic)_project.Json).FromString — каст ниже.
 // Обход SqlGet, стоявший здесь при переносе, снят вместе с DbExtencions.
 
-﻿
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

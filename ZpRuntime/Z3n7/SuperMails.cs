@@ -7,7 +7,6 @@
 // Заодно проверено, что перенесённые ранее AnyMessage, FirstMail и GMail
 // совпадают с их нынешним местом: они переехали из Api/ в Mail/, тела не
 // изменились.
-
 using System;
 using System.Collections.Generic;
 using System.Net;

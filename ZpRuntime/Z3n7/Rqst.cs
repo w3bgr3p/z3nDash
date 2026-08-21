@@ -6,7 +6,6 @@
 //
 // Отступлений нет. Три обхода DbGet, стоявшие здесь при переносе, сняты вместе
 // с переносом DbExtencions — теперь эталонный DbGet на месте.
-
 using System;
 using System.Collections.Generic;
 using System.Linq;

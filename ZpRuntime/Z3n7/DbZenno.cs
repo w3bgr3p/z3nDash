@@ -1,8 +1,6 @@
 ﻿// Перенесено из z3n7/Db/DbZenno.cs. Копия дословная.
 // Проектный конструктор для z3n7.Db — вторая часть partial-класса.
 
-
-
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
 namespace z3n7

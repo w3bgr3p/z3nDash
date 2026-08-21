@@ -15,7 +15,6 @@
 //   Sql(null, null).
 //   DbTable.EnsureTable игнорирует аргумент schema и всегда создаёт
 //   DbSchema.Process.
-
 using System;
 using System.Text;
 using System.Collections.Generic;

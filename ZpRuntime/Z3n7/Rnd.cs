@@ -3,7 +3,6 @@
 // Понадобился под XML-плеер: ветки шаблона зовут Rnd.RndPass() и присваивают
 // project.Profile.Password. Под это же IProfile в ZennoStub.cs расширен с трёх
 // полей до личности целиком — именно ей ZP заполняет формы через {-Profile.Name-}.
-
 using System;
 using System.Collections.Generic;
 using System.IO;

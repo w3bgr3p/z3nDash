@@ -1,4 +1,4 @@
-// Перенесено из z3n7/Essentials/Logger.cs. Копия дословная.
+﻿// Перенесено из z3n7/Essentials/Logger.cs. Копия дословная.
 //
 // Не заменяет DevDeck.Logger: тот приложенческий, этот проектно-скоупленный.
 // Привязка к project у эталона вынужденная — в ZennoPoster иначе логировать
@@ -6,7 +6,6 @@
 //
 // Сюда же возвращён ProjectExtensions.Deadline из Time.cs — он вызывает
 // project.log, из-за чего был отложен при переносе Time (13661ef).
-
 using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -217,7 +216,6 @@ namespace z3n7
 }
 
 // ── Extensions ────────────────────────────────────────────────────────────────
-
 namespace z3n7
 {
     public static partial class ProjectExtensions
@@ -231,7 +229,7 @@ namespace z3n7
         {
             if (Regex.IsMatch(caller, @"^M[a-f0-9]{32}$"))
                 caller = project.Name;
-            Logger.Get(project).Send(toLog, caller, show: show, toZp: toZp);
+            Logger.Get(project).Send(toLog, caller, show: show,  toZp: toZp);
         }
 
         public static void warn(
@@ -254,27 +252,6 @@ namespace z3n7
             var msg = withStack ? ex.Message + "\n" + ex.StackTrace : ex.Message;
             project.Var("err", msg);
             Logger.Get(project).Warn(msg, caller, show: true, thrw: thrw);
-        }
-
-        // Из Time.cs — отложен там, потому что вызывает project.log.
-        public static int Deadline(this IZennoPosterProjectModel project, int sec = 0, bool log = false)
-        {
-            if (sec != 0)
-            {
-                var start = project.Variables["t0"].Value;
-                long currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                long startTime = long.Parse(start);
-                int difference = (int)(currentTime - startTime);
-
-                if (difference > sec) throw new Exception($"Deadline Exception: {sec}s, after {project.LastExecutedActionId}");
-                if (log) project.log($"{difference}s");
-                return difference;
-            }
-            else
-            {
-                project.Variables["t0"].Value = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-                return 0;
-            }
         }
     }
 }

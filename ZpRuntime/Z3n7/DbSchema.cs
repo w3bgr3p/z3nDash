@@ -4,7 +4,6 @@
 // (расписания, клипы, кэши ИИ), этот — служебные таблицы z3n7. Namespace
 // разные, оба сосуществуют, как два Logger. Осторожно в файлах, куда попадут
 // оба using: TableSchema и DbSchema там станут неоднозначными.
-
 using System.Collections.Generic;
 
 namespace z3n7

@@ -8,7 +8,6 @@
 //
 // Слой сам по себе самостоятельный: DbExtencions его не зовёт, он ходит в Sql
 // напрямую. Здесь он ради скриптов, написанных под new Db(project).
-
 using System;
 using System.Text;
 using System.Collections.Generic;

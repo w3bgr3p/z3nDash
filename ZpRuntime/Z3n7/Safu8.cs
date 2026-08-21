@@ -1,4 +1,4 @@
-// Перенесено из z3n7/Essentials/Safu8.cs. Копия дословная.
+﻿// Перенесено из z3n7/Essentials/Safu8.cs. Копия дословная.
 //
 // Перенос завершён. Safu8 и Constantes в эталоне зависят друг от друга:
 //   SAFU.Decode/Encode/HWPass (статические, 2 аргумента) -> project.SecureVar
@@ -16,7 +16,6 @@
 // в составе HWID означало бы нечитаемые данные.
 
 #if WINDOWS
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -84,16 +83,12 @@ namespace z3n7
             }
         }
 
-        // Самописный PBKDF2-HMAC-SHA256. Совпадает с Rfc2898DeriveBytes
-        // байт-в-байт только при outputBytes <= 32: индекс блока записан как
-        // INT(1) жёстко, второй блок не считается. Обе стороны просят ровно 32,
-        // менять размер нельзя.
         static byte[] Pbkdf2Sha256(string password, byte[] salt, int iterations, int outputBytes)
         {
             using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(password)))
             {
                 var result = new byte[outputBytes];
-                var block = new byte[salt.Length + 4];
+                var block  = new byte[salt.Length + 4];
                 Array.Copy(salt, block, salt.Length);
                 block[salt.Length + 3] = 1;
                 var u = hmac.ComputeHash(block);
@@ -404,5 +399,4 @@ namespace z3n7
         }
     }
 }
-
 #endif

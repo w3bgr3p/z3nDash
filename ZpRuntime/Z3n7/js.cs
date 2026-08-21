@@ -8,7 +8,6 @@
 //
 // CenterMouse зовёт GetCenter из Canvas.cs; оттуда взят срез — см. Canvas.cs.
 
-
 using System;
 using System.Collections.Generic;
 using System.IO;

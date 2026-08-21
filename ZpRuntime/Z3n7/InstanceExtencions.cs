@@ -31,7 +31,7 @@ namespace z3n7
     {
         private static readonly Time.Sleeper _clickSleep = new Time.Sleeper(1008, 1337);
         private static readonly Time.Sleeper _inputSleep = new Time.Sleeper(1337, 2077);
-
+        
         private class ElementNotFoundException : Exception
         {
             public ElementNotFoundException(string message) : base(message) { }
@@ -221,7 +221,7 @@ namespace z3n7
                 try
                 {
                     HtmlElement he = instance.GetHe(obj, method);
-                    throw new Exception($"error detected: {atr}='{he.GetAttribute(atr)}'");
+                    throw new Exception(he.GetAttribute(atr));
                 }
                 catch (Exception ex)
                 {

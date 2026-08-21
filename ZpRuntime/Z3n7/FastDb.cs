@@ -4,8 +4,6 @@
 // Zenno/CommandCenter.cs добавлена реализация поверх ODBC. Ходит FastDb мимо
 // dbSource, своим DSN к файлу <project.Path>/<dbName>.sql.
 
-
-
 using System.Collections.Generic;
 using System.Linq;
 
@@ -50,9 +48,9 @@ namespace z3n7
         public string dbString(string query)
         {
 			
-			if (_log) _project.SendInfoToLog($"-> {query}");
+			if (_log) _project.SendInfoToLog($"-> {query}", true);
 			var resp = rawQ(query);
-			if (_log && resp.StartsWith("SELECT")) _project.SendInfoToLog($"<- {resp}");
+			if (_log && resp.StartsWith("SELECT")) _project.SendInfoToLog($"<- {resp}",true);
             return resp;
         }
 		

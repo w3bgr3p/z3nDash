@@ -4,7 +4,6 @@
 // Namespace здесь z3n7.Tools, то есть Tools у эталона не класс, а пространство
 // имён; наш одноимённый класс DevDeck.Tools удалён, иначе в файле с обоими
 // using имя Tools стало бы неоднозначным.
-
 using System;
 using System.Threading;
 using ZennoLab.InterfacesLibrary.ProjectModel;

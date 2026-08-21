@@ -5,7 +5,6 @@
 // Из Web3/StringExtentions.cs (namespace DevDeck) сняты StringToHex и
 // HexToString: они были посимвольной копией эталонных. Остальное там —
 // криптография адресов и ключей, эталонного аналога не имеет и остаётся нашим.
-
 using ZennoLab.InterfacesLibrary.ProjectModel;
 using Newtonsoft.Json;
 using System;

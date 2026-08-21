@@ -4,7 +4,6 @@
 // возвращал to, конструктор принимал готовый Logger вместо флага, прокси брался
 // из _api. Ни одной ссылки на GmailClient в репозитории не было, так что правок
 // на стороне вызова не понадобилось.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

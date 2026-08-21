@@ -5,7 +5,6 @@
 // (мы экранировали при подстановке, эталон — при загрузке ключей, и оставляет
 // пробел перед &password). Ради этого файл и переносится: ProjectExtensions
 // .OtpCode внизу — последний дубль из инвентаря, и он зовёт FirstMail.GetOTP.
-
 using System;
 using System.Text.RegularExpressions;
 
