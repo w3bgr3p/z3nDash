@@ -21,6 +21,7 @@ Web3/StringExtentions.cs — дословные копии эталонных, �
 """
 
 import argparse
+import difflib
 import os
 import re
 import sys
@@ -116,6 +117,56 @@ def normalize(type_name):
     return re.sub(r'[\w\.]*\.(\w+<)', r'\1', type_name).replace(' ', '')
 
 
+def read_lines(path):
+    """Строки файла без CR и BOM — сравнение не должно спотыкаться о перевод строки."""
+    try:
+        with open(path, encoding='utf-8-sig', errors='replace') as fh:
+            return [l.rstrip() for l in fh.readlines()]
+    except OSError:
+        return []
+
+
+def drift(ported_dir, z3n7_root):
+    """
+    Сверка дословных копий с эталоном.
+
+    Копии в ZpRuntime/Z3n7 начинаются с нашей шапки, поэтому сравнение идёт со
+    сдвигом: ищем строку, с которой начинается эталон, и от неё сверяем остаток.
+    Совпало — копия дословная; не совпало — либо помеченное отступление, либо
+    эталон ушёл вперёд, и это надо разбирать глазами.
+
+    Ради этой сверки всё и затевалось: за три недели без неё FastDb отстал от
+    эталона по существу, а ListExtentions и Time оказались не совсем дословными
+    с самого начала. Глазом такое не видно.
+    """
+    ref = {os.path.basename(f): f for f in cs_files(z3n7_root)}
+    exact, deviated, orphan = [], [], []
+
+    for f in sorted(cs_files(ported_dir)):
+        name = os.path.basename(f)
+        if name not in ref:
+            orphan.append(name)
+            continue
+
+        ours, theirs = read_lines(f), read_lines(ref[name])
+        if any(ours[n:] == theirs for n in range(0, 40)):
+            exact.append(name)
+            continue
+
+        first = theirs[0].strip() if theirs else ''
+        start = next((n for n in range(0, 40)
+                      if n < len(ours) and ours[n].strip() == first), 0)
+        d = [l for l in difflib.unified_diff(theirs, ours[start:], lineterm='', n=0)
+             if l[:1] in '+-' and not l.startswith(('+++', '---'))]
+        deviated.append((name,
+                         sum(1 for l in d if l[0] == '+'),
+                         sum(1 for l in d if l[0] == '-'),
+                         os.path.relpath(ref[name], z3n7_root).replace(os.sep, '/')))
+
+    return exact, deviated, orphan
+
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--z3n7', default=DEFAULT_Z3N7, help='корень проекта-ядра z3n7')
@@ -200,8 +251,25 @@ def main():
         rel = os.path.relpath(path, args.z3n7).replace(os.sep, '/')
         print(f'  {lines:>5} строк  {rel}')
 
-    print(f'\nитого к разрешению: {len(shared)}, из них с расхождением типа: {divergent}'
-          f'; типов под вопросом: {len(candidates)}; файлов без пары: {len(missing)}')
+    # Дрейф копий. Считается последним: это единственная секция, где «всё
+    # хорошо» означает буквально пустоту, а любая строка — повод открыть diff.
+    exact, deviated, orphan = drift(PORTED_DIR, args.z3n7)
+
+    print()
+    print(f'=== дословность копий: совпадают {len(exact)}, '
+          f'с отличиями {len(deviated)}, без пары {len(orphan)} ===')
+    for name, adds, dels, rel in deviated:
+        print(f'  {name:<26} +{adds} -{dels}   <- {rel}')
+    if orphan:
+        print('  без пары в эталоне: ' + ', '.join(orphan))
+    if deviated:
+        print('  каждая строка выше — либо помеченное отступление, либо ушедший')
+        print('  вперёд эталон; отличать надо diff-ом, счётчик этого не знает')
+
+    print()
+    print(f'итого к разрешению: {len(shared)}, из них с расхождением типа: {divergent}'
+          f'; типов под вопросом: {len(candidates)}; файлов без пары: {len(missing)}'
+          f'; копий с отличиями: {len(deviated)}')
     return 0
 
 
