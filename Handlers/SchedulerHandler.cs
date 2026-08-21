@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json;
 using DevDeck;
@@ -14,6 +14,7 @@ namespace DevDeck;
 ///   POST /scheduler/run      — запустить вручную немедленно
 ///   POST /scheduler/stop     — Kill процесса по id
 ///   GET  /scheduler/output   — last_output из БД по ?id=
+///   GET  /scheduler/pick     — системный диалог выбора файла или каталога
 /// </summary>
 public sealed class SchedulerHandler : IScriptHandler
 {
@@ -68,6 +69,7 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/scheduler/live-output"  && method == "GET")  { await LiveOutput(context);     return true; }
             if (path == "/scheduler/clear-output" && method == "POST") { await ClearOutput(context, db); return true; }
             if (path == "/scheduler/payload"      && method == "GET")  { await GetPayload(context, db); return true; }
+            if (path == "/scheduler/pick"         && method == "GET")  { await Pick(context);           return true; }
             if (path == "/scheduler/payload" && method == "POST")        { await SavePayload(context, db);             return true; }
             if (path == "/scheduler/process-stats" && method == "GET") { await ProcessStats(context); return true; }
             if (path == "/scheduler/instances"     && method == "GET")  { await Instances(context); return true; }
@@ -872,4 +874,104 @@ public sealed class SchedulerHandler : IScriptHandler
 
         return null;
     }
+
+    /// <summary>
+    /// Системный диалог выбора пути. Из страницы полный путь получить нельзя:
+    /// браузер отдаёт только имя файла, а планировщику нужен абсолютный путь.
+    /// Поэтому диалог открывает само приложение.
+    ///
+    /// Параметры: mode=file|folder, ext — подсказка для фильтра, start — откуда
+    /// начать. Отмена — не ошибка, возвращается пустой путь.
+    /// </summary>
+    private static async Task Pick(HttpListenerContext ctx)
+    {
+        var mode  = ctx.Request.QueryString["mode"]  ?? "file";
+        var ext   = ctx.Request.QueryString["ext"]   ?? "";
+        var start = ctx.Request.QueryString["start"] ?? "";
+
+        string picked;
+        try
+        {
+            picked = ShowPicker(mode, ext, start);
+        }
+        catch (Exception ex)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = ex.Message });
+            return;
+        }
+
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true, path = picked });
+    }
+
+#if WINDOWS
+    /// <summary>
+    /// Диалоги WinForms требуют STA, а запрос обрабатывается в потоке пула,
+    /// поэтому окно поднимается на отдельном потоке и мы ждём его закрытия.
+    /// Владелец — скрытая форма поверх остальных: иначе диалог уходит за окно
+    /// приложения и выглядит как зависание.
+    /// </summary>
+    private static string ShowPicker(string mode, string ext, string start)
+    {
+        var result = "";
+        var thread = new Thread(() =>
+        {
+            using var owner = new System.Windows.Forms.Form
+            {
+                TopMost       = true,
+                ShowInTaskbar = false,
+                Size          = new System.Drawing.Size(0, 0),
+                StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen,
+            };
+            owner.Show();
+            owner.Hide();
+
+            if (mode == "folder")
+            {
+                using var dialog = new System.Windows.Forms.FolderBrowserDialog();
+                if (Directory.Exists(start)) dialog.SelectedPath = start;
+                if (dialog.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK)
+                    result = dialog.SelectedPath;
+            }
+            else
+            {
+                using var dialog = new System.Windows.Forms.OpenFileDialog
+                {
+                    CheckFileExists = true,
+                    Filter          = FilterFor(ext),
+                };
+                var dir = Directory.Exists(start) ? start
+                        : File.Exists(start)      ? Path.GetDirectoryName(start)
+                        : null;
+                if (!string.IsNullOrEmpty(dir)) dialog.InitialDirectory = dir;
+
+                if (dialog.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK)
+                    result = dialog.FileName;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        return result;
+    }
+
+    /// <summary>Фильтр по типу задачи — чтобы не искать .xml среди всего подряд.</summary>
+    private static string FilterFor(string ext) => ext switch
+    {
+        "xml"     => "Шаблон ZennoPoster (*.xml)|*.xml|Все файлы (*.*)|*.*",
+        "csx"     => "Скрипт C# (*.csx)|*.csx|Все файлы (*.*)|*.*",
+        "py"      => "Python (*.py)|*.py|Все файлы (*.*)|*.*",
+        "js"      => "JavaScript (*.js;*.ts)|*.js;*.ts|Все файлы (*.*)|*.*",
+        "ps1"     => "PowerShell (*.ps1)|*.ps1|Все файлы (*.*)|*.*",
+        "exe"     => "Программа (*.exe)|*.exe|Все файлы (*.*)|*.*",
+        "cmd"     => "Пакетный файл (*.cmd;*.bat)|*.cmd;*.bat|Все файлы (*.*)|*.*",
+        "sh"      => "Shell (*.sh)|*.sh|Все файлы (*.*)|*.*",
+        _         => "Все файлы (*.*)|*.*",
+    };
+#else
+    private static string ShowPicker(string mode, string ext, string start)
+        => throw new PlatformNotSupportedException(
+            "Выбор пути через системный диалог доступен только в сборке под Windows.");
+#endif
+
 }

@@ -876,7 +876,11 @@ function renderSettings(s) {
         + '<div class="form-label">Name</div>'
         + '<input class="form-input" id="f_name" value="' + escHtml(s.name) + '">'
         + '<div class="form-label">Script / Task</div>'
-        + '<input class="form-input" id="f_script_path" value="' + escHtml(s.script_path) + '" placeholder="/path/to/script or folder">'
+        + '<div style="display:flex;gap:4px;">'
+        +   '<input class="form-input" id="f_script_path" style="flex:1;" value="' + escHtml(s.script_path) + '" placeholder="/path/to/script or folder">'
+        +   '<button type="button" class="btn sm" onclick="pickPath(&#39;file&#39;)" title="Выбрать файл">📄</button>'
+        +   '<button type="button" class="btn sm" onclick="pickPath(&#39;folder&#39;)" title="Выбрать каталог">📁</button>'
+        + '</div>'
         + '<div class="form-label">Executor</div>'
         + '<select class="form-input" id="f_executor">'
         // csx, csx-internal и csx-zp7 планировщик умеет давно, но в списке их не было —
@@ -1918,3 +1922,30 @@ window.addEventListener('resize', function() {
         topPanel.style.height = Math.max(100, rightCol.clientHeight - (hResizer.offsetHeight||0) - botPanel.offsetHeight) + 'px';
     }
 });
+
+// Системный диалог выбора пути. Из страницы полный путь получить нельзя —
+// браузер отдаёт только имя файла, — поэтому диалог открывает само приложение,
+// а сюда возвращается уже абсолютный путь. Отмена приходит пустой строкой и
+// поле не трогает.
+function pickPath(mode) {
+    var field = document.getElementById('f_script_path');
+    var exec  = (document.getElementById('f_executor') || {}).value || '';
+
+    var extByExec = {
+        'xml': 'xml', 'csx': 'csx', 'csx-internal': 'csx', 'csx-zp7': 'csx',
+        'python': 'py', 'node': 'js', 'ts-node': 'js', 'ps1': 'ps1',
+        'exe': 'exe', 'cmd': 'cmd', 'bat': 'cmd', 'bash': 'sh'
+    };
+
+    var url = '/scheduler/pick?mode=' + encodeURIComponent(mode)
+            + '&ext=' + encodeURIComponent(extByExec[exec] || '')
+            + '&start=' + encodeURIComponent(field.value || '');
+
+    fetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.ok)   { alert('Не удалось открыть диалог: ' + (d.error || '')); return; }
+            if (d.path)  { field.value = d.path; }
+        })
+        .catch(function(e) { alert('Не удалось открыть диалог: ' + e); });
+}
