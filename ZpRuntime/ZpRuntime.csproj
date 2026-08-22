@@ -47,17 +47,23 @@
         <PackageReference Include="OpenCvSharp4"                            Version="4.9.0.20240103" />
         <!-- Разбор HTML писем в перенесённом Api/AnyMessage.cs -->
         <PackageReference Include="HtmlAgilityPack"                         Version="1.12.4" />
-        <!-- Версии как в эталоне: Tools/Img.cs (SVG в растр) и
-             Browser/HtmlExtensions.cs (чтение QR с элемента) -->
-        <PackageReference Include="Svg"                                     Version="2.4.3" />
+        <!-- Tools/Img.cs (SVG в растр) и Browser/HtmlExtensions.cs (чтение QR
+             с элемента). Svg здесь 3.x, а не эталонный 2.4.3: у 2.4.3 есть
+             только сборки под .NET Framework, и NuGet тащил их в net10.0 через
+             режим совместимости (NU1701). Версия пакета — не поведение копии,
+             дословность от этого не страдает. -->
+        <PackageReference Include="Svg"                                     Version="3.4.8" />
         <PackageReference Include="ZXing.Net"                               Version="0.16.10" />
         <!-- ZXing.Net с .NET Core отдаёт только generic BarcodeReader<T>; чтение
              System.Drawing.Bitmap, как в эталоне, живёт в этом пакете. Он же
              тянет System.Drawing.Common, который нужен Tools/Img.cs. -->
         <PackageReference Include="ZXing.Net.Bindings.Windows.Compatibility" Version="0.16.12" />
-        <!-- Tools/SysAudit.cs читает счётчики производительности и службы Windows -->
-        <PackageReference Include="System.Diagnostics.PerformanceCounter"    Version="9.0.*" />
-        <PackageReference Include="System.ServiceProcess.ServiceController"  Version="9.0.*" />
+        <!-- Tools/SysAudit.cs читает счётчики производительности и службы Windows.
+             Версия ровно та, что стоит в DevDeck.csproj: библиотека не должна
+             тянуть приложение вверх — иначе NU1605 «package downgrade», и не
+             собирается уже приложение, а не мы. -->
+        <PackageReference Include="System.Diagnostics.PerformanceCounter"    Version="6.0.0" />
+        <PackageReference Include="System.ServiceProcess.ServiceController"  Version="6.0.0" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
