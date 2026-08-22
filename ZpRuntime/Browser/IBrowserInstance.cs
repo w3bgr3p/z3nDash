@@ -210,8 +210,17 @@ namespace DevDeck.Browser
         /// <summary>Скриншот элемента в base64 (ZP: DrawToBitmap).</summary>
         string    DrawToBitmap();
 
+        /// <summary>
+        /// Скриншот куска элемента в base64. В ZP это DrawPartAsBitmap и им
+        /// снимают QR-код с элемента — см. перенесённый HtmlExtensions.DecodeQr.
+        /// Координаты отсчитываются от левого верхнего угла самого элемента.
+        /// </summary>
+        string    DrawPartToBitmap(int x, int y, int width, int height);
+
         IHeElement ParentElement { get; }
         IHeElement FindChildByAttribute(string tag, string attr, string pattern, string mode, int index);
+        /// <summary>Прямые потомки с указанными тегами (ZP: FindChildrenByTags).</summary>
+        IEnumerable<IHeElement> FindChildrenByTags(string tags);
         void      RemoveChild(IHeElement child);
     }
 }

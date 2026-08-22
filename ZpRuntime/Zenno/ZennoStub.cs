@@ -136,6 +136,13 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
     public interface IContext
     {
         string SessionId { get; }
+
+        /// <summary>
+        /// Сумка значений на время выполнения шаблона. В ZP этим держат состояние
+        /// между ветками, не засоряя переменные проекта; у нас через неё ходит
+        /// перенесённый TrafficCounter. Отсутствующий ключ отдаёт null.
+        /// </summary>
+        object this[string key] { get; set; }
     }
 }
 
@@ -311,6 +318,20 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
     internal sealed class StubContext : IContext
     {
         public string SessionId { get; } = Guid.NewGuid().ToString("N");
+
+        // Один шаблон крутится в несколько потоков — сумка общая, значит с замком.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> _bag
+            = new(StringComparer.OrdinalIgnoreCase);
+
+        public object this[string key]
+        {
+            get => _bag.TryGetValue(key, out var v) ? v : null;
+            set
+            {
+                if (value is null) _bag.TryRemove(key, out _);
+                else               _bag[key] = value;
+            }
+        }
     }
 
     internal sealed class StubProfile : IProfile

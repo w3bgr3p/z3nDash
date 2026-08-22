@@ -838,6 +838,43 @@ namespace DevDeck.Browser
         public string DrawToBitmap()
             => Convert.ToBase64String(Sync(_loc.ScreenshotAsync()));
 
+        /// <summary>
+        /// ZP-шный DrawPartAsBitmap: кусок элемента, координаты от его левого
+        /// верхнего угла. Playwright умеет обрезать только по странице, поэтому
+        /// область смещается на положение элемента в документе.
+        /// </summary>
+        public string DrawPartToBitmap(int x, int y, int width, int height)
+        {
+            var box = Sync(_loc.BoundingBoxAsync())
+                      ?? throw new InvalidOperationException(
+                          "DrawPartAsBitmap: элемент не отрисован — нет геометрии");
+
+            var png = Sync(_loc.Page.ScreenshotAsync(new PageScreenshotOptions
+            {
+                Clip = new Clip
+                {
+                    X      = (float)box.X + x,
+                    Y      = (float)box.Y + y,
+                    Width  = width,
+                    Height = height,
+                },
+            }));
+
+            return Convert.ToBase64String(png);
+        }
+
+        public IEnumerable<IHeElement> FindChildrenByTags(string tags)
+        {
+            var list = (tags ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (list.Length == 0) list = new[] { "*" };
+            // Прямые потомки, а не любые вложенные: ZP считает по ним позицию
+            // элемента среди братьев, и вложенные сбили бы нумерацию.
+            var loc = _loc.Locator(string.Join(", ", list.Select(t => "> " + t)));
+            return Enumerable.Range(0, Sync(loc.CountAsync()))
+                             .Select(i => (IHeElement)new PlaywrightElement(loc.Nth(i)))
+                             .ToList();
+        }
+
         public IHeElement FindChildByAttribute(string tag, string attr, string pattern, string mode, int index)
         {
             var tags = (tag ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

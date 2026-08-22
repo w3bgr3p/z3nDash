@@ -23,7 +23,7 @@
 трафик, состояние DOM. «Прочитал код и выглядит правильно» — это `не проверено`,
 именно так и были пропущены `FillAsync` и `DispatchEvent`.
 
-## 1. Дословные копии эталона — `ZpRuntime/Z3n7/`, 30 файлов
+## 1. Дословные копии эталона — `ZpRuntime/Z3n7/`, 42 файла
 
 Сверяются механически, глазами не требуют:
 
@@ -36,7 +36,7 @@ python ZpRuntime/tools/ext_inventory.py
 переехал в ядро, в новый каталог `Mail/`. Во-вторых, часть копий разошлась с
 эталоном по существу.
 
-После пересборки из текущего эталона (HEAD `6c40977`): 22 файла совпадают
+После пересборки из текущего эталона (HEAD `6c40977`): 34 файла совпадают
 дословно, 6 отличаются только помеченными отступлениями, 2 (`Constantes.cs`,
 `GVars.cs`) — извлечения из `Essentials/Vars.cs`, парного файла у них нет.
 Проверено, что три наших файла вместе покрывают все 21 метод эталонного
@@ -101,6 +101,10 @@ python ZpRuntime/tools/ext_inventory.py
 | `SaveCookie(path)` | выгрузить cookie в файл | **проверено** | круговой прогон 2026-08-13 |
 | `SetCookie(text)` | восстановить cookie | **проверено** | круговой прогон 2026-08-13; 2026-08-22 добавлен срок и `httpOnly` из Netscape |
 | `GetCookie(domain, isCookieFormat)` | выгрузить cookie строкой | **проверено** | 2026-08-22: Netscape в диалекте ZP, фильтр по домену, круговой прогон |
+| `HtmlElement.DrawPartAsBitmap` | снимок куска элемента | **проверено** | 2026-08-22: `DecodeQr` прочитал настоящий QR со страницы |
+| `HtmlElement.FindChildrenByTags` | прямые потомки по тегам | **проверено** | 2026-08-22: `li` → 3 из 4 детей, `li;span` → 4 в порядке документа |
+| `Tab.GetTraffic()` | весь трафик вкладки | **проверено** | 2026-08-22: `TrafficCounter.Checkpoint` насчитал 559 байт на загрузке |
+| `project.Context[key]` | сумка значений на время прогона | **проверено** | 2026-08-22: список пережил запись/чтение, отсутствующий ключ даёт null |
 | `InstallCrxExtension` | поставить расширение | отказ | было пустым телом |
 | `Tab.IsBusy` | страница ещё грузится | **проверено** | 2026-08-13: `document.open()` → `true`, `close()` → `false` |
 | `Tab.Handle` | в ZP это HWND окна вкладки | **известно неверный** | суррогат из `GetHashCode`; годится как ключ, но `Emulator.SendKey` с ним работать не будет. Зовёт его `ChromeExt.cs`, который ещё не перенесён |
@@ -176,6 +180,55 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-22 — ещё двенадцать файлов ядра и четыре дыры в подложке
+
+Перенесены дословно: `Api/Telegram`, `Api/Webshare`, `Api/Aiio`, `Api/ZB`,
+`Mail/TempMail`, `Traffic/GraphQL`, `Traffic/TrafficCounter`,
+`Browser/HtmlExtensions`, `Tools/Extractor`, `Tools/Img`, `Tools/ZpToCsx`,
+`MethodExtensions/DictionaryExtensions`. Осталось 22 файла из 62.
+
+Первые четыре и `GraphQL` с `ZB` встали без единой правки — вся подложка под
+ними уже была. Остальные упёрлись в четыре дыры, все закрыты и проверены на
+живой странице:
+
+- `Tab.GetTraffic()` без аргументов — этой перегрузки не было вовсе,
+  `TrafficCounter.Init` её зовёт первой строкой;
+- `project.Context[key]` — сумки значений на время прогона не существовало,
+  `IContext` знал только `SessionId`. Сделана на `ConcurrentDictionary`: один
+  шаблон крутится в несколько потоков, а сумка общая;
+- `HtmlElement.DrawPartAsBitmap` — снимок куска элемента. Playwright режет
+  только по странице, поэтому область смещается на положение элемента;
+- `HtmlElement.FindChildrenByTags` — **прямые** потомки, не любые вложенные:
+  по ним `GetXPath` считает позицию среди братьев, и вложенные сбили бы номер.
+
+Отдельно понадобился переходник `Zenno/ZXingShim.cs`. `ZXing.Net` на .NET Core
+даёт только `BarcodeReader<T>`, а копия написана под ZennoPoster и говорит
+`using ZXing; new BarcodeReader()`. Трогать копию нельзя, поэтому недостающее
+имя объявлено в namespace `ZXing` — тем же приёмом, каким у нас объявлен весь
+`ZennoLab.CommandCenter`. Внутри — `BarcodeReader` из
+`ZXing.Windows.Compatibility`.
+
+Пакеты: `Svg` 2.4.3 и `ZXing.Net` 0.16.10 — версии как в эталоне, плюс
+`ZXing.Net.Bindings.Windows.Compatibility` и пришедший с ним
+`System.Drawing.Common` (нужен `Tools/Img.cs`).
+
+**Чем проверено.** Страница из файла с QR-картинкой и списком:
+
+```
+DecodeQr                 — hello-from-devdeck (QR прочитан с элемента)
+FindChildrenByTags("li") — 3 из 4 детей: a,b,c
+      ("li;span")        — 4 в порядке документа: a,b,x,c
+GetXPath 2-го li         — //*/body/ul[@id='list']/li[2]
+project.Context[key]     — список вернулся, отсутствующий ключ дал null
+TrafficCounter.Checkpoint— 559 байт на загрузке example.com
+```
+
+`Tools/Extractor.cs` потянул за собой `Tools/ZpToCsx.cs` — тот встал без правок.
+
+**Не проверено.** `Api/Telegram`, `Api/Webshare`, `Api/Aiio`, `Api/ZB`,
+`Mail/TempMail` — это дословные копии поверх уже проверенной подложки, и живой
+проверке мешают чужие ключи и деньги. Статус `копия`.
 
 ### 2026-08-22 — перенос `Browser/Cookies.cs`: срок жизни уезжал молча
 

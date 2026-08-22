@@ -376,6 +376,24 @@ namespace ZennoLab.CommandCenter
 
         public string DrawToBitmap(bool isImage, string hash) => He.DrawToBitmap();
 
+        /// <summary>
+        /// ZP отдаёт System.Drawing.Bitmap — так его и принимает перенесённый
+        /// HtmlExtensions.DecodeQr, скармливая напрямую в ZXing. Наш слой снимает
+        /// область в PNG, здесь она разворачивается в Bitmap.
+        /// </summary>
+        public System.Drawing.Bitmap DrawPartAsBitmap(int x, int y, int width, int height,
+                                                       bool isImage)
+        {
+            if (width <= 0 || height <= 0) return null;
+            var png = He.DrawPartToBitmap(x, y, width, height);
+            if (string.IsNullOrEmpty(png)) return null;
+            using var ms = new System.IO.MemoryStream(Convert.FromBase64String(png));
+            return new System.Drawing.Bitmap(ms);
+        }
+
+        public HtmlElementCollection FindChildrenByTags(string tags)
+            => new HtmlElementCollection(He.FindChildrenByTags(tags));
+
         public HtmlElement FindChildByAttribute(string tags, string attrName, string attrValue,
                                                 string searchKind, int number)
             => new HtmlElement(He.FindChildByAttribute(tags, attrName, attrValue, searchKind, number));
@@ -525,6 +543,11 @@ namespace ZennoLab.CommandCenter
             => new HtmlElementCollection(T.FindElementsByAttribute(tags, attrName, attrValue, searchKind));
 
         // ── Трафик ────────────────────────────────────────────────────────────
+
+        /// <summary>Весь трафик вкладки без фильтра — так его берёт
+        /// перенесённый TrafficCounter.</summary>
+        public IEnumerable<TrafficItem> GetTraffic()
+            => T.GetTraffic(null).Select(x => new TrafficItem(x));
 
         /// <summary>Перегрузка с одним фильтром — её зовёт перенесённый Traffic.</summary>
         public IEnumerable<TrafficItem> GetTraffic(IEnumerable<string> urlFilters)
