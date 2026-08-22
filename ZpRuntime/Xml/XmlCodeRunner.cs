@@ -126,8 +126,28 @@ public sealed class XmlCodeRunner
             .Select(a => Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(a.Location))
             .ToList();
 
+        // Имя сборки завязано на хеш исходника. Раньше оно было одно на все
+        // шаблоны — "TemplateCommonCode", — и второй шаблон в том же процессе
+        // падал с «Assembly with same name is already loaded»: у DevDeck
+        // планировщик долгоживущий, там за сессию проходит не один шаблон.
+        var hash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(_context.CommonCode)))[..16];
+        var asmName = $"TemplateCommonCode_{hash}";
+
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "devdeck-xml");
+        System.IO.Directory.CreateDirectory(dir);
+        var dll = System.IO.Path.Combine(dir, $"{asmName}.dll");
+
+        // Тот же шаблон во второй раз: сборка уже в процессе, второй раз её
+        // грузить нельзя и незачем — просто ссылаемся на готовый файл.
+        var already = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(a => !a.IsDynamic && a.GetName().Name == asmName);
+        if (already is not null && System.IO.File.Exists(dll))
+            return Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(dll);
+
         var comp = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
-            "TemplateCommonCode",
+            asmName,
             [tree],
             refs,
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
@@ -136,16 +156,7 @@ public sealed class XmlCodeRunner
         // Пишем на диск, а не держим в памяти: скрипт исполняется в этом же
         // процессе, и CLR разрешает ссылку по имени сборки. Загрузка из byte[]
         // такую сборку по имени не находит — ветка падает на «Could not load
-        // file or assembly». Имя файла завязано на хеш исходника, поэтому
-        // повторный запуск того же шаблона переиспользует готовую сборку.
-        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "devdeck-xml");
-        System.IO.Directory.CreateDirectory(dir);
-
-        var hash = Convert.ToHexString(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(_context.CommonCode)))[..16];
-        var dll = System.IO.Path.Combine(dir, $"CommonCode-{hash}.dll");
-
+        // file or assembly».
         var ms   = new MemoryStream();
         var emit = comp.Emit(ms);
 
@@ -160,7 +171,12 @@ public sealed class XmlCodeRunner
                 "CommonCode шаблона не компилируется:\n" + string.Join("\n", errors));
         }
 
-        System.IO.File.WriteAllBytes(dll, ms.ToArray());
+        // Файл мог остаться от прошлого запуска и быть занят уже загруженной
+        // сборкой. Содержимое при совпадении хеша то же самое, переписывать
+        // нечего — а падать на занятом файле незачем.
+        try { System.IO.File.WriteAllBytes(dll, ms.ToArray()); }
+        catch (System.IO.IOException) when (System.IO.File.Exists(dll)) { }
+
         System.Reflection.Assembly.LoadFrom(dll);
 
         return Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(dll);
