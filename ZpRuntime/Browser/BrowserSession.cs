@@ -136,6 +136,12 @@ public sealed class BrowserSession : IAsyncDisposable
                 Channel      = string.IsNullOrWhiteSpace(channel) ? null : channel,
                 Headless     = headless,
                 Proxy        = proxySettings,
+                // Patchright ставит этот ключ сам — но только в фикстурах своего
+                // тест-раннера, а не в LaunchPersistentContextAsync, которым
+                // пользуемся мы. Без него navigator.webdriver === true, а это
+                // первое, что смотрит любая проверка на автоматизацию. Проверено:
+                // с ключом false, без него true.
+                Args = ["--disable-blink-features=AutomationControlled"],
                 // Песочница включена намеренно. Playwright по умолчанию её
                 // выключает — «if (options.chromiumSandbox !== true) push("--no-sandbox")» —
                 // а Chrome на этот ключ показывает плашку «unsupported
