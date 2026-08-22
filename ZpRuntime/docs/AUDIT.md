@@ -181,6 +181,37 @@ python ZpRuntime/tools/ext_inventory.py
 
 Записи снизу вверх, новые сверху.
 
+### 2026-08-22 — прогон остатка: восемь файлов из четырнадцати снято
+
+Master заранее сказал, что оставшийся куст — часть именно для ZP и к нашей
+подложке отношения не имеет. Прогнал остаток тем же признаком: чем файл ходит
+наружу. Оценка подтвердилась, восемь файлов внесены в `SKIP_FILES`.
+
+| файл | чем ходит наружу |
+|---|---|
+| `Essentials/ZpServer` | `Start`/`StopZpServer` — сервер управления ZennoPoster, 10 обращений к `ZennoPoster.*` |
+| `Essentials/Init` | первой строкой зовёт `StartZpServer` — тянет тот же сервер |
+| `DbUtils/ProcessManager` | гасит процессы `zbe1` (движок ZennoBrowser) и читает WMI; мы поднимаем Patchright |
+| `Accounts/ProcAcc` | ищет процессы ZP по имени и разбирает их `CommandLine` через WMI |
+| `Browser/ChromeExt` | `Emulator.SendKey` по `ActiveTab.Handle` — системная эмуляция клавиш в окно браузера ZP |
+| `Accounts/ProfileSync` | раскладка профиля ZP по колонкам БД плюс `instance.WebGLPreferences.Load` |
+| `Accounts/Disposer` | собран из `InstanceManager` и `Reporter` — весь тот же цикл |
+| `Reports/Reporter` | `ZennoPoster.ImageProcessing*` по `instance.Port`; у нас это уже «отказ» |
+
+Заодно снимается пункт «`Tab.Handle` отдаёт `GetHashCode` вместо HWND — ждёт
+переноса `ChromeExt.cs`»: `ChromeExt` не переносится, ждать нечего. Суррогат
+остаётся ключом, и единственный, кому был нужен настоящий HWND, ушёл.
+
+**Остаток — 6 файлов, и они не про ZP.** Их судьба решается не этим признаком:
+
+| файл | что это | чего ждёт |
+|---|---|---|
+| `Browser/BrowserScan` | ходит на browserscan.net нашим `Instance`, читает результат со страницы, пишет в наши таблицы | одного `HtmlElement.GetChildren` в подложке |
+| `Browser/GpuSpoof` | генератор строк GPU из `pci.ids` — сам по себе чистый | решения, чем подменять WebGL: у ZP это `WebGLPreference`, у нас CDP |
+| `Accounts/AccountRunner` | `ChooseAccountByCondition` — выборка аккаунта из БД, это наше; `ChooseAndRunByCondition` — уже запуск браузера циклом ZP | разделения: половина файла переносима, половина нет |
+| `Reports/Accountant`, `Reports/JsonReportGenerator` | отчёты по данным из БД, HTML и JSON | решения, нужны ли отчёты ZP в DevDeck |
+| `Tools/Git` | клиент GitHub API, ZP не касается вовсе | решения, нужен ли он здесь |
+
 ### 2026-08-22 — пять переносов откачены: критерий был не тот
 
 Master остановил на том, что часть переноса бессмысленна, и он прав. Я отбирал

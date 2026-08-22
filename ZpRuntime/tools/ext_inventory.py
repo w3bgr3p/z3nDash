@@ -74,6 +74,24 @@ DEFAULT_Z3N7 = 'W:/code_hard/.net/z3n7/z3n7'
 # TaskManager.cs: управление очередью задач ZP — ExportInputSettings, TasksList,
 #   StartTask, SetMaxThreads. Пятнадцать обращений к ZennoPoster.*, и все они у
 #   нас помечены «отказ»: очереди ZP нет, планировщик свой.
+#
+# Ниже — куст жизненного цикла инстанса ZP. Формулировка Master: «это часть
+# именно для ZP, она не имеет смысла и к нашей подложке отношения не имеет».
+# Проверено по тому, чем каждый файл ходит наружу:
+# ZpServer.cs: Start/StopZpServer — сервер управления ZennoPoster, 10 обращений
+#   к ZennoPoster.*.
+# Init.cs: первым делом зовёт StartZpServer, то есть тянет тот же сервер.
+# ProcessManager.cs: гасит процессы zbe1 (движок ZennoBrowser) и читает WMI. Мы
+#   поднимаем Patchright, таких процессов нет.
+# ProcAcc.cs: ищет процессы ZP по имени и разбирает их CommandLine через WMI,
+#   чтобы привязать аккаунт к процессу.
+# ChromeExt.cs: Emulator.SendKey по ActiveTab.Handle — системная эмуляция клавиш
+#   в окно браузера ZP. HWND у нас нет и не будет, Tab.Handle суррогат.
+# ProfileSync.cs: раскладка профиля ZP по колонкам БД плюс
+#   instance.WebGLPreferences.Load — формат профиля ZP.
+# Disposer.cs: собран из InstanceManager и Reporter, то есть весь тот же цикл.
+# Reporter.cs: ZennoPoster.ImageProcessing* по instance.Port — обработка
+#   скриншотов сервисом ZP, у нас уже «отказ».
 SKIP_FILES = {
     'ProjectExtencions.cs',
     'Extractor.cs',
@@ -81,6 +99,14 @@ SKIP_FILES = {
     'ExternalCode.cs',
     'LogDisabler.cs',
     'TaskManager.cs',
+    'ZpServer.cs',
+    'Init.cs',
+    'ProcessManager.cs',
+    'ProcAcc.cs',
+    'ChromeExt.cs',
+    'ProfileSync.cs',
+    'Disposer.cs',
+    'Reporter.cs',
 }
 
 
