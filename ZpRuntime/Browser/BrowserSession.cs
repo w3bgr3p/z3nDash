@@ -101,8 +101,14 @@ public sealed class BrowserSession : IAsyncDisposable
     /// Канал Chrome. Patchright просит настоящий "chrome"; пустая строка оставит
     /// Chromium из поставки — тогда часть патчей теряет смысл.
     /// </param>
+    /// <param name="log">
+    /// Куда релей прокси рассказывает про отказы. Без этого отказ авторизации
+    /// выглядит снаружи как молчание: браузер отдаёт ERR_EMPTY_RESPONSE, а
+    /// причина не доезжает никуда.
+    /// </param>
     public static async Task<BrowserSession> LaunchAsync(
-        string profileDir, bool headless = false, string? proxy = null, string? channel = "chrome")
+        string profileDir, bool headless = false, string? proxy = null, string? channel = "chrome",
+        Action<string>? log = null)
     {
         if (string.IsNullOrWhiteSpace(profileDir))
             throw new ArgumentException(
@@ -115,6 +121,7 @@ public sealed class BrowserSession : IAsyncDisposable
         // Chromium не умеет авторизацию SOCKS5, поэтому такой прокси уходит
         // браузеру через локальный релей — то же, что делает ZP-шный proxifier.
         var relay = ProxyRelay.StartIfNeeded(proxy);
+        if (relay is not null && log is not null) relay.Log = m => log("[proxy] " + m);
         var forBrowser = relay?.Endpoint ?? proxy;
 
         var proxySettings = string.IsNullOrWhiteSpace(forBrowser)

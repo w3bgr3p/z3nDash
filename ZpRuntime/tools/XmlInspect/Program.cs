@@ -194,7 +194,8 @@ else if (wantLocal)
     else Console.WriteLine("[br] без прокси — ветки с ProxySet откажут");
 
     session = await DevDeck.Browser.BrowserSession.LaunchAsync(
-        profileDir, headless, launchProxy.Length > 0 ? launchProxy : null);
+        profileDir, headless, launchProxy.Length > 0 ? launchProxy : null,
+        log: Console.WriteLine);
 }
 
 var instance = session?.Instance ?? new ZennoLab.CommandCenter.Instance();

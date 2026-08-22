@@ -600,7 +600,8 @@ private static void SeedDefaults(Db db)
                     rp.AddLine($"[br] Patchright, профиль {profileDir}"
                                + (proxy.Length > 0 ? $", прокси {proxy}" : ", без прокси"));
                     session = await DevDeck.Browser.BrowserSession.LaunchAsync(
-                        profileDir, headless: false, proxy: proxy.Length > 0 ? proxy : null);
+                        profileDir, headless: false, proxy: proxy.Length > 0 ? proxy : null,
+                        log: rp.AddLine);
                 }
 
                 var player = new DevDeck.Xml.XmlPlayer(project, session.Instance, rp.AddLine);

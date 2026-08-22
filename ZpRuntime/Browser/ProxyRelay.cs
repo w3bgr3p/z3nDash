@@ -1,5 +1,5 @@
-// ══════════════════════════════════════════════════════════════════════════════
-// ProxyRelay.cs — локальный SOCKS5 без авторизации поверх SOCKS5 с авторизацией.
+﻿// ══════════════════════════════════════════════════════════════════════════════
+// ProxyRelay.cs — локальный HTTP-прокси поверх SOCKS5 с авторизацией.
 //
 // Chromium не умеет авторизацию SOCKS5: логин с паролем он из строки выкидывает,
 // подключается анонимно, получает отказ и отдаёт ERR_SOCKS_CONNECTION_FAILED.
@@ -10,9 +10,33 @@
 // его включённым: ZennoPoster поднимает локальный прокси, который и держит
 // авторизацию. Здесь то же самое, только своё.
 //
-// Релей слушает на 127.0.0.1, принимает от браузера анонимный SOCKS5, а наверх
-// ходит с логином и паролем (RFC 1928 + RFC 1929). Запрос CONNECT пересылается
-// как есть — разбирать адрес нужно только чтобы понять, где он кончается.
+// ── Почему браузеру отдаётся HTTP, а не SOCKS5 ───────────────────────────────
+//
+// Раньше релей и вниз говорил на SOCKS5. На это драйвер Patchright добавляет
+// браузеру ключ:
+//
+//     const isSocks = proxyURL.protocol === "socks5:";
+//     if (isSocks && !options.socksProxyPort)
+//       chromeArguments.push(`--host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE …"`);
+//
+// Ключ нужный: он валит локальное разрешение имён, чтобы Chrome отдал домен
+// прокси, а не резолвил сам мимо него. Но Chrome на него показывает плашку
+// «You are using an unsupported command-line flag», а она занимает высоту окна —
+// то есть сдвигает вьюпорт и попадает в скриншоты. Координаты кликов и
+// DrawPartAsBitmap считаются от смещённой области.
+//
+// С HTTP-прокси эта развилка исчезает вместе с ключом: в CONNECT браузер пишет
+// имя хоста, а не адрес, и сам ничего не резолвит. Имя доходит до нас и уходит
+// наверх типом адреса 0x03 — резолвит его прокси. Утечки DNS нет по устройству
+// протокола, а не по ключу командной строки.
+//
+// Вниз поддержаны оба вида запроса, которые шлёт браузер прокси:
+//   CONNECT host:port         — весь HTTPS, дальше труба байт в байт;
+//   GET http://host/path      — обычный HTTP в абсолютной форме.
+// Во втором случае соединение помечается Connection: close. Иначе браузер
+// оставил бы его живым и послал бы следующий запрос — возможно к другому хосту —
+// в уже открытую наверх трубу, то есть не туда. Плата — лишнее соединение на
+// голом HTTP, которого в шаблонах почти нет.
 // ══════════════════════════════════════════════════════════════════════════════
 
 using System.Net;
@@ -30,14 +54,22 @@ public sealed class ProxyRelay : IDisposable
     private readonly string            _pass;
     private readonly CancellationTokenSource _cts = new();
 
-    /// <summary>Адрес для браузера: анонимный SOCKS5 на локальной петле.</summary>
+    /// <summary>Адрес для браузера: HTTP-прокси на локальной петле.</summary>
     public string Endpoint { get; }
+
+    /// <summary>
+    /// Куда рассказывать про отказы. Без этого каждый сбой уходил в пустой
+    /// catch, и наружу это выглядело как «прокси молчит»: браузер получал
+    /// ERR_EMPTY_RESPONSE, а причина — отказ авторизации или отказ прокси на
+    /// CONNECT — не доезжала никуда.
+    /// </summary>
+    public Action<string>? Log { get; set; }
 
     private ProxyRelay(TcpListener listener, string host, int port, string user, string pass)
     {
         _listener = listener;
         _host = host; _port = port; _user = user; _pass = pass;
-        Endpoint = $"socks5://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}";
+        Endpoint = $"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}";
     }
 
     /// <summary>
@@ -94,43 +126,167 @@ public sealed class ProxyRelay : IDisposable
                 client.NoDelay = true;
                 var down = client.GetStream();
 
-                // ── рукопожатие с браузером: соглашаемся без авторизации ───────
-                var head = await ReadExactAsync(down, 2);
-                int nMethods = head[1];
-                await ReadExactAsync(down, nMethods);
-                await down.WriteAsync(new byte[] { 0x05, 0x00 });
+                var head = await ReadHeadAsync(down);
+                if (head.Length == 0) return;
 
-                // ── запрос CONNECT: читаем целиком, чтобы переслать как есть ──
-                var request = await ReadRequestAsync(down);
+                int nl = head.IndexOf('\n');
+                if (nl < 0) return;
+                var parts = head[..nl].TrimEnd('\r').Split(' ');
+                if (parts.Length < 3) return;
+
+                bool isConnect = parts[0].Equals("CONNECT", StringComparison.OrdinalIgnoreCase);
+                string host; int port;
+
+                if (isConnect)
+                {
+                    var hp = parts[1].Split(':');
+                    host = hp[0];
+                    port = hp.Length > 1 && int.TryParse(hp[1], out var p1) ? p1 : 443;
+                }
+                else
+                {
+                    // Абсолютная форма: GET http://host/path HTTP/1.1
+                    if (!Uri.TryCreate(parts[1], UriKind.Absolute, out var uri)) return;
+                    host = uri.Host;
+                    port = uri.IsDefaultPort ? 80 : uri.Port;
+                }
 
                 using var upstream = new TcpClient { NoDelay = true };
                 await upstream.ConnectAsync(_host, _port, _cts.Token);
                 var up = upstream.GetStream();
 
-                if (!await AuthenticateAsync(up)) return;
+                if (!await AuthenticateAsync(up))
+                {
+                    Log?.Invoke($"прокси отклонил авторизацию ({_host}:{_port})");
+                    if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
+                    return;
+                }
 
-                await up.WriteAsync(request, _cts.Token);
+                // Имя хоста уходит наверх как есть, типом адреса 0x03: резолвит
+                // его прокси. Мы имя не разрешаем — в этом весь смысл затеи.
+                var code = await ConnectThroughSocksAsync(up, host, port);
+                if (code != 0x00)
+                {
+                    Log?.Invoke($"прокси отказал в CONNECT {host}:{port}, код 0x{code:X2}");
+                    if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
+                    return;
+                }
 
-                // Ответ наверх идёт браузеру дословно — в нём адрес привязки.
-                var reply = await ReadRequestAsync(up, isReply: true);
-                await down.WriteAsync(reply, _cts.Token);
-
-                if (reply.Length > 1 && reply[1] != 0x00) return;   // отказ наверху
+                if (isConnect)
+                    await WriteAsciiAsync(down, "HTTP/1.1 200 Connection Established" + "\r\n\r\n");
+                else
+                    await WriteAsciiAsync(up, RewriteForOrigin(head));
 
                 await Task.WhenAny(
                     down.CopyToAsync(up, _cts.Token),
                     up.CopyToAsync(down, _cts.Token));
             }
-            catch { /* оборванное соединение — обычное дело, браузер их рвёт сам */ }
+            catch (Exception ex)
+            {
+                // Обрыв — обычное дело, браузер рвёт соединения сам. Но раньше
+                // сюда же уходили и настоящие отказы, и наружу они выглядели
+                // одинаково — молчанием.
+                Log?.Invoke($"соединение оборвалось: {ex.GetType().Name}: {ex.Message}");
+            }
         }
     }
 
-    /// <summary>Логин с паролем по RFC 1929.</summary>
+    /// <summary>
+    /// Заголовки запроса до пустой строки. Читаем побайтно: тело, если оно есть,
+    /// должно остаться в потоке — дальше его перельёт труба.
+    /// </summary>
+    private static async Task<string> ReadHeadAsync(NetworkStream s)
+    {
+        var buf = new List<byte>(1024);
+        var one = new byte[1];
+
+        while (buf.Count < 64 * 1024)
+        {
+            if (await s.ReadAsync(one) == 0) break;
+            buf.Add(one[0]);
+
+            int c = buf.Count;
+            if (c >= 4 && buf[c - 4] == 13 && buf[c - 3] == 10 && buf[c - 2] == 13 && buf[c - 1] == 10) break;
+            if (c >= 2 && buf[c - 2] == 10 && buf[c - 1] == 10) break;
+        }
+
+        return Encoding.ASCII.GetString(buf.ToArray());
+    }
+
+    /// <summary>
+    /// Перевести запрос из абсолютной формы в обычную и закрыть соединение после
+    /// ответа: живым его держать нельзя, наверх у нас труба к одному хосту, а
+    /// следующий запрос браузера может быть к другому.
+    /// </summary>
+    private static string RewriteForOrigin(string head)
+    {
+        var lines = head.Replace("\r\n", '\n'.ToString()).TrimEnd('\n').Split('\n');
+
+        var first = lines[0].Split(' ');
+        if (first.Length >= 3 && Uri.TryCreate(first[1], UriKind.Absolute, out var uri))
+            lines[0] = $"{first[0]} {uri.PathAndQuery} {first[2]}";
+
+        var outLines = new List<string>();
+        foreach (var l in lines)
+        {
+            if (l.StartsWith("Proxy-Connection:", StringComparison.OrdinalIgnoreCase)) continue;
+            if (l.StartsWith("Connection:",       StringComparison.OrdinalIgnoreCase)) continue;
+            outLines.Add(l);
+        }
+        outLines.Add("Connection: close");
+
+        return string.Join("\r\n", outLines) + "\r\n\r\n";
+    }
+
+    /// <summary>
+    /// CONNECT наверх по SOCKS5 с именем хоста (RFC 1928, ATYP 0x03).
+    /// Возвращает код ответа прокси: 0x00 — успех.
+    /// </summary>
+    private async Task<byte> ConnectThroughSocksAsync(NetworkStream up, string host, int port)
+    {
+        var name = Encoding.ASCII.GetBytes(host);
+        if (name.Length > 255) return 0xFF;
+
+        var req = new byte[7 + name.Length];
+        req[0] = 0x05;                  // версия
+        req[1] = 0x01;                  // CONNECT
+        req[2] = 0x00;                  // резерв
+        req[3] = 0x03;                  // адрес — доменное имя
+        req[4] = (byte)name.Length;
+        name.CopyTo(req, 5);
+        req[5 + name.Length] = (byte)(port >> 8);
+        req[6 + name.Length] = (byte)(port & 0xFF);
+
+        await up.WriteAsync(req, _cts.Token);
+
+        var reply = await ReadReplyAsync(up);
+        return reply.Length > 1 ? reply[1] : (byte)0xFF;
+    }
+
+    private static async Task WriteAsciiAsync(NetworkStream s, string text)
+        => await s.WriteAsync(Encoding.ASCII.GetBytes(text));
+
+    /// <summary>
+    /// Договориться о способе и, если он того просит, войти логином с паролем
+    /// (RFC 1928 + RFC 1929).
+    ///
+    /// Предлагаем оба способа — «без авторизации» и «логин с паролем». Раньше
+    /// предлагался только второй, и прокси, отвечающий 0x00 «вход не нужен»,
+    /// получал от нас разрыв: браузеру это доезжало как ERR_EMPTY_RESPONSE, а
+    /// причина не доезжала никуда. Выбирает способ сервер, наше дело — назвать
+    /// оба, которые мы умеем.
+    /// </summary>
     private async Task<bool> AuthenticateAsync(NetworkStream up)
     {
-        await up.WriteAsync(new byte[] { 0x05, 0x01, 0x02 }, _cts.Token);   // метод 2
+        await up.WriteAsync(new byte[] { 0x05, 0x02, 0x00, 0x02 }, _cts.Token);
         var choice = await ReadExactAsync(up, 2);
-        if (choice[1] != 0x02) return false;
+
+        if (choice[1] == 0x00) return true;             // вход не требуется
+        if (choice[1] != 0x02)
+        {
+            Log?.Invoke($"прокси не принял ни один способ входа (ответ 0x{choice[1]:X2})");
+            return false;
+        }
 
         var u = Encoding.UTF8.GetBytes(_user);
         var p = Encoding.UTF8.GetBytes(_pass);
@@ -148,11 +304,10 @@ public sealed class ProxyRelay : IDisposable
     }
 
     /// <summary>
-    /// Прочитать запрос или ответ SOCKS5 целиком. Разбирать адрес нужно только
-    /// затем, чтобы знать, где сообщение кончается: дальше оно пересылается
-    /// байт в байт.
+    /// Прочитать ответ SOCKS5 целиком. Адрес разбирается только затем, чтобы
+    /// знать, где сообщение кончается.
     /// </summary>
-    private static async Task<byte[]> ReadRequestAsync(NetworkStream s, bool isReply = false)
+    private static async Task<byte[]> ReadReplyAsync(NetworkStream s)
     {
         var head = await ReadExactAsync(s, 4);          // VER CMD/REP RSV ATYP
         int addrLen = head[3] switch
