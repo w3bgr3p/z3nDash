@@ -456,12 +456,7 @@ namespace DevDeck.Browser
             // fulltagname: ZP-специфика — ищем по типу тега
             // "input:password" → input[type="password"]
             if (attr == "fulltagname")
-            {
-                string cssTag = tag.Contains(':')
-                    ? $"{tag.Split(':')[0]}[type='{tag.Split(':')[1]}']"
-                    : tag;
-                return page.Locator(cssTag);
-            }
+                return page.Locator(CssTag(tag));
 
             if (attr is "innertext" or "text")
             {
@@ -495,14 +490,14 @@ namespace DevDeck.Browser
             string clause  = negate ? $":not([{attr}='{escaped}'])" : $"[{attr}='{escaped}']";
             var    tags    = SplitTags(tag);
             if (tags.Length == 0) tags = new[] { "*" };
-            return page.Locator(string.Join(", ", tags.Select(t => t + clause)));
+            return page.Locator(string.Join(", ", tags.Select(t => CssTag(t) + clause)));
         }
 
         /// <summary>Список тегов ZP ("a;div") → CSS-селектор ("a, div"). Пустой тег → "*".</summary>
         private static string CssTags(string tag)
         {
             var tags = SplitTags(tag);
-            return tags.Length == 0 ? "*" : string.Join(", ", tags);
+            return tags.Length == 0 ? "*" : string.Join(", ", tags.Select(CssTag));
         }
 
         /// <summary>Список тегов ZP + условие → XPath-объединение ("//a[c]|//div[c]").</summary>
@@ -510,11 +505,37 @@ namespace DevDeck.Browser
         {
             var tags = SplitTags(tag);
             if (tags.Length == 0) tags = new[] { "*" };
-            return "xpath=" + string.Join("|", tags.Select(t => $"//{t}[{condition}]"));
+            return "xpath=" + string.Join("|", tags.Select(t => $"//{XPathTag(t)}[{condition}]"));
         }
 
         private static string[] SplitTags(string tag)
             => (tag ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        /// <summary>
+        /// ZP пишет тип поля через двоеточие: "input:text", "input:password".
+        /// В CSS это не тег: Playwright понимает ":text" как свою
+        /// псевдокласс-функцию, и разбор селектора на "input:text" падает.
+        ///
+        /// Перевод стоял ровно в одной ветке поиска — по fulltagname. Во всех
+        /// остальных (точное совпадение, регулярка, поиск по тексту) тег уходил
+        /// в CSS как есть: селектор не находил ничего, цикл ожидания это глотал
+        /// и отчитывался «not found in Ns» про элемент, который всё это время
+        /// был на экране.
+        /// </summary>
+        internal static string CssTag(string tag)
+        {
+            var t = (tag ?? "").Trim();
+            var i = t.IndexOf(':');
+            return i <= 0 ? t : $"{t[..i]}[type='{t[(i + 1)..]}']";
+        }
+
+        /// <summary>То же для XPath: "input:text" → "input[@type='text']".</summary>
+        private static string XPathTag(string tag)
+        {
+            var t = (tag ?? "").Trim();
+            var i = t.IndexOf(':');
+            return i <= 0 ? t : $"{t[..i]}[@type='{t[(i + 1)..]}']";
+        }
 
         private static T    Sync<T>(Task<T> t) => t.GetAwaiter().GetResult();
         private static void Sync(Task t)        => t.GetAwaiter().GetResult();
@@ -900,7 +921,7 @@ namespace DevDeck.Browser
             if (list.Length == 0) list = new[] { "*" };
             // Прямые потомки, а не любые вложенные: ZP считает по ним позицию
             // элемента среди братьев, и вложенные сбили бы нумерацию.
-            var loc = _loc.Locator(string.Join(", ", list.Select(t => "> " + t)));
+            var loc = _loc.Locator(string.Join(", ", list.Select(t => "> " + PlaywrightInstance.CssTag(t))));
             return Enumerable.Range(0, Sync(loc.CountAsync()))
                              .Select(i => (IHeElement)new PlaywrightElement(loc.Nth(i)))
                              .ToList();
@@ -914,7 +935,7 @@ namespace DevDeck.Browser
             string escaped = pattern.Replace("\\", "\\\\").Replace("'", "\\'");
             string clause  = negate ? $":not([{attr}='{escaped}'])" : $"[{attr}='{escaped}']";
             return new PlaywrightElement(
-                _loc.Locator(string.Join(", ", tags.Select(t => t + clause))).Nth(index));
+                _loc.Locator(string.Join(", ", tags.Select(t => PlaywrightInstance.CssTag(t) + clause))).Nth(index));
         }
 
         // Random.Shared, а не свой экземпляр: System.Random не потокобезопасен,

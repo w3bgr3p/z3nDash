@@ -85,8 +85,15 @@ internal static class RegexSelector
                 try { re = new RegExp(q.pattern, 'i'); }
                 catch (e) { return []; }
 
+                // ZP пишет тип поля через двоеточие: "input:text". В CSS это
+                // не тег — querySelectorAll на нём бросает SyntaxError, и весь
+                // поиск молча возвращал пусто.
                 const tags = (q.tags || '*').split(';')
-                    .map(t => t.trim()).filter(t => t.length) ;
+                    .map(t => t.trim()).filter(t => t.length)
+                    .map(t => {
+                        const i = t.indexOf(':');
+                        return i <= 0 ? t : t.slice(0, i) + "[type='" + t.slice(i + 1) + "']";
+                    });
                 const css = tags.length ? tags.join(', ') : '*';
 
                 const out = [];
