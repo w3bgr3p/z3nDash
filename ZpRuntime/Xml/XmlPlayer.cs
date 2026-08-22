@@ -68,6 +68,17 @@ public sealed class XmlPlayer
         if (dead.Count > 0)
             _log($"[xml] недостижимо узлов: {dead.Count} — артефакты разработки, в маршрут не входят");
 
+        // Каталог проекта — папка шаблона, имя — сам файл. Так их разбирает и
+        // ZP, и перенесённый код: ReadEnv ищет .env в project.Path, а
+        // Constantes.ProjectName — файл с именем project.Name внутри него. Пока
+        // это не проставлено, .env искался рядом с приложением, и шаблон падал
+        // на «… is not set in .env», хотя файл лежит рядом с ним.
+        if (_project is StubProject stub)
+        {
+            stub.Path = templateDir;
+            if (!string.IsNullOrWhiteSpace(tpl.Name)) stub.Name = tpl.Name;
+        }
+
         SeedVariables(tpl);
 
         // Личность нужна до первой ветки: {-Profile.Name-} встречается уже в

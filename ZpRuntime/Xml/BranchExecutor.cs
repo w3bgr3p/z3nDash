@@ -48,6 +48,7 @@ public sealed class BranchExecutor
             ("HTMLElement", "GetAttribute") => GetAttribute(branch),
             ("WebBrowser",  "CMD_NAVIGATE") => Navigate(branch),
             ("Profile",     "Update")       => UpdateProfile(branch),
+            ("Logic",       "Pause")        => Pause(branch, ct),
             _ => throw new NotSupportedException(
                      $"ветка {branch.Type}/{branch.Action} в плеере не реализована"),
         };
@@ -119,6 +120,25 @@ public sealed class BranchExecutor
         // проверка, что адрес действительно сменился. Своя короткая дорога здесь
         // ровно та же ошибка, что была с однократным поиском элемента.
         _instance.Go(url);
+        return BranchResult.Empty;
+    }
+
+    /// <summary>
+    /// Пауза. У ZP два вида: Constant — ровно столько секунд, Random — случайно
+    /// между Delay и DelayTo. Ноль тоже осмыслен: в шаблонах так ставят точку
+    /// разрыва между ветками.
+    /// </summary>
+    private BranchResult Pause(Branch branch, CancellationToken ct)
+    {
+        _ = int.TryParse(_project.Expand(branch.Param("Delay")),   out var from);
+        _ = int.TryParse(_project.Expand(branch.Param("DelayTo")), out var to);
+
+        var seconds = branch.Param("PauseType") == "Random" && to > from
+            ? Random.Shared.Next(from, to + 1)
+            : from;
+
+        if (seconds > 0) ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(seconds));
+        ct.ThrowIfCancellationRequested();
         return BranchResult.Empty;
     }
 

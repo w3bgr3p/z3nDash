@@ -456,8 +456,21 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         private readonly StubContext     _context = new StubContext();
 
         public string Name      { get; set; } = "stub.zp";
+
+        /// <summary>
+        /// Каталог проекта. В ZP это папка, где лежит сам шаблон, а Name — имя
+        /// файла в ней: так их и разбирает перенесённый Constantes.ProjectName,
+        /// который ищет Name внутри Path.
+        /// </summary>
         public string Path      { get; set; } = System.IO.Directory.GetCurrentDirectory();
-        public string Directory => System.IO.Path.GetDirectoryName(Path) ?? Path;
+
+        /// <summary>
+        /// В ZP Directory — тот же каталог проекта, что и Path. Здесь стоял
+        /// GetDirectoryName(Path), то есть возвращался родительский каталог:
+        /// макрос {-Project.Directory-} указывал на уровень выше, и всё, что
+        /// шаблон кладёт рядом с собой, уходило не туда.
+        /// </summary>
+        public string Directory => Path;
         public string TaskId    { get; } = Guid.NewGuid().ToString("N").Substring(0, 8);
 
         public ILocalVariables  Variables       => _variables;

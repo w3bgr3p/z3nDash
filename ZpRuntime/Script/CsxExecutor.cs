@@ -41,6 +41,10 @@ public static class CsxExecutor
             .AddImports(
                 "System",
                 "System.Collections.Generic",
+                "System.IO",
+                "System.Text",
+                "System.Text.RegularExpressions",
+                "System.Globalization",
                 "System.Linq",
                 "System.Threading",
                 "System.Threading.Tasks",
