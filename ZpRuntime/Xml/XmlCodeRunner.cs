@@ -113,9 +113,20 @@ public sealed class XmlCodeRunner
     /// подключаем ссылкой. Так же поступает и ZennoPoster — там это часть
     /// сборки проекта, общая для всех веток.
     /// </summary>
+    // Подготовка сборки общего кода — единственное место, где потоки трогают
+    // общий ресурс: файл на диске и список загруженных сборок процесса. Два
+    // потока одного шаблона стартуют одновременно, поэтому проверка «уже
+    // загружена», запись файла и загрузка обязаны идти под одной защёлкой.
+    private static readonly object _commonLock = new();
+
     private MetadataReference? CompileCommonCode(IEnumerable<System.Reflection.Assembly> loaded)
     {
         if (string.IsNullOrWhiteSpace(_context.CommonCode)) return null;
+        lock (_commonLock) return CompileCommonCodeLocked(loaded);
+    }
+
+    private MetadataReference CompileCommonCodeLocked(IEnumerable<System.Reflection.Assembly> loaded)
+    {
 
         var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
             _context.CommonCode,

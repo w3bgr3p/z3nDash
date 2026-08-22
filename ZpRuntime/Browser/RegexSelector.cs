@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // RegexSelector.cs — движок селекторов для ZP-шного SearchKind="regexp".
 //
 // В ZennoPoster поиск по атрибуту умеет регулярку, и шаблоны этим пользуются
@@ -26,8 +26,14 @@ internal static class RegexSelector
     /// <summary>Имя движка. Селектор пишется как "zpre=теги|атрибут|neg|шаблон".</summary>
     public const string Name = "zpre";
 
+    // Регистрация живёт в конкретном экземпляре Playwright, а не в процессе.
+    // Раньше здесь стоял один флаг на всё приложение: первый запуск
+    // регистрировал движок, а второй параллельный поднимал свой Playwright,
+    // видел флаг и регистрацию пропускал. Селектор zpre в нём не существовал, и
+    // каждый поиск по regexp падал — то есть при многопоточности ломался ровно
+    // тот вид поиска, которым в шаблонах задана половина элементов.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IPlaywright, object> _registered = new();
     private static readonly object _lock = new();
-    private static bool _registered;
 
     /// <summary>
     /// Собрать селектор. Разделитель — вертикальная черта; в шаблоне регулярки
@@ -38,17 +44,18 @@ internal static class RegexSelector
         => $"{Name}={tags}|{attr}|{(negate ? "1" : "0")}|{pattern}";
 
     /// <summary>
-    /// Движок регистрируется один раз на процесс: Playwright на повторную
-    /// регистрацию того же имени бросает.
+    /// Зарегистрировать движок в этом экземпляре Playwright. Повторная
+    /// регистрация того же имени в том же экземпляре бросает, поэтому сделанное
+    /// запоминается — но по экземпляру, а не по процессу.
     /// </summary>
     public static void Register(IPlaywright pw)
     {
         lock (_lock)
         {
-            if (_registered) return;
+            if (_registered.TryGetValue(pw, out _)) return;
             pw.Selectors.RegisterAsync(Name, new SelectorsRegisterOptions { Script = Script })
               .GetAwaiter().GetResult();
-            _registered = true;
+            _registered.Add(pw, new object());
         }
     }
 

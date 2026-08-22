@@ -15,7 +15,10 @@ namespace DevDeck.Browser
     /// </summary>
     public sealed partial class PlaywrightInstance
     {
-        private static readonly Random _rng = new();
+        // Random.Shared, а не свой экземпляр: System.Random не потокобезопасен,
+        // и при параллельных запусках одного шаблона его внутреннее состояние
+        // портится — вместо случайных чисел начинают идти нули. Задержки и
+        // отступы, ради которых он тут и стоит, при этом пропадают молча.
 
         // ── Profile ───────────────────────────────────────────────────────────
 
@@ -170,7 +173,7 @@ namespace DevDeck.Browser
         {
             var c = GetCenter();
 
-            double angle  = _rng.NextDouble() * Math.PI * 2;
+            double angle  = Random.Shared.NextDouble() * Math.PI * 2;
             int    tx     = (int)(c[0] + distance * Math.Cos(angle));
             int    ty     = (int)(c[1] + distance * Math.Sin(angle));
 

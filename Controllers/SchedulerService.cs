@@ -586,9 +586,15 @@ private static void SeedDefaults(Db db)
 
                 if (session is null)
                 {
-                    // Профиль на задачу: имя может содержать точки и пробелы,
-                    // поэтому в путь идёт очищенное.
-                    var safe = string.Concat(name.Select(
+                    // Профиль на запуск, а не на задачу. Persistent context в
+                    // Playwright занимает каталог монопольно: два потока одного
+                    // шаблона на общем профиле либо не поднимутся, либо испортят
+                    // друг другу куки. Поэтому в путь идёт ещё и runId, а при
+                    // работе по аккаунтам — сам аккаунт, чтобы его сессия
+                    // возвращалась в свой каталог.
+                    var acc  = payload.GetValueOrDefault("acc0", "");
+                    var slot = acc.Length > 0 ? acc : runId;
+                    var safe = string.Concat((name + "-" + slot).Select(
                         c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
                     var profileDir = Path.Combine(Path.GetTempPath(), "devdeck-xml", "profile-" + safe);
                     rp.AddLine($"[br] Patchright, профиль {profileDir}"

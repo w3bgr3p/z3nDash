@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // ProfileGenerator.cs — личность профиля из настроек шаблона.
 //
 // В <StaticTechnologies><Profile> лежит не сам профиль, а правила его генерации:
@@ -58,7 +58,8 @@ public sealed class ProfileRules
 
 public static class ProfileGenerator
 {
-    private static readonly Random _rnd = new();
+    // Random.Shared: System.Random не потокобезопасен, а личности
+    // генерируются параллельно — по одной на каждый поток шаблона.
 
     private static readonly string[] MaleNames =
     [
@@ -83,14 +84,14 @@ public static class ProfileGenerator
     {
         var p = project.Profile;
 
-        bool male = _rnd.Next(100) < rules.Males;
+        bool male = Random.Shared.Next(100) < rules.Males;
         p.Gender  = male ? "Male" : "Female";
         p.Name    = Pick(male ? MaleNames : FemaleNames);
         p.Surname = Pick(Surnames);
 
-        int age  = _rnd.Next(Math.Min(rules.MinAge, rules.MaxAge),
+        int age  = Random.Shared.Next(Math.Min(rules.MinAge, rules.MaxAge),
                              Math.Max(rules.MinAge, rules.MaxAge) + 1);
-        var born = DateTime.Today.AddYears(-age).AddDays(-_rnd.Next(365));
+        var born = DateTime.Today.AddYears(-age).AddDays(-Random.Shared.Next(365));
         p.BirthDate = born.ToString("yyyy-MM-dd");
 
         p.Country = rules.Nationality;
@@ -105,7 +106,7 @@ public static class ProfileGenerator
         p.Email    = z3n7.Rnd.RndMail();
     }
 
-    private static string Pick(string[] from) => from[_rnd.Next(from.Length)];
+    private static string Pick(string[] from) => from[Random.Shared.Next(from.Length)];
 
     /// <summary>
     /// LoginGenerationRule вида "[Eng|4][RndNum|1970|1990]": куски в скобках
@@ -126,7 +127,7 @@ public static class ProfileGenerator
                 "rndnum" when parts.Length > 2
                               && int.TryParse(parts[1], out var lo)
                               && int.TryParse(parts[2], out var hi)
-                    => _rnd.Next(Math.Min(lo, hi), Math.Max(lo, hi) + 1).ToString(),
+                    => Random.Shared.Next(Math.Min(lo, hi), Math.Max(lo, hi) + 1).ToString(),
                 _   => m.Value,
             };
         });

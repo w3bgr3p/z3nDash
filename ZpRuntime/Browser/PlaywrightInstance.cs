@@ -767,7 +767,10 @@ namespace DevDeck.Browser
                 _loc.Locator(string.Join(", ", tags.Select(t => t + clause))).Nth(index));
         }
 
-        private static readonly Random _rnd = new();
+        // Random.Shared, а не свой экземпляр: System.Random не потокобезопасен,
+        // и при параллельных запусках одного шаблона его внутреннее состояние
+        // портится — вместо случайных чисел начинают идти нули. Задержки и
+        // отступы, ради которых он тут и стоит, при этом пропадают молча.
 
         /// <summary>
         /// Клик всегда настоящий, мышью. Раньше здесь при уровне эмуляции ниже
@@ -783,7 +786,7 @@ namespace DevDeck.Browser
             if (eventName != "click") { Sync(_loc.DispatchEventAsync(eventName)); return; }
 
             Sync(_loc.ScrollIntoViewIfNeededAsync());
-            Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = _rnd.Next(40, 140) }));
+            Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = Random.Shared.Next(40, 140) }));
         }
 
         /// <summary>
@@ -805,13 +808,13 @@ namespace DevDeck.Browser
             }
 
             Sync(_loc.ScrollIntoViewIfNeededAsync());
-            Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = _rnd.Next(40, 140) }));
+            Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = Random.Shared.Next(40, 140) }));
             if (clear) Sync(_loc.ClearAsync());
 
             foreach (var ch in value)
             {
-                Sync(_loc.PressAsync(ch.ToString(), new LocatorPressOptions { Delay = _rnd.Next(20, 70) }));
-                Thread.Sleep(_rnd.Next(35, 145));
+                Sync(_loc.PressAsync(ch.ToString(), new LocatorPressOptions { Delay = Random.Shared.Next(20, 70) }));
+                Thread.Sleep(Random.Shared.Next(35, 145));
             }
         }
 
