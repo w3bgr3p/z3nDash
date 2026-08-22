@@ -136,6 +136,14 @@ public sealed class BrowserSession : IAsyncDisposable
                 Channel      = string.IsNullOrWhiteSpace(channel) ? null : channel,
                 Headless     = headless,
                 Proxy        = proxySettings,
+                // Песочница включена намеренно. Playwright по умолчанию её
+                // выключает — «if (options.chromiumSandbox !== true) push("--no-sandbox")» —
+                // а Chrome на этот ключ показывает плашку «unsupported
+                // command-line flag». Плашка занимает высоту окна: сдвигает
+                // вьюпорт и попадает в скриншоты, по которым считаются
+                // координаты. Заодно настоящий браузер у человека всегда
+                // запущен с песочницей, и её отсутствие — лишнее отличие.
+                ChromiumSandbox = true,
                 // Свой UserAgent и принудительный размер окна — те самые признаки,
                 // которые Patchright и убирает. Не задаём ни того, ни другого.
                 ViewportSize = ViewportSize.NoViewport,
