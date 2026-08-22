@@ -31,6 +31,11 @@ namespace DevDeck.Browser
         void ClearCookie(string domain = null);
         void SaveCookie(string path);
         void SetCookie(string cookieString);
+        /// <summary>
+        /// Cookie строкой. isCookieFormat=false — Netscape (табулированный формат
+        /// cookies.txt), true — заголовок "name=value; name=value".
+        /// </summary>
+        string GetCookie(string domain = null, bool isCookieFormat = false);
         void WaitFieldEmulationDelay();
         void InstallCrxExtension(string path);
 

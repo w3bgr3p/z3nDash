@@ -1,6 +1,7 @@
 ﻿using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -193,11 +194,14 @@ namespace DevDeck.Browser
                     if (f.Length < 7) continue;
                     list.Add(new Cookie
                     {
-                        Domain = f[0],
-                        Path   = f[2],
-                        Secure = f[3].Equals("TRUE", StringComparison.OrdinalIgnoreCase),
-                        Name   = f[5],
-                        Value  = f[6],
+                        Domain   = f[0],
+                        Path     = f[2],
+                        Secure   = f[3].Equals("TRUE", StringComparison.OrdinalIgnoreCase),
+                        Expires  = ParseNetscapeExpiry(f[4]),
+                        Name     = f[5],
+                        Value    = f[6],
+                        HttpOnly = f.Length > 7
+                                   && f[7].Equals("TRUE", StringComparison.OrdinalIgnoreCase),
                     });
                 }
             }
@@ -219,6 +223,84 @@ namespace DevDeck.Browser
             }
 
             if (list.Count > 0) Sync(_context.AddCookiesAsync(list));
+        }
+
+        /// <summary>
+        /// Чтение cookie строкой — то, чем в ZP пользуется Cookies.GetCookies и
+        /// вся выгрузка сессии в базу. Раньше метод бросал NotSupportedException,
+        /// и перенос Browser/Cookies.cs был об это заблокирован.
+        ///
+        /// Формат по умолчанию — Netscape (cookies.txt): именно его ждёт
+        /// NetscapeToJson и разбирает наш же SetCookie. isCookieFormat=true даёт
+        /// заголовочный вид "name=value; name=value" без домена и срока.
+        /// </summary>
+        public string GetCookie(string domain = null, bool isCookieFormat = false)
+        {
+            var cookies = Sync(_context.CookiesAsync());
+
+            if (!string.IsNullOrEmpty(domain))
+            {
+                var target = domain.TrimStart('.');
+                cookies = cookies.Where(c =>
+                {
+                    var d = (c.Domain ?? "").TrimStart('.');
+                    return d.Equals(target, StringComparison.OrdinalIgnoreCase)
+                        || d.EndsWith("." + target, StringComparison.OrdinalIgnoreCase);
+                }).ToList();
+            }
+
+            if (isCookieFormat)
+                return string.Join("; ", cookies.Select(c => $"{c.Name}={c.Value}"));
+
+            // domain, includeSubdomains, path, secure, expires, name, value,
+            // httpOnly, FALSE — ровно те девять колонок, которые пишет
+            // Cookies.JsonToNetscape эталона и читает его же NetscapeToJson.
+            var lines = cookies.Select(c => string.Join("\t",
+                c.Domain,
+                (c.Domain ?? "").StartsWith(".") ? "TRUE" : "FALSE",
+                string.IsNullOrEmpty(c.Path) ? "/" : c.Path,
+                c.Secure == true ? "TRUE" : "FALSE",
+                FormatNetscapeExpiry(c.Expires),
+                c.Name,
+                c.Value,
+                c.HttpOnly == true ? "TRUE" : "FALSE",
+                "FALSE"));
+
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>
+        /// Срок в колонке expires — не unix-секунды, а "MM/dd/yyyy HH:mm:ss": так
+        /// его пишет ZennoPoster, и только этот вид разбирает Cookies.NetscapeToJson
+        /// эталона (TryParseExact с этой маской). Unix-секунды он не бросал, а молча
+        /// клал expirationDate = null — cookie превращалась в сессионную.
+        ///
+        /// Время местное, не UTC: NetscapeToJson заворачивает разобранное в
+        /// new DateTimeOffset(expiry), то есть трактует его как локальное. При
+        /// выгрузке в UTC срок уезжал ровно на смещение пояса — проверено, +5 часов.
+        ///
+        /// Пустая строка означает сессионную cookie.
+        /// </summary>
+        private static string FormatNetscapeExpiry(float expires)
+            => expires < 0
+                   ? ""
+                   : DateTimeOffset.FromUnixTimeSeconds((long)expires).LocalDateTime
+                       .ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+
+        /// <summary>Обратный разбор той же колонки, в тех же местных сутках.
+        /// Unix-секунды тоже принимаются: их пишут выгрузки сторонних
+        /// расширений.</summary>
+        private static float ParseNetscapeExpiry(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return -1;
+
+            if (DateTime.TryParseExact(raw, "MM/dd/yyyy HH:mm:ss",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                return (float)new DateTimeOffset(dt).ToUnixTimeSeconds();
+
+            return double.TryParse(raw, NumberStyles.Any,
+                       CultureInfo.InvariantCulture, out var unix) && unix > 0
+                       ? (float)unix : -1;
         }
 
         public void WaitFieldEmulationDelay() => Thread.Sleep(new Random().Next(1337, 2077));

@@ -23,7 +23,7 @@
 трафик, состояние DOM. «Прочитал код и выглядит правильно» — это `не проверено`,
 именно так и были пропущены `FillAsync` и `DispatchEvent`.
 
-## 1. Дословные копии эталона — `ZpRuntime/Z3n7/`, 28 файлов
+## 1. Дословные копии эталона — `ZpRuntime/Z3n7/`, 30 файлов
 
 Сверяются механически, глазами не требуют:
 
@@ -36,7 +36,7 @@ python ZpRuntime/tools/ext_inventory.py
 переехал в ядро, в новый каталог `Mail/`. Во-вторых, часть копий разошлась с
 эталоном по существу.
 
-После пересборки из текущего эталона (HEAD `6c40977`): 20 файлов совпадают
+После пересборки из текущего эталона (HEAD `6c40977`): 22 файла совпадают
 дословно, 6 отличаются только помеченными отступлениями, 2 (`Constantes.cs`,
 `GVars.cs`) — извлечения из `Essentials/Vars.cs`, парного файла у них нет.
 Проверено, что три наших файла вместе покрывают все 21 метод эталонного
@@ -99,7 +99,8 @@ python ZpRuntime/tools/ext_inventory.py
 | `ClearCache` | очистить кеш | отказ по домену | исправлен 8c03be8: чистил cookie вместо кеша |
 | `ClearCookie(domain)` | удалить cookie | **проверено** | круговой прогон 2026-08-13: после вызова `document.cookie` пуст |
 | `SaveCookie(path)` | выгрузить cookie в файл | **проверено** | круговой прогон 2026-08-13 |
-| `SetCookie(text)` | восстановить cookie | **проверено** | круговой прогон 2026-08-13 |
+| `SetCookie(text)` | восстановить cookie | **проверено** | круговой прогон 2026-08-13; 2026-08-22 добавлен срок и `httpOnly` из Netscape |
+| `GetCookie(domain, isCookieFormat)` | выгрузить cookie строкой | **проверено** | 2026-08-22: Netscape в диалекте ZP, фильтр по домену, круговой прогон |
 | `InstallCrxExtension` | поставить расширение | отказ | было пустым телом |
 | `Tab.IsBusy` | страница ещё грузится | **проверено** | 2026-08-13: `document.open()` → `true`, `close()` → `false` |
 | `Tab.Handle` | в ZP это HWND окна вкладки | **известно неверный** | суррогат из `GetHashCode`; годится как ключ, но `Emulator.SendKey` с ним работать не будет. Зовёт его `ChromeExt.cs`, который ещё не перенесён |
@@ -145,7 +146,7 @@ python ZpRuntime/tools/ext_inventory.py
 | `HtmlElementCollection.*` | **проверено** | 2026-08-13: `Count`, `IsVoid`, индексатор, `GetByNumber`, `IndexOf`, `AttributesToString` |
 | `ZennoPoster.AddTask`/`StartTask`/`TasksList` и прочее управление задачами | отказ | очереди ZP нет, планировщик свой |
 | `ZennoPoster.ImageProcessing*` | отказ | не реализовано |
-| `Instance.Launch`, `Reload`, `GetCookie`, `SetCookie`, `Tab.Stop` | отказ | — |
+| `Instance.Launch`, `Reload`, `Tab.Stop` | отказ | — |
 
 ## 4. Подложка — `ZpRuntime/Zenno/ZennoStub.cs`
 
@@ -175,6 +176,64 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-22 — перенос `Browser/Cookies.cs`: срок жизни уезжал молча
+
+Перенесены `Browser/Cookies.cs` и `Browser/CookieCollector.cs` — дословно.
+Перенос был заблокирован подложкой: `Instance.GetCookie` бросал
+`NotSupportedException`, а его зовут `Cookies.GetCookies`, `SaveAllCookies` и
+`SaveDomainCookies`, то есть вся выгрузка сессии. Реализован через
+`_context.CookiesAsync()`.
+
+**Найдено при проверке, а не при чтении.** Первая версия писала колонку
+`expires` в unix-секундах — так её пишут выгрузки расширений, и так её читал наш
+же разбор. Эталонный `Cookies.NetscapeToJson` разбирает её
+`TryParseExact("MM/dd/yyyy HH:mm:ss")` и на несовпадении **не бросает**, а кладёт
+`expirationDate = null` и `session = false`. То есть `GetCookies()` отдавал
+формально правильный JSON, в котором у каждой cookie пропал срок: сохранённая
+сессия превращалась в сессионную и умирала с браузером.
+
+Второй заход, уже с маской, но в UTC, дал ту же болезнь мягче: срок уезжал ровно
+на смещение пояса, у меня +5 часов. Причина — `NetscapeToJson` заворачивает
+разобранное в `new DateTimeOffset(expiry)`, то есть считает время **местным**.
+Пишем местное.
+
+Правки в `PlaywrightInstance`: `FormatNetscapeExpiry`/`ParseNetscapeExpiry`,
+девять колонок вместо семи (добавились `httpOnly` и хвостовой `FALSE` — их
+пишет `JsonToNetscape` эталона), и обратный разбор в `SetCookie` перестал
+терять срок и `httpOnly`.
+
+**Чем проверено.** Живой браузер, `example.com`, две cookie с `max-age=86400`:
+
+```
+GetCookie() netscape:
+  example.com | FALSE | / | FALSE | 08/23/2026 10:40:48 | probe | 42 | FALSE | FALSE
+GetCookie("example.com")   — те же две
+GetCookie("nonexistent.tld") — []
+GetCookie(isCookieFormat)  — probe=42; second=abc
+Cookies.GetCookies(json)   — expirationDate 1787499648, совпадает с настоящим
+ClearCookie → []           → SetCookie(netscape) → document.cookie = probe=42; second=abc
+GetCookie после round-trip — срок тот же
+```
+
+Отдельно проверены `GetCookiesByJs` (вернул cookie живой страницы),
+`SetCookiesByJs` (`viajs=777` появилась в `document.cookie`), `ParseJwt`
+(разобрал заголовок, `sub`, `iat`) и `CookieCollector.Run` — сходил в сеть за
+`example.com` и `wikipedia.org`, принёс 5 настоящих cookie.
+
+**Баг эталона, чинить в z3n7.** `ConvertCookieFormat(json, "netscape")` уводит
+срок на смещение пояса: `NetscapeToJson` читает колонку как местное время, а
+парный `JsonToNetscape` пишет её из UTC. Круговой прогон json→netscape→json
+сдвигает срок на величину пояса, у меня на 5 часов. В копии не тронуто.
+
+**Не проверено, упирается в базу.** `AnalyzeCookies`, `PruneCookies`,
+`PruneAllCookies`, `PrintCookieReport`, `SaveAllCookies`, `SaveDomainCookies`,
+`LoadCookies`, `CleanDomainInDb` ходят в `DbGet`/`DbUpd`. Проверка упирается в
+известный баг эталона: в режиме SQLite запись уходит в никуда (см. запись ниже).
+
+Подложка попутно доросла: `IProfile.HTTPAccept` и `IProfile.AcceptLanguage`
+(их читает `InstanceExtensions.GetCookies` при наполнении профиля коллектором) и
+перегрузка `SendInfoToLog(message, type, showInPoster)`.
 
 ### 2026-08-13 — CFSolve, коллекция, CtrlV и находка в слое данных
 

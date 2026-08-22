@@ -105,6 +105,12 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
     {
         string UserAgent  { get; set; }
 
+        /// <summary>Заголовок Accept профиля. В ZP им подписываются запросы,
+        /// идущие мимо браузера, чтобы они не отличались от браузерных.</summary>
+        string HTTPAccept     { get; set; }
+        /// <summary>Заголовок Accept-Language профиля.</summary>
+        string AcceptLanguage { get; set; }
+
         string Name       { get; set; }
         string Surname    { get; set; }
         string MiddleName { get; set; }
@@ -187,6 +193,7 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         void SendToLog(string message, LogType type, bool showInPoster);
         void SendToLog(string message, LogType type, bool showInPoster, LogColor color);
         void SendInfoToLog(string message,    bool showInPoster = false);
+        void SendInfoToLog(string message, string messageType, bool showInPoster);
         void SendWarningToLog(string message, bool showInPoster = false);
         void SendErrorToLog(string message,   bool showInPoster = false);
     }
@@ -317,6 +324,12 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) " +
             "Chrome/124.0.0.0 Safari/537.36";
+
+        public string HTTPAccept { get; set; } =
+            "text/html,application/xhtml+xml,application/xml;q=0.9," +
+            "image/avif,image/webp,image/apng,*/*;q=0.8";
+
+        public string AcceptLanguage { get; set; } = "en-US,en;q=0.9";
 
         public string Name       { get; set; } = "";
         public string Surname    { get; set; } = "";
@@ -549,6 +562,10 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
             Logger?.Info(message);
             OnLog?.Invoke(message);
         }
+
+        public void SendInfoToLog(string message, string messageType, bool show)
+            => SendInfoToLog(string.IsNullOrEmpty(messageType)
+                                 ? message : $"[{messageType}] {message}", show);
 
         public void SendWarningToLog(string message, bool show = false)
         {

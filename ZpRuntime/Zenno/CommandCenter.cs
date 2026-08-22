@@ -605,8 +605,8 @@ namespace ZennoLab.CommandCenter
 
         public void   SaveCookie(string path)   => Br.SaveCookie(path);
         public void   SetCookie(string cookie)  => Br.SetCookie(cookie);
-        public string GetCookie(string domain, bool isCookieFormat) => throw new NotSupportedException(
-            "Instance.GetCookie: чтение cookie в ZpRuntime не реализовано — используйте SaveCookie");
+        public string GetCookie(string domain = null, bool isCookieFormat = false)
+            => Br.GetCookie(domain, isCookieFormat);
 
         public void WaitFieldEmulationDelay() => Br.WaitFieldEmulationDelay();
 
