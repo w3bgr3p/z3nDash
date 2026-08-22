@@ -581,8 +581,24 @@ namespace DevDeck.Browser
             set { _mousePos = value; Sync(_page.Mouse.MoveAsync(value.X, value.Y)); }
         }
 
+        /// <summary>
+        /// Переход. Возвращается, как только новый документ принят браузером
+        /// (Commit), а не когда доехало всё до последнего пикселя.
+        ///
+        /// Так устроен ZP, и на это прямо рассчитан эталонный Go:
+        /// «Navigate(...); if (ActiveTab.IsBusy &amp;&amp; waitTdle) WaitDownloading()» —
+        /// ждать или не ждать решает вызывающий, а не переход. Мы же ждали
+        /// состояния load всегда и на таймауте бросали. На живом сайте вроде
+        /// airbnb.fr, где аналитика не даёт load случиться никогда, это роняло
+        /// ветку на полностью загруженной странице: «Timeout 30000ms exceeded,
+        /// waiting until load». В ZP исключения в этом месте нет.
+        /// </summary>
         public void Navigate(string url, string referer = "")
-            => Sync(_page.GotoAsync(url, new PageGotoOptions { Referer = referer == "" ? null : referer }));
+            => Sync(_page.GotoAsync(url, new PageGotoOptions
+            {
+                Referer   = referer == "" ? null : referer,
+                WaitUntil = WaitUntilState.Commit,
+            }));
 
         public void MouseClick(int x, int y, string button, string mouseEvent, bool considerScroll)
         {
@@ -622,8 +638,20 @@ namespace DevDeck.Browser
         /// таймауту. Пока IsBusy врал «не занята», путь был мёртвый и это не
         /// проявлялось — а после его починки Go и F5 начали сюда заходить.
         /// </summary>
+        /// <summary>
+        /// Ожидание загрузки. По истечении срока просто возвращается: «подожди
+        /// загрузку» в ZP — это ожидание, а не проверка. Сайты, где load не
+        /// наступает никогда из-за висящей аналитики, иначе роняют ветку на
+        /// готовой странице.
+        /// </summary>
         public void WaitDownloading()
-            => Sync(_page.WaitForLoadStateAsync(LoadState.Load));
+        {
+            // PlaywrightException, а не TimeoutException: у Playwright свой
+            // одноимённый тип, и он от неё наследуется — заодно ловится смена
+            // документа прямо во время ожидания.
+            try { Sync(_page.WaitForLoadStateAsync(LoadState.Load)); }
+            catch (PlaywrightException) { }
+        }
 
         public void KeyEvent(string key, string type, string modifier = "")
             => Sync(_page.Keyboard.PressAsync(string.IsNullOrEmpty(modifier) ? key : $"{modifier}+{key}"));
