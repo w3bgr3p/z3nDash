@@ -58,10 +58,29 @@ SKIP_DIRS = {
 DEFAULT_Z3N7 = 'W:/code_hard/.net/z3n7/z3n7'
 
 # Файлы эталона, которые переносить не нужно, — иначе они вечно висят в остатке.
-# MethodExtensions/ProjectExtencions.cs: Help — просмотр методов ZennoLab через
-# рефлексию, инструмент разработки. В скомпилированных рабочих скриптах его нет.
+#
+# Критерий отбора здесь не «компилируется ли», а «есть ли под нами то, к чему
+# оно обращается». Инфраструктура самого ZennoPoster под нами не значит ничего:
+# компилируется она прекрасно, а работать ей не с чем.
+#
+# ProjectExtencions.cs: Help — просмотр методов ZennoLab через рефлексию,
+#   инструмент разработки. В скомпилированных рабочих скриптах его нет.
+# Extractor.cs, ZpToCsx.cs: конвертация ZP-шаблона в csx. Мы играем XML
+#   напрямую через XmlPlayer — конвертировать не во что.
+# ExternalCode.cs: RunZp — запуск .zp файла процессом ZennoPoster. Такого
+#   процесса под нами нет, и файл без конвертации всё равно не запустится.
+# LogDisabler.cs: гасит папку Logs рядом с ZennoPoster.exe. У нашего процесса
+#   её нет.
+# TaskManager.cs: управление очередью задач ZP — ExportInputSettings, TasksList,
+#   StartTask, SetMaxThreads. Пятнадцать обращений к ZennoPoster.*, и все они у
+#   нас помечены «отказ»: очереди ZP нет, планировщик свой.
 SKIP_FILES = {
     'ProjectExtencions.cs',
+    'Extractor.cs',
+    'ZpToCsx.cs',
+    'ExternalCode.cs',
+    'LogDisabler.cs',
+    'TaskManager.cs',
 }
 
 

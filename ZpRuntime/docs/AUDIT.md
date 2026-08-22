@@ -23,7 +23,7 @@
 трафик, состояние DOM. «Прочитал код и выглядит правильно» — это `не проверено`,
 именно так и были пропущены `FillAsync` и `DispatchEvent`.
 
-## 1. Дословные копии эталона — `ZpRuntime/Z3n7/`, 50 файлов
+## 1. Дословные копии эталона — `ZpRuntime/Z3n7/`, 45 файлов
 
 Сверяются механически, глазами не требуют:
 
@@ -36,7 +36,7 @@ python ZpRuntime/tools/ext_inventory.py
 переехал в ядро, в новый каталог `Mail/`. Во-вторых, часть копий разошлась с
 эталоном по существу.
 
-После пересборки из текущего эталона (HEAD `6c40977`): 42 файла совпадают
+После пересборки из текущего эталона (HEAD `6c40977`): 37 файлов совпадают
 дословно, 6 отличаются только помеченными отступлениями, 2 (`Constantes.cs`,
 `GVars.cs`) — извлечения из `Essentials/Vars.cs`, парного файла у них нет.
 Проверено, что три наших файла вместе покрывают все 21 метод эталонного
@@ -181,12 +181,41 @@ python ZpRuntime/tools/ext_inventory.py
 
 Записи снизу вверх, новые сверху.
 
+### 2026-08-22 — пять переносов откачены: критерий был не тот
+
+Master остановил на том, что часть переноса бессмысленна, и он прав. Я отбирал
+файлы по «компилируется — значит перенесено». Критерий должен быть другой:
+**есть ли под нами то, к чему файл обращается.** Инфраструктура самого
+ZennoPoster компилируется прекрасно — работать ей не с чем.
+
+Убраны из `Z3n7/` и внесены в `SKIP_FILES` инвентаря с причинами, чтобы не
+всплыли снова:
+
+| файл | почему не нужен |
+|---|---|
+| `Tools/Extractor.cs`, `Tools/ZpToCsx.cs` | конвертация ZP-шаблона в csx. Мы играем XML напрямую через `XmlPlayer` — конвертировать не во что |
+| `Essentials/ExternalCode.cs` | `RunZp` — запуск `.zp` файла процессом ZennoPoster. Такого процесса нет, да и файл без конвертации не запустится |
+| `Essentials/LogDisabler.cs` | гасит папку `Logs` рядом с `ZennoPoster.exe`; у нашего процесса её нет |
+| `DbUtils/TaskManager.cs` | очередь задач ZP: `ExportInputSettings`, `TasksList`, `StartTask`, `SetMaxThreads`. Пятнадцать обращений к `ZennoPoster.*`, и все они у нас уже помечены «отказ» — планировщик свой |
+
+`TaskManager` показателен: он собрался без единой правки подложки и выглядел
+переносом, хотя каждый его метод, кроме `TblEnsure`, бросил бы на первом же
+вызове. Сборка этого не видит — ровно та же слепота, ради которой заведён этот
+дневник, только этажом выше: там метод молча делал не то, здесь молча не делал
+ничего целый файл.
+
+Остальные перенесённые проверены тем же признаком — обращений к `ZennoPoster.*`
+ни в одном не осталось (в `TrafficCounter` только в комментарии). Остаток по
+файлам не изменился: 14, потому что снятые пять ушли не в остаток, а в пропуск.
+
 ### 2026-08-22 — ещё восемь файлов и упор в жизненный цикл инстанса
 
-Перенесены дословно и без единой правки подложки: `Essentials/ExternalCode`,
-`Essentials/LogDisabler`, `Mail/MSMail`, `Api/OmniRoute`,
-`Accounts/PropertyManager`, `Tools/Rss`, `Tools/SysAudit`,
-`DbUtils/TaskManager`. Осталось 14 файлов из 62.
+Перенесены дословно и без единой правки подложки: `Mail/MSMail`,
+`Api/OmniRoute`, `Accounts/PropertyManager`, `Tools/Rss`, `Tools/SysAudit`.
+Осталось 14 файлов из 62.
+
+*Правка от того же числа: сюда же попали `Essentials/ExternalCode`,
+`Essentials/LogDisabler` и `DbUtils/TaskManager` — они сняты, см. запись выше.*
 
 Из пакетов добавились только `System.Diagnostics.PerformanceCounter` и
 `System.ServiceProcess.ServiceController` — их читает `SysAudit`.
@@ -218,8 +247,10 @@ python ZpRuntime/tools/ext_inventory.py
 
 Перенесены дословно: `Api/Telegram`, `Api/Webshare`, `Api/Aiio`, `Api/ZB`,
 `Mail/TempMail`, `Traffic/GraphQL`, `Traffic/TrafficCounter`,
-`Browser/HtmlExtensions`, `Tools/Extractor`, `Tools/Img`, `Tools/ZpToCsx`,
-`MethodExtensions/DictionaryExtensions`. Осталось 22 файла из 62.
+`Browser/HtmlExtensions`, `Tools/Img`, `MethodExtensions/DictionaryExtensions`.
+
+*Правка от того же числа: сюда же попали `Tools/Extractor` и `Tools/ZpToCsx` —
+они сняты, см. запись выше.*
 
 Первые четыре и `GraphQL` с `ZB` встали без единой правки — вся подложка под
 ними уже была. Остальные упёрлись в четыре дыры, все закрыты и проверены на
@@ -256,8 +287,6 @@ GetXPath 2-го li         — //*/body/ul[@id='list']/li[2]
 project.Context[key]     — список вернулся, отсутствующий ключ дал null
 TrafficCounter.Checkpoint— 559 байт на загрузке example.com
 ```
-
-`Tools/Extractor.cs` потянул за собой `Tools/ZpToCsx.cs` — тот встал без правок.
 
 **Не проверено.** `Api/Telegram`, `Api/Webshare`, `Api/Aiio`, `Api/ZB`,
 `Mail/TempMail` — это дословные копии поверх уже проверенной подложки, и живой
