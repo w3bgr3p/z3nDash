@@ -235,15 +235,42 @@ public sealed class BranchExecutor
                 number);
     }
 
-    /// <summary>Сколько ждать элемент. В XML срока нет — берём ZP-шный по умолчанию.</summary>
-    private static int Deadline(Branch branch) => 10;
+    /// <summary>
+    /// Сколько секунд ждать элемент. Срок лежит в самой ветке —
+    /// &lt;WaitElementTime&gt;, в секундах, ровно как в поле ZP «Время ожидания
+    /// элемента».
+    ///
+    /// Здесь стояла десятка числом и комментарий «в XML срока нет». Это было
+    /// неправдой: срок есть, и он у веток разный — в шаблонах встречается и 60.
+    /// Поднятое до 30 ожидание молча оставалось десяткой, а ветка падала
+    /// «not found in 10s» на сайте, который просто медленнее.
+    ///
+    /// Ноль пропускается как есть: в ZP это «не ждать», и подменять его
+    /// десяткой значит менять смысл ветки.
+    /// </summary>
+    private int Deadline(Branch branch)
+    {
+        var raw = _project.Expand(branch.Param("WaitElementTime"));
+        return int.TryParse(raw, out var seconds) && seconds >= 0 ? seconds : 10;
+    }
 
-    /// <summary>ZP-шный EmulationLevel ветки; по умолчанию как у инстанса.</summary>
+    /// <summary>
+    /// Уровень эмуляции ветки. В XML это два поля: &lt;Emulation&gt; говорит,
+    /// откуда брать — Current значит «как у инстанса», — и только иначе в дело
+    /// идёт &lt;EmulationLevel&gt;.
+    ///
+    /// Проверялся один EmulationLevel на равенство «Current», а там лежит
+    /// уровень («Middle»), поэтому условие не срабатывало никогда: настройка
+    /// инстанса молча игнорировалась, и клик шёл с уровнем ветки даже там, где
+    /// шаблон просил обратное.
+    /// </summary>
     private string EmulationLevel(Branch branch)
     {
+        var source = branch.Param("Emulation");
+        if (string.IsNullOrWhiteSpace(source) || source.Equals("Current", StringComparison.OrdinalIgnoreCase))
+            return _instance.EmulationLevel;
+
         var level = branch.Param("EmulationLevel");
-        return string.IsNullOrWhiteSpace(level) || level == "Current"
-            ? _instance.EmulationLevel
-            : level;
+        return string.IsNullOrWhiteSpace(level) ? _instance.EmulationLevel : level;
     }
 }
