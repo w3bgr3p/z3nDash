@@ -181,6 +181,54 @@ python ZpRuntime/tools/ext_inventory.py
 
 Записи снизу вверх, новые сверху.
 
+### 2026-08-22 — ветка ImageProcessing/WaterMark
+
+`[xml] ImageProcessing/WaterMark → ошибка [ветка в плеере не реализована]`, и
+следом «обработчик конца сам упал»: ветка стоит в обработчике `BadEnd`, поэтому
+маршрут терял не только снимок, но и разбор падения.
+
+В шаблонах это не украшение, а инструмент разбора. Ветка идёт сразу за кодом,
+который собирает состояние:
+
+```csharp
+project.Variables["errRep"].Value = $@"{project.LastErrorComment}
+{instance.ActiveTab.URL}
+{project.Var("numDirection")}
+{project.LastExecutedActionId}";
+project.Variables["errPath"].Value = Path.Combine(project.Path, "debug_screens", …);
+```
+
+— и кладёт это поверх снимка страницы в `debug_screens`.
+
+**Подложка.** Появился `Tab.GetPagePreview()` — снимок страницы в base64, тот же
+контракт, что у ZP (его же зовёт эталонный `Canvas.cs`). В ZP саму ветку делает
+`ZennoPoster.ImageProcessingWaterMarkTextFromScreenshot`, адресуя инстанс по
+порту; порта у нас нет, поэтому источник — вкладка.
+
+Разобраны параметры ветки как они лежат в XML: `SourceImage` (`Browser` или файл
+из `ImageFile`), `SignType`, `Text`, `OutputFile`, `Location` с `OffsetLeft`/
+`OffsetTop`, `Font` формата `"Tahoma, 10pt, Regular, [255;0;0;0]"` (имя, размер,
+начертание, цвет как `[A;R;G;B]`), `Transparency` в процентах, `Quality` для
+JPEG. Каталог под `OutputFile` создаётся: без этого ветка разбора падала бы
+именно тогда, когда нужна.
+
+**Отступления, названные вслух.** `Imposition` (`Horizontally`/`Vertically`) в ZP
+размножает знак по всей картинке — здесь знак ставится один раз в точке
+`Location`: для разбора нужен читаемый текст, а не заливка им кадра. Под текст
+кладётся полупрозрачная подложка — поверх пёстрой страницы запись иначе
+нечитаема. `SignType` кроме `Text` отказывает вслух.
+
+**Чем проверено.** Ветка взята из `numlex.casino_.xml` дословно и исполнена
+через `BranchExecutor` на живой странице `example.com`:
+
+```
+[xml] снимок сохранён: …\debug_screens\probe.png
+файл есть: True, 14355 байт, 929x993
+```
+
+Снимок открыт и посмотрен глазами: страница на месте, в левом верхнем углу
+читаются три строки состояния — текст ошибки, адрес, идентификатор ветки.
+
 ### 2026-08-22 — релей прокси: вниз HTTP, наверх SOCKS5
 
 Chrome показывал плашку «You are using an unsupported command-line flag:

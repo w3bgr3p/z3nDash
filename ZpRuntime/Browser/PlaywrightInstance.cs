@@ -653,6 +653,9 @@ namespace DevDeck.Browser
             catch (PlaywrightException) { }
         }
 
+        public string GetPagePreview()
+            => Convert.ToBase64String(Sync(_page.ScreenshotAsync()));
+
         public void KeyEvent(string key, string type, string modifier = "")
             => Sync(_page.Keyboard.PressAsync(string.IsNullOrEmpty(modifier) ? key : $"{modifier}+{key}"));
 

@@ -49,6 +49,7 @@ public sealed class BranchExecutor
             ("WebBrowser",  "CMD_NAVIGATE") => Navigate(branch),
             ("Profile",     "Update")       => UpdateProfile(branch),
             ("Logic",       "Pause")        => Pause(branch, ct),
+            ("ImageProcessing", "WaterMark")=> WaterMarkBranch(branch),
             _ => throw new NotSupportedException(
                      $"ветка {branch.Type}/{branch.Action} в плеере не реализована"),
         };
@@ -109,6 +110,60 @@ public sealed class BranchExecutor
     }
 
     // ── Прочее ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Снимок страницы с надписью поверх. В шаблонах это ветка разбора: на ней
+    /// сохраняется состояние, на котором маршрут встал.
+    ///
+    /// В ZP это ZennoPoster.ImageProcessingWaterMarkTextFromScreenshot с портом
+    /// инстанса. Порта у нас нет, поэтому источник — Tab.GetPagePreview.
+    /// </summary>
+    private BranchResult WaterMarkBranch(Branch branch)
+    {
+        var output = _project.Expand(branch.Param("OutputFile"));
+        if (string.IsNullOrWhiteSpace(output))
+            throw new InvalidOperationException("WaterMark без OutputFile: некуда сохранять");
+
+        var source = branch.Param("SourceImage") ?? "Browser";
+        byte[] bytes;
+
+        if (source.Equals("Browser", StringComparison.OrdinalIgnoreCase))
+        {
+            bytes = Convert.FromBase64String(_instance.ActiveTab.GetPagePreview());
+        }
+        else
+        {
+            // Источником может быть файл: у ZP это ImageFile, а FilePath —
+            // каталог, куда он смотрит, когда путь относительный.
+            var file = _project.Expand(branch.Param("ImageFile"));
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file))
+                throw new InvalidOperationException(
+                    $"WaterMark: источник {source}, но файла нет: {file}");
+            bytes = File.ReadAllBytes(file);
+        }
+
+        var signType = branch.Param("SignType") ?? "Text";
+        if (!signType.Equals("Text", StringComparison.OrdinalIgnoreCase))
+            throw new NotSupportedException(
+                $"WaterMark: знак вида {signType} не реализован, есть только Text");
+
+        var saved = WaterMark.Draw(
+            bytes,
+            _project.Expand(branch.Param("Text")) ?? "",
+            output,
+            branch.Param("Font"),
+            branch.Param("Location"),
+            Int(branch.Param("OffsetLeft")),
+            Int(branch.Param("OffsetTop")),
+            Int(branch.Param("Transparency")),
+            Int(branch.Param("Quality"), 100));
+
+        _log($"[xml] снимок сохранён: {saved}");
+        return new BranchResult(saved);
+    }
+
+    private static int Int(string? raw, int fallback = 0)
+        => int.TryParse(raw, out var v) ? v : fallback;
 
     private BranchResult Navigate(Branch branch)
     {

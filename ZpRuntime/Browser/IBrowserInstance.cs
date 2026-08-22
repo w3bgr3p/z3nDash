@@ -123,6 +123,12 @@ namespace DevDeck.Browser
         void MouseClick(int x, int y, string button, string mouseEvent, bool considerScroll);
         void FullEmulationMouseMove(int toX, int toY);
         void WaitDownloading();
+        /// <summary>
+        /// Снимок страницы в base64 (ZP: Tab.GetPagePreview). Снимается видимая
+        /// часть — то, что было на экране: снимок делается ради разбора, и важно
+        /// именно состояние, которое видел шаблон.
+        /// </summary>
+        string GetPagePreview();
         void Close();
         void KeyEvent(string key, string type, string modifier = "");
 

@@ -499,6 +499,9 @@ namespace ZennoLab.CommandCenter
         }
 
         public void Navigate(string url, string referrer = "") => T.Navigate(url, referrer);
+        /// <summary>Снимок страницы в base64 — тот же контракт, что у ZP.</summary>
+        public string GetPagePreview() => T.GetPagePreview();
+
         public void WaitDownloading()                          => T.WaitDownloading();
         public void Close()                                    => T.Close();
         public void Stop()                                     => throw new NotSupportedException(
