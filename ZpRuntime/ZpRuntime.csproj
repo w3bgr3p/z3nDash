@@ -55,6 +55,9 @@
              System.Drawing.Bitmap, как в эталоне, живёт в этом пакете. Он же
              тянет System.Drawing.Common, который нужен Tools/Img.cs. -->
         <PackageReference Include="ZXing.Net.Bindings.Windows.Compatibility" Version="0.16.12" />
+        <!-- Tools/SysAudit.cs читает счётчики производительности и службы Windows -->
+        <PackageReference Include="System.Diagnostics.PerformanceCounter"    Version="9.0.*" />
+        <PackageReference Include="System.ServiceProcess.ServiceController"  Version="9.0.*" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">

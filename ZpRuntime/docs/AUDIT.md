@@ -23,7 +23,7 @@
 трафик, состояние DOM. «Прочитал код и выглядит правильно» — это `не проверено`,
 именно так и были пропущены `FillAsync` и `DispatchEvent`.
 
-## 1. Дословные копии эталона — `ZpRuntime/Z3n7/`, 42 файла
+## 1. Дословные копии эталона — `ZpRuntime/Z3n7/`, 50 файлов
 
 Сверяются механически, глазами не требуют:
 
@@ -36,7 +36,7 @@ python ZpRuntime/tools/ext_inventory.py
 переехал в ядро, в новый каталог `Mail/`. Во-вторых, часть копий разошлась с
 эталоном по существу.
 
-После пересборки из текущего эталона (HEAD `6c40977`): 34 файла совпадают
+После пересборки из текущего эталона (HEAD `6c40977`): 42 файла совпадают
 дословно, 6 отличаются только помеченными отступлениями, 2 (`Constantes.cs`,
 `GVars.cs`) — извлечения из `Essentials/Vars.cs`, парного файла у них нет.
 Проверено, что три наших файла вместе покрывают все 21 метод эталонного
@@ -180,6 +180,39 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-08-22 — ещё восемь файлов и упор в жизненный цикл инстанса
+
+Перенесены дословно и без единой правки подложки: `Essentials/ExternalCode`,
+`Essentials/LogDisabler`, `Mail/MSMail`, `Api/OmniRoute`,
+`Accounts/PropertyManager`, `Tools/Rss`, `Tools/SysAudit`,
+`DbUtils/TaskManager`. Осталось 14 файлов из 62.
+
+Из пакетов добавились только `System.Diagnostics.PerformanceCounter` и
+`System.ServiceProcess.ServiceController` — их читает `SysAudit`.
+
+**Чем проверено.** `SystemSnapshot.Collect()` собрал настоящий отчёт на 122 189
+символов: аптайм 5д 22ч, 63.35 ГБ памяти, 16 логических ядер, агрегация
+процессов с их TCP-соединениями. То есть счётчики и службы читаются, а не
+падают на первом обращении.
+
+**Упор.** Оставшиеся 14 файлов — это один куст: `Accounts/AccountRunner`,
+`Accounts/Disposer`, `Accounts/ProcAcc`, `Accounts/ProfileSync`,
+`Accounts/InstanceManager` целиком, `Reports/*`, `Browser/ChromeExt`,
+`Browser/BrowserScan`, `Browser/GpuSpoof`, `Essentials/Init`,
+`Essentials/ZpServer`, `DbUtils/ProcessManager`, `Tools/Git`. Пробный перенос
+показал, чего им не хватает, и это не мелочи:
+
+- `IProfile.Save`/`Load` — файл профиля ZP целиком;
+- `Instance.SetWindowSize`, `UseMedia`, `Port`, `WebGLPreference`,
+  `BrowserType` как enum вместо строки;
+- `project.StartZpServer`, `project.GetLastError`;
+- `SAFU` в `Init`, WMI в `ProcessManager`.
+
+Это контракты жизненного цикла инстанса ZP, а у нас он устроен иначе: браузер
+поднимает `BrowserSession`, задачами заведует планировщик DevDeck. Тащить их
+как есть — значит тащить чужой жизненный цикл, о чём и предупреждает шапка
+нашего среза `InstanceManager.cs`. Решение за Master.
 
 ### 2026-08-22 — ещё двенадцать файлов ядра и четыре дыры в подложке
 
