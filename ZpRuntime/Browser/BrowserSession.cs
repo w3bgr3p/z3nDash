@@ -136,12 +136,26 @@ public sealed class BrowserSession : IAsyncDisposable
                 Channel      = string.IsNullOrWhiteSpace(channel) ? null : channel,
                 Headless     = headless,
                 Proxy        = proxySettings,
-                // Patchright ставит этот ключ сам — но только в фикстурах своего
+                // Первый ключ Patchright ставит сам — но только в фикстурах своего
                 // тест-раннера, а не в LaunchPersistentContextAsync, которым
                 // пользуемся мы. Без него navigator.webdriver === true, а это
-                // первое, что смотрит любая проверка на автоматизацию. Проверено:
-                // с ключом false, без него true.
-                Args = ["--disable-blink-features=AutomationControlled"],
+                // первое, что смотрит любая проверка на автоматизацию.
+                //
+                // Второй нужен из-за первого: на --disable-blink-features Chrome
+                // показывает плашку «unsupported command-line flag», то есть
+                // сам ключ против детекта приносил детект пожирнее — плашка
+                // занимает высоту окна и лезет в скриншоты. --test-type её
+                // гасит. Замерено по зазору outerHeight-innerHeight:
+                //
+                //   без Args                       зазор  95, плашки нет, webdriver true
+                //   AutomationControlled           зазор 147, плашка ЕСТЬ, webdriver false
+                //   AutomationControlled+test-type зазор  95, плашки нет, webdriver false
+                //   только test-type               зазор  95, плашки нет, webdriver true
+                //
+                // Сверка отпечатка со страницы (UA, языки, плагины, mime, chrome,
+                // ядра, память, экран, глубина, WebGL) с --test-type и без него
+                // различий не дала.
+                Args = ["--disable-blink-features=AutomationControlled", "--test-type"],
                 // Песочница включена намеренно. Playwright по умолчанию её
                 // выключает — «if (options.chromiumSandbox !== true) push("--no-sandbox")» —
                 // а Chrome на этот ключ показывает плашку «unsupported

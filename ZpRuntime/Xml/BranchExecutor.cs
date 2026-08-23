@@ -71,6 +71,8 @@ public sealed class BranchExecutor
     {
         var ev = _project.Expand(branch.Param("EventName")) is { Length: > 0 } e ? e : "click";
 
+        _log($"[xml] RiseEvent: {ev} по {Target(branch)}");
+
         // Эталонный HeClick умеет только click — остальные события шлём сами,
         // но через тот же GetHe, чтобы ожидание элемента было общим.
         if (ev.Equals("click", StringComparison.OrdinalIgnoreCase))
@@ -90,6 +92,9 @@ public sealed class BranchExecutor
         // Пустая подстановка — почти всегда не «так задумано», а незаполненная
         // переменная. Молча вводить ничего и отчитаться «выполнено» — ровно то,
         // из-за чего ветка потом падает через две штуки и в другом месте.
+        _log($"[xml] SetAttribute: {attr} = «{value}»" +
+             (raw != value ? $" (из «{raw}»)" : "") + $" в {Target(branch)}");
+
         if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(raw) && raw.Contains("{-"))
             _log($"[xml] SetAttribute: «{raw}» развернулось в пустую строку — вводить нечего");
 
@@ -106,8 +111,10 @@ public sealed class BranchExecutor
             // на следующей ветке, где ничего не появилось.
             var actual = ReadBack(branch);
             if (actual is not null && actual != value)
-                _log($"[xml] SetAttribute: в поле осталось «{actual}», а вводили «{value}» " +
-                     "— значение не закрепилось");
+            {
+                _log($"[xml] SetAttribute: в поле осталось «{actual}», а вводили «{value}»");
+                _log("[xml] SetAttribute: " + Describe(branch));
+            }
         }
         else _instance.GetHe(Selector(branch)).SetAttribute(attr, value);
 
@@ -124,6 +131,37 @@ public sealed class BranchExecutor
         catch { return null; }
     }
 
+    /// <summary>
+    /// Состояние элемента на момент неудачного ввода. Печатается только когда
+    /// значение не закрепилось, поэтому обычный прогон от этого не шумит.
+    ///
+    /// Смысл каждого признака — назвать причину, по которой набор проходит без
+    /// единого исключения и не даёт результата:
+    /// совпадений больше одного — вводили, возможно, не в то поле;
+    /// нулевой размер — элемент в разметке есть, но не отрисован;
+    /// readonly — Playwright спокойно шлёт нажатия, значение не меняется;
+    /// disabled — то же самое.
+    /// </summary>
+    private string Describe(Branch branch)
+    {
+        try
+        {
+            var (tag, attr, val, kind, number) = Selector(branch);
+            var all = _instance.ActiveTab.FindElementsByAttribute(tag, attr, val, kind);
+            var he  = _instance.GetHe(Selector(branch));
+
+            var ro   = he.GetAttribute("readonly");
+            var dis  = he.GetAttribute("disabled");
+            var type = he.GetAttribute("type");
+
+            return $"совпадений {all.Count} (берём {number}), размер {he.Width}x{he.Height}, " +
+                   $"type={(string.IsNullOrEmpty(type) ? "—" : type)}, " +
+                   $"readonly={(string.IsNullOrEmpty(ro) ? "нет" : ro)}, " +
+                   $"disabled={(string.IsNullOrEmpty(dis) ? "нет" : dis)}";
+        }
+        catch (Exception ex) { return "состояние снять не удалось: " + FirstLine(ex.Message); }
+    }
+
     private BranchResult GetAttribute(Branch branch)
     {
         var attr = branch.Param("Attribute");
@@ -131,7 +169,10 @@ public sealed class BranchExecutor
         // Пустой Attribute у ZP означает innertext — так стоит в шаблоне для
         // чтения капчи.
         var atr = string.IsNullOrWhiteSpace(attr) ? "innertext" : attr;
+        _log($"[xml] GetAttribute: читаю {atr} из {Target(branch)}");
+
         var value = _instance.HeGet(Selector(branch), deadline: Deadline(branch), atr: atr);
+        _log($"[xml] GetAttribute: прочитано «{value}»");
 
         return new BranchResult(value ?? "");
     }
@@ -189,6 +230,13 @@ public sealed class BranchExecutor
         return new BranchResult(saved);
     }
 
+    /// <summary>Первая строка сообщения — в лог не нужен весь стек Playwright.</summary>
+    private static string FirstLine(string text)
+    {
+        var i = text.IndexOf('\n');
+        return i < 0 ? text : text[..i].TrimEnd();
+    }
+
     private static int Int(string? raw, int fallback = 0)
         => int.TryParse(raw, out var v) ? v : fallback;
 
@@ -241,6 +289,22 @@ public sealed class BranchExecutor
     /// перенесённого слоя, а не пишутся здесь заново — своя реализация искала
     /// элемент однократно и роняла ветку на странице, которая ещё грузится.
     /// </summary>
+    /// <summary>
+    /// Куда метится ветка — теми же словами, какими об этом говорит ошибка
+    /// поиска. В логе была одна строка «10. HTMLElement/SetAttribute», и по ней
+    /// нельзя было сказать ни что вводится, ни куда: приходилось лезть в
+    /// шаблон и сверять вручную.
+    /// </summary>
+    private string Target(Branch branch)
+    {
+        try
+        {
+            var (tag, attr, val, kind, number) = Selector(branch);
+            return $"tag=[{tag}] attribute=[{attr}] pattern=[{val}] mode=[{kind}] pos=[{number}]";
+        }
+        catch (Exception ex) { return "цель разобрать не удалось: " + FirstLine(ex.Message); }
+    }
+
     private (string, string, string, string, int) Selector(Branch branch)
     {
         var f = branch.ParamNode("Finder")
