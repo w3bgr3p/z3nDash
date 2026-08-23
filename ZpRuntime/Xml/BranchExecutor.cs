@@ -109,12 +109,12 @@ public sealed class BranchExecutor
             // неё «ветка выполнена» значит только «не бросила исключение», а
             // поле при этом может остаться пустым — и разбираться придётся уже
             // на следующей ветке, где ничего не появилось.
-            var actual = ReadBack(branch);
-            if (actual is not null && actual != value)
-            {
-                _log($"[xml] SetAttribute: в поле осталось «{actual}», а вводили «{value}»");
-                _log("[xml] SetAttribute: " + Describe(branch));
-            }
+            // Два чтения подряд: через наш же элемент и напрямую со страницы.
+            // Первое говорит, что наш поиск считает результатом; второе — что
+            // на самом деле лежит в документе. Пока они не сведены, спорить о
+            // причинах бессмысленно.
+            _log($"[xml] SetAttribute: после ввода наш элемент «{ReadBack(branch) ?? "прочитать не вышло"}», " +
+                 $"страница: {PageSide(branch)}");
         }
         else _instance.GetHe(Selector(branch)).SetAttribute(attr, value);
 
@@ -130,6 +130,47 @@ public sealed class BranchExecutor
         try   { return _instance.GetHe(Selector(branch)).GetAttribute("value"); }
         catch { return null; }
     }
+
+    /// <summary>
+    /// Чтение того же места напрямую из документа, мимо нашего поиска: сколько
+    /// узлов, какое у них value, виден ли узел и какого он размера.
+    /// </summary>
+    private string PageSide(Branch branch)
+    {
+        try
+        {
+            var (tag, attr, val, kind, number) = Selector(branch);
+            if (!kind.Equals("text", StringComparison.OrdinalIgnoreCase))
+                return $"режим {kind} — прямое чтение не делаю";
+
+            var css = CssFor(tag, attr, val);
+            var js  =
+                "var n = document.querySelectorAll(" + Quote(css) + ");" +
+                "var out = 'узлов ' + n.length;" +
+                "for (var i = 0; i < n.length && i < 4; i++) {" +
+                "  var e = n[i], r = e.getBoundingClientRect(), st = getComputedStyle(e);" +
+                "  out += ' | #' + i + ' value=[' + e.value + '] ' + Math.round(r.width) + 'x' + Math.round(r.height) +" +
+                "         ' display=' + st.display + ' visibility=' + st.visibility + ' opacity=' + st.opacity +" +
+                "         (e.readOnly ? ' readonly' : '') + (e.disabled ? ' disabled' : '');" +
+                "}" +
+                "return out;";
+
+            return _instance.ActiveTab.MainDocument.EvaluateScript(js);
+        }
+        catch (Exception ex) { return "прочитать не вышло: " + FirstLine(ex.Message); }
+    }
+
+    /// <summary>Тот же CSS, что строит подложка: ZP-шный "input:text" — не селектор.</summary>
+    private static string CssFor(string tag, string attr, string val)
+    {
+        var t = (tag ?? "*").Trim();
+        var i = t.IndexOf(':');
+        var cssTag = i <= 0 ? t : $"{t[..i]}[type='{t[(i + 1)..]}']";
+        return $"{cssTag}[{attr}='{val}']";
+    }
+
+    private static string Quote(string s)
+        => "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
     /// <summary>
     /// Состояние элемента на момент неудачного ввода. Печатается только когда
