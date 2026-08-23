@@ -32,7 +32,8 @@ public sealed class SchedulerHandler : IScriptHandler
         "cron", "interval_minutes", "fixed_time", "on_overlap", "max_threads",
         "status", "last_run", "last_exit", "last_output",
         "payload_schema", "payload_values",
-        "runs_total", "runs_success", "schedule_tag", "last_run_id"
+        "runs_total", "runs_success", "schedule_tag", "last_run_id",
+        "use_venv", "schedule_mode", "schedule_json", "sched_runs", "sched_started_at"
     };
 
     public SchedulerHandler(DbConnectionService dbService, SchedulerService scheduler, string wwwrootPath)
@@ -93,8 +94,10 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/scheduler/package-scripts" && method == "GET") { await PackageScripts(context, db); return true; }
             if (path == "/scheduler/config-file" && method == "GET") { await GetConfigFile(context, db); return true; }
             if (path == "/scheduler/config-file" && method == "POST") { await SaveConfigFile(context); return true; }
-            if (path == "/scheduler/terminal-config" && method == "GET") { await TerminalConfig(context); return true; }
-            if (path == "/scheduler/detect-venv" && method == "GET") { await DetectVenv(context, db); return true; }
+            if (path == "/scheduler/ensure-venv" && method == "POST") { await EnsureVenv(context, db); return true; }
+            if (path == "/scheduler/internal-tasks" && method == "GET") { await InternalTasks(context); return true; }
+            if (path == "/scheduler/schedule-preview" && method == "POST") { await SchedulePreview(context); return true; }
+            if (path == "/scheduler/install/stream" && method == "GET") { await InstallStream(context, db); return true; }
             if (path == "/scheduler/open-terminal" && method == "GET") { await OpenTerminal(context, db); return true; }
 
         }
@@ -648,44 +651,206 @@ public sealed class SchedulerHandler : IScriptHandler
         }
     }
 
-    // ── Terminal config ────────────────────────────────────────────────────────
+    // ── venv ───────────────────────────────────────────────────────────────────
 
-    private async Task TerminalConfig(HttpListenerContext ctx)
+    /// <summary>
+    /// Создаёт venv рядом со скриптом, если его ещё нет. Вызывается по галке
+    /// Use venv, чтобы каталог появился до первого запуска, а не во время него.
+    /// </summary>
+    private async Task EnsureVenv(HttpListenerContext ctx, Db db)
     {
-        var terminal = Config.Terminal ?? "cmd";
-        var terminalPath = Config.TerminalPath ?? "";
-        var gitbashFound = FindGitBash() ?? "";
+        var json = await ReadJson(ctx.Request);
+        var id   = json?.TryGetProperty("id", out var eid) == true ? eid.GetString() ?? "" : "";
+        if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
 
-        await HttpHelpers.WriteJson(ctx.Response, new
+        var scriptPath = db.Get("script_path", Table, where: $"\"id\" = '{id}'");
+        if (string.IsNullOrWhiteSpace(scriptPath))
         {
-            terminal,
-            terminal_path = terminalPath,
-            gitbash_found = gitbashFound
-        });
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = "Schedule not found" });
+            return;
+        }
+
+        var lines = new List<string>();
+        var interpreter = await Task.Run(() => PythonEnv.Ensure(scriptPath, lines.Add));
+        var created = File.Exists(interpreter);
+
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = created, interpreter, log = lines });
     }
 
-    // ── Detect venv ────────────────────────────────────────────────────────────
+    // ── Установка зависимостей ─────────────────────────────────────────────────
 
-    private async Task DetectVenv(HttpListenerContext ctx, Db db)
+    /// <summary>
+    /// npm install / pip install с потоковым выводом. Для python установка идёт
+    /// интерпретатором venv, если галка Use venv включена, иначе системным.
+    /// </summary>
+    private async Task InstallStream(HttpListenerContext ctx, Db db)
     {
         var id = ctx.Request.QueryString["id"] ?? "";
-        if (string.IsNullOrEmpty(id))
+        var row = db.Get("executor,script_path,use_venv", Table, where: $"\"id\" = '{id}'");
+
+        ctx.Response.ContentType = "text/event-stream";
+        ctx.Response.Headers.Add("Cache-Control", "no-cache");
+        ctx.Response.Headers.Add("X-Accel-Buffering", "no");
+        ctx.Response.StatusCode = 200;
+        var output = ctx.Response.OutputStream;
+
+        if (string.IsNullOrWhiteSpace(row))
         {
-            ctx.Response.StatusCode = 400;
+            await SendInstallLine(output, "[ERR] schedule not found", "ERROR");
+            await FinishInstall(ctx, output);
             return;
         }
 
-        var row = db.Get("script_path", Table, where: $"\"id\" = '{id}'");
-        if (string.IsNullOrEmpty(row))
+        var parts      = row.Split('¦');
+        var executor   = parts.Length > 0 ? parts[0] : "";
+        var scriptPath = parts.Length > 1 ? parts[1] : "";
+        var useVenv    = parts.Length > 2 && parts[2] == "true";
+        var folder     = PythonEnv.FolderOf(scriptPath);
+
+        if (!Directory.Exists(folder))
         {
-            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, venvs = new List<object>() });
+            await SendInstallLine(output, $"[ERR] folder not found: {folder}", "ERROR");
+            await FinishInstall(ctx, output);
             return;
         }
 
-        var scriptPath = row;
-        var venvs = DetectVenvFolders(scriptPath);
-        await HttpHelpers.WriteJson(ctx.Response, new { ok = true, venvs });
+        string fileName, arguments;
+        if (IsJs(executor))
+        {
+            fileName  = OperatingSystem.IsWindows() ? "cmd.exe" : "npm";
+            arguments = OperatingSystem.IsWindows() ? "/c npm install" : "install";
+        }
+        else
+        {
+            var requirements = Path.Combine(folder, "requirements.txt");
+            if (!File.Exists(requirements))
+            {
+                await SendInstallLine(output, "[ERR] requirements.txt not found", "ERROR");
+                await FinishInstall(ctx, output);
+                return;
+            }
+            var lines = new List<string>();
+            fileName = useVenv ? PythonEnv.Ensure(scriptPath, lines.Add) : "python";
+            foreach (var line in lines) await SendInstallLine(output, line, "INFO");
+            arguments = "-m pip install -r requirements.txt";
+        }
+
+        await RunInstallProcess(output, fileName, arguments, folder);
+        await FinishInstall(ctx, output);
     }
+
+    private static async Task RunInstallProcess(Stream output, string fileName, string arguments, string cwd)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName               = fileName,
+            Arguments              = arguments,
+            WorkingDirectory       = cwd,
+            RedirectStandardOutput = true,
+            RedirectStandardError  = true,
+            UseShellExecute        = false,
+            CreateNoWindow         = true,
+        };
+
+        try
+        {
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null)
+            {
+                await SendInstallLine(output, $"[ERR] cannot start {fileName}", "ERROR");
+                return;
+            }
+
+            while (await proc.StandardOutput.ReadLineAsync() is { } line)
+                await SendInstallLine(output, line, "INFO");
+
+            var stderr = await proc.StandardError.ReadToEndAsync();
+            foreach (var line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                await SendInstallLine(output, line.TrimEnd(), "ERROR");
+
+            await proc.WaitForExitAsync();
+            await SendInstallLine(output, $"exit code {proc.ExitCode}", proc.ExitCode == 0 ? "INFO" : "ERROR");
+        }
+        catch (Exception ex)
+        {
+            await SendInstallLine(output, "[ERR] " + ex.Message, "ERROR");
+        }
+    }
+
+    private static async Task SendInstallLine(Stream output, string line, string level)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { line, level });
+        var bytes   = System.Text.Encoding.UTF8.GetBytes($"event: output\ndata: {payload}\n\n");
+        await output.WriteAsync(bytes);
+        await output.FlushAsync();
+    }
+
+    private static async Task FinishInstall(HttpListenerContext ctx, Stream output)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes("event: done\ndata: {}\n\n");
+        await output.WriteAsync(bytes);
+        await output.FlushAsync();
+        ctx.Response.Close();
+    }
+
+    // ── Предпросмотр расписания ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Ближайшие расчётные запуски по несохранённым настройкам формы —
+    /// упрощённый отладчик расписания. Ошибки настроек возвращаются списком,
+    /// по ним форма подсвечивает поля и блокирует включение.
+    /// </summary>
+    private static async Task SchedulePreview(HttpListenerContext ctx)
+    {
+        var json = await ReadJson(ctx.Request);
+        if (json == null) { ctx.Response.StatusCode = 400; return; }
+
+        var mode = json.Value.TryGetProperty("mode", out var m) ? m.GetString() ?? "off" : "off";
+        var now  = DateTime.UtcNow;
+
+        if (mode == "cron")
+        {
+            var cron = json.Value.TryGetProperty("cron", out var c) ? c.GetString() ?? "" : "";
+            try
+            {
+                var expr  = Cronos.CronExpression.Parse(cron);
+                var times = new List<string>();
+                var cursor = now;
+                for (var i = 0; i < 20; i++)
+                {
+                    var next = expr.GetNextOccurrence(cursor, TimeZoneInfo.Utc);
+                    if (!next.HasValue) break;
+                    times.Add(next.Value.ToString("yyyy-MM-dd HH:mm"));
+                    cursor = next.Value;
+                }
+                await HttpHelpers.WriteJson(ctx.Response, new { ok = true, errors = Array.Empty<string>(), times });
+            }
+            catch (Exception ex)
+            {
+                await HttpHelpers.WriteJson(ctx.Response, new { ok = false, errors = new[] { ex.Message }, times = Array.Empty<string>() });
+            }
+            return;
+        }
+
+        var raw  = json.Value.TryGetProperty("schedule_json", out var sj) ? sj.GetString() ?? "" : "";
+        var spec = ZpSchedule.Parse(raw);
+        if (!spec.IsValid)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, errors = spec.Errors, times = Array.Empty<string>() });
+            return;
+        }
+
+        var preview = ZpSchedule.Preview(spec, now)
+                                .Select(t => t.ToString("yyyy-MM-dd HH:mm"))
+                                .ToList();
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true, errors = Array.Empty<string>(), times = preview });
+    }
+
+    // ── Internal tasks ─────────────────────────────────────────────────────────
+
+    /// <summary>Список зарегистрированных internal-задач для выпадашки в Settings.</summary>
+    private async Task InternalTasks(HttpListenerContext ctx)
+        => await HttpHelpers.WriteJson(ctx.Response, new { tasks = _scheduler.InternalTaskNames });
 
     // ── Open terminal ──────────────────────────────────────────────────────────
 
@@ -698,17 +863,12 @@ public sealed class SchedulerHandler : IScriptHandler
             return;
         }
 
-        var row = db.Get("script_path,terminal_override,terminal_init_cmd", Table, where: $"\"id\" = '{id}'");
-        if (string.IsNullOrEmpty(row))
+        var scriptPath = db.Get("script_path", Table, where: $"\"id\" = '{id}'");
+        if (string.IsNullOrEmpty(scriptPath))
         {
             await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = "Schedule not found" });
             return;
         }
-
-        var parts = row.Split('¦');
-        var scriptPath = parts.Length > 0 ? parts[0] : "";
-        var termOverride = parts.Length > 1 ? parts[1] : "";
-        var termInitCmd = parts.Length > 2 ? parts[2] : "";
 
         var folder = Directory.Exists(scriptPath) ? scriptPath : Path.GetDirectoryName(scriptPath) ?? "";
 
@@ -720,7 +880,7 @@ public sealed class SchedulerHandler : IScriptHandler
 
         try
         {
-            var error = LaunchTerminal(folder, termOverride, termInitCmd);
+            var error = LaunchTerminal(folder);
             if (error != null)
             {
                 await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error });
@@ -738,7 +898,7 @@ public sealed class SchedulerHandler : IScriptHandler
 
     // ── Helper methods ─────────────────────────────────────────────────────────
 
-    private static bool IsJs(string executor) => executor is "node" or "ts-node";
+    private static bool IsJs(string executor) => executor is "node" or "ts-node" or "npm";
     private static bool IsPy(string executor) => executor == "python";
 
     private static (string path, bool found) ResolveConfigPath(string executor, string scriptPath)
@@ -758,121 +918,46 @@ public sealed class SchedulerHandler : IScriptHandler
         return ("", false);
     }
 
-    private static string? FindGitBash()
+    /// <summary>
+    /// Открыть терминал в папке задачи. Настройки нет: на Windows это
+    /// PowerShell, на Linux — первый найденный системный эмулятор терминала.
+    /// </summary>
+    private static string? LaunchTerminal(string cwd)
     {
-        var candidates = new[]
+        if (OperatingSystem.IsWindows())
         {
-            @"C:\Program Files\Git\bin\bash.exe",
-            @"C:\Program Files (x86)\Git\bin\bash.exe",
-            @"C:\Git\bin\bash.exe"
-        };
-
-        foreach (var path in candidates)
-        {
-            if (File.Exists(path))
-                return path;
-        }
-        return null;
-    }
-
-    private static List<object> DetectVenvFolders(string scriptPath)
-    {
-        var folder = Directory.Exists(scriptPath) ? scriptPath : Path.GetDirectoryName(scriptPath) ?? "";
-        if (!Directory.Exists(folder))
-            return new List<object>();
-
-        var venvCandidates = new[] { ".venv", "venv", "env", ".env" };
-        var results = new List<object>();
-
-        foreach (var venvName in venvCandidates)
-        {
-            var venvPath = Path.Combine(folder, venvName);
-            if (!Directory.Exists(venvPath))
-                continue;
-
-            var pythonExe = Path.Combine(venvPath, "Scripts", "python.exe");
-            if (File.Exists(pythonExe))
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                results.Add(new
+                FileName        = "powershell.exe",
+                Arguments       = $"-NoExit -Command \"Set-Location '{cwd}'\"",
+                UseShellExecute = true,
+                CreateNoWindow  = false,
+            });
+            return null;
+        }
+
+        string[] candidates =
+        [
+            Environment.GetEnvironmentVariable("TERMINAL") ?? "",
+            "x-terminal-emulator", "gnome-terminal", "konsole", "xfce4-terminal", "xterm",
+        ];
+
+        foreach (var term in candidates.Where(t => !string.IsNullOrWhiteSpace(t)))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
-                    name = venvName,
-                    path = venvPath,
-                    python = pythonExe
+                    FileName         = term,
+                    WorkingDirectory = cwd,
+                    UseShellExecute  = true,
                 });
+                return null;
             }
+            catch { /* следующий кандидат */ }
         }
 
-        return results;
-    }
-
-    private static string? LaunchTerminal(string cwd, string termOverride, string initCmd)
-    {
-        var terminal = !string.IsNullOrWhiteSpace(termOverride) ? termOverride : (Config.Terminal ?? "cmd");
-
-        if (terminal == "cmd")
-        {
-            var cdCmd = $"cd /d {cwd}";
-            var full = !string.IsNullOrWhiteSpace(initCmd) ? $"{cdCmd} && {initCmd}" : cdCmd;
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/K {full}",
-                UseShellExecute = true,
-                CreateNoWindow = false
-            });
-        }
-        else if (terminal == "powershell")
-        {
-            var cdCmd = $"Set-Location '{cwd}'";
-            var full = !string.IsNullOrWhiteSpace(initCmd) ? $"{cdCmd}; {initCmd}" : cdCmd;
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-NoExit -Command \"{full}\"",
-                UseShellExecute = true,
-                CreateNoWindow = false
-            });
-        }
-        else if (terminal == "gitbash")
-        {
-            var bash = FindGitBash();
-            if (bash == null)
-                return "Git Bash not found. Install Git for Windows.";
-
-            var cdExpr = $"cd '{cwd}'";
-            var full = !string.IsNullOrWhiteSpace(initCmd)
-                ? $"{cdExpr} && {initCmd} && exec bash"
-                : $"{cdExpr} && exec bash";
-
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = bash,
-                Arguments = $"--login -c \"{full}\"",
-                UseShellExecute = true,
-                CreateNoWindow = false
-            });
-        }
-        else if (terminal == "third_party")
-        {
-            var termPath = Config.TerminalPath ?? "";
-            if (string.IsNullOrWhiteSpace(termPath))
-                return "TERMINAL_PATH is not set in config";
-            if (!File.Exists(termPath))
-                return $"Terminal not found: {termPath}";
-
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = termPath,
-                WorkingDirectory = cwd,
-                UseShellExecute = true
-            });
-        }
-        else
-        {
-            return $"Unknown terminal: {terminal}";
-        }
-
-        return null;
+        return "No terminal emulator found. Set $TERMINAL.";
     }
 
     /// <summary>

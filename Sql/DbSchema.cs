@@ -50,6 +50,11 @@
                 { "runs_success",     "TEXT DEFAULT '0'" },
                 { "schedule_tag",     "TEXT DEFAULT ''" },
                 { "last_run_id",      "TEXT DEFAULT ''" },
+                { "use_venv",         "TEXT DEFAULT 'false'" },
+                { "schedule_mode",    "TEXT DEFAULT 'off'" },
+                { "schedule_json",    "TEXT DEFAULT ''" },
+                { "sched_runs",       "TEXT DEFAULT '0'" },
+                { "sched_started_at", "TEXT DEFAULT ''" },
             }
         };
 

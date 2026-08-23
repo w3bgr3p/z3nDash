@@ -16,8 +16,6 @@ public class Config
     public static AiConfig       AiConfig       { get; private set; } = new();
     public static WatchdogConfig WatchdogConfig { get; private set; } = new();
 
-    public static string? Terminal { get; private set; }
-    public static string? TerminalPath { get; private set; }
 
     public static Dictionary<string, CrxItem> Crx { get; private set; } = new();
     public static void Init()
@@ -41,8 +39,6 @@ public class Config
         AiConfig       = config.GetSection("AiConfig").Get<AiConfig>()             ?? new();
         WatchdogConfig = config.GetSection("WatchdogConfig").Get<WatchdogConfig>() ?? new();
 
-        Terminal = config["Terminal"];
-        TerminalPath = config["TerminalPath"];
 
         Crx = config.GetSection("Crx").Get<Dictionary<string, CrxItem>>() ?? new();
 

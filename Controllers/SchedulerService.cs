@@ -19,6 +19,9 @@ public sealed class SchedulerService : IDisposable
     public void RegisterTask(string name, Func<Dictionary<string, string>, CancellationToken, Action<string>, Task<string>> handler)
         => _internalTasks[name] = handler;
 
+    /// <summary>Имена зарегистрированных internal-задач — для выпадашки в Settings.</summary>
+    public IReadOnlyList<string> InternalTaskNames => _internalTasks.Keys.OrderBy(k => k).ToList();
+
     private static string Table => DbSchema.Schedules.Name;
     private static string QueueTable => DbSchema.ScheduleQueue.Name;
 
@@ -158,12 +161,20 @@ private static void SeedDefaults(Db db)
         foreach (var row in rows)
         {
             var record     = ParseRow(row, columns);
-            if (!ShouldFire(record, now)) continue;
+            var id         = record.GetValueOrDefault("id", "");
+            var active     = CountActiveInstances(id);
+
+            var decision = Decide(record, now, isRunning: active > 0);
+            if (!decision.Fire) continue;
+
+            NoteScheduledFire(db, id, record, decision.Attempts);
 
             var overlap    = record.GetValueOrDefault("on_overlap", "skip");
-            var id         = record.GetValueOrDefault("id", "");
             var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
-            var active     = CountActiveInstances(id);
+
+            // «Сколько делать» из ZP: первая попытка идёт сразу, остальные в очередь.
+            for (var extra = 1; extra < decision.Attempts; extra++)
+                EnqueueItem(db, id, record, priority: 10);
 
             switch (overlap)
             {
@@ -718,7 +729,10 @@ private static void SeedDefaults(Db db)
 
             return;
         }
-        var (fileName, arguments) = BuildCommand(executor, scriptPath, args);
+        var useVenv = record.GetValueOrDefault("use_venv", "false") == "true";
+        // venv создаётся лениво: чекбокс можно поставить до того, как каталог появится.
+        if (useVenv && executor == "python") PythonEnv.Ensure(scriptPath, line => _log?.Info($"[{name}] {line}"));
+        var (fileName, arguments) = BuildCommand(executor, scriptPath, args, useVenv);
 
         _log?.Info($"[{name}] launch → {fileName} {Path.GetFileName(scriptPath)} run={runId}");
         UpdateStatus(db, id, "running", firedAt, "", "", runId);
@@ -854,40 +868,53 @@ private static void SeedDefaults(Db db)
         );
     }
 
-    private static bool ShouldFire(Dictionary<string, string> r, DateTime now)
+    /// <summary>
+    /// Пора ли запускать задачу. Режим берётся из schedule_mode: off — только
+    /// вручную, cron — выражение из колонки cron, zp — модель планировщика
+    /// ZennoPoster из schedule_json.
+    /// </summary>
+    private static ZpSchedule.Decision Decide(Dictionary<string, string> r, DateTime now, bool isRunning)
+        => r.GetValueOrDefault("schedule_mode", "off") switch
+        {
+            "cron" => CronFires(r.GetValueOrDefault("cron", ""), now)
+                          ? new ZpSchedule.Decision(true, 1)
+                          : ZpSchedule.Decision.No,
+            "zp"   => ZpSchedule.ShouldFire(ZpSchedule.Parse(r.GetValueOrDefault("schedule_json", "")),
+                                            ReadState(r, isRunning), now),
+            _      => ZpSchedule.Decision.No,
+        };
+
+    private static bool CronFires(string cron, DateTime now)
     {
-        var cron = r.GetValueOrDefault("cron", "");
-        if (!string.IsNullOrWhiteSpace(cron))
+        if (string.IsNullOrWhiteSpace(cron)) return false;
+        try
         {
-            try
-            {
-                var expr = CronExpression.Parse(cron);
-                var prev = expr.GetNextOccurrence(now.AddMinutes(-1), TimeZoneInfo.Utc);
-                if (prev.HasValue && prev.Value >= now.AddMinutes(-1) && prev.Value <= now)
-                    return true;
-            }
-            catch { }
+            var expr = CronExpression.Parse(cron);
+            var prev = expr.GetNextOccurrence(now.AddMinutes(-1), TimeZoneInfo.Utc);
+            return prev.HasValue && prev.Value >= now.AddMinutes(-1) && prev.Value <= now;
         }
+        catch { return false; }
+    }
 
-        if (int.TryParse(r.GetValueOrDefault("interval_minutes", "0"), out int interval) && interval > 0)
-        {
-            var lastRun = r.GetValueOrDefault("last_run", "");
-            if (string.IsNullOrEmpty(lastRun)) return true;
-            if (DateTime.TryParse(lastRun, out var last) && (now - last).TotalMinutes >= interval)
-                return true;
-        }
+    private static ZpSchedule.State ReadState(Dictionary<string, string> r, bool isRunning)
+    {
+        DateTime? lastRun = DateTime.TryParse(r.GetValueOrDefault("last_run", ""), out var lr) ? lr : null;
+        DateTime? started = DateTime.TryParse(r.GetValueOrDefault("sched_started_at", ""), out var sa) ? sa : null;
+        var runs = int.TryParse(r.GetValueOrDefault("sched_runs", "0"), out var n) ? n : 0;
+        return new ZpSchedule.State(lastRun, runs, started, isRunning);
+    }
 
-        var fixedTime = r.GetValueOrDefault("fixed_time", "");
-        if (!string.IsNullOrWhiteSpace(fixedTime) && TimeSpan.TryParse(fixedTime, out var ft))
-        {
-            var todayFire = now.Date + ft;
-            var lastRun   = r.GetValueOrDefault("last_run", "");
-            DateTime.TryParse(lastRun, out var last);
-            if (now >= todayFire && now < todayFire.AddMinutes(1) && last.Date < now.Date)
-                return true;
-        }
-
-        return false;
+    /// <summary>
+    /// Счётчик запусков расписания. Отдельно от runs_total, потому что тот
+    /// считает и ручные запуски, а условие «Завершить после N повторений»
+    /// должно видеть только запуски самого расписания.
+    /// </summary>
+    private void NoteScheduledFire(Db db, string id, Dictionary<string, string> record, int attempts)
+    {
+        var runs = int.TryParse(record.GetValueOrDefault("sched_runs", "0"), out var n) ? n : 0;
+        runs += Math.Max(1, attempts);
+        record["sched_runs"] = runs.ToString();
+        db.Upd($"sched_runs = '{runs}'", Table, where: $"\"id\" = '{id}'");
     }
 
     private static string ResolveGitBash()
@@ -903,7 +930,10 @@ private static void SeedDefaults(Db db)
         return "bash"; // PATH fallback
     }
 
-    private static (string fileName, string arguments) BuildCommand(string executor, string scriptPath, string args)
+    private static string ResolvePython(string scriptPath, bool useVenv)
+        => PythonEnv.Resolve(scriptPath, useVenv);
+
+    private static (string fileName, string arguments) BuildCommand(string executor, string scriptPath, string args, bool useVenv = false)
     {
         static string TsNodeArgs(string path, string extraArgs)
         {
@@ -915,7 +945,7 @@ private static void SeedDefaults(Db db)
 
         return executor.ToLower() switch
         {
-            "python"  => ("python",   $"\"{scriptPath}\" {args}".Trim()),
+            "python"  => (ResolvePython(scriptPath, useVenv), $"\"{scriptPath}\" {args}".Trim()),
             "node"    => ("node",     $"\"{scriptPath}\" {args}".Trim()),
             "ts-node" => ("cmd.exe",  TsNodeArgs(scriptPath, args)),
             "npm"     => ("cmd.exe",  $"/c cd /d \"{Path.GetDirectoryName(scriptPath)}\" && npm {args}".Trim()),
@@ -925,7 +955,7 @@ private static void SeedDefaults(Db db)
             "bat"     => ("cmd.exe",  $"/c \"{scriptPath}\" {args}".Trim()),
             "bash" => (ResolveGitBash(), $"\"{scriptPath}\" {args}".Trim()),
             "ps1" => ("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" {args}".Trim()),
-            _         => ("python",   $"\"{scriptPath}\" {args}".Trim()),
+            _         => (ResolvePython(scriptPath, useVenv), $"\"{scriptPath}\" {args}".Trim()),
         };
     }
 

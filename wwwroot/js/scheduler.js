@@ -7,7 +7,6 @@ var _PS = {
 };
 
 var schedules  = [];
-var _globalTerminal = 'cmd';
 var selectedId = null;
 var activeTab  = 'execution';
 var outputPoll = null;
@@ -27,7 +26,7 @@ var _cmEditor     = null;
 var _cmFilePath   = '';
 var _cmScheduleId = '';
 
-function _isJs(executor)     { return executor === 'node' || executor === 'ts-node'; }
+function _isJs(executor)     { return executor === 'node' || executor === 'ts-node' || executor === 'npm'; }
 function _isPy(executor)     { return executor === 'python'; }
 function _needsConfig(executor) { return _isJs(executor) || _isPy(executor); }
 
@@ -37,9 +36,7 @@ function getTaskStatus(s) {
     if (s.status === 'running') return 'running';
     var neverRan = !s.runs_total || parseInt(s.runs_total) === 0;
     if (neverRan) return 'newbie';
-    var hasSchedule = !!((s.cron && s.cron.trim()) ||
-        (s.interval_minutes && parseInt(s.interval_minutes) > 0) ||
-        (s.fixed_time && s.fixed_time.trim()));
+    var hasSchedule = (s.schedule_mode || 'off') !== 'off';
     var isPaused = s.enabled === 'false';
     if (hasSchedule) return isPaused ? 'paused' : 'planned';
     var isFail = s.status === 'error' || (s.last_exit && s.last_exit !== '0');
@@ -101,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 last_run:   s.last_run,
                 last_exit:  s.last_exit,
                 cron:       s.cron,
-                interval_minutes: s.interval_minutes,
+                schedule_mode: s.schedule_mode,
             }, null, 2);
         });
     }
@@ -113,6 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initHResizer();
     initVResizer();
     restoreLayout();
+    loadInternalTasks();
     document.getElementById('detailBody').addEventListener('input',  function() { formDirty = true; });
     document.getElementById('detailBody').addEventListener('change', function() { formDirty = true; });
 });
@@ -164,11 +162,23 @@ function toggleGroup(grp) {
     renderList();
 }
 
+/// Подпись расписания в списке. Для ZP-режима разворачивается коротко:
+/// сырой JSON в строке списка читать невозможно.
 function triggerLabel(s) {
-    if (s.cron && s.cron.trim()) return s.cron.trim();
-    if (s.interval_minutes && parseInt(s.interval_minutes) > 0) return 'every ' + s.interval_minutes + 'm';
-    if (s.fixed_time && s.fixed_time.trim()) return 'at ' + s.fixed_time.trim();
-    return 'on demand';
+    var mode = s.schedule_mode || 'off';
+    if (mode === 'cron') return (s.cron || '').trim() || 'cron';
+    if (mode !== 'zp')   return 'on demand';
+
+    try {
+        var z    = JSON.parse(s.schedule_json || '{}');
+        var how  = { once: 'once', daily: 'daily', weekly: 'weekly', monthly: 'monthly' }[z.how] || 'zp';
+        var rep  = z.repeat || {};
+        if (z.how === 'once') return 'once';
+        if (rep.mode === 'pause' || rep.mode === 'regular') return how + ' / ' + (rep.min || 0) + 'm';
+        if (rep.mode === 'back_to_back') return how + ' / nonstop';
+        if (rep.mode === 'spread')       return how + ' / spread';
+        return how;
+    } catch (e) { return 'zp'; }
 }
 
 function getGroupName(name) {
@@ -414,12 +424,14 @@ function showDetailHeader(s) {
 function renderDetailActions(s) {
     var id         = s.id || '';
     var pauseLabel = s.enabled === 'false' ? '▶' : '⏸';
+    // Pause relates to the schedule: an on-demand task has nothing to pause.
+    var scheduled  = (s.schedule_mode || 'off') !== 'off';
     var runLabel   = _isJs(s.executor) ? '▶ npm run' : '▶ Run';
 
     document.getElementById('detailActions').innerHTML =
         '<div class="action-group">'
         + '<button class="btn primary sm" onclick="runNow(\'' + id + '\')">' + runLabel + '</button>'
-        + '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled || 'true') + '\')">' + pauseLabel + '</button>'
+        + (scheduled ? '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled || 'true') + '\')">' + pauseLabel + '</button>' : '')
         + '<button class="btn sm" title="Restart" onclick="restartNow(\'' + id + '\')" style="border-color:#d29922;color:#d29922;">↺</button>'
         + '<button class="btn stop sm" title="Interrupt" onclick="stopNow(\'' + id + '\')">■</button>'
         + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🗑</button>'
@@ -678,6 +690,7 @@ function showBottomPanels(s) {
 
 function renderDetail(s) {
     if      (activeTab === 'settings') renderSettings(s);
+    else if (activeTab === 'schedule') renderSchedule(s);
     else if (activeTab === 'logs')     renderLogsTab(s);
     else                               renderExecution(s);
 }
@@ -857,7 +870,8 @@ function newSchedule() {
     formDirty  = true;
     renderList();
     var s = { id:'', name:'', executor:'python', script_path:'', args:'',
-              enabled:'true', cron:'', interval_minutes:'0', fixed_time:'', on_overlap:'skip' };
+              enabled:'false', cron:'', on_overlap:'skip',
+              use_venv:'false', schedule_mode:'off', schedule_json:'' };
     document.getElementById('detailHeader').style.display = 'none';
     document.getElementById('bottomPanels').style.display = 'none';
     document.getElementById('hResizer').style.display     = 'none';
@@ -868,65 +882,64 @@ function newSchedule() {
     renderSettings(s);
 }
 
+// ── Executor capabilities ─────────────────────────────────────────────────────
+//
+// Форма Settings зависит от экзекутора: у части задач путь — это файл, у части
+// папка, у internal вообще имя зарегистрированной задачи. Аргументы прячутся
+// там, где ими управляет не пользователь: у npm их пишет выпадашка скриптов,
+// у internal и csx-internal в args лежит base64-payload.
+
+var EXECUTORS = ['python','node','ts-node','npm','exe','cmd','bat','bash','ps1',
+                 'csx','csx-internal','csx-zp7','xml','internal'];
+
+var EXECUTOR_SPEC = {
+    'python':       { label: 'Script (.py)',      pick: 'file'   },
+    'node':         { label: 'Script (.js)',      pick: 'file'   },
+    'ts-node':      { label: 'Script (.ts)',      pick: 'file'   },
+    'npm':          { label: 'Project folder',    pick: 'folder', noArgs: true },
+    'exe':          { label: 'Executable (.exe)', pick: 'file'   },
+    'cmd':          { label: 'Command',           pick: 'none'   },
+    'bat':          { label: 'Script (.bat)',     pick: 'file'   },
+    'bash':         { label: 'Script (.sh)',      pick: 'file'   },
+    'ps1':          { label: 'Script (.ps1)',     pick: 'file'   },
+    'csx':          { label: 'Script (.csx)',     pick: 'file'   },
+    'csx-internal': { label: 'Script (.csx)',     pick: 'file',   noArgs: true },
+    'csx-zp7':      { label: 'Script (.csx)',     pick: 'file'   },
+    'xml':          { label: 'Template (.xml)',   pick: 'file'   },
+    'internal':     { label: 'Task',              pick: 'task',   noArgs: true },
+};
+
+function execSpec(executor) {
+    return EXECUTOR_SPEC[executor] || EXECUTOR_SPEC['python'];
+}
+
+var _internalTaskNames = [];
+
+function loadInternalTasks() {
+    fetch('/scheduler/internal-tasks')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { _internalTaskNames = d.tasks || []; })
+        .catch(function() {});
+}
+
 function renderSettings(s) {
-    var id = s.id || '';
-    console.log('[renderSettings] s.terminal_override=', s.terminal_override, 's.terminal_init_cmd=', s.terminal_init_cmd);
+    var id   = s.id || '';
+    var spec = execSpec(s.executor);
+
     document.getElementById('detailBody').innerHTML =
         '<div class="form-grid">'
         + '<div class="form-label">Name</div>'
         + '<input class="form-input" id="f_name" value="' + escHtml(s.name) + '">'
-        + '<div class="form-label">Script / Task</div>'
-        + '<div style="display:flex;gap:4px;">'
-        +   '<input class="form-input" id="f_script_path" style="flex:1;" value="' + escHtml(s.script_path) + '" placeholder="/path/to/script or folder">'
-        +   '<button type="button" class="btn sm" onclick="pickPath(&#39;file&#39;)" title="Выбрать файл">📄</button>'
-        +   '<button type="button" class="btn sm" onclick="pickPath(&#39;folder&#39;)" title="Выбрать каталог">📁</button>'
-        + '</div>'
         + '<div class="form-label">Executor</div>'
-        + '<select class="form-input" id="f_executor">'
-        // csx, csx-internal и csx-zp7 планировщик умеет давно, но в списке их не было —
-        // задачу такого типа нельзя было завести из интерфейса. xml проигрывает
-        // шаблон ZennoPoster: путь указывается на .xml, браузер поднимается сам.
-        + ['python','node','ts-node','npm','exe','cmd','bat','bash','ps1',
-           'csx','csx-internal','csx-zp7','xml','internal'].map(function(e) {
+        + '<select class="form-input" id="f_executor" onchange="onExecutorChange()">'
+        + EXECUTORS.map(function(e) {
             return '<option ' + (s.executor === e ? 'selected' : '') + '>' + e + '</option>';
         }).join('') + '</select>'
-        + '<div class="form-label">Arguments</div>'
-        + '<input class="form-input" id="f_args" value="' + escHtml(s.args) + '">'
-        + '<div class="form-label">Virtual Env (Python)</div>'
-        + '<div style="display:flex;gap:4px;align-items:center;">'
-        + '<input class="form-input" id="f_venv_path" value="' + escHtml(s.venv_path || '') + '" placeholder="Auto-detect or /path/to/venv" style="flex:1">'
-        + '<button class="btn" onclick="detectVenv(\'' + escHtml(id) + '\')" style="padding:4px 8px;font-size:10px">Detect</button>'
-        + '</div>'
-        + '<div class="form-label">Enabled</div>'
-        + '<select class="form-input" id="f_enabled">'
-        + '<option value="true" '  + (s.enabled !== 'false' ? 'selected' : '') + '>Yes</option>'
-        + '<option value="false" ' + (s.enabled === 'false'  ? 'selected' : '') + '>No</option>'
-        + '</select>'
-        + '<div class="form-section">Schedule</div>'
-        + '<div class="form-label">Period</div>'
-        + '<select class="form-input" id="b_period" onchange="builderUpdate()">'
-        + ['OnDemand','EveryDay','EveryWeek','EveryMonth','Interval'].map(function(o) {
-            return '<option value="' + o + '" ' + (schedBuilderPeriodFromSaved(s) === o ? 'selected' : '') + '>' + o + '</option>';
-        }).join('') + '</select>'
-        + '<div id="b_time_row" class="form-label" style="display:none">Time(s)</div>'
-        + '<div id="b_time_wrap" style="display:none"><input class="form-input" id="b_times" placeholder="09:00, 14:30" oninput="builderUpdate()" value="' + escHtml(schedBuilderTimesFromSaved(s)) + '"></div>'
-        + '<div id="b_weekday_row" class="form-label" style="display:none">Day of week</div>'
-        + '<div id="b_weekday_wrap" style="display:none"><div style="display:flex;gap:4px;flex-wrap:wrap" id="b_weekdays">'
-        + ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d, i) {
-            var bit = i === 6 ? 0 : i + 1;
-            return '<div class="wd-btn' + (schedBuilderWeekdayActive(s, bit) ? ' wd-on' : '') + '" data-bit="' + bit + '" onclick="toggleWeekday(this)">' + d + '</div>';
-        }).join('') + '</div></div>'
-        + '<div id="b_monthday_row" class="form-label" style="display:none">Day of month</div>'
-        + '<div id="b_monthday_wrap" style="display:none"><input class="form-input" id="b_monthday" type="number" min="1" max="28" placeholder="1" oninput="builderUpdate()" value="' + escHtml(schedBuilderMonthdayFromSaved(s)) + '"></div>'
-        + '<div id="b_interval_row" class="form-label" style="display:none">Every (min)</div>'
-        + '<div id="b_interval_wrap" style="display:none"><input class="form-input" id="b_interval" type="number" min="1" placeholder="30" oninput="builderUpdate()" value="' + escHtml(schedBuilderIntervalFromSaved(s)) + '"></div>'
-        + '<div class="form-section">Result</div>'
-        + '<div class="form-label">Cron</div>'
-        + '<div class="trigger-row"><input class="form-input" id="f_cron" value="' + escHtml(s.cron) + '" placeholder="0 * * * *" oninput="builderClear()"><span style="color:var(--text2);font-size:10px;white-space:nowrap">min h dom mon dow</span></div>'
-        + '<div class="form-label">Interval (min)</div>'
-        + '<input class="form-input" id="f_interval_minutes" type="number" min="0" value="' + (s.interval_minutes || 0) + '" oninput="builderClear()">'
-        + '<div class="form-label">Fixed time</div>'
-        + '<input class="form-input" id="f_fixed_time" value="' + escHtml(s.fixed_time) + '" placeholder="14:30" oninput="builderClear()">'
+        + '<div class="form-label" id="f_script_label">' + spec.label + '</div>'
+        + '<div id="f_script_wrap">' + scriptFieldHtml(s, spec) + '</div>'
+        + '<div class="form-label" id="f_args_label"' + (spec.noArgs ? ' style="display:none"' : '') + '>Arguments</div>'
+        + '<input class="form-input" id="f_args" value="' + escHtml(s.args) + '"' + (spec.noArgs ? ' style="display:none"' : '') + '>'
+        + venvRowHtml(s, id)
         + '<div class="form-section">Overlap</div>'
         + '<div class="form-label">On overlap</div>'
         + '<select class="form-input" id="f_on_overlap" onchange="onOverlapChanged()">'
@@ -936,118 +949,373 @@ function renderSettings(s) {
         + '</select>'
         + '<div class="form-label" id="f_max_threads_label" style="' + (s.on_overlap === 'parallel' ? '' : 'display:none') + '">Max threads</div>'
         + '<input class="form-input" id="f_max_threads" type="number" min="1" value="' + (s.max_threads || '1') + '" style="' + (s.on_overlap === 'parallel' ? '' : 'display:none') + '">'
-        + '<div class="form-section">Terminal (per-task override)</div>'
-        + '<div class="form-label">Terminal app</div>'
-        + '<select class="form-input" id="f_terminal_override" onchange="onTerminalOverrideChange()">'
-        + '<option value="">Use global (' + _globalTerminalLabel() + ')</option>'
-        + '<option value="cmd"'         + (s.terminal_override === "cmd"         ? ' selected' : '') + '>cmd</option>'
-        + '<option value="powershell"'  + (s.terminal_override === "powershell"  ? ' selected' : '') + '>PowerShell</option>'
-        + '<option value="gitbash"'     + (s.terminal_override === "gitbash"     ? ' selected' : '') + '>Git Bash</option>'
-        + '<option value="third_party"' + (s.terminal_override === "third_party" ? ' selected' : '') + '>Third Party</option>'
-        + '</select>'
-        + '<div class="form-label">Init command</div>'
-        + '<input class="form-input" id="f_terminal_init_cmd" value="' + escHtml(s.terminal_init_cmd || '') + '" placeholder="e.g. conda activate myenv">'
-        + '<div class="form-label"></div>'
-        + '<div id="f_terminal_override_note" style="font-size:10px;color:var(--red,#f85149);padding-top:3px;"></div>'
         + '<div class="form-actions"><button class="btn primary" onclick="saveSchedule(\'' + escHtml(id) + '\')">Save</button></div>'
         + '</div>';
-    builderUpdate();
-    _checkTerminalOverrideNote();
-    // DIAG
-    console.log('[renderSettings] done, checking terminal section:', document.getElementById('f_terminal_override'));
 }
 
-// ── Schedule builder ──────────────────────────────────────────────────────────
+/// Поле пути: файл с пикером, папка с пикером каталога, команда без пикера,
+/// либо выпадашка зарегистрированных internal-задач.
+function scriptFieldHtml(s, spec) {
+    if (spec.pick === 'task') {
+        var names = _internalTaskNames.slice();
+        if (s.script_path && names.indexOf(s.script_path) < 0) names.unshift(s.script_path);
+        if (names.length === 0)
+            return '<input class="form-input" id="f_script_path" value="' + escHtml(s.script_path) + '" placeholder="no internal tasks registered">';
+        return '<select class="form-input" id="f_script_path">'
+             + names.map(function(n) {
+                 return '<option ' + (s.script_path === n ? 'selected' : '') + '>' + escHtml(n) + '</option>';
+               }).join('')
+             + '</select>';
+    }
 
-function schedBuilderPeriodFromSaved(s) {
-    if (s.interval_minutes && parseInt(s.interval_minutes) > 0) return 'Interval';
-    if (!s.cron) return 'OnDemand';
-    var parts = s.cron.trim().split(/\s+/);
-    if (parts.length !== 5) return 'OnDemand';
-    var h = parts[1], dom = parts[2], dow = parts[4];
-    if (dow !== '*') return 'EveryWeek';
-    if (dom !== '*' && dom !== '?') return 'EveryMonth';
-    if (h !== '*') return 'EveryDay';
-    return 'OnDemand';
+    var input = '<input class="form-input" id="f_script_path" style="flex:1;" value="' + escHtml(s.script_path) + '" placeholder="'
+              + (spec.pick === 'none' ? 'command to run' : '/path/to/script or folder') + '">';
+    if (spec.pick === 'none') return '<div style="display:flex;gap:4px;">' + input + '</div>';
+
+    var btn = spec.pick === 'folder'
+        ? '<button type="button" class="btn sm" onclick="pickPath(&#39;folder&#39;)" title="Выбрать каталог">📁</button>'
+        : '<button type="button" class="btn sm" onclick="pickPath(&#39;file&#39;)" title="Выбрать файл">📄</button>';
+    return '<div style="display:flex;gap:4px;">' + input + btn + '</div>';
 }
-function schedBuilderTimesFromSaved(s) {
-    if (!s.cron) return '';
-    var parts = s.cron.trim().split(/\s+/);
-    if (parts.length !== 5) return '';
-    var min = parts[0], h = parts[1];
-    if (h === '*' || min === '*') return '';
-    var mins = min.split(','), hours = h.split(',');
-    if (mins.length === 1 && hours.length >= 1)
-        return hours.map(function(hh) { return pad2(hh) + ':' + pad2(mins[0]); }).join(', ');
-    return '';
+
+/// venv нужен только питону: остальные экзекуторы про него ничего не знают.
+function venvRowHtml(s, id) {
+    if (s.executor !== 'python') return '';
+    return '<div class="form-label">Use venv</div>'
+        + '<div style="display:flex;gap:6px;align-items:center;">'
+        + '<input type="checkbox" id="f_use_venv"' + (s.use_venv === 'true' ? ' checked' : '') + '>'
+        + '<span style="color:var(--text2);font-size:10px;">каталог venv рядом со скриптом, интерпретатор системный</span>'
+        + '<button class="btn sm" onclick="ensureVenv(\'' + escHtml(id) + '\')" style="padding:3px 8px;">Create now</button>'
+        + '</div>';
 }
-function schedBuilderWeekdayActive(s, bit) {
-    if (!s.cron) return false;
-    var parts = s.cron.trim().split(/\s+/);
-    if (parts.length !== 5) return false;
-    return parts[4].split(',').indexOf(String(bit)) >= 0;
+
+/// Смена экзекутора перерисовывает форму: набор полей у каждого свой.
+function onExecutorChange() {
+    var s = _formSnapshot();
+    renderSettings(s);
 }
-function schedBuilderMonthdayFromSaved(s) {
-    if (!s.cron) return '';
-    var parts = s.cron.trim().split(/\s+/);
-    if (parts.length !== 5) return '';
-    var dom = parts[2];
-    return (dom !== '*' && dom !== '?') ? dom : '';
+
+/// Текущее содержимое формы — чтобы перерисовка не теряла введённое.
+function _formSnapshot() {
+    var s = schedules.find(function(x) { return x.id === selectedId; }) || {};
+    var snap = Object.assign({}, s);
+    snap.name        = (document.getElementById('f_name')        || {}).value || '';
+    snap.executor    = (document.getElementById('f_executor')    || {}).value || 'python';
+    snap.script_path = (document.getElementById('f_script_path') || {}).value || '';
+    snap.args        = (document.getElementById('f_args')        || {}).value || '';
+    snap.on_overlap  = (document.getElementById('f_on_overlap')  || {}).value || 'skip';
+    snap.max_threads = (document.getElementById('f_max_threads') || {}).value || '1';
+    var venv = document.getElementById('f_use_venv');
+    if (venv) snap.use_venv = venv.checked ? 'true' : 'false';
+    return snap;
 }
-function schedBuilderIntervalFromSaved(s) {
-    return (s.interval_minutes && parseInt(s.interval_minutes) > 0) ? s.interval_minutes : '';
+
+async function ensureVenv(id) {
+    if (!id) { Dialog.info('Сохраните задачу, потом создавайте venv.'); return; }
+    var res  = await fetch('/scheduler/ensure-venv', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ id: id }),
+    });
+    var data = await res.json();
+    if (data.ok) Dialog.info('venv готов:\n\n' + data.interpreter);
+    else         Dialog.error((data.log || []).join('\n') || data.error || 'venv не создан');
 }
-function builderClear() {
-    var el = document.getElementById('b_period');
-    if (el) { el.value = 'OnDemand'; builderShowRows('OnDemand'); }
+
+// ── Schedule tab ──────────────────────────────────────────────────────────────
+//
+// Три режима: расписания нет, модель планировщика ZennoPoster, сырой cron.
+// ZP-часть повторяет шесть блоков оригинала: как выполнять, начать,
+// сколько делать, когда повторять, как повторять, завершить.
+
+var WEEKDAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function zpDefaults() {
+    return {
+        how:       'daily',
+        weekdays:  [],
+        monthdays: '',
+        start:     { mode: 'now',   at: '' },
+        attempts:  { min: 1, max: 1, resetSuccess: false },
+        windows:   [],
+        repeat:    { mode: 'pause', min: 10, max: 10 },
+        end:       { mode: 'never', at: '', min: 1, max: 1 },
+    };
 }
-function toggleWeekday(el) { el.classList.toggle('wd-on'); builderUpdate(); }
-function builderShowRows(period) {
-    var showTime     = ['EveryDay','EveryWeek','EveryMonth'].indexOf(period) >= 0;
-    var showWeekday  = period === 'EveryWeek';
-    var showMonthday = period === 'EveryMonth';
-    var showInterval = period === 'Interval';
-    setRowVisible('b_time_row',     showTime);     setRowVisible('b_time_wrap',     showTime);
-    setRowVisible('b_weekday_row',  showWeekday);  setRowVisible('b_weekday_wrap',  showWeekday);
-    setRowVisible('b_monthday_row', showMonthday); setRowVisible('b_monthday_wrap', showMonthday);
-    setRowVisible('b_interval_row', showInterval); setRowVisible('b_interval_wrap', showInterval);
+
+function zpFromSaved(s) {
+    var d = zpDefaults();
+    if (!s.schedule_json) return d;
+    try {
+        var p = JSON.parse(s.schedule_json);
+        return {
+            how:       p.how       || d.how,
+            weekdays:  p.weekdays  || d.weekdays,
+            monthdays: p.monthdays || d.monthdays,
+            start:     Object.assign(d.start,    p.start    || {}),
+            attempts:  Object.assign(d.attempts, p.attempts || {}),
+            windows:   p.windows   || d.windows,
+            repeat:    Object.assign(d.repeat,   p.repeat   || {}),
+            end:       Object.assign(d.end,      p.end      || {}),
+        };
+    } catch (e) { return d; }
 }
-function setRowVisible(id, show) { var el = document.getElementById(id); if (el) el.style.display = show ? '' : 'none'; }
-function builderUpdate() {
-    var period = (document.getElementById('b_period') || {}).value || 'OnDemand';
-    builderShowRows(period);
-    if (period === 'OnDemand') return;
-    if (period === 'Interval') {
-        var mins = parseInt((document.getElementById('b_interval') || {}).value || '0');
-        setCronField(''); setIntervalField(mins > 0 ? mins : 0); return;
+
+var _zp = zpDefaults();
+
+function renderSchedule(s) {
+    var mode = s.schedule_mode || 'off';
+    _zp = zpFromSaved(s);
+
+    document.getElementById('detailBody').innerHTML =
+        '<div class="form-grid">'
+        + '<div class="form-label">Schedule</div>'
+        + '<select class="form-input" id="f_schedule_mode" onchange="onScheduleModeChange()">'
+        + '<option value="off"  ' + (mode === 'off'  ? 'selected' : '') + '>Disabled</option>'
+        + '<option value="zp"   ' + (mode === 'zp'   ? 'selected' : '') + '>ZP style</option>'
+        + '<option value="cron" ' + (mode === 'cron' ? 'selected' : '') + '>Cron</option>'
+        + '</select>'
+        + '</div>'
+        + '<div id="scheduleBody"></div>';
+
+    renderScheduleBody(s, mode);
+}
+
+function onScheduleModeChange() {
+    var s = schedules.find(function(x) { return x.id === selectedId; }) || {};
+    renderScheduleBody(s, document.getElementById('f_schedule_mode').value);
+}
+
+function renderScheduleBody(s, mode) {
+    var box = document.getElementById('scheduleBody');
+    if (!box) return;
+
+    if (mode === 'off') {
+        box.innerHTML = '<div class="empty-state" style="padding:18px 4px;">Расписания нет — задача запускается только кнопкой Run.</div>'
+                      + scheduleActionsHtml(s, false);
+        return;
     }
-    var timesRaw  = ((document.getElementById('b_times') || {}).value || '').trim();
-    var timesList = timesRaw ? timesRaw.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : ['00:00'];
-    if (timesList.length > 1) {
-        var minutes = timesList.map(function(t) { var p = parseHHMM(t); return p.h * 60 + p.m; }).sort(function(a,b){return a-b;});
-        var gaps = [];
-        for (var i = 1; i < minutes.length; i++) gaps.push(minutes[i] - minutes[i-1]);
-        var minGap = gaps.reduce(function(a,b){return Math.min(a,b);}, gaps[0] || 60);
-        setCronField(''); setIntervalField(Math.max(1, minGap)); return;
+    if (mode === 'cron') {
+        box.innerHTML = '<div class="form-grid">'
+            + '<div class="form-label">Cron</div>'
+            + '<div class="trigger-row"><input class="form-input" id="f_cron" value="' + escHtml(s.cron || '') + '" placeholder="0 * * * *"><span style="color:var(--text2);font-size:10px;white-space:nowrap">min h dom mon dow</span></div>'
+            + '</div>'
+            + previewBoxHtml()
+            + scheduleActionsHtml(s, true);
+        return;
     }
-    var t = parseHHMM(timesList[0]);
-    var cron = '';
-    if (period === 'EveryDay') cron = t.m + ' ' + t.h + ' * * *';
-    else if (period === 'EveryWeek') {
-        var days = [];
-        document.querySelectorAll('#b_weekdays .wd-btn.wd-on').forEach(function(b) { days.push(b.getAttribute('data-bit')); });
-        cron = t.m + ' ' + t.h + ' * * ' + (days.length ? days.join(',') : '*');
-    } else if (period === 'EveryMonth') {
-        var dom = parseInt((document.getElementById('b_monthday') || {}).value || '1');
-        if (!dom || dom < 1 || dom > 28) dom = 1;
-        cron = t.m + ' ' + t.h + ' ' + dom + ' * *';
-    }
-    setCronField(cron); setIntervalField(0);
+
+    box.innerHTML = zpFormHtml(s) + previewBoxHtml() + scheduleActionsHtml(s, true);
+    zpSyncRows();
 }
-function setCronField(v)     { var el = document.getElementById('f_cron');             if (el) el.value = v; }
-function setIntervalField(v) { var el = document.getElementById('f_interval_minutes'); if (el) el.value = v || 0; }
-function parseHHMM(str)      { var p = (str || '00:00').split(':'); return { h: parseInt(p[0])||0, m: parseInt(p[1])||0 }; }
-function pad2(n)             { return String(parseInt(n)||0).padStart(2,'0'); }
+
+function scheduleActionsHtml(s, withToggle) {
+    var enabled = s.enabled !== 'false';
+    return '<div class="form-grid">'
+        + (withToggle
+            ? '<div class="form-label">Enabled</div>'
+              + '<select class="form-input" id="f_enabled">'
+              + '<option value="true" '  + (enabled  ? 'selected' : '') + '>Yes</option>'
+              + '<option value="false" ' + (!enabled ? 'selected' : '') + '>No</option>'
+              + '</select>'
+            : '')
+        + '<div class="form-actions">'
+        + (withToggle ? '<button class="btn" onclick="previewSchedule()">Preview</button>' : '')
+        + '<button class="btn primary" onclick="saveSchedule(\'' + escHtml(s.id || '') + '\')">Save</button>'
+        + '</div>'
+        + '</div>';
+}
+
+function previewBoxHtml() {
+    return '<div id="schedulePreview" style="margin:6px 0;font-size:10px;color:var(--text2);"></div>';
+}
+
+function zpFormHtml(s) {
+    var z = _zp;
+    return '<div class="form-grid">'
+        // 1. Как выполнять
+        + '<div class="form-section">Как выполнять</div>'
+        + '<div class="form-label">Периодичность</div>'
+        + '<select class="form-input" id="z_how" onchange="zpSyncRows()">'
+        + [['once','Один раз'],['daily','Каждый день'],['weekly','Каждую неделю'],['monthly','Каждый месяц']]
+            .map(function(o) { return '<option value="' + o[0] + '"' + (z.how === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+        + '</select>'
+        + '<div class="form-label" id="z_weekdays_label">Дни недели</div>'
+        + '<div id="z_weekdays_wrap"><div style="display:flex;gap:4px;flex-wrap:wrap" id="z_weekdays">'
+        + WEEKDAY_NAMES.map(function(d, i) {
+            return '<div class="wd-btn' + (z.weekdays.indexOf(i) >= 0 ? ' wd-on' : '') + '" data-bit="' + i + '" onclick="this.classList.toggle(\'wd-on\')">' + d + '</div>';
+          }).join('')
+        + '</div></div>'
+        + '<div class="form-label" id="z_monthdays_label">Числа месяца</div>'
+        + '<input class="form-input" id="z_monthdays" value="' + escHtml(z.monthdays) + '" placeholder="1-5, 10, 20">'
+
+        // 2. Начать
+        + '<div class="form-section">Начать</div>'
+        + '<div class="form-label">Начало</div>'
+        + '<select class="form-input" id="z_start_mode" onchange="zpSyncRows()">'
+        + '<option value="now"' + (z.start.mode === 'now' ? ' selected' : '') + '>Сразу</option>'
+        + '<option value="date"' + (z.start.mode === 'date' ? ' selected' : '') + '>По дате</option>'
+        + '</select>'
+        + '<div class="form-label" id="z_start_at_label">Дата и время</div>'
+        + '<input class="form-input" id="z_start_at" type="datetime-local" value="' + escHtml(z.start.at || '') + '">'
+
+        // 3. Сколько делать
+        + '<div class="form-section">Сколько делать</div>'
+        + '<div class="form-label">Попыток за раз</div>'
+        + rangeInputsHtml('z_attempts', z.attempts.min, z.attempts.max)
+        + '<div class="form-label">Сбрасывать успехи</div>'
+        + '<div><input type="checkbox" id="z_reset_success"' + (z.attempts.resetSuccess ? ' checked' : '') + '></div>'
+
+        // 4. Когда повторять
+        + '<div class="form-section" id="z_windows_section">Когда повторять</div>'
+        + '<div class="form-label" id="z_windows_label">Интервалы</div>'
+        + '<div id="z_windows_wrap">'
+        +   '<div id="z_windows"></div>'
+        +   '<button class="btn sm" onclick="zpAddWindow()" style="margin-top:4px;">+ Добавить интервал</button>'
+        +   '<div style="color:var(--text2);font-size:10px;margin-top:3px;">пусто — круглосуточно</div>'
+        + '</div>'
+
+        // 5. Как повторять
+        + '<div class="form-section" id="z_repeat_section">Как повторять</div>'
+        + '<div class="form-label" id="z_repeat_label">Режим</div>'
+        + '<select class="form-input" id="z_repeat_mode" onchange="zpSyncRows()">'
+        + [['back_to_back','Подряд'],['pause','Подряд с паузой'],['regular','Регулярно'],['spread','Распределить по интервалу']]
+            .map(function(o) { return '<option value="' + o[0] + '"' + (z.repeat.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+        + '</select>'
+        + '<div class="form-label" id="z_repeat_min_label">Минут</div>'
+        + rangeInputsHtml('z_repeat', z.repeat.min, z.repeat.max)
+
+        // 6. Завершить
+        + '<div class="form-section" id="z_end_section">Завершить</div>'
+        + '<div class="form-label" id="z_end_label">Условие</div>'
+        + '<select class="form-input" id="z_end_mode" onchange="zpSyncRows()">'
+        + [['never','Без конца'],['date','По дате'],['count','После N повторений']]
+            .map(function(o) { return '<option value="' + o[0] + '"' + (z.end.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+        + '</select>'
+        + '<div class="form-label" id="z_end_at_label">Дата и время</div>'
+        + '<input class="form-input" id="z_end_at" type="datetime-local" value="' + escHtml(z.end.at || '') + '">'
+        + '<div class="form-label" id="z_end_count_label">Повторений</div>'
+        + rangeInputsHtml('z_end_count', z.end.min, z.end.max)
+        + '</div>';
+}
+
+/// «Точное число или диапазон» — в ZP это одна строка с двумя полями.
+function rangeInputsHtml(prefix, min, max) {
+    return '<div id="' + prefix + '_wrap" style="display:flex;gap:4px;align-items:center;">'
+        + '<input class="form-input" id="' + prefix + '_min" type="number" min="1" value="' + (min || 1) + '" style="width:70px">'
+        + '<span style="color:var(--text2);font-size:10px;">до</span>'
+        + '<input class="form-input" id="' + prefix + '_max" type="number" min="1" value="' + (max || min || 1) + '" style="width:70px">'
+        + '</div>';
+}
+
+/// Показ строк по выбранным режимам: при «Один раз» блоки 4–6 в ZP недоступны.
+function zpSyncRows() {
+    var how    = _val('z_how', 'daily');
+    var repeat = _val('z_repeat_mode', 'pause');
+    var end    = _val('z_end_mode', 'never');
+    var start  = _val('z_start_mode', 'now');
+    var once   = how === 'once';
+
+    _row('z_weekdays_label',  'z_weekdays_wrap',  how === 'weekly');
+    _row('z_monthdays_label', 'z_monthdays',      how === 'monthly');
+    _row('z_start_at_label',  'z_start_at',       start === 'date');
+
+    _show('z_windows_section', !once);
+    _row('z_windows_label',   'z_windows_wrap',   !once);
+
+    _show('z_repeat_section', !once);
+    _row('z_repeat_label',    'z_repeat_mode',    !once);
+    _row('z_repeat_min_label','z_repeat_wrap',    !once && (repeat === 'pause' || repeat === 'regular'));
+
+    _show('z_end_section',    !once);
+    _row('z_end_label',       'z_end_mode',       !once);
+    _row('z_end_at_label',    'z_end_at',         !once && end === 'date');
+    _row('z_end_count_label', 'z_end_count_wrap', !once && end === 'count');
+
+    zpRenderWindows();
+}
+
+function _val(id, fallback) { var el = document.getElementById(id); return el ? el.value : fallback; }
+function _show(id, on)      { var el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; }
+function _row(labelId, fieldId, on) { _show(labelId, on); _show(fieldId, on); }
+
+function zpRenderWindows() {
+    var box = document.getElementById('z_windows');
+    if (!box) return;
+    box.innerHTML = _zp.windows.map(function(w, i) {
+        return '<div style="display:flex;gap:4px;align-items:center;margin-bottom:3px;">'
+            + '<input class="form-input" type="time" value="' + escHtml(w.from || '') + '" onchange="zpSetWindow(' + i + ',\'from\',this.value)" style="width:96px">'
+            + '<span style="color:var(--text2);font-size:10px;">–</span>'
+            + '<input class="form-input" type="time" value="' + escHtml(w.to || '') + '" onchange="zpSetWindow(' + i + ',\'to\',this.value)" style="width:96px">'
+            + '<button class="btn sm danger" onclick="zpRemoveWindow(' + i + ')" style="padding:2px 7px;">✕</button>'
+            + '</div>';
+    }).join('');
+}
+
+function zpAddWindow()  { _zp.windows.push({ from: '09:00', to: '18:00' }); zpRenderWindows(); }
+function zpRemoveWindow(i) { _zp.windows.splice(i, 1); zpRenderWindows(); }
+function zpSetWindow(i, key, val) { if (_zp.windows[i]) _zp.windows[i][key] = val; }
+
+/// Форма → JSON для колонки schedule_json.
+function collectZp() {
+    var weekdays = [];
+    document.querySelectorAll('#z_weekdays .wd-btn.wd-on').forEach(function(b) {
+        weekdays.push(parseInt(b.getAttribute('data-bit')));
+    });
+    return {
+        how:       _val('z_how', 'daily'),
+        weekdays:  weekdays,
+        monthdays: _val('z_monthdays', ''),
+        start:     { mode: _val('z_start_mode', 'now'), at: _val('z_start_at', '') },
+        attempts:  {
+            min: _num('z_attempts_min', 1),
+            max: _num('z_attempts_max', 1),
+            resetSuccess: !!(document.getElementById('z_reset_success') || {}).checked,
+        },
+        windows:   _zp.windows.filter(function(w) { return w.from && w.to; }),
+        repeat:    { mode: _val('z_repeat_mode', 'pause'), min: _num('z_repeat_min', 10), max: _num('z_repeat_max', 10) },
+        end:       { mode: _val('z_end_mode', 'never'), at: _val('z_end_at', ''), min: _num('z_end_count_min', 1), max: _num('z_end_count_max', 1) },
+    };
+}
+
+function _num(id, fallback) {
+    var el = document.getElementById(id);
+    var n  = el ? parseInt(el.value) : NaN;
+    return isNaN(n) ? fallback : n;
+}
+
+/// Предпросмотр ближайших запусков — заодно проверяет настройки:
+/// пока сервер возвращает ошибки, расписание считается невалидным.
+async function previewSchedule() {
+    var box  = document.getElementById('schedulePreview');
+    var mode = _val('f_schedule_mode', 'off');
+    if (!box || mode === 'off') return;
+
+    box.textContent = 'считаю...';
+    var body = mode === 'cron'
+        ? { mode: 'cron', cron: _val('f_cron', '') }
+        : { mode: 'zp',   schedule_json: JSON.stringify(collectZp()) };
+
+    try {
+        var res  = await fetch('/scheduler/schedule-preview', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(body),
+        });
+        var data = await res.json();
+        if (!data.ok) {
+            box.innerHTML = '<span style="color:var(--red,#f85149)">' + (data.errors || []).map(escHtml).join('<br>') + '</span>';
+            return;
+        }
+        if (!data.times || data.times.length === 0) {
+            box.innerHTML = '<span style="color:var(--red,#f85149)">Ближайших запусков нет — проверьте настройки</span>';
+            return;
+        }
+        box.innerHTML = 'Ближайшие запуски (UTC):<br>' + data.times.map(escHtml).join('<br>');
+    } catch (e) {
+        box.textContent = e.message;
+    }
+}
 
 // ── Output tab ────────────────────────────────────────────────────────────────
 
@@ -1320,76 +1588,6 @@ async function loadHttp() {
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
-function _globalTerminalLabel() {
-    return _globalTerminal || 'cmd';
-}
-
-function onTerminalOverrideChange() {
-    _checkTerminalOverrideNote();
-}
-
-function _checkTerminalOverrideNote() {
-    var sel  = document.getElementById('f_terminal_override');
-    var note = document.getElementById('f_terminal_override_note');
-    if (!sel || !note) return;
-    var val = sel.value;
-    if (val === 'gitbash') {
-        fetch('/scheduler/terminal-config')
-            .then(function(r) { return r.json(); })
-            .then(function(cfg) {
-                note.textContent = cfg.gitbash_found ? '' : '⚠ Git Bash not found in default locations';
-            }).catch(function() {});
-    } else {
-        note.textContent = '';
-    }
-}
-
-function loadTerminalConfig() {
-    fetch('/scheduler/terminal-config')
-        .then(function(r) { return r.json(); })
-        .then(function(cfg) {
-            _globalTerminal = cfg.terminal || 'cmd';
-            var sel  = document.getElementById('f_terminal');
-            var path = document.getElementById('f_terminal_path');
-            if (sel) { sel.value = cfg.terminal || 'cmd'; }
-            if (path) path.value = cfg.terminal_path || '';
-            _updateTerminalUI(cfg.terminal || 'cmd', cfg.gitbash_found || '');
-        }).catch(function() {});
-}
-
-function _updateTerminalUI(term, gitbashFound) {
-    var pathLabel = document.getElementById('f_terminal_path_row');
-    var pathInput = document.getElementById('f_terminal_path');
-    var note      = document.getElementById('f_terminal_note');
-    var show = term === 'third_party';
-    if (pathLabel) pathLabel.style.display = show ? '' : 'none';
-    if (pathInput) pathInput.style.display = show ? '' : 'none';
-    if (note) {
-        if (term === 'gitbash' && !gitbashFound)
-            note.textContent = '⚠ Git Bash not found in default locations';
-        else
-            note.textContent = '';
-    }
-}
-
-async function saveTerminalConfig() {
-    var term = (document.getElementById('f_terminal') || {}).value || 'cmd';
-    var path = ((document.getElementById('f_terminal_path') || {}).value || '').trim();
-    var cfg  = await fetch('/scheduler/terminal-config').then(function(r) { return r.json(); });
-
-    if (term === 'gitbash' && !cfg.gitbash_found) {
-        Dialog.error('Git Bash not found. Install Git for Windows or use Third Party.');
-        return;
-    }
-    if (term === 'third_party' && !path) {
-        Dialog.error('Enter path to terminal executable.');
-        return;
-    }
-    var lines = 'TERMINAL = "' + term + '"';
-    if (term === 'third_party') lines += '\nTERMINAL_PATH = "' + path + '"';
-    Dialog.alert('Copy to config.py:\n\n' + lines, '⌨ Terminal config');
-}
-
 function openAiForTask(id) {
     var s = schedules.find(function(x) { return x.id === id; });
     if (!s) return;
@@ -1406,49 +1604,46 @@ async function openInTerminal(id) {
     } catch(e) { Dialog.error(e.message); }
 }
 
+/// Save собирает только те поля, которые есть на текущем табе: Settings и
+/// Schedule живут в одном detailBody, и одновременно на экране только один.
 async function saveSchedule(existingId) {
-    var maxThreadsEl = document.getElementById('f_max_threads');
-    var payload = {
-        id:               existingId || undefined,
-        name:             document.getElementById('f_name').value.trim(),
-        executor:         document.getElementById('f_executor').value,
-        script_path:      document.getElementById('f_script_path').value.trim(),
-        args:             document.getElementById('f_args').value.trim(),
-        venv_path:        document.getElementById('f_venv_path').value.trim(),
-        enabled:          document.getElementById('f_enabled').value,
-        cron:             document.getElementById('f_cron').value.trim(),
-        interval_minutes: document.getElementById('f_interval_minutes').value,
-        fixed_time:       document.getElementById('f_fixed_time').value.trim(),
-        on_overlap:       document.getElementById('f_on_overlap').value,
-        max_threads:      maxThreadsEl ? maxThreadsEl.value : '1',
-        terminal_override: (document.getElementById('f_terminal_override') || {}).value || '',
-        terminal_init_cmd: (document.getElementById('f_terminal_init_cmd') || {}).value || '',
-    };
+    var prev    = schedules.find(function(x) { return x.id === selectedId; }) || {};
+    var payload = { id: existingId || undefined };
+
+    if (document.getElementById('f_name')) {
+        var maxThreadsEl = document.getElementById('f_max_threads');
+        var venvEl       = document.getElementById('f_use_venv');
+        payload.name        = document.getElementById('f_name').value.trim();
+        payload.executor    = document.getElementById('f_executor').value;
+        payload.script_path = document.getElementById('f_script_path').value.trim();
+        payload.on_overlap  = document.getElementById('f_on_overlap').value;
+        payload.max_threads = maxThreadsEl ? maxThreadsEl.value : '1';
+        payload.use_venv    = venvEl ? (venvEl.checked ? 'true' : 'false') : (prev.use_venv || 'false');
+
+        // У npm, internal и csx-internal поля Arguments нет: там args служебный.
+        var argsEl = document.getElementById('f_args');
+        if (argsEl && argsEl.style.display !== 'none') payload.args = argsEl.value.trim();
+    }
+
+    var modeEl = document.getElementById('f_schedule_mode');
+    if (modeEl) {
+        var mode = modeEl.value;
+        payload.schedule_mode = mode;
+        payload.cron          = mode === 'cron' ? (_val('f_cron', '').trim()) : '';
+        payload.schedule_json = mode === 'zp'   ? JSON.stringify(collectZp()) : '';
+        payload.enabled       = mode === 'off' ? 'false' : _val('f_enabled', 'true');
+
+        // Включение расписания заново начинает отсчёт повторений и сетку «Регулярно».
+        if (mode !== 'off' && (prev.schedule_mode !== mode || prev.schedule_json !== payload.schedule_json)) {
+            payload.sched_runs       = '0';
+            payload.sched_started_at = new Date().toISOString();
+        }
+    }
+
     var res  = await fetch('/scheduler/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     var data = await res.json();
     if (data.ok) { selectedId = data.id; formDirty = false; await loadList(); selectRow(data.id); }
     else Dialog.error(data.error || 'Save failed');
-}
-
-async function detectVenv(id) {
-    if (!id) return;
-    var res = await fetch('/scheduler/detect-venv?id=' + encodeURIComponent(id));
-    var data = await res.json();
-    if (!data.ok) {
-        Dialog.error('Failed to detect venv');
-        return;
-    }
-    if (!data.venvs || data.venvs.length === 0) {
-        Dialog.info('No virtual environments found in script folder.\n\nSearched for: .venv, venv, env');
-        return;
-    }
-    // Use first detected venv
-    var venv = data.venvs[0];
-    var input = document.getElementById('f_venv_path');
-    if (input) {
-        input.value = venv.path;
-        Dialog.info('Detected venv: ' + venv.name + '\n\nPath: ' + venv.path);
-    }
 }
 
 function _nextDuplicateName(name, existingNames) {
@@ -1467,8 +1662,8 @@ async function duplicateSchedule(id) {
     var res  = await fetch('/scheduler/save', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ name:newName, executor:s.executor, script_path:s.script_path, args:s.args,
-            enabled:'false', cron:s.cron, interval_minutes:s.interval_minutes,
-            fixed_time:s.fixed_time, on_overlap:s.on_overlap, max_threads:s.max_threads })
+            enabled:'false', cron:s.cron, on_overlap:s.on_overlap, max_threads:s.max_threads,
+            use_venv:s.use_venv, schedule_mode:s.schedule_mode, schedule_json:s.schedule_json })
     });
     var data = await res.json();
     if (!data.ok) { Dialog.error(data.error || 'Duplicate: save failed'); return; }
