@@ -80,6 +80,7 @@ public sealed class BranchExecutor
         else
             _instance.GetHe(Selector(branch)).RiseEvent(ev, EmulationLevel(branch));
 
+        SettleAfterAction();
         return BranchResult.Empty;
     }
 
@@ -216,6 +217,26 @@ public sealed class BranchExecutor
         _log($"[xml] GetAttribute: прочитано «{value}»");
 
         return new BranchResult(value ?? "");
+    }
+
+    /// <summary>
+    /// Дождаться страницы, если действие её сменило.
+    ///
+    /// Клик по ссылке может открыть окно на месте, а может увести на другой
+    /// адрес — со стороны ветки это неразличимо. Без ожидания следующая ветка
+    /// работает с уходящей страницей: ввод ложится в поле, которое через
+    /// мгновение заменится новым, пустым. Проверка после ввода при этом
+    /// показывает введённое — она успевает раньше перехода, — и наружу всё
+    /// выглядит успешным.
+    ///
+    /// Именно так вёл себя airbnb под прокси: клик «Se connecter ou s'inscrire»
+    /// вместо окна на месте перезагружал страницу целиком.
+    ///
+    /// Так же поступает и эталонный Go: «if (IsBusy) WaitDownloading()».
+    /// </summary>
+    private void SettleAfterAction()
+    {
+        if (_instance.ActiveTab.IsBusy) _instance.ActiveTab.WaitDownloading();
     }
 
     // ── Прочее ────────────────────────────────────────────────────────────────
