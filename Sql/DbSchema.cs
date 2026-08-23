@@ -55,6 +55,7 @@
                 { "schedule_json",    "TEXT DEFAULT ''" },
                 { "sched_runs",       "TEXT DEFAULT '0'" },
                 { "sched_started_at", "TEXT DEFAULT ''" },
+                { "browser_json",     "TEXT DEFAULT ''" },
             }
         };
 

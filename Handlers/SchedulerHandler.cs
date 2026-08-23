@@ -33,7 +33,8 @@ public sealed class SchedulerHandler : IScriptHandler
         "status", "last_run", "last_exit", "last_output",
         "payload_schema", "payload_values",
         "runs_total", "runs_success", "schedule_tag", "last_run_id",
-        "use_venv", "schedule_mode", "schedule_json", "sched_runs", "sched_started_at"
+        "use_venv", "schedule_mode", "schedule_json", "sched_runs", "sched_started_at",
+        "browser_json"
     };
 
     public SchedulerHandler(DbConnectionService dbService, SchedulerService scheduler, string wwwrootPath)

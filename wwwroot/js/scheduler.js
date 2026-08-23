@@ -940,6 +940,7 @@ function renderSettings(s) {
         + '<div class="form-label" id="f_args_label"' + (spec.noArgs ? ' style="display:none"' : '') + '>Arguments</div>'
         + '<input class="form-input" id="f_args" value="' + escHtml(s.args) + '"' + (spec.noArgs ? ' style="display:none"' : '') + '>'
         + venvRowHtml(s, id)
+        + browserSectionHtml(s)
         + '<div class="form-section">Overlap</div>'
         + '<div class="form-label">On overlap</div>'
         + '<select class="form-input" id="f_on_overlap" onchange="onOverlapChanged()">'
@@ -951,6 +952,8 @@ function renderSettings(s) {
         + '<input class="form-input" id="f_max_threads" type="number" min="1" value="' + (s.max_threads || '1') + '" style="' + (s.on_overlap === 'parallel' ? '' : 'display:none') + '">'
         + '<div class="form-actions"><button class="btn primary" onclick="saveSchedule(\'' + escHtml(id) + '\')">Save</button></div>'
         + '</div>';
+
+    if (s.executor === 'xml') browserSyncRows();
 }
 
 /// Поле пути: файл с пикером, папка с пикером каталога, команда без пикера,
@@ -1007,6 +1010,7 @@ function _formSnapshot() {
     snap.max_threads = (document.getElementById('f_max_threads') || {}).value || '1';
     var venv = document.getElementById('f_use_venv');
     if (venv) snap.use_venv = venv.checked ? 'true' : 'false';
+    if (document.getElementById('b_mode')) snap.browser_json = JSON.stringify(collectBrowser());
     return snap;
 }
 
@@ -1020,6 +1024,154 @@ async function ensureVenv(id) {
     var data = await res.json();
     if (data.ok) Dialog.info('venv готов:\n\n' + data.interpreter);
     else         Dialog.error((data.log || []).join('\n') || data.error || 'venv не создан');
+}
+
+// ── Browser (xml) ─────────────────────────────────────────────────────────────
+//
+// Шаблон ZennoPoster всегда играется в браузере, и браузер этот может быть не
+// наш: у антидетект-профиля свой отпечаток и свой прокси, поднимать поверх него
+// Patchright бессмысленно. Поэтому режимов четыре, а внешний подключается по CDP.
+//
+// Пресеты — это только заполнение полей: код у всех антиков один, разница лишь
+// в URL и в том, как в ответе лежит эндпоинт.
+
+var BROWSER_PRESETS = {
+    adspower: {
+        title: 'AdsPower',
+        method: 'GET',
+        url:    'http://local.adspower.net:50325/api/v1/browser/start?user_id={profile}',
+        ws:     '{data.ws.puppeteer}',
+        stopUrl:'http://local.adspower.net:50325/api/v1/browser/stop?user_id={profile}'
+    },
+    dolphin: {
+        title: 'Dolphin Anty',
+        method: 'GET',
+        url:    'http://localhost:3001/v1.0/browser_profiles/{profile}/start?automation=1',
+        ws:     'ws://127.0.0.1:{automation.port}{automation.wsEndpoint}',
+        stopUrl:'http://localhost:3001/v1.0/browser_profiles/{profile}/stop'
+    }
+};
+
+function browserDefaults() {
+    return {
+        mode: 'patchright', profile: '', cdp: '', close: true,
+        api: { method: 'GET', url: '', body: '', ws: '', stopMethod: 'GET', stopUrl: '' }
+    };
+}
+
+function browserFromSaved(s) {
+    var d = browserDefaults();
+    if (!s.browser_json) return d;
+    try {
+        var p = JSON.parse(s.browser_json);
+        return {
+            mode:    p.mode    || d.mode,
+            profile: p.profile || '',
+            cdp:     p.cdp     || '',
+            close:   p.close !== false,
+            api:     Object.assign(d.api, p.api || {})
+        };
+    } catch (e) { return d; }
+}
+
+/// Блок браузера в Settings. Показывается только у xml: остальные экзекуторы
+/// браузер не поднимают.
+function browserSectionHtml(s) {
+    if (s.executor !== 'xml') return '';
+    var b = browserFromSaved(s);
+
+    return '<div class="form-section">Browser</div>'
+        + '<div class="form-label">Источник</div>'
+        + '<select class="form-input" id="b_mode" onchange="browserSyncRows()">'
+        + [['patchright','Patchright (свой браузер)'],
+           ['zennobrowser','ZennoBrowser'],
+           ['cdp','Внешний по CDP'],
+           ['api','Внешний через API антика']]
+            .map(function(o) { return '<option value="' + o[0] + '"' + (b.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+        + '</select>'
+
+        + '<div class="form-label" id="b_profile_label">Профиль</div>'
+        + '<div id="b_profile_wrap" style="display:flex;gap:6px;align-items:center;">'
+        +   '<input class="form-input" id="b_profile" value="' + escHtml(b.profile) + '" placeholder="id профиля" style="flex:1">'
+        +   '<span style="color:var(--text2);font-size:10px;white-space:nowrap">payload перекрывает</span>'
+        + '</div>'
+
+        + '<div class="form-label" id="b_cdp_label">CDP-эндпоинт</div>'
+        + '<input class="form-input" id="b_cdp" value="' + escHtml(b.cdp) + '" placeholder="ws://127.0.0.1:9222/devtools/browser/...">'
+
+        + '<div class="form-label" id="b_preset_label">Пресет</div>'
+        + '<div id="b_preset_wrap">'
+        +   '<select class="form-input" id="b_preset" onchange="applyBrowserPreset()">'
+        +   '<option value="">— вручную —</option>'
+        +   Object.keys(BROWSER_PRESETS).map(function(k) {
+                return '<option value="' + k + '">' + BROWSER_PRESETS[k].title + '</option>';
+            }).join('')
+        +   '</select>'
+        + '</div>'
+
+        + '<div class="form-label" id="b_method_label">Метод старта</div>'
+        + '<select class="form-input" id="b_method" onchange="browserSyncRows()">'
+        + ['GET','POST'].map(function(m) { return '<option' + (b.api.method === m ? ' selected' : '') + '>' + m + '</option>'; }).join('')
+        + '</select>'
+
+        + '<div class="form-label" id="b_url_label">URL старта</div>'
+        + '<input class="form-input" id="b_url" value="' + escHtml(b.api.url) + '" placeholder="http://.../start?user_id={profile}">'
+
+        + '<div class="form-label" id="b_body_label">Тело запроса</div>'
+        + '<input class="form-input" id="b_body" value="' + escHtml(b.api.body) + '" placeholder="JSON для POST, можно с {profile}">'
+
+        + '<div class="form-label" id="b_ws_label">Шаблон эндпоинта</div>'
+        + '<input class="form-input" id="b_ws" value="' + escHtml(b.api.ws) + '" placeholder="{data.ws.puppeteer}">'
+
+        + '<div class="form-label" id="b_stop_label">URL закрытия</div>'
+        + '<input class="form-input" id="b_stop" value="' + escHtml(b.api.stopUrl) + '" placeholder="http://.../stop?user_id={profile}">'
+
+        + '<div class="form-label" id="b_close_label">Закрывать после прогона</div>'
+        + '<div id="b_close_wrap"><input type="checkbox" id="b_close"' + (b.close ? ' checked' : '') + '></div>';
+}
+
+/// Поля зависят от источника: у Patchright их нет вовсе, у CDP только эндпоинт.
+function browserSyncRows() {
+    var mode = _val('b_mode', 'patchright');
+    var api  = mode === 'api';
+
+    _row('b_profile_label', 'b_profile_wrap', mode === 'zennobrowser' || api);
+    _row('b_cdp_label',     'b_cdp',          mode === 'cdp');
+    _row('b_preset_label',  'b_preset_wrap',  api);
+    _row('b_method_label',  'b_method',       api);
+    _row('b_url_label',     'b_url',          api);
+    _row('b_body_label',    'b_body',         api && _val('b_method', 'GET') === 'POST');
+    _row('b_ws_label',      'b_ws',           api);
+    _row('b_stop_label',    'b_stop',         api);
+    _row('b_close_label',   'b_close_wrap',   api);
+}
+
+function applyBrowserPreset() {
+    var preset = BROWSER_PRESETS[_val('b_preset', '')];
+    if (!preset) return;
+    document.getElementById('b_method').value = preset.method;
+    document.getElementById('b_url').value    = preset.url;
+    document.getElementById('b_ws').value     = preset.ws;
+    document.getElementById('b_stop').value   = preset.stopUrl;
+    browserSyncRows();
+}
+
+/// Форма → JSON для колонки browser_json.
+function collectBrowser() {
+    return {
+        mode:    _val('b_mode', 'patchright'),
+        profile: _val('b_profile', ''),
+        cdp:     (_val('b_cdp', '') || '').trim(),
+        close:   !!(document.getElementById('b_close') || { checked: true }).checked,
+        api: {
+            method:     _val('b_method', 'GET'),
+            url:        (_val('b_url', '') || '').trim(),
+            body:       (_val('b_body', '') || '').trim(),
+            ws:         (_val('b_ws', '') || '').trim(),
+            stopMethod: 'GET',
+            stopUrl:    (_val('b_stop', '') || '').trim()
+        }
+    };
 }
 
 // ── Schedule tab ──────────────────────────────────────────────────────────────
@@ -1623,6 +1775,9 @@ async function saveSchedule(existingId) {
         // У npm, internal и csx-internal поля Arguments нет: там args служебный.
         var argsEl = document.getElementById('f_args');
         if (argsEl && argsEl.style.display !== 'none') payload.args = argsEl.value.trim();
+
+        // Браузер настраивается только у xml; у прочих экзекуторов колонку не трогаем.
+        if (document.getElementById('b_mode')) payload.browser_json = JSON.stringify(collectBrowser());
     }
 
     var modeEl = document.getElementById('f_schedule_mode');

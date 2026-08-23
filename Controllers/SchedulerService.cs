@@ -566,6 +566,9 @@ private static void SeedDefaults(Db db)
             Console.ResetColor();
 
             DevDeck.Browser.BrowserSession? session = null;
+            // Профиль антика, который мы обязаны закрыть за собой; null — не наш.
+            string? externalProfile = null;
+            var brConfig = BrowserConfig.Parse(record.GetValueOrDefault("browser_json", ""));
             try
             {
                 var project = new StubProject { Name = name, OnLog = rp.AddLine };
@@ -586,13 +589,56 @@ private static void SeedDefaults(Db db)
                     rawProxy = tpl.Variables.GetValueOrDefault("proxy", "");
                 var proxy = DevDeck.Browser.BrowserSession.NormalizeProxy(rawProxy);
 
-                var zbId = payload.GetValueOrDefault("zb_id", "");
-                if (!string.IsNullOrWhiteSpace(zbId))
+                // Чем поднимать браузер — настройка задачи; какой именно профиль
+                // открывать — данные запуска, поэтому payload перекрывает настройку.
+                var profile = payload.GetValueOrDefault("browser_profile", "");
+                if (string.IsNullOrWhiteSpace(profile)) profile = payload.GetValueOrDefault("zb_id", "");
+                if (string.IsNullOrWhiteSpace(profile)) profile = brConfig.Profile;
+
+                var mode = brConfig.Mode;
+                // Профиль ZennoBrowser в payload включает свою ветку и при
+                // настройке по умолчанию — так задачи вели себя до появления выбора.
+                if (mode == "patchright" && !string.IsNullOrWhiteSpace(payload.GetValueOrDefault("zb_id", "")))
+                    mode = "zennobrowser";
+
+                if (mode == "zennobrowser" && !string.IsNullOrWhiteSpace(profile))
                 {
                     // Боевой путь: профиль ZennoBrowser со своим отпечатком.
-                    var ws = await new ZB(Config.ApiConfig.ZB).RunProfile(zbId);
+                    var ws = await new ZB(Config.ApiConfig.ZB).RunProfile(profile);
                     if (!string.IsNullOrWhiteSpace(ws))
                         session = await DevDeck.Browser.BrowserSession.AttachAsync(ws);
+                    else
+                        rp.AddLine($"[br] ZennoBrowser не отдал эндпоинт для профиля {profile}");
+                }
+                else if (mode == "cdp")
+                {
+                    if (string.IsNullOrWhiteSpace(brConfig.Cdp))
+                        rp.AddLine("[br] режим CDP выбран, но эндпоинт не задан");
+                    else
+                    {
+                        rp.AddLine($"[br] подключаюсь к {brConfig.Cdp}");
+                        session = await DevDeck.Browser.BrowserSession.AttachAsync(brConfig.Cdp);
+                    }
+                }
+                else if (mode == "api")
+                {
+                    var ws = await BrowserProvider.StartAsync(brConfig, profile, rp.AddLine);
+                    if (!string.IsNullOrWhiteSpace(ws))
+                    {
+                        session = await DevDeck.Browser.BrowserSession.AttachAsync(ws);
+                        externalProfile = brConfig.CloseAfterRun ? profile : null;
+                    }
+                }
+
+                // Внешний браузер не поднялся — это не повод молча уйти на
+                // Patchright: у профиля другой отпечаток и другой прокси.
+                if (session is null && mode != "patchright")
+                {
+                    rp.AddLine("[ERR] внешний браузер не подключён, запуск отменён");
+                    UpdateStatus(db, id, "error", firedAt, "-1", rp.Snapshot(), runId);
+                    _running.TryRemove(instanceKey, out _);
+                    FinishQueueEntry(db, queueUuid, "error", runId);
+                    return;
                 }
 
                 if (session is null)
@@ -650,6 +696,10 @@ private static void SeedDefaults(Db db)
             finally
             {
                 if (session is not null) await session.DisposeAsync();
+                // Профиль антика закрываем только если сами его открывали:
+                // при прогоне по аккаунтам иначе накопятся десятки открытых окон.
+                if (externalProfile is not null)
+                    await BrowserProvider.StopAsync(brConfig, externalProfile, rp.AddLine);
                 cts.Dispose();
                 TryDrainOne(db, id);
             }
