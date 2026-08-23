@@ -84,17 +84,44 @@ public sealed class BranchExecutor
     private BranchResult SetAttribute(Branch branch)
     {
         var attr  = branch.Param("Attribute") ?? "value";
-        var value = _project.Expand(branch.Param("Value"));
+        var raw   = branch.Param("Value");
+        var value = _project.Expand(raw);
+
+        // Пустая подстановка — почти всегда не «так задумано», а незаполненная
+        // переменная. Молча вводить ничего и отчитаться «выполнено» — ровно то,
+        // из-за чего ветка потом падает через две штуки и в другом месте.
+        if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(raw) && raw.Contains("{-"))
+            _log($"[xml] SetAttribute: «{raw}» развернулось в пустую строку — вводить нечего");
 
         // ZP пишет любой атрибут, но value вводится с эмуляцией, а не
         // присвоением: на нём висят обработчики, которые от SetAttribute не
         // сработают. Эталонный HeSet это и делает — заодно ждёт элемент.
         if (attr.Equals("value", StringComparison.OrdinalIgnoreCase))
+        {
             _instance.HeSet(Selector(branch), value, deadline: Deadline(branch));
-        else
-            _instance.GetHe(Selector(branch)).SetAttribute(attr, value);
+
+            // Проверка по факту. ZP её не делает, но ZP и не наша подложка: без
+            // неё «ветка выполнена» значит только «не бросила исключение», а
+            // поле при этом может остаться пустым — и разбираться придётся уже
+            // на следующей ветке, где ничего не появилось.
+            var actual = ReadBack(branch);
+            if (actual is not null && actual != value)
+                _log($"[xml] SetAttribute: в поле осталось «{actual}», а вводили «{value}» " +
+                     "— значение не закрепилось");
+        }
+        else _instance.GetHe(Selector(branch)).SetAttribute(attr, value);
 
         return BranchResult.Empty;
+    }
+
+    /// <summary>
+    /// Перечитать value у того же элемента. Ошибку глотаем: это диагностика, и
+    /// падать из-за неё там, где ZP не падает, нельзя.
+    /// </summary>
+    private string? ReadBack(Branch branch)
+    {
+        try   { return _instance.GetHe(Selector(branch)).GetAttribute("value"); }
+        catch { return null; }
     }
 
     private BranchResult GetAttribute(Branch branch)
