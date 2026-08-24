@@ -667,11 +667,15 @@ namespace DevDeck.Browser
         /// </summary>
         public void WaitDownloading()
         {
-            // PlaywrightException, а не TimeoutException: у Playwright свой
-            // одноимённый тип, и он от неё наследуется — заодно ловится смена
-            // документа прямо во время ожидания.
+            // Ловятся оба типа, и это проверено, а не выведено из названий:
+            // Playwright .NET бросает по сроку System.TimeoutException, который
+            // PlaywrightException НЕ наследует. Прежний catch(PlaywrightException)
+            // не ловил ничего, и первый же сайт, не доходящий до load, ронял
+            // ветку прямо здесь. PlaywrightException оставлен ради смены
+            // документа во время ожидания.
             try { Sync(_page.WaitForLoadStateAsync(LoadState.Load)); }
-            catch (PlaywrightException) { }
+            catch (System.TimeoutException)  { }
+            catch (PlaywrightException)      { }
         }
 
         public string GetPagePreview()
