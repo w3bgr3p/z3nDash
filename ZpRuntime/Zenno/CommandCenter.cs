@@ -681,19 +681,7 @@ namespace ZennoLab.CommandCenter
                              bool emulateWebrtc = false)
         {
             if (string.IsNullOrWhiteSpace(proxyString)) return;
-
-            var current = Br.Proxy;
-
-            if (string.IsNullOrEmpty(current))
-                throw new NotSupportedException(
-                    "Instance.SetProxy: браузер поднят без прокси, а сменить его на живом " +
-                    "инстансе нельзя — Playwright принимает прокси только при запуске. " +
-                    $"Передайте [{proxyString}] в BrowserSession при создании сессии.");
-
-            if (!SameProxy(current, proxyString))
-                throw new NotSupportedException(
-                    $"Instance.SetProxy: браузер поднят с прокси [{current}], " +
-                    $"запрошен [{proxyString}] — сменить на живом инстансе нельзя.");
+            Br.SetProxy(proxyString);
         }
 
         public string GetProxy() => Br.Proxy ?? "";

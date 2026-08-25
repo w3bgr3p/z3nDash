@@ -49,6 +49,12 @@ namespace DevDeck.Browser
         /// </summary>
         string Proxy { get; }
 
+        /// <summary>
+        /// Сменить прокси на живом браузере. Возможно потому, что браузер
+        /// смотрит в наш локальный релей, а меняется то, куда ходит релей.
+        /// </summary>
+        void SetProxy(string proxy);
+
         // ── Временная зона ────────────────────────────────────────────────────
         void SetTimezone(int offsetMinutes, int unused);
         void SetIanaTimezone(string ianaName);

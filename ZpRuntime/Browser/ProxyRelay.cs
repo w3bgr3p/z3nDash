@@ -48,11 +48,32 @@ namespace DevDeck.Browser;
 public sealed class ProxyRelay : IDisposable
 {
     private readonly TcpListener       _listener;
-    private readonly string            _host;
-    private readonly int               _port;
-    private readonly string            _user;
-    private readonly string            _pass;
     private readonly CancellationTokenSource _cts = new();
+
+    /// <summary>
+    /// Куда ходить наверх. Меняется на живом релее — в этом весь смысл: ZP-шный
+    /// SetProxy зовут посреди прогона, когда прокси только что получен от
+    /// поставщика, а браузер уже поднят.
+    /// </summary>
+    private volatile Upstream _up = Upstream.Direct;
+
+    /// <summary>
+    /// Живые соединения браузера. Нужны, чтобы порвать их при смене верхнего
+    /// прокси: браузер держит соединения к нам открытыми и переиспользует, и
+    /// без разрыва он продолжает ходить через прежний прокси — смена
+    /// логируется, а IP не меняется. Проверено: без этого SetProxy не менял
+    /// ничего.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<TcpClient, byte> _live = new();
+
+    /// <summary>Верхний прокси: напрямую, SOCKS5 или HTTP, с логином или без.</summary>
+    private sealed record Upstream(string Kind, string Host, int Port, string User, string Pass)
+    {
+        public static readonly Upstream Direct = new("direct", "", 0, "", "");
+        public bool HasAuth => User.Length > 0;
+        public override string ToString()
+            => Kind == "direct" ? "напрямую" : $"{Kind} {Host}:{Port}{(HasAuth ? " с логином" : "")}";
+    }
 
     /// <summary>Адрес для браузера: HTTP-прокси на локальной петле.</summary>
     public string Endpoint { get; }
@@ -65,44 +86,75 @@ public sealed class ProxyRelay : IDisposable
     /// </summary>
     public Action<string>? Log { get; set; }
 
-    private ProxyRelay(TcpListener listener, string host, int port, string user, string pass)
+    private ProxyRelay(TcpListener listener)
     {
         _listener = listener;
-        _host = host; _port = port; _user = user; _pass = pass;
-        Endpoint = $"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}";
+        Endpoint  = $"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}";
+    }
+
+    /// <summary>Что сейчас наверху — для Instance.GetProxy и сверки.</summary>
+    public string Current { get; private set; } = "";
+
+    /// <summary>
+    /// Поднять релей и слушать. Верхний прокси задаётся отдельно и может
+    /// меняться сколько угодно раз.
+    /// </summary>
+    public static ProxyRelay Start()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var relay = new ProxyRelay(listener);
+        _ = relay.AcceptLoopAsync();
+        return relay;
     }
 
     /// <summary>
-    /// Поднять релей для строки вида socks5://user:pass@host:port. Если
-    /// авторизации в строке нет, релей не нужен — возвращается null, и прокси
-    /// отдаётся браузеру напрямую.
+    /// Сменить верхний прокси. Пустая строка — ходить напрямую.
+    ///
+    /// Уже открытые соединения остаются на прежнем верхнем прокси: рвать их
+    /// значит уронить страницу под руками у шаблона. Новые пойдут через новый.
     /// </summary>
-    public static ProxyRelay? StartIfNeeded(string? proxy)
+    public void SetUpstream(string? proxy)
     {
-        if (string.IsNullOrWhiteSpace(proxy)) return null;
+        _up     = Parse(proxy);
+        Current = string.IsNullOrWhiteSpace(proxy) ? "" : proxy.Trim();
+
+        // Рвём то, что уже открыто: иначе браузер продолжит ходить через
+        // прежний прокси по переиспользованным соединениям.
+        var dropped = 0;
+        foreach (var c in _live.Keys)
+        {
+            _live.TryRemove(c, out _);
+            try { c.Close(); dropped++; } catch { }
+        }
+
+        Log?.Invoke($"верхний прокси: {_up}" + (dropped > 0 ? $", порвано соединений: {dropped}" : ""));
+    }
+
+    /// <summary>Разбор строки вида scheme://user:pass@host:port; схема по умолчанию http.</summary>
+    private static Upstream Parse(string? proxy)
+    {
+        if (string.IsNullOrWhiteSpace(proxy)) return Upstream.Direct;
 
         var v = proxy.Trim();
         int s = v.IndexOf("://", StringComparison.Ordinal);
         var scheme = s > 0 ? v[..s].ToLowerInvariant() : "http";
         if (s > 0) v = v[(s + 3)..];
 
-        // HTTP-прокси Chromium авторизует сам, обходной путь нужен только SOCKS.
-        if (!scheme.StartsWith("socks")) return null;
-
+        var user = ""; var pass = "";
         int at = v.LastIndexOf('@');
-        if (at < 0) return null;                    // без логина релей не нужен
+        if (at >= 0)
+        {
+            var creds = v[..at].Split(':', 2);
+            user = creds[0];
+            pass = creds.Length > 1 ? creds[1] : "";
+            v    = v[(at + 1)..];
+        }
 
-        var creds = v[..at].Split(':', 2);
-        var hp    = v[(at + 1)..].Split(':');
-        if (hp.Length < 2 || !int.TryParse(hp[1], out var port)) return null;
+        var hp = v.Split(':');
+        if (hp.Length < 2 || !int.TryParse(hp[1], out var port)) return Upstream.Direct;
 
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-
-        var relay = new ProxyRelay(listener, hp[0], port,
-                                   creds[0], creds.Length > 1 ? creds[1] : "");
-        _ = relay.AcceptLoopAsync();
-        return relay;
+        return new Upstream(scheme.StartsWith("socks") ? "socks5" : "http", hp[0], port, user, pass);
     }
 
     private async Task AcceptLoopAsync()
@@ -121,6 +173,7 @@ public sealed class ProxyRelay : IDisposable
     {
         using (client)
         {
+            _live[client] = 0;
             try
             {
                 client.NoDelay = true;
@@ -151,26 +204,15 @@ public sealed class ProxyRelay : IDisposable
                     port = uri.IsDefaultPort ? 80 : uri.Port;
                 }
 
+                var up_ = _up;                       // снимок на время соединения
+
                 using var upstream = new TcpClient { NoDelay = true };
-                await upstream.ConnectAsync(_host, _port, _cts.Token);
+                await upstream.ConnectAsync(
+                    up_.Kind == "direct" ? host : up_.Host,
+                    up_.Kind == "direct" ? port : up_.Port, _cts.Token);
                 var up = upstream.GetStream();
 
-                if (!await AuthenticateAsync(up))
-                {
-                    Log?.Invoke($"прокси отклонил авторизацию ({_host}:{_port})");
-                    if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
-                    return;
-                }
-
-                // Имя хоста уходит наверх как есть, типом адреса 0x03: резолвит
-                // его прокси. Мы имя не разрешаем — в этом весь смысл затеи.
-                var code = await ConnectThroughSocksAsync(up, host, port);
-                if (code != 0x00)
-                {
-                    Log?.Invoke($"прокси отказал в CONNECT {host}:{port}, код 0x{code:X2}");
-                    if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
-                    return;
-                }
+                if (!await OpenTunnelAsync(up, up_, host, port, isConnect, down)) return;
 
                 if (isConnect)
                     await WriteAsciiAsync(down, "HTTP/1.1 200 Connection Established" + "\r\n\r\n");
@@ -186,8 +228,12 @@ public sealed class ProxyRelay : IDisposable
                 // Обрыв — обычное дело, браузер рвёт соединения сам. Но раньше
                 // сюда же уходили и настоящие отказы, и наружу они выглядели
                 // одинаково — молчанием.
-                Log?.Invoke($"соединение оборвалось: {ex.GetType().Name}: {ex.Message}");
+                // ObjectDisposedException — это мы сами порвали соединение при
+                // смене прокси; сообщать об этом нечего.
+                if (ex is not ObjectDisposedException)
+                    Log?.Invoke($"соединение оборвалось: {ex.GetType().Name}: {FirstLine(ex.Message)}");
             }
+            finally { _live.TryRemove(client, out _); }
         }
     }
 
@@ -263,8 +309,66 @@ public sealed class ProxyRelay : IDisposable
         return reply.Length > 1 ? reply[1] : (byte)0xFF;
     }
 
+    /// <summary>Первая строка ответа — в лог не нужен весь заголовок.</summary>
+    private static string FirstLine(string text)
+    {
+        var i = text.IndexOf('\n');
+        return (i < 0 ? text : text[..i]).Trim();
+    }
+
     private static async Task WriteAsciiAsync(NetworkStream s, string text)
         => await s.WriteAsync(Encoding.ASCII.GetBytes(text));
+
+    /// <summary>
+    /// Довести соединение до целевого хоста через выбранный верхний прокси.
+    /// Напрямую делать нечего — сокет уже соединён с целью.
+    /// </summary>
+    private async Task<bool> OpenTunnelAsync(NetworkStream up, Upstream cfg,
+                                             string host, int port, bool isConnect, NetworkStream down)
+    {
+        if (cfg.Kind == "direct") return true;
+
+        if (cfg.Kind == "socks5")
+        {
+            if (!await AuthenticateAsync(up, cfg))
+            {
+                Log?.Invoke($"прокси отклонил авторизацию ({cfg.Host}:{cfg.Port})");
+                if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
+                return false;
+            }
+
+            // Имя хоста уходит наверх как есть, типом адреса 0x03: резолвит его
+            // прокси. Мы имя не разрешаем — в этом весь смысл затеи.
+            var code = await ConnectThroughSocksAsync(up, host, port);
+            if (code == 0x00) return true;
+
+            Log?.Invoke($"прокси отказал в CONNECT {host}:{port}, код 0x{code:X2}");
+            if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
+            return false;
+        }
+
+        // HTTP наверху: свой CONNECT с заголовком авторизации. Имя хоста тоже
+        // уходит именем — резолвит верхний прокси.
+        var req = $"CONNECT {host}:{port} HTTP/1.1" + "\r\n" + $"Host: {host}:{port}" + "\r\n";
+        if (cfg.HasAuth)
+        {
+            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{cfg.User}:{cfg.Pass}"));
+            req += "Proxy-Authorization: Basic " + token + "\r\n";
+        }
+        req += "Proxy-Connection: keep-alive" + "\r\n" + "\r\n";
+
+        await WriteAsciiAsync(up, req);
+
+        var head = await ReadHeadAsync(up);
+        var ok   = head.Contains(" 200 ");
+        if (!ok)
+        {
+            var line = FirstLine(head);
+            Log?.Invoke($"прокси отказал в CONNECT {host}:{port}: {line}");
+            if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
+        }
+        return ok;
+    }
 
     /// <summary>
     /// Договориться о способе и, если он того просит, войти логином с паролем
@@ -276,7 +380,7 @@ public sealed class ProxyRelay : IDisposable
     /// причина не доезжала никуда. Выбирает способ сервер, наше дело — назвать
     /// оба, которые мы умеем.
     /// </summary>
-    private async Task<bool> AuthenticateAsync(NetworkStream up)
+    private async Task<bool> AuthenticateAsync(NetworkStream up, Upstream cfg)
     {
         await up.WriteAsync(new byte[] { 0x05, 0x02, 0x00, 0x02 }, _cts.Token);
         var choice = await ReadExactAsync(up, 2);
@@ -288,8 +392,8 @@ public sealed class ProxyRelay : IDisposable
             return false;
         }
 
-        var u = Encoding.UTF8.GetBytes(_user);
-        var p = Encoding.UTF8.GetBytes(_pass);
+        var u = Encoding.UTF8.GetBytes(cfg.User);
+        var p = Encoding.UTF8.GetBytes(cfg.Pass);
 
         var auth = new byte[3 + u.Length + p.Length];
         auth[0] = 0x01;

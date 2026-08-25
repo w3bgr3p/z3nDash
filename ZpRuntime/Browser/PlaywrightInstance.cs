@@ -63,6 +63,23 @@ namespace DevDeck.Browser
         /// <summary>Проставляется тем, кто поднял браузер, — см. BrowserSession.</summary>
         public string Proxy { get; internal set; } = "";
 
+        /// <summary>
+        /// Релей, через который ходит браузер. Есть всегда у поднятого нами
+        /// инстанса; у подключённого по CDP его нет — там прокси чужой.
+        /// </summary>
+        internal ProxyRelay? Relay { get; set; }
+
+        public void SetProxy(string proxy)
+        {
+            if (Relay is null)
+                throw new NotSupportedException(
+                    "Instance.SetProxy: браузер подняли не мы (подключение по CDP), " +
+                    "прокси у него свой и меняется на его стороне.");
+
+            Relay.SetUpstream(proxy);
+            Proxy = proxy ?? "";
+        }
+
         public bool   UseFullMouseEmulation { get; set; } = false;
         public string EmulationLevel => UseFullMouseEmulation ? "superEmulation" : "none";
 

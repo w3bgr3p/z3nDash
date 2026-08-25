@@ -60,7 +60,7 @@ public sealed class BrowserSession : IAsyncDisposable
         _relay        = relay;
 
         Page     = page;
-        Browser  = new PlaywrightInstance(page) { Proxy = proxy };
+        Browser  = new PlaywrightInstance(page) { Proxy = proxy, Relay = relay };
         Instance = new ZennoLab.CommandCenter.Instance(Browser);
 
         // Чтобы ZennoPoster.HTTP.Request умел уйти с сессией браузера — та самая
@@ -118,15 +118,23 @@ public sealed class BrowserSession : IAsyncDisposable
         var pw = await Playwright.CreateAsync();
         RegexSelector.Register(pw);
 
-        // Chromium не умеет авторизацию SOCKS5, поэтому такой прокси уходит
-        // браузеру через локальный релей — то же, что делает ZP-шный proxifier.
-        var relay = ProxyRelay.StartIfNeeded(proxy);
-        if (relay is not null && log is not null) relay.Log = m => log("[proxy] " + m);
-        var forBrowser = relay?.Endpoint ?? proxy;
+        // Релей поднимается всегда, даже когда прокси на старте нет.
+        //
+        // Причина — ZP-шный SetProxy: шаблоны зовут его посреди прогона, когда
+        // прокси только что получен от поставщика. Playwright принимает прокси
+        // лишь в параметрах запуска, поэтому единственный способ дать SetProxy
+        // работать по-настоящему — держать браузер на постоянном локальном
+        // адресе и менять то, куда ходит релей. Так же устроен и proxifier ZP.
+        //
+        // Без этого шаблон, вычисляющий прокси на ходу, отказывал: «браузер
+        // поднят без прокси». А шаблон с готовым прокси в переменной работал —
+        // разница была не в шаблонах, а в том, успел ли планировщик увидеть
+        // прокси до запуска.
+        var relay = ProxyRelay.Start();
+        if (log is not null) relay.Log = m => log("[proxy] " + m);
+        relay.SetUpstream(proxy);
 
-        var proxySettings = string.IsNullOrWhiteSpace(forBrowser)
-            ? null
-            : new Proxy { Server = forBrowser.Contains("://") ? forBrowser : $"http://{forBrowser}" };
+        var proxySettings = new Proxy { Server = relay.Endpoint };
 
         Directory.CreateDirectory(profileDir);
 
@@ -170,8 +178,8 @@ public sealed class BrowserSession : IAsyncDisposable
             });
 
         var page = ctx.Pages.FirstOrDefault() ?? await ctx.NewPageAsync();
-        // Proxy держим исходный, с авторизацией: SetProxy сверяет то, что просит
-        // шаблон, а не адрес нашей петли.
+        // Proxy держим исходный, с авторизацией: шаблон сверяет то, что просил,
+        // а не адрес нашей петли.
         return new BrowserSession(pw, null, ctx, page, owned: true, proxy: proxy ?? "", relay: relay);
     }
 
