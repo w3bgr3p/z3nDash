@@ -636,6 +636,9 @@ namespace ZennoLab.CommandCenter
 
         public void WaitFieldEmulationDelay() => Br.WaitFieldEmulationDelay();
 
+        /// <summary>Размер окна браузера — тот же контракт, что у ZP.</summary>
+        public void SetWindowSize(int width, int height) => Br.SetWindowSize(width, height);
+
         public void SetTimezone(int hours, int minutes, string mode = "Emulate")
             => Br.SetTimezone(hours * 60 + minutes, 0);
         public void SetIanaTimezone(string ianaZone, string mode = "Emulate")

@@ -37,6 +37,8 @@ namespace DevDeck.Browser
         /// </summary>
         string GetCookie(string domain = null, bool isCookieFormat = false);
         void WaitFieldEmulationDelay();
+        /// <summary>Размер окна браузера (ZP: Instance.SetWindowSize).</summary>
+        void SetWindowSize(int width, int height);
         void InstallCrxExtension(string path);
 
         // ── Прокси ────────────────────────────────────────────────────────────

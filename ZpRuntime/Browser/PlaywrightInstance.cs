@@ -353,6 +353,41 @@ namespace DevDeck.Browser
                 new Dictionary<string, object> { ["timezoneId"] = ianaName }));
         }
 
+        /// <summary>
+        /// Размер окна браузера. Шаблоны ставят его первой же веткой, чтобы у
+        /// всех запусков была одинаковая геометрия — от неё зависят координаты
+        /// кликов и то, какая вёрстка достанется от сайта.
+        ///
+        /// Меняется именно окно, а не вьюпорт: мы поднимаемся с NoViewport,
+        /// страница следует за окном, и подмена вьюпорта отдельно от окна как
+        /// раз и есть один из признаков автоматизации. Поэтому CDP
+        /// Browser.setWindowBounds, а не Page.setDeviceMetricsOverride.
+        /// </summary>
+        public void SetWindowSize(int width, int height)
+        {
+            if (width <= 0 || height <= 0) return;
+
+            var cdp = Cdp();
+            var win = Sync(cdp.SendAsync("Browser.getWindowForTarget"));
+            if (win is not { } node || !node.TryGetProperty("windowId", out var idNode))
+                throw new InvalidOperationException("SetWindowSize: CDP не отдал windowId");
+            var id = idNode.GetInt32();
+
+            // Развёрнутое или свёрнутое окно размеров не принимает — сначала
+            // возвращаем его в обычное состояние.
+            Sync(cdp.SendAsync("Browser.setWindowBounds", new Dictionary<string, object>
+            {
+                ["windowId"] = id,
+                ["bounds"]   = new Dictionary<string, object> { ["windowState"] = "normal" },
+            }));
+
+            Sync(cdp.SendAsync("Browser.setWindowBounds", new Dictionary<string, object>
+            {
+                ["windowId"] = id,
+                ["bounds"]   = new Dictionary<string, object> { ["width"] = width, ["height"] = height },
+            }));
+        }
+
         public IHeElement FindElementById(string id)
             => new PlaywrightElement(_activePage.Locator($"#{id}"));
 
