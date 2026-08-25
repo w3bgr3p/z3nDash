@@ -55,6 +55,8 @@
         .row-dot         { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; cursor: pointer; }
         .row-dot.enabled  { background: var(--green); }
         .row-dot.disabled { background: var(--border); }
+        /* Задача без расписания: включать нечего, точка только держит отступ. */
+        .row-dot.ondemand { background: none; border: 1px solid var(--border); cursor: default; }
         .row-info  { flex: 1; min-width: 0; }
         .row-name  { font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .row-sub   { font-size: 9px; color: var(--text2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

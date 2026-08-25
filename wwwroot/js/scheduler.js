@@ -143,11 +143,15 @@ function updateHeaderStats() {
     var total   = schedules.length;
     var running = schedules.filter(function(s) { return s.status === 'running'; }).length;
     var errors  = schedules.filter(function(s) { return getTaskStatus(s) === 'fail'; }).length;
-    var enabled = schedules.filter(function(s) { return s.enabled !== 'false'; }).length;
+    // Не «сколько задач включено», а «сколько работает по расписанию»:
+    // у задачи без расписания включённости нет.
+    var enabled = schedules.filter(function(s) {
+        return (s.schedule_mode || 'off') !== 'off' && s.enabled !== 'false';
+    }).length;
     document.getElementById('headerStats').innerHTML =
         '<div class="stat-item">Tasks: <span class="stat-val">' + total + '</span></div>' +
         '<div class="stat-item">Running: <span class="stat-val stat-running">' + running + '</span></div>' +
-        '<div class="stat-item">Active: <span class="stat-val">' + enabled + '</span></div>' +
+        '<div class="stat-item">Scheduled: <span class="stat-val">' + enabled + '</span></div>' +
         (errors ? '<div class="stat-item">Errors: <span class="stat-val stat-error">' + errors + '</span></div>' : '');
 }
 
@@ -249,8 +253,11 @@ function renderList() {
 
         if (collapsed) return;
 
-        var status   = getTaskStatus(s);
-        var disabled = s.enabled === 'false';
+        var status    = getTaskStatus(s);
+        // Включённость — свойство расписания. У задачи «по требованию» её нет:
+        // ни гасить строку, ни предлагать переключатель смысла не имеет.
+        var scheduled = (s.schedule_mode || 'off') !== 'off';
+        var disabled  = scheduled && s.enabled === 'false';
         var total    = parseInt(s.runs_total)   || 0;
         var done     = parseInt(s.runs_success) || 0;
         var trigger  = triggerLabel(s);
@@ -261,9 +268,11 @@ function renderList() {
             + (s.id === selectedId ? ' active' : '')
             + (disabled ? ' row-disabled' : '')
             + '" onclick="selectRow(\'' + s.id + '\')">'
-            + '<span class="row-dot ' + (disabled ? 'disabled' : 'enabled')
-            + '" title="' + (disabled ? 'Enable' : 'Disable')
-            + '" onclick="event.stopPropagation();toggleEnabled(\'' + s.id + '\',\'' + s.enabled + '\')"></span>'
+            + (scheduled
+                ? '<span class="row-dot ' + (disabled ? 'disabled' : 'enabled')
+                  + '" title="' + (disabled ? 'Enable' : 'Disable')
+                  + '" onclick="event.stopPropagation();toggleEnabled(\'' + s.id + '\',\'' + s.enabled + '\')"></span>'
+                : '<span class="row-dot ondemand" title="Без расписания"></span>')
             + '<div class="row-info">'
             + '<div class="row-name">' + escHtml(showGrp ? shortName : (s.name || '(unnamed)')) + '</div>'
             + '<div class="row-sub">' + escHtml(trigger) + (lastRun ? ' · ' + lastRun : '') + '</div>'
@@ -329,7 +338,7 @@ function renderGlobalStats() {
         if (st === 'running') running++;
         if (st === 'planned') scheduled++;
         if (st === 'fail')    errors++;
-        if (s.enabled === 'false') off++;
+        if ((s.schedule_mode || 'off') !== 'off' && s.enabled === 'false') off++;
     });
 
     var statTiles =
@@ -358,7 +367,7 @@ function renderGlobalStats() {
         var totalN   = parseInt(s.runs_total)   || 0;
         var out      = _lastOutputLine(s);
         var isErr    = /\[ERROR\]|\[ERR\]/i.test(out);
-        var disabled = s.enabled === 'false';
+        var disabled = (s.schedule_mode || 'off') !== 'off' && s.enabled === 'false';
         var dotCls   = st === 'running' ? ' run' : st === 'fail' ? ' fail' : disabled ? ' off' : '';
         return '<div class="ov-row' + (disabled ? ' off' : '') + '" onclick="selectRow(\'' + s.id + '\')">'
             + '<span class="ov-dot' + dotCls + '"></span>'
@@ -793,7 +802,10 @@ function renderExecution(s) {
         + '</div>'
         + '<div class="detail-section">'
         + '<div class="info-card-title">Scheduler</div>'
-        + infoRow('Active',     s.enabled !== 'false' ? '<span class="green">True</span>' : '<span class="red">False</span>')
+        // Строка Active есть только у задачи с расписанием.
+        + ((s.schedule_mode || 'off') !== 'off'
+            ? infoRow('Active', s.enabled !== 'false' ? '<span class="green">True</span>' : '<span class="red">False</span>')
+            : '')
         + infoRow('Last Run',   lastRun)
         + infoRow('Period',     trigger)
         + infoRow('On Overlap', s.on_overlap || '—')
