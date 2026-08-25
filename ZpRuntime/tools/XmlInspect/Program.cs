@@ -60,7 +60,9 @@ var supported = new HashSet<(string, string)>
 var gaps = tpl.Steps
     .Where(s => !dead.Contains(s.Id))
     .SelectMany(s => s.Branches)
-    .Where(b => !supported.Contains((b.Type, b.Action)))
+    // Выключенное действие не исполняется, значит и в пробел переноса не
+    // записывается: поддерживать нечего.
+    .Where(b => !b.IsDisabled && !supported.Contains((b.Type, b.Action)))
     .GroupBy(b => (b.Type, b.Action))
     .ToList();
 
@@ -74,7 +76,8 @@ foreach (var s in tpl.Steps)
 
     foreach (var b in s.Branches)
     {
-        var ok   = supported.Contains((b.Type, b.Action)) ? " " : "!";
+        var ok   = b.IsDisabled                            ? "×"
+                 : supported.Contains((b.Type, b.Action))  ? " " : "!";
         var outv = Macros.OutputVariableName(b.OutputVariable);
         var arrows = new List<string>();
         if (!b.OnSuccess.IsNone) arrows.Add($"ok→{b.OnSuccess}");

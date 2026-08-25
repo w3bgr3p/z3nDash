@@ -92,7 +92,13 @@ internal static class RegexSelector
                     .map(t => t.trim()).filter(t => t.length)
                     .map(t => {
                         const i = t.indexOf(':');
-                        return i <= 0 ? t : t.slice(0, i) + "[type='" + t.slice(i + 1) + "']";
+                        if (i <= 0) return t;
+                        const name = t.slice(0, i), type = t.slice(i + 1);
+                        // text — ещё и поле без атрибута type: оно текстовое по
+                        // умолчанию, и ZP его находит.
+                        return type.toLowerCase() === 'text'
+                            ? name + ":is([type='text' i], :not([type]))"
+                            : name + "[type='" + type + "' i]";
                     });
                 const css = tags.length ? tags.join(', ') : '*';
 

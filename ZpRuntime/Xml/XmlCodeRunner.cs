@@ -6,8 +6,10 @@
 // CsxExecutor.ScriptOptionsFor, чтобы csx и шаблоны видели одно и то же
 // окружение. Скрипт, написанный в ZennoPoster, не знает, чем его запустят.
 //
-// Компиляция кешируется по тексту блока: в цикле шаблон проходит одну и ту же
-// ветку сотни раз, а Roslyn стоит десятки миллисекунд на компиляцию.
+// Компиляция кешируется: в цикле шаблон проходит одну и ту же ветку сотни раз,
+// а Roslyn стоит десятки миллисекунд. Но ключ — не только текст блока: тот же
+// текст, собранный с другим CommonCode, usings или набором ссылок, — другая
+// сборка. См. CacheKey ниже.
 // ══════════════════════════════════════════════════════════════════════════════
 
 using System.Collections.Concurrent;
@@ -30,12 +32,28 @@ public sealed class XmlCodeGlobals
 
 public sealed class XmlCodeRunner
 {
-    private static readonly ConcurrentDictionary<string, Script<object>> _cache = new();
+    /// <summary>
+    /// Ключ кеша. Текста ветки мало: она компилируется в связке с CommonCode
+    /// шаблона, его usings и ссылками. Раньше ключом была одна строка исходника,
+    /// и подмена xml не доезжала до исполнения: CommonCode пересобирался в новую
+    /// сборку TemplateCommonCode_&lt;новый хеш&gt;, а ветка, чей текст не менялся,
+    /// доставалась из кеша уже скомпилированной против СТАРОЙ сборки. Снаружи —
+    /// «файл подменил, а работает по-прежнему», и ни одной ошибки. Тем же ключом
+    /// склеивались и разные шаблоны с одинаковой болванкой ветки.
+    /// </summary>
+    private sealed record CacheKey(string TemplateDir, string Env, string Source);
+
+    private static readonly ConcurrentDictionary<CacheKey, Script<object>> _cache = new();
+
+    /// <summary>Какое окружение сейчас живёт для каждой папки шаблона.</summary>
+    private static readonly ConcurrentDictionary<string, string> _envOfDir =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private readonly XmlCodeGlobals _globals;
     private readonly string         _templateDir;
     private readonly OwnCodeContext _context;
     private readonly ScriptOptions  _options;
+    private readonly string         _envKey;
 
     public XmlCodeRunner(XmlCodeGlobals globals, string templateDir, OwnCodeContext? context = null)
     {
@@ -43,7 +61,68 @@ public sealed class XmlCodeRunner
         _templateDir = templateDir;
         _context     = context ?? new OwnCodeContext();
         _options     = BuildOptions();
+        _envKey      = ComputeEnvKey();
+
+        DropStaleEnv();
     }
+
+    /// <summary>
+    /// Отпечаток окружения: всё, что влияет на результат компиляции ветки, кроме
+    /// её собственного текста.
+    /// </summary>
+    private string ComputeEnvKey()
+    {
+        // Каждый кусок с длиной впереди: разделителем тут не обойтись — любой
+        // символ может оказаться внутри CommonCode, и тогда разные окружения
+        // склеились бы в одну строку и получили один хеш.
+        var sb = new System.Text.StringBuilder();
+
+        void Part(string value) => sb.Append(value.Length).Append(':').Append(value);
+
+        Part(_context.CommonCode);
+        foreach (var u in _context.Usings)     Part(u);
+        sb.Append('|');
+        foreach (var r in _context.References) Part(r);
+
+        return Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(sb.ToString())))[..16];
+    }
+
+    /// <summary>
+    /// Шаблон в этой папке пересобрали — выкинуть всё, что скомпилировано под его
+    /// прошлое окружение. Иначе у долгоживущего планировщика кеш пухнет с каждой
+    /// правкой xml и держит мёртвые Script вместе с их сборками.
+    /// </summary>
+    private void DropStaleEnv()
+    {
+        var previous = _envOfDir.AddOrUpdate(_templateDir, _envKey, (_, _) => _envKey);
+        if (previous == _envKey) return;
+
+        foreach (var key in _cache.Keys)
+            if (key.Env != _envKey &&
+                string.Equals(key.TemplateDir, _templateDir, StringComparison.OrdinalIgnoreCase))
+                _cache.TryRemove(key, out _);
+    }
+
+    /// <summary>Скомпилировать текст ветки, кешируя его вместе с окружением шаблона.</summary>
+    private Script<object> GetOrCompile(string source)
+        => _cache.GetOrAdd(new CacheKey(_templateDir, _envKey, source), key =>
+        {
+            var s = CSharpScript.Create<object>(key.Source, _options, globalsType: typeof(XmlCodeGlobals));
+
+            var errors = s.Compile()
+                .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                .Select(d => d.ToString())
+                .ToList();
+
+            if (errors.Count > 0)
+                throw new InvalidOperationException(
+                    "не компилируется:" + Environment.NewLine
+                    + string.Join(Environment.NewLine, errors));
+
+            return s;
+        });
 
     /// <summary>
     /// Окружение csx плюс то, что объявил сам шаблон: usings из OwnCodeUsings.Text
@@ -200,43 +279,11 @@ public sealed class XmlCodeRunner
     /// </summary>
     public void Compile(string source) => Prepare(source);
 
-    private Script<object> Prepare(string source)
-    {
-        return _cache.GetOrAdd(source, src =>
-        {
-            var s = CSharpScript.Create<object>(src, _options, globalsType: typeof(XmlCodeGlobals));
-
-            var errors = s.Compile()
-                .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
-                .Select(d => d.ToString())
-                .ToList();
-
-            if (errors.Count > 0)
-                throw new InvalidOperationException(
-                    "не компилируется:" + Environment.NewLine
-                    + string.Join(Environment.NewLine, errors));
-
-            return s;
-        });
-    }
+    private Script<object> Prepare(string source) => GetOrCompile(source);
 
     public object? Run(string source, CancellationToken ct)
     {
-        var script = _cache.GetOrAdd(source, src =>
-        {
-            var s = CSharpScript.Create<object>(src, _options, globalsType: typeof(XmlCodeGlobals));
-
-            var errors = s.Compile()
-                .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
-                .Select(d => d.ToString())
-                .ToList();
-
-            if (errors.Count > 0)
-                throw new InvalidOperationException(
-                    "не компилируется:\n" + string.Join("\n", errors));
-
-            return s;
-        });
+        var script = GetOrCompile(source);
 
         return script.RunAsync(_globals, ct).GetAwaiter().GetResult().ReturnValue;
     }

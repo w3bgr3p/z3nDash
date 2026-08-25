@@ -7,6 +7,7 @@
 //   ветка была последней     → маршрут закончен;
 //   ошибка + OnError задан   → прыжок по адресу;
 //   ошибка + OnError пуст    → маршрут падает, если ветка не IsNotNecessarily.
+//   IsDisable="True"         → ветка не исполняется, маршрут идёт по OnSuccess.
 //
 // Отдельно считается число шагов: шаблон с циклом, у которого сломано условие
 // выхода, иначе крутится вечно. Предел настраивается, по умолчанию щедрый.
@@ -158,6 +159,22 @@ public sealed class XmlPlayer
 
             var branch = step.Branches[index];
             BranchRef next;
+
+            // Выключенное действие (серый кубик на холсте) не исполняется:
+            // в ZP оно просто «успешно» и маршрут идёт по OnSuccess. Не по
+            // index++ — стрелка с выключенной ветки никуда не девается, и
+            // если она вела в другой узел, вести должна по-прежнему.
+            if (branch.IsDisabled)
+            {
+                if (_opt.Trace) _log($"[xml] {run,4}. {branch} — выключено, пропуск");
+                next = branch.OnSuccess;
+                if (next.IsNone) { index++; continue; }
+                if (tpl.Locate(next) is not { } skipTo)
+                    return new PlayResult(false,
+                        $"переход в никуда: {next} — такой ветки в шаблоне нет", run, branch, null);
+                (step, index) = skipTo;
+                continue;
+            }
 
             try
             {

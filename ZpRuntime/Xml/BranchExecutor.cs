@@ -166,7 +166,11 @@ public sealed class BranchExecutor
     {
         var t = (tag ?? "*").Trim();
         var i = t.IndexOf(':');
-        var cssTag = i <= 0 ? t : $"{t[..i]}[type='{t[(i + 1)..]}']";
+        var cssTag = i <= 0
+            ? t
+            : t[(i + 1)..].Equals("text", StringComparison.OrdinalIgnoreCase)
+                ? $"{t[..i]}:is([type='text' i], :not([type]))"
+                : $"{t[..i]}[type='{t[(i + 1)..]}' i]";
         return $"{cssTag}[{attr}='{val}']";
     }
 

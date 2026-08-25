@@ -526,7 +526,21 @@ namespace DevDeck.Browser
         {
             var t = (tag ?? "").Trim();
             var i = t.IndexOf(':');
-            return i <= 0 ? t : $"{t[..i]}[type='{t[(i + 1)..]}']";
+            if (i <= 0) return t;
+
+            var name = t[..i];
+            var type = t[(i + 1)..];
+
+            // Тип сравнивается без учёта регистра: в разметке встречается TEXT.
+            //
+            // Для text отдельный случай: поле без атрибута type — текстовое по
+            // умолчанию, и ZP его находит. Селектор [type='text'] такое поле
+            // пропускает, потому что атрибута нет вовсе. На React-формах его
+            // не пишут сплошь и рядом — так «not found in 30s» получала форма,
+            // которая была на экране.
+            return type.Equals("text", StringComparison.OrdinalIgnoreCase)
+                ? $"{name}:is([type='text' i], :not([type]))"
+                : $"{name}[type='{type}' i]";
         }
 
         /// <summary>То же для XPath: "input:text" → "input[@type='text']".</summary>
@@ -534,7 +548,14 @@ namespace DevDeck.Browser
         {
             var t = (tag ?? "").Trim();
             var i = t.IndexOf(':');
-            return i <= 0 ? t : $"{t[..i]}[@type='{t[(i + 1)..]}']";
+            if (i <= 0) return t;
+
+            var name = t[..i];
+            var type = t[(i + 1)..];
+
+            return type.Equals("text", StringComparison.OrdinalIgnoreCase)
+                ? $"{name}[@type='text' or not(@type)]"
+                : $"{name}[@type='{type}']";
         }
 
         private static T    Sync<T>(Task<T> t) => t.GetAwaiter().GetResult();
@@ -595,11 +616,19 @@ namespace DevDeck.Browser
         public int Handle => _page.GetHashCode();
 
         // System.Drawing.Point — у Microsoft.Playwright есть одноимённый тип.
-        private System.Drawing.Point _mousePos;
+        /// <summary>
+        /// Позиция курсора общая с MouseEmulation: клики по элементам едут
+        /// оттуда же. Держи её тут отдельно — путь начинался бы от точки, где
+        /// курсор давно не стоит, и траектория выходила бы фальшивой.
+        /// </summary>
         public System.Drawing.Point FullEmulationMouseCurrentPosition
         {
-            get => _mousePos;
-            set { _mousePos = value; Sync(_page.Mouse.MoveAsync(value.X, value.Y)); }
+            get => MouseEmulation.Position(_page);
+            set
+            {
+                Sync(_page.Mouse.MoveAsync(value.X, value.Y));
+                MouseEmulation.Remember(_page, value.X, value.Y);
+            }
         }
 
         /// <summary>
@@ -630,7 +659,7 @@ namespace DevDeck.Browser
                 _        => MouseButton.Left,
             };
             Sync(_page.Mouse.ClickAsync(x, y, new MouseClickOptions { Button = btn }));
-            _mousePos = new System.Drawing.Point(x, y);
+            MouseEmulation.Remember(_page, x, y);
         }
 
         /// <summary>
@@ -641,14 +670,7 @@ namespace DevDeck.Browser
         /// растягивался на десятки событий.
         /// </summary>
         public void FullEmulationMouseMove(int toX, int toY)
-        {
-            int dx = toX - _mousePos.X, dy = toY - _mousePos.Y;
-            int distance = (int)Math.Sqrt(dx * dx + dy * dy);
-            int steps = Math.Clamp(distance / 12, 6, 40);
-
-            Sync(_page.Mouse.MoveAsync(toX, toY, new MouseMoveOptions { Steps = steps }));
-            _mousePos = new System.Drawing.Point(toX, toY);
-        }
+            => MouseEmulation.MoveTo(_page, toX, toY);
 
         /// <summary>
         /// Дождаться, пока страница догрузится. В ZP это именно загрузка
@@ -698,7 +720,12 @@ namespace DevDeck.Browser
             int x = area.X + area.Width  / 2;
             int y = area.Y + area.Height / 2;
             if (eventName == "click")
-                Sync(_page.Mouse.ClickAsync(x, y));
+            {
+                MouseEmulation.MoveTo(_page, x, y);
+                Thread.Sleep(Random.Shared.Next(45, 160));
+                Sync(_page.Mouse.ClickAsync(x, y, new MouseClickOptions { Delay = Random.Shared.Next(40, 140) }));
+                MouseEmulation.Remember(_page, x, y);
+            }
             else
                 Sync(_page.EvaluateAsync(
                     $"document.elementFromPoint({x},{y})?.dispatchEvent(new MouseEvent('{eventName}',{{bubbles:true,clientX:{x},clientY:{y}}}))"));
@@ -958,10 +985,64 @@ namespace DevDeck.Browser
         /// </summary>
         public void RiseEvent(string eventName, string emulationLevel)
         {
-            if (eventName != "click") { Sync(_loc.DispatchEventAsync(eventName)); return; }
+            bool full = string.Equals(emulationLevel, "superEmulation", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(emulationLevel, "Full",           StringComparison.OrdinalIgnoreCase);
 
-            Sync(_loc.ScrollIntoViewIfNeededAsync());
-            Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = Random.Shared.Next(40, 140) }));
+            switch ((eventName ?? "").ToLowerInvariant())
+            {
+                case "click":
+                    // Без эмуляции — тоже настоящий клик мышью, просто без
+                    // подъезда курсора: DispatchEvent("click") даёт событие без
+                    // isTrusted, которое и детектируется, и на половине сайтов
+                    // не срабатывает — обработчики висят на mousedown/mouseup.
+                    if (full) MouseEmulation.Click(_loc);
+                    else
+                    {
+                        Sync(_loc.ScrollIntoViewIfNeededAsync());
+                        Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = Random.Shared.Next(40, 140) }));
+                    }
+                    return;
+
+                case "contextmenu":
+                    if (full) MouseEmulation.Click(_loc, MouseButton.Right);
+                    else Sync(_loc.ClickAsync(new LocatorClickOptions { Button = MouseButton.Right }));
+                    return;
+
+                case "dblclick":
+                    if (full) MouseEmulation.Hover(_loc);
+                    Sync(_loc.DblClickAsync(new LocatorDblClickOptions { Delay = Random.Shared.Next(40, 120) }));
+                    return;
+
+                // Наведение мышью изобразимо по-настоящему, и при полной
+                // эмуляции так и надо: браузер сам выдаст mouseover, mouseenter
+                // и хвост mousemove по дороге — с isTrusted, чего
+                // DispatchEvent не даёт никогда.
+                case "mouseover":
+                case "mouseenter":
+                case "mousemove":
+                case "hover":
+                    if (full) { MouseEmulation.Hover(_loc); return; }
+                    break;
+
+                // Отдельные фазы нажатия: мышь стоит там, где надо, и жмёт.
+                case "mousedown":
+                case "mouseup":
+                    if (full)
+                    {
+                        MouseEmulation.Hover(_loc);
+                        Thread.Sleep(Random.Shared.Next(30, 90));
+                        var page = _loc.Page;
+                        if (eventName.Equals("mousedown", StringComparison.OrdinalIgnoreCase))
+                            Sync(page.Mouse.DownAsync());
+                        else
+                            Sync(page.Mouse.UpAsync());
+                        return;
+                    }
+                    break;
+            }
+
+            // Всё, что мышью не изобразить (change, input, blur, submit...).
+            Sync(_loc.DispatchEventAsync(eventName));
         }
 
         /// <summary>
@@ -982,8 +1063,10 @@ namespace DevDeck.Browser
                 return;
             }
 
-            Sync(_loc.ScrollIntoViewIfNeededAsync());
-            Sync(_loc.ClickAsync(new LocatorClickOptions { Delay = Random.Shared.Next(40, 140) }));
+            // Фокус берём тем же полным кликом, а не голым ClickAsync: до поля
+            // сначала доезжает курсор. Валидаторы и антибот смотрят на то, как
+            // поле получило фокус, не меньше, чем на сам набор.
+            MouseEmulation.Click(_loc);
             if (clear) Sync(_loc.ClearAsync());
 
             foreach (var ch in value)

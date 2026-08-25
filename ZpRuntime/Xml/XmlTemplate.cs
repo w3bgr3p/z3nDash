@@ -84,6 +84,15 @@ public sealed class Branch
     /// <summary>ZP-шный флаг «не обязательно»: ошибка не валит маршрут.</summary>
     public bool IsOptional { get; init; }
 
+    /// <summary>
+    /// Действие выключено в редакторе — на холсте это серый кубик. ZP такую
+    /// ветку не исполняет вовсе: она сразу «успешна» и маршрут идёт дальше.
+    /// Выключают обычно именно то, что на текущем сайте не работает, поэтому
+    /// попытка его выполнить — гарантированное падение, а не безобидный лишний
+    /// шаг.
+    /// </summary>
+    public bool IsDisabled { get; init; }
+
     public BranchRef Ref => new(StepId, Id);
 
     public string? Param(string name)      => Parameters?.Element(name)?.Value;
@@ -199,6 +208,10 @@ public sealed class XmlTemplate
                     Action     = b.Attribute("Action")?.Value ?? "",
                     Title      = b.Attribute("UserText")?.Value ?? "",
                     IsOptional = string.Equals(b.Attribute("IsNotNecessarily")?.Value,
+                                               "True", StringComparison.OrdinalIgnoreCase),
+                    // Атрибута может не быть вовсе: ZP пишет его не всегда, а
+                    // отсутствие значит «включено».
+                    IsDisabled = string.Equals(b.Attribute("IsDisable")?.Value,
                                                "True", StringComparison.OrdinalIgnoreCase),
                     Parameters = b.Element("Parameters"),
 
