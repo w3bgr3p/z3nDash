@@ -66,7 +66,11 @@ public sealed class ProxyRelay : IDisposable
     /// </summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<TcpClient, byte> _live = new();
 
-    /// <summary>Верхний прокси: напрямую, SOCKS5 или HTTP, с логином или без.</summary>
+    /// <summary>
+    /// Верхний прокси: напрямую, SOCKS5 или HTTP. Логин поддержан обоими и в
+    /// работе всегда есть — прокси без авторизации в боевых прогонах не
+    /// встречаются, режим без логина оставлен только как вырожденный случай.
+    /// </summary>
     private sealed record Upstream(string Kind, string Host, int Port, string User, string Pass)
     {
         public static readonly Upstream Direct = new("direct", "", 0, "", "");
