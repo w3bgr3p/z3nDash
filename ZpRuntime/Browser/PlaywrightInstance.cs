@@ -521,7 +521,7 @@ namespace DevDeck.Browser
 
                 // Регулярка по тегу — через свой движок: он умеет считать
                 // "полный тег" сам, см. RegexSelector.
-                return page.Locator(RegexSelector.Build(tag, "fulltag", pattern, negate));
+                return page.Locator(RegexSelector.Build(tag, "fulltag", pattern, negate, regexp: true));
             }
 
             if (attr is "innertext" or "text")
@@ -539,6 +539,12 @@ namespace DevDeck.Browser
                     : new LocatorFilterOptions { HasTextString    = pattern });
             }
 
+            // Живые значения: в CSS их не выразить ни точным совпадением, ни
+            // регуляркой. outerhtml вообще не атрибут, а value после ввода
+            // расходится с атрибутом — в разметке остаётся начальное.
+            if (attr is "innerhtml" or "outerhtml" or "value")
+                return page.Locator(RegexSelector.Build(tag, attr, pattern, negate, regexp));
+
             if (regexp)
             {
                 // Регулярка выполняется в самой странице — см. RegexSelector.cs.
@@ -547,7 +553,7 @@ namespace DevDeck.Browser
                 // btn-c, и xbtn-a. Ветка при этом не падала — просто кликала не
                 // туда, потому что вместе с лишними совпадениями сдвигался
                 // Number, по которому выбирается нужный элемент.
-                return page.Locator(RegexSelector.Build(tag, attr, pattern, negate));
+                return page.Locator(RegexSelector.Build(tag, attr, pattern, negate, regexp: true));
             }
 
             // Точное совпадение оставляем на CSS: в отличие от XPath его движок

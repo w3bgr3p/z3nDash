@@ -40,8 +40,14 @@ internal static class RegexSelector
     /// она встречается (альтернатива), поэтому на части режем только первые три
     /// вхождения, а остаток целиком считаем шаблоном.
     /// </summary>
-    public static string Build(string tags, string attr, string pattern, bool negate)
-        => $"{Name}={tags}|{attr}|{(negate ? "1" : "0")}|{pattern}";
+    /// <summary>
+    /// Селектор для движка. Режим кодируется одним полем, потому что движок
+    /// нужен не только регуляркам: по «живым» значениям (innerhtml, outerhtml,
+    /// value) точное совпадение тоже нельзя выразить в CSS.
+    ///   rx — регулярка, eq — точное совпадение; префикс n — отрицание.
+    /// </summary>
+    public static string Build(string tags, string attr, string pattern, bool negate, bool regexp = true)
+        => $"{Name}={tags}|{attr}|{(negate ? "n" : "")}{(regexp ? "rx" : "eq")}|{pattern}";
 
     /// <summary>
     /// Зарегистрировать движок в этом экземпляре Playwright. Повторная
@@ -65,10 +71,12 @@ internal static class RegexSelector
                 const i = selector.indexOf('|');
                 const j = selector.indexOf('|', i + 1);
                 const k = selector.indexOf('|', j + 1);
+                const mode = selector.slice(j + 1, k);
                 return {
                     tags:    selector.slice(0, i),
                     attr:    selector.slice(i + 1, j),
-                    negate:  selector.slice(j + 1, k) === '1',
+                    negate:  mode.charAt(0) === 'n',
+                    regexp:  mode.indexOf('rx') >= 0,
                     pattern: selector.slice(k + 1),
                 };
             },
@@ -76,6 +84,10 @@ internal static class RegexSelector
             _value(el, attr) {
                 if (attr === 'innertext' || attr === 'text') return el.innerText;
                 if (attr === 'innerhtml') return el.innerHTML;
+                if (attr === 'outerhtml') return el.outerHTML;
+                // value у поля — живое свойство: после ввода оно расходится с
+                // атрибутом, а искать шаблон будет по тому, что в поле сейчас.
+                if (attr === 'value' && 'value' in el) return el.value;
                 // ZP-шный «полный тег»: input:checkbox, input:text, div.
                 if (attr === 'fulltag' || attr === 'fulltagname') {
                     const t = el.tagName.toLowerCase();
@@ -86,9 +98,11 @@ internal static class RegexSelector
 
             queryAll(root, selector) {
                 const q = this._parse(selector);
-                let re;
-                try { re = new RegExp(q.pattern, 'i'); }
-                catch (e) { return []; }
+                let re = null;
+                if (q.regexp) {
+                    try { re = new RegExp(q.pattern, 'i'); }
+                    catch (e) { return []; }
+                }
 
                 // ZP пишет тип поля через двоеточие: "input:text". В CSS это
                 // не тег — querySelectorAll на нём бросает SyntaxError, и весь
@@ -110,7 +124,7 @@ internal static class RegexSelector
                 const out = [];
                 for (const el of root.querySelectorAll(css)) {
                     const v = this._value(el, q.attr);
-                    const hit = v != null && re.test(v);
+                    const hit = v != null && (re ? re.test(v) : v === q.pattern);
                     if (hit !== q.negate) out.push(el);
                 }
                 return out;
