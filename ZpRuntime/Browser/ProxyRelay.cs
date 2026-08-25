@@ -232,9 +232,11 @@ public sealed class ProxyRelay : IDisposable
                 // Обрыв — обычное дело, браузер рвёт соединения сам. Но раньше
                 // сюда же уходили и настоящие отказы, и наружу они выглядели
                 // одинаково — молчанием.
-                // ObjectDisposedException — это мы сами порвали соединение при
-                // смене прокси; сообщать об этом нечего.
-                if (ex is not ObjectDisposedException)
+                // ObjectDisposedException — это мы сами: порвали соединение при
+                // смене прокси или закрыли релей вместе с сессией. Сообщать не о
+                // чем, а после закрытия такие строки шли пачкой прямо в отчёт
+                // задачи, уже после её конца.
+                if (ex is not ObjectDisposedException && !_cts.IsCancellationRequested)
                     Log?.Invoke($"соединение оборвалось: {ex.GetType().Name}: {FirstLine(ex.Message)}");
             }
             finally { _live.TryRemove(client, out _); }
@@ -454,6 +456,7 @@ public sealed class ProxyRelay : IDisposable
 
     public void Dispose()
     {
+        Log = null;                       // после закрытия рассказывать некому
         try { _cts.Cancel(); }  catch { }
         try { _listener.Stop(); } catch { }
         _cts.Dispose();

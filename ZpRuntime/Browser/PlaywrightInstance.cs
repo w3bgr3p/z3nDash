@@ -505,10 +505,24 @@ namespace DevDeck.Browser
             bool negate = mode == "notext";
             bool regexp = mode == "regexp";
 
-            // fulltagname: ZP-специфика — ищем по типу тега
-            // "input:password" → input[type="password"]
-            if (attr == "fulltagname")
-                return page.Locator(CssTag(tag));
+            // Поиск по самому тегу, а не по атрибуту: в XML это
+            // AttrName="fulltag", а в значении лежит тег вида "input:checkbox".
+            //
+            // Здесь стояло только "fulltagname" — имя, которого в шаблонах нет
+            // вовсе (в них 2 вхождения "fulltag" и ни одного "fulltagname").
+            // То есть особый случай не срабатывал никогда, и поиск уходил
+            // искать атрибут с именем fulltag, которого ни у кого нет.
+            if (attr is "fulltag" or "fulltagname")
+            {
+                // Значение первично: в нём и лежит искомый тег. Tag дублирует
+                // его, но пустым тоже встречается.
+                var spec = string.IsNullOrWhiteSpace(pattern) ? tag : pattern;
+                if (!regexp) return page.Locator(CssTag(spec));
+
+                // Регулярка по тегу — через свой движок: он умеет считать
+                // "полный тег" сам, см. RegexSelector.
+                return page.Locator(RegexSelector.Build(tag, "fulltag", pattern, negate));
+            }
 
             if (attr is "innertext" or "text")
             {

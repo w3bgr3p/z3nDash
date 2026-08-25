@@ -76,6 +76,11 @@ internal static class RegexSelector
             _value(el, attr) {
                 if (attr === 'innertext' || attr === 'text') return el.innerText;
                 if (attr === 'innerhtml') return el.innerHTML;
+                // ZP-шный «полный тег»: input:checkbox, input:text, div.
+                if (attr === 'fulltag' || attr === 'fulltagname') {
+                    const t = el.tagName.toLowerCase();
+                    return (t === 'input' && el.type) ? t + ':' + el.type.toLowerCase() : t;
+                }
                 return el.getAttribute(attr);
             },
 
