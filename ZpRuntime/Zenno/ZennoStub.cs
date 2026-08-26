@@ -495,16 +495,43 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         /// Каталог проекта. В ZP это папка, где лежит сам шаблон, а Name — имя
         /// файла в ней: так их и разбирает перенесённый Constantes.ProjectName,
         /// который ищет Name внутри Path.
+        ///
+        /// **Всегда оканчивается разделителем** — так его отдаёт ZP, и на это
+        /// прямо рассчитывает перенесённый код:
+        ///
+        ///     string pathToDb = _project.Path + dbName + ".sql";   // FastDb
+        ///
+        /// Без разделителя склейка давала соседний путь: вместо
+        /// «…\CURRENT_JOBS\simroute\simroute.sql» получалось
+        /// «…\CURRENT_JOBS\simroutesimroute.sql» — другой файл, со своей
+        /// таблицей от прежних запусков. Наружу это выглядело как «в таблице нет
+        /// колонки», хотя в настоящей базе колонка была.
         /// </summary>
-        public string Path      { get; set; } = System.IO.Directory.GetCurrentDirectory();
+        public string Path
+        {
+            get => _path;
+            set => _path = Normalize(value);
+        }
+        private string _path = Normalize(System.IO.Directory.GetCurrentDirectory());
+
+        private static string Normalize(string dir)
+        {
+            if (string.IsNullOrEmpty(dir)) return dir;
+            var sep = System.IO.Path.DirectorySeparatorChar;
+            return dir.EndsWith(sep) || dir.EndsWith(System.IO.Path.AltDirectorySeparatorChar)
+                ? dir : dir + sep;
+        }
 
         /// <summary>
-        /// В ZP Directory — тот же каталог проекта, что и Path. Здесь стоял
-        /// GetDirectoryName(Path), то есть возвращался родительский каталог:
-        /// макрос {-Project.Directory-} указывал на уровень выше, и всё, что
-        /// шаблон кладёт рядом с собой, уходило не туда.
+        /// В ZP Directory — тот же каталог проекта, но без хвостового
+        /// разделителя: его подставляют в пути через Path.Combine и печатают в
+        /// логи. Здесь стоял GetDirectoryName(Path), то есть возвращался
+        /// родительский каталог: макрос {-Project.Directory-} указывал на
+        /// уровень выше, и всё, что шаблон кладёт рядом с собой, уходило не туда.
         /// </summary>
-        public string Directory => Path;
+        public string Directory
+            => _path.TrimEnd(System.IO.Path.DirectorySeparatorChar,
+                             System.IO.Path.AltDirectorySeparatorChar);
         public string TaskId    { get; } = Guid.NewGuid().ToString("N").Substring(0, 8);
 
         public ILocalVariables  Variables       => _variables;

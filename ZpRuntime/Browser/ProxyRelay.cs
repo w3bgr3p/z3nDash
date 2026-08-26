@@ -39,6 +39,7 @@
 // голом HTTP, которого в шаблонах почти нет.
 // ══════════════════════════════════════════════════════════════════════════════
 
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -348,7 +349,7 @@ public sealed class ProxyRelay : IDisposable
             var code = await ConnectThroughSocksAsync(up, host, port);
             if (code == 0x00) return true;
 
-            Log?.Invoke($"прокси отказал в CONNECT {host}:{port}, код 0x{code:X2}");
+            Log?.Invoke($"прокси отказал в CONNECT {host}:{port}, код 0x{code:X2} (наверху {cfg})");
             if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
             return false;
         }

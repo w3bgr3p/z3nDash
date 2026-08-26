@@ -18,6 +18,7 @@ window.NAV_CONFIG = {
         { id: 'zb',        label: 'ZB',         href: '/?page=zb',       hotkey: '3' },
         { id: 'logs',      label: 'Logs',       href: '/?page=logs',     hotkey: '4' },
         { id: 'http',      label: 'HTTP',       href: '/?page=http',     hotkey: '5' },
+        { id: 'har',       label: 'HAR',        href: '/har.html',       hotkey: '' },
         { id: 'json',      label: 'JSON',       href: '/json',           hotkey: '6' },
         { id: 'text',      label: 'Text',       href: '/?page=text',     hotkey: '7' },
         { id: 'clips',     label: 'Clips',      href: '/?page=clips',    hotkey: 'C' },

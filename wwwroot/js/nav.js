@@ -28,6 +28,7 @@ window.PageState = {
         if (q.includes('page=zp7'))     return 'zp7';
         if (q.includes('page=logs'))   return 'logs';
         if (q.includes('page=http'))   return 'http';
+        if (p.includes('har'))         return 'har';
         if (q.includes('page=config')) return 'config';
         if (p.includes('report'))      return 'report';
         if (p.includes('json'))        return 'json';
