@@ -34,6 +34,13 @@ window.ICONS = {
                   <circle cx="56" cy="64" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                   <circle cx="200" cy="192" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                 </svg>`,
+    
+    har:        `<svg viewBox="0 0 256 256">
+                    <path fill="none" d="M0 0h256v256H0z"/>
+                    <circle cx="128" cy="128" r="96" opacity=".2"/>
+                    <circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M96 88v80M160 88v80M96 128h64"/>
+                </svg>`,
                     
     json:      `<svg viewBox="0 0 256 256">
                   <path fill="none" d="M0 0h256v256H0z"/>

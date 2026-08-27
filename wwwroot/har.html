@@ -629,10 +629,6 @@
 
     <input type="text" id="urlFilter" placeholder="Filter by URL..." onkeyup="refresh()">
 
-    <select id="machineFilter" onchange="refresh()">
-        <option value="">All Machines</option>
-    </select>
-
     <select id="projectFilter" onchange="refresh()">
         <option value="">All Projects</option>
     </select>
@@ -718,7 +714,6 @@
             methodFilter:  document.getElementById('methodFilter').value,
             statusFilter:  document.getElementById('statusFilter').value,
             urlFilter:     document.getElementById('urlFilter').value,
-            machineFilter: document.getElementById('machineFilter').value,
             projectFilter: document.getElementById('projectFilter').value,
             limitInput:    document.getElementById('limitInput').value,
             selectedIdx:   selectedIdx
@@ -747,6 +742,47 @@
             toggleEl.classList.add('open');
             body.classList.add('open');
         }
+    }
+
+    const HAR_DB_NAME = 'DevDeckHar';
+    const HAR_DB_STORE = 'state';
+    const HAR_DB_KEY = 'current';
+
+    function openHarDb(dbFactory = indexedDB) {
+        return new Promise((resolve, reject) => {
+            const request = dbFactory.open(HAR_DB_NAME, 1);
+            request.onupgradeneeded = () => {
+                if (!request.result.objectStoreNames.contains(HAR_DB_STORE))
+                    request.result.createObjectStore(HAR_DB_STORE);
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error || new Error('Failed to open HAR storage'));
+        });
+    }
+
+    async function runHarDbRequest(mode, action, dbFactory = indexedDB) {
+        const db = await openHarDb(dbFactory);
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(HAR_DB_STORE, mode);
+            const request = action(transaction.objectStore(HAR_DB_STORE));
+            let result = null;
+            request.onsuccess = () => { result = request.result ?? null; };
+            request.onerror = () => reject(request.error || new Error('HAR storage request failed'));
+            transaction.oncomplete = () => { db.close(); resolve(result); };
+            transaction.onerror = () => reject(transaction.error || new Error('HAR storage transaction failed'));
+        });
+    }
+
+    function savePersistedHar(fileName, logs, dbFactory = indexedDB) {
+        return runHarDbRequest('readwrite', store => store.put({ fileName, logs }, HAR_DB_KEY), dbFactory);
+    }
+
+    function loadPersistedHar(dbFactory = indexedDB) {
+        return runHarDbRequest('readonly', store => store.get(HAR_DB_KEY), dbFactory);
+    }
+
+    function clearPersistedHar(dbFactory = indexedDB) {
+        return runHarDbRequest('readwrite', store => store.delete(HAR_DB_KEY), dbFactory);
     }
 
     function harHeaders(headers) {
@@ -827,6 +863,8 @@
                 .map(entry => harEntryToLog(entry, pageTitles))
                 .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
+            await savePersistedHar(file.name, harLogs);
+
             document.getElementById('harFileName').textContent = `${file.name} · ${harLogs.length} requests`;
             closeDetails();
             refresh();
@@ -845,7 +883,6 @@
         const method  = document.getElementById('methodFilter').value;
         const status  = document.getElementById('statusFilter').value;
         const url     = document.getElementById('urlFilter').value;
-        const machine = document.getElementById('machineFilter').value;
         const project = document.getElementById('projectFilter').value;
         const limit   = document.getElementById('limitInput').value;
         saveFilters();
@@ -854,7 +891,6 @@
         if (method)  logs = logs.filter(l => l.method === method);
         if (status)  logs = logs.filter(l => String(l.statusCode || '').startsWith(status));
         if (url)     logs = logs.filter(l => (l.url || '').toLowerCase().includes(url.toLowerCase()));
-        if (machine) logs = logs.filter(l => (l.machine || '') === machine);
         if (project) logs = logs.filter(l => (l.project || '') === project);
 
         currentLogs = logs.slice(0, parseInt(limit) || 200);
@@ -862,7 +898,6 @@
         updateStats();
 
         const st = PageState.load();
-        if (st.machineFilter) document.getElementById('machineFilter').value = st.machineFilter;
         if (st.projectFilter) document.getElementById('projectFilter').value = st.projectFilter;
         if (st.detailsVisible && st.selectedIdx != null && currentLogs[st.selectedIdx]) {
             showDetails(st.selectedIdx);
@@ -883,7 +918,7 @@
             <div class="request-item" onclick="showDetails(${idx})">
                 <span class="timestamp">${time}</span>
                 <span class="method ${log.method}">${log.method}</span>
-                <span class="url" title="${escapeHtml(log.url)}">${escapeHtml(truncate(log.url, 60))}</span>
+                <span class="url" title="${escapeHtml(log.url)}">${escapeHtml(truncate(log.url, 200))}</span>
                 <span class="status ${statusClass}">${log.statusCode}</span>
                 <span class="duration">${duration}</span>
                 <span class="account">${log.account || '-'}</span>
@@ -1225,12 +1260,10 @@
             (harLogs.length ? Math.round((success / harLogs.length) * 100) : 0) + '%';
         document.getElementById('avgTime').textContent = avgDuration + 'ms';
 
-        const machineFilter = document.getElementById('machineFilter');
         const projectFilter = document.getElementById('projectFilter');
         const curProject = projectFilter.value;
         const projects = [...new Set(harLogs.map(log => log.project).filter(Boolean))].sort();
 
-        machineFilter.innerHTML = '<option value="">All Machines</option>';
         projectFilter.innerHTML = '<option value="">All Projects</option>';
         projects.forEach(project => projectFilter.add(new Option(project, project, false, project === curProject)));
     }
@@ -1239,18 +1272,22 @@
         document.getElementById('methodFilter').value = '';
         document.getElementById('statusFilter').value = '';
         document.getElementById('urlFilter').value = '';
-        document.getElementById('machineFilter').value = '';
         document.getElementById('projectFilter').value = '';
-        PageState.save({ methodFilter: '', statusFilter: '', urlFilter: '', machineFilter: '', projectFilter: '' });
+        PageState.save({ methodFilter: '', statusFilter: '', urlFilter: '', projectFilter: '' });
         refresh();
     }
 
-    function clearHar() {
+    async function clearHar() {
         harLogs = [];
         currentLogs = [];
         document.getElementById('harFileName').textContent = 'No HAR file loaded';
         closeDetails();
         refresh();
+        try {
+            await clearPersistedHar();
+        } catch (e) {
+            console.error('Failed to clear saved HAR:', e);
+        }
     }
 
     // ── PLAY MODAL ──
@@ -1874,14 +1911,24 @@
     }
 
     // Restore controls from saved state before first refresh
-    (function restoreState() {
+    (async function restoreState() {
         const st = PageState.load();
         if (st.methodFilter  != null) document.getElementById('methodFilter').value  = st.methodFilter;
         if (st.statusFilter  != null) document.getElementById('statusFilter').value  = st.statusFilter;
         if (st.urlFilter     != null) document.getElementById('urlFilter').value     = st.urlFilter;
         if (st.limitInput    != null) document.getElementById('limitInput').value    = st.limitInput;
+        try {
+            const saved = await loadPersistedHar();
+            if (saved && Array.isArray(saved.logs)) {
+                harLogs = saved.logs;
+                document.getElementById('harFileName').textContent =
+                    `${saved.fileName || 'Saved HAR'} · ${harLogs.length} requests`;
+            }
+        } catch (e) {
+            console.error('Failed to restore saved HAR:', e);
+        }
+        refresh();
     })();
-    refresh();
 </script>
 
 <!-- CURL IMPORT MODAL -->
