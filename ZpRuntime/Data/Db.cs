@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Npgsql;
 
-namespace DevDeck
+namespace z3nDash
 {
     
     public enum dbMode

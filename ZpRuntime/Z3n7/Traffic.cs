@@ -1,7 +1,7 @@
 ﻿// Перенесено из z3n7/Traffic/Traffic.cs. Копия дословная.
 //
 // Наш Traffic/Traffic.cs удалён целиком — TrafficMonitor, TrafficElement и
-// DevDeck.Traffic. Это была параллельная реализация того же поверх Playwright
+// z3nDash.Traffic. Это была параллельная реализация того же поверх Playwright
 // (IPage/IBrowserContext, async), а не подложка: эталон ходит через
 // Instance.ActiveTab.GetTraffic, и наш CommandCenter это уже умеет. Ни одной
 // ссылки извне того файла не было — весь набор был мёртвым кодом.

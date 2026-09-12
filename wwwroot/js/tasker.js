@@ -1,4 +1,4 @@
-﻿// scheduler.js
+﻿// tasker.js
 
 // Safe wrappers for PageState (may not exist in standalone mode)
 var _PS = {
@@ -11,6 +11,19 @@ var selectedId = null;
 var activeTab  = 'execution';
 var outputPoll = null;
 var formDirty  = false;
+var taskDraft = null;
+
+// Keep editable values separate from the periodically refreshed server list.
+function captureTaskDraft() {
+    if (!selectedId) return;
+    var base = taskDraft || schedules.find(function(s) { return s.id === selectedId; }) || {};
+    taskDraft = Object.assign({}, base, collectScheduleFields(base));
+}
+
+function markTaskDirty() {
+    formDirty = true;
+    captureTaskDraft();
+}
 
 var _sseLog    = null;
 var _sseHttp   = null;
@@ -34,6 +47,7 @@ function _needsConfig(executor) { return _isJs(executor) || _isPy(executor); }
 
 function getTaskStatus(s) {
     if (s.status === 'running') return 'running';
+    if (scheduleHeld(s)) return 'paused';
     var neverRan = !s.runs_total || parseInt(s.runs_total) === 0;
     if (neverRan) return 'newbie';
     var hasSchedule = (s.schedule_mode || 'off') !== 'off';
@@ -41,6 +55,10 @@ function getTaskStatus(s) {
     if (hasSchedule) return isPaused ? 'paused' : 'planned';
     var isFail = s.status === 'error' || (s.last_exit && s.last_exit !== '0');
     return isFail ? 'fail' : 'done';
+}
+
+function scheduleHeld(s) {
+    return s.schedule_paused === 'true' || Date.parse(s.deferred_until || '') > Date.now();
 }
 
 function escHtml(s) {
@@ -111,15 +129,18 @@ document.addEventListener('DOMContentLoaded', function() {
     initVResizer();
     restoreLayout();
     loadInternalTasks();
-    document.getElementById('detailBody').addEventListener('input',  function() { formDirty = true; });
-    document.getElementById('detailBody').addEventListener('change', function() { formDirty = true; });
+    document.getElementById('detailBody').addEventListener('input', markTaskDirty);
+    document.getElementById('detailBody').addEventListener('change', markTaskDirty);
+    document.getElementById('detailBody').addEventListener('click', function(e) {
+        if (e.target.closest('.wd-btn')) markTaskDirty();
+    });
 });
 
 // ── Load list ─────────────────────────────────────────────────────────────────
 
 async function loadList() {
-    var res = await fetch('/scheduler/list');
-    if (!res.ok) throw new Error('/scheduler/list HTTP ' + res.status);
+    var res = await fetch('/tasker/list');
+    if (!res.ok) throw new Error('/tasker/list HTTP ' + res.status);
     schedules = await res.json();
     updateHeaderStats();
     renderList();
@@ -292,6 +313,7 @@ function filterList() { renderList(); }
 function deselect() {
     if (!selectedId) return;
     selectedId = null;
+    taskDraft = null;
     formDirty  = false;
     stopProcStatsPoll();
     closeSse();
@@ -315,7 +337,7 @@ function _lastOutputLine(s) {
 
 function renderGlobalStats() {
     var NAV_PAGES = [
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.scheduler : ''), title: 'DevDeck',      desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)', url: '/scheduler.html', color: '#e3b341' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.scheduler : ''), title: 'z3nDash',      desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)', url: '/tasker.html', color: '#e3b341' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.zp7       : ''), title: 'ZP7',        desc: 'Управление ZP7',                                                      url: '/?page=zp7',      color: '#58a6ff' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.logs       : ''), title: 'Logs',       desc: 'Логи приложения с фильтрацией по уровню, машине, проекту, аккаунту.', url: '/?page=logs',     color: '#3fb950' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.http       : ''), title: 'HTTP',       desc: 'Перехваченные HTTP-запросы и ответы из ZP-задач. Replay запросов.',   url: '/?page=http',     color: '#d29922' },
@@ -402,8 +424,9 @@ function renderGlobalStats() {
 // ── Select / detail ───────────────────────────────────────────────────────────
 
 function selectRow(id) {
+    if (selectedId === id) captureTaskDraft();
+    else { taskDraft = null; formDirty = false; }
     selectedId = id;
-    formDirty  = false;
     stopProcStatsPoll();
     _PS.save({ selectedId: id });
     var s = schedules.find(function(x) { return x.id === id; });
@@ -412,7 +435,7 @@ function selectRow(id) {
     showDetailHeader(s);
     activeTab = 'execution';
     setActiveTab('execution');
-    renderDetail(s);
+    renderDetail(taskDraft || s);
     showBottomPanels(s);
     _updateAiContext(s);
 }
@@ -441,6 +464,7 @@ function renderDetailActions(s) {
         '<div class="action-group">'
         + '<button class="btn primary sm" onclick="runNow(\'' + id + '\')">' + runLabel + '</button>'
         + (scheduled ? '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled || 'true') + '\')">' + pauseLabel + '</button>' : '')
+        + (scheduleHeld(s) ? '<button class="btn sm" title="Clear script pause and deferral" onclick="resumeSchedule(\'' + id + '\')">Resume schedule</button>' : '')
         + '<button class="btn sm" title="Restart" onclick="restartNow(\'' + id + '\')" style="border-color:#d29922;color:#d29922;">↺</button>'
         + '<button class="btn stop sm" title="Interrupt" onclick="stopNow(\'' + id + '\')">■</button>'
         + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🗑</button>'
@@ -475,7 +499,7 @@ function renderDetailActions(s) {
 async function extendDetailActions(s) {
     var res, info;
     try {
-        res  = await fetch('/scheduler/scan-folder?id=' + encodeURIComponent(s.id));
+        res  = await fetch('/tasker/scan-folder?id=' + encodeURIComponent(s.id));
         info = await res.json();
     } catch(e) { return; }
 
@@ -486,7 +510,7 @@ async function extendDetailActions(s) {
     // npm scripts dropdown
     if (_isJs(s.executor)) {
         try {
-            var pkgRes   = await fetch('/scheduler/package-scripts?id=' + encodeURIComponent(s.id));
+            var pkgRes   = await fetch('/tasker/package-scripts?id=' + encodeURIComponent(s.id));
             var pkgData  = await pkgRes.json();
             var scripts  = pkgData.scripts || {};
             var names    = Object.keys(scripts);
@@ -572,7 +596,7 @@ async function _saveNpmScript(scheduleId, scriptName) {
     if (s.args === newArgs) return;
     s.args = newArgs;
     try {
-        await fetch('/scheduler/save', {
+        await fetch('/tasker/save', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify(Object.assign({}, s, { args: newArgs })),
@@ -592,18 +616,14 @@ function runInstall(s, btn) {
     if (box)   { box.innerHTML = ''; }
     if (badge) { badge.style.display = 'inline-block'; }
 
-    var src = new EventSource('/scheduler/install/stream?id=' + encodeURIComponent(s.id));
+    var src = new EventSource('/tasker/install/stream?id=' + encodeURIComponent(s.id));
 
     src.addEventListener('output', function(e) {
         try {
-            var d    = JSON.parse(e.data);
-            var line  = d.line || '';
-            var level = (d.level || 'INFO').toUpperCase();
-            var timestamp = new Date().toLocaleString('en-US', {hour12: false});
+            var d = JSON.parse(e.data);
             if (!box) return;
             var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-            box.insertAdjacentHTML('beforeend',
-                '<div class="out-line ' + level + '"><span class="out-line-text">' + escHtml(line) + '</span><span class="out-line-timestamp">' + timestamp + '</span></div>');
+            _appendLine(box, d);
             if (atBottom) box.scrollTop = box.scrollHeight;
         } catch(err) {}
     });
@@ -636,7 +656,7 @@ async function openCmModal(s, type) {
 
     var res, data;
     try {
-        res  = await fetch('/scheduler/config-file?id=' + encodeURIComponent(s.id) + '&type=' + encodeURIComponent(type));
+        res  = await fetch('/tasker/config-file?id=' + encodeURIComponent(s.id) + '&type=' + encodeURIComponent(type));
         data = await res.json();
     } catch(e) { Dialog.error(e.message); return; }
 
@@ -672,7 +692,7 @@ function closeCmModal() {
 async function saveCmConfig() {
     if (!_cmEditor || !_cmFilePath) return;
     try {
-        var res  = await fetch('/scheduler/config-file', {
+        var res  = await fetch('/tasker/config-file', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ path: _cmFilePath, content: _cmEditor.getValue() }),
@@ -748,12 +768,13 @@ function renderLogsTab(s) {
 }
 
 function switchTab(tab) {
+    captureTaskDraft();
     activeTab = tab;
     setActiveTab(tab);
     _PS.save({ activeTab: tab });
     if (tab !== 'execution') stopProcStatsPoll();
     if (tab !== 'logs') closeSse();
-    var s = schedules.find(function(x) { return x.id === selectedId; });
+    var s = taskDraft || schedules.find(function(x) { return x.id === selectedId; });
     if (!s) return;
     renderDetail(s);
 }
@@ -782,7 +803,8 @@ function renderExecution(s) {
     var lastExit  = s.last_exit || '—';
     var trigger   = triggerLabel(s);
     var isRunning = status === 'running';
-    var isParallel = s.on_overlap === 'parallel';
+    // Многопоточная задача: ёмкость больше одной нити либо очередь поверх неё.
+    var isMulti = (parseInt(s.max_threads || '1', 10) || 1) > 1 || s.on_overlap === 'parallel';
 
     document.getElementById('detailBody').innerHTML =
         '<div class="detail-grid">'
@@ -794,7 +816,7 @@ function renderExecution(s) {
         + infoRow('Total',      total)
         + infoRow('Failed',     fail > 0 ? '<span class="red">' + fail + '</span>' : '0')
         + infoRow('Last Exit',  lastExit === '0' ? '<span class="green">0</span>' : lastExit === '-1' ? '<span class="red">-1</span>' : lastExit)
-        + (isRunning && !isParallel
+        + (isRunning && !isMulti
             ? infoRow('PID',    '<span id="procPid"    class="accent">—</span>')
             + infoRow('Uptime', '<span id="procUptime" class="accent">—</span>')
             + infoRow('Memory', '<span id="procMem"    class="accent">—</span>')
@@ -807,11 +829,15 @@ function renderExecution(s) {
             ? infoRow('Active', s.enabled !== 'false' ? '<span class="green">True</span>' : '<span class="red">False</span>')
             : '')
         + infoRow('Last Run',   lastRun)
+        + (s.schedule_paused === 'true' ? infoRow('Script pause', 'Paused') : '')
+        + (Date.parse(s.deferred_until || '') > Date.now()
+            ? infoRow('Deferred until', escHtml(new Date(s.deferred_until).toLocaleString())) : '')
+        + (scheduleHeld(s) && s.defer_reason ? infoRow('Reason', escHtml(s.defer_reason)) : '')
         + infoRow('Period',     trigger)
-        + infoRow('On Overlap', s.on_overlap || '—')
-        + (isParallel ? infoRow('Max Threads', s.max_threads || '1') : '')
+        + infoRow('Threads',    s.max_threads || '1')
+        + infoRow('When full',  OVERLAP_LABELS[s.on_overlap] || s.on_overlap || '—')
         + '</div>'
-        + (isRunning && isParallel
+        + (isRunning && isMulti
             ? '<div class="detail-section" id="instancesCard"><div class="info-card-title">Active instances</div><div id="instancesList">—</div></div>'
             + '<div class="detail-section" id="queueCard"><div class="info-card-title">Queue (pending)</div><div id="queueList">—</div>'
             + '<button class="btn sm" style="margin-top:4px" onclick="clearQueue(\'' + escHtml(s.id) + '\')">Clear queue</button></div>'
@@ -822,7 +848,7 @@ function renderExecution(s) {
         var id = s.id;
 
         function pollStats() {
-            fetch('/scheduler/process-stats?id=' + encodeURIComponent(id))
+            fetch('/tasker/process-stats?id=' + encodeURIComponent(id))
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     var elPid    = document.getElementById('procPid');
@@ -837,7 +863,7 @@ function renderExecution(s) {
         }
 
         function pollInstances() {
-            fetch('/scheduler/instances?id=' + encodeURIComponent(id))
+            fetch('/tasker/instances?id=' + encodeURIComponent(id))
                 .then(function(r) { return r.json(); })
                 .then(function(list) {
                     var el = document.getElementById('instancesList');
@@ -852,7 +878,7 @@ function renderExecution(s) {
                     }).join('');
                 }).catch(function() {});
 
-            fetch('/scheduler/queue?id=' + encodeURIComponent(id))
+            fetch('/tasker/queue?id=' + encodeURIComponent(id))
                 .then(function(r) { return r.json(); })
                 .then(function(list) {
                     var el = document.getElementById('queueList');
@@ -862,11 +888,11 @@ function renderExecution(s) {
                 }).catch(function() {});
         }
 
-        if (!isParallel) pollStats();
-        if (isParallel)  pollInstances();
+        if (!isMulti) pollStats();
+        if (isMulti)  pollInstances();
         _procStatsPoll = setInterval(function() {
-            if (!isParallel) pollStats();
-            if (isParallel)  pollInstances();
+            if (!isMulti) pollStats();
+            if (isMulti)  pollInstances();
         }, 2000);
     }
 }
@@ -882,15 +908,20 @@ function newSchedule() {
     formDirty  = true;
     renderList();
     var s = { id:'', name:'', executor:'python', script_path:'', args:'',
-              enabled:'false', cron:'', on_overlap:'skip',
+              enabled:'false', cron:'', on_overlap:'skip', max_threads:'1',
               use_venv:'false', schedule_mode:'off', schedule_json:'' };
-    document.getElementById('detailHeader').style.display = 'none';
+    taskDraft = Object.assign({}, s);
+    document.getElementById('detailHeader').style.display = '';
+    document.getElementById('detailTitle').textContent = 'New task';
+    document.getElementById('detailSub').textContent = '';
+    document.getElementById('detailActions').innerHTML = '';
     document.getElementById('bottomPanels').style.display = 'none';
     document.getElementById('hResizer').style.display     = 'none';
     closeSseOutput();
     var dp = document.getElementById('detailPanel');
     dp.style.flex = ''; dp.style.height = '';
     activeTab = 'settings';
+    setActiveTab('settings');
     renderSettings(s);
 }
 
@@ -928,7 +959,7 @@ function execSpec(executor) {
 var _internalTaskNames = [];
 
 function loadInternalTasks() {
-    fetch('/scheduler/internal-tasks')
+    fetch('/tasker/internal-tasks')
         .then(function(r) { return r.json(); })
         .then(function(d) { _internalTaskNames = d.tasks || []; })
         .catch(function() {});
@@ -953,19 +984,25 @@ function renderSettings(s) {
         + '<input class="form-input" id="f_args" value="' + escHtml(s.args) + '"' + (spec.noArgs ? ' style="display:none"' : '') + '>'
         + venvRowHtml(s, id)
         + browserSectionHtml(s)
-        + '<div class="form-section">Overlap</div>'
-        + '<div class="form-label">On overlap</div>'
+        + '<div class="form-section">Threads</div>'
+        + '<div class="form-label">Threads</div>'
+        + '<div style="display:flex;gap:6px;align-items:center;">'
+        +   '<input class="form-input" id="f_max_threads" type="number" min="1" max="256" style="width:70px" value="' + (s.max_threads || '1') + '" oninput="onThreadsChanged()">'
+        +   '<span style="color:var(--text2);font-size:10px;">сколько инстансов задачи держать одновременно</span>'
+        + '</div>'
+        + '<div class="form-label">When full</div>'
         + '<select class="form-input" id="f_on_overlap" onchange="onOverlapChanged()">'
-        + '<option value="skip"         ' + (s.on_overlap === 'skip'         ? 'selected' : '') + '>Skip</option>'
-        + '<option value="parallel"     ' + (s.on_overlap === 'parallel'     ? 'selected' : '') + '>Parallel</option>'
-        + '<option value="kill_restart" ' + (s.on_overlap === 'kill_restart' ? 'selected' : '') + '>Kill &amp; restart</option>'
+        + '<option value="skip"         ' + (s.on_overlap === 'skip'         ? 'selected' : '') + '>Skip — пропустить заход</option>'
+        + '<option value="parallel"     ' + (s.on_overlap === 'parallel'     ? 'selected' : '') + '>Queue — копить очередь</option>'
+        + '<option value="kill_restart" ' + (s.on_overlap === 'kill_restart' ? 'selected' : '') + '>Kill &amp; restart — снести и перезапустить</option>'
         + '</select>'
-        + '<div class="form-label" id="f_max_threads_label" style="' + (s.on_overlap === 'parallel' ? '' : 'display:none') + '">Max threads</div>'
-        + '<input class="form-input" id="f_max_threads" type="number" min="1" value="' + (s.max_threads || '1') + '" style="' + (s.on_overlap === 'parallel' ? '' : 'display:none') + '">'
+        + '<div class="form-label"></div>'
+        + '<div id="f_threads_hint" style="color:var(--text2);font-size:10px;"></div>'
         + '<div class="form-actions"><button class="btn primary" onclick="saveSchedule(\'' + escHtml(id) + '\')">Save</button></div>'
         + '</div>';
 
     if (s.executor === 'xml') browserSyncRows();
+    onThreadsChanged();
 }
 
 /// Поле пути: файл с пикером, папка с пикером каталога, команда без пикера,
@@ -1007,12 +1044,14 @@ function venvRowHtml(s, id) {
 /// Смена экзекутора перерисовывает форму: набор полей у каждого свой.
 function onExecutorChange() {
     var s = _formSnapshot();
+    taskDraft = s;
+    formDirty = true;
     renderSettings(s);
 }
 
 /// Текущее содержимое формы — чтобы перерисовка не теряла введённое.
 function _formSnapshot() {
-    var s = schedules.find(function(x) { return x.id === selectedId; }) || {};
+    var s = taskDraft || schedules.find(function(x) { return x.id === selectedId; }) || {};
     var snap = Object.assign({}, s);
     snap.name        = (document.getElementById('f_name')        || {}).value || '';
     snap.executor    = (document.getElementById('f_executor')    || {}).value || 'python';
@@ -1028,7 +1067,7 @@ function _formSnapshot() {
 
 async function ensureVenv(id) {
     if (!id) { Dialog.info('Сохраните задачу, потом создавайте venv.'); return; }
-    var res  = await fetch('/scheduler/ensure-venv', {
+    var res  = await fetch('/tasker/ensure-venv', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ id: id }),
@@ -1042,7 +1081,7 @@ async function ensureVenv(id) {
 //
 // Шаблон ZennoPoster всегда играется в браузере, и браузер этот может быть не
 // наш: у антидетект-профиля свой отпечаток и свой прокси, поднимать поверх него
-// Patchright бессмысленно. Поэтому режимов четыре, а внешний подключается по CDP.
+// Patchright бессмысленно. Поэтому режимов пять, а внешний подключается по CDP.
 //
 // Пресеты — это только заполнение полей: код у всех антиков один, разница лишь
 // в URL и в том, как в ответе лежит эндпоинт.
@@ -1097,6 +1136,7 @@ function browserSectionHtml(s) {
         + '<select class="form-input" id="b_mode" onchange="browserSyncRows()">'
         + [['patchright','Patchright (свой браузер)'],
            ['zennobrowser','ZennoBrowser'],
+           ['shardx','ShardX'],
            ['cdp','Внешний по CDP'],
            ['api','Внешний через API антика']]
             .map(function(o) { return '<option value="' + o[0] + '"' + (b.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
@@ -1146,8 +1186,9 @@ function browserSectionHtml(s) {
 function browserSyncRows() {
     var mode = _val('b_mode', 'patchright');
     var api  = mode === 'api';
+    var shardx = mode === 'shardx';
 
-    _row('b_profile_label', 'b_profile_wrap', mode === 'zennobrowser' || api);
+    _row('b_profile_label', 'b_profile_wrap', mode === 'zennobrowser' || shardx || api);
     _row('b_cdp_label',     'b_cdp',          mode === 'cdp');
     _row('b_preset_label',  'b_preset_wrap',  api);
     _row('b_method_label',  'b_method',       api);
@@ -1155,7 +1196,7 @@ function browserSyncRows() {
     _row('b_body_label',    'b_body',         api && _val('b_method', 'GET') === 'POST');
     _row('b_ws_label',      'b_ws',           api);
     _row('b_stop_label',    'b_stop',         api);
-    _row('b_close_label',   'b_close_wrap',   api);
+    _row('b_close_label',   'b_close_wrap',   api || shardx);
 }
 
 function applyBrowserPreset() {
@@ -1246,7 +1287,10 @@ function renderSchedule(s) {
 }
 
 function onScheduleModeChange() {
-    var s = schedules.find(function(x) { return x.id === selectedId; }) || {};
+    captureTaskDraft();
+    formDirty = true;
+    var s = taskDraft || {};
+    _zp = zpFromSaved(s);
     renderScheduleBody(s, document.getElementById('f_schedule_mode').value);
 }
 
@@ -1461,7 +1505,7 @@ async function previewSchedule() {
         : { mode: 'zp',   schedule_json: JSON.stringify(collectZp()) };
 
     try {
-        var res  = await fetch('/scheduler/schedule-preview', {
+        var res  = await fetch('/tasker/schedule-preview', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify(body),
@@ -1490,15 +1534,9 @@ function renderOutput(s) {
 
 function renderOutputLines(text) {
     if (!text || !text.trim()) return '<div class="out-line empty">(no output yet)</div>';
-    var normalized = text.replace(/\\n/g, '\n');
-    return normalized.split('\n').map(function(line) {
-        var level = 'INFO';
-        if (/\[ERROR\]|\[ERR\]/i.test(line))        level = 'ERROR';
-        else if (/\[WARNING\]|\[WARN\]/i.test(line)) level = 'WARNING';
-        else if (/\[DEBUG\]/i.test(line))            level = 'DEBUG';
-        var timestamp = new Date().toLocaleString('en-US', {hour12: false});
-        return '<div class="out-line ' + level + '"><span class="out-line-text">' + escHtml(line) + '</span><span class="out-line-timestamp">' + timestamp + '</span></div>';
-    }).join('');
+    return text.replace(/\\n/g, '\n').split('\n')
+               .map(function(line) { return LogLine.build({ line: line }); })
+               .join('');
 }
 
 // ── Output box (bottom panel) ─────────────────────────────────────────────────
@@ -1506,25 +1544,102 @@ function renderOutputLines(text) {
 function _getOutputBox()  { return document.getElementById('outputBox'); }
 function _getLiveBadge()  { return document.getElementById('liveBadgeBottom'); }
 
+// ── Нити и фильтры вывода ─────────────────────────────────────────────────────
+// Пять параллельных нитей пишут в одно окно, поэтому у каждой свой цвет,
+// бейдж с началом runId и чип в шапке для изоляции.
+
+var _runsSeen  = {};
+var _runFilter = null;
+
+// «Подряд» на пяти нитях рождает новый runId каждые несколько секунд, поэтому
+// в шапке живут только последние чипы: старые нити всё равно уже завершились.
+var RUN_CHIP_LIMIT = 12;
+
+function _resetRuns() {
+    _runsSeen  = {};
+    _runFilter = null;
+    var chips = document.getElementById('runChips');
+    if (chips) chips.innerHTML = '';
+    var box = _getOutputBox();
+    if (box) box.classList.remove('multi-run');
+}
+
+function _noteRun(run) {
+    if (!run || _runsSeen[run]) return;
+    _runsSeen[run] = true;
+
+    var chips = document.getElementById('runChips');
+    if (chips) {
+        var chip = document.createElement('button');
+        chip.className   = 'run-chip';
+        chip.textContent = run.slice(0, 4);
+        chip.title       = 'Только нить ' + run;
+        chip.setAttribute('data-run', run);
+        chip.style.setProperty('--ll-h', LogLine.hue(run));
+        chip.onclick = function () { toggleRunFilter(run); };
+        chips.appendChild(chip);
+        _trimRunChips(chips);
+        chips.scrollLeft = chips.scrollWidth;
+    }
+
+    // Бейдж нити нужен, только когда нитей действительно несколько.
+    var box = _getOutputBox();
+    if (box && Object.keys(_runsSeen).length > 1) box.classList.add('multi-run');
+}
+
+/// Выкинуть самые старые чипы, сняв с них фильтр, если он на них стоял.
+function _trimRunChips(chips) {
+    while (chips.children.length > RUN_CHIP_LIMIT) {
+        var oldest = chips.firstElementChild;
+        if (oldest.getAttribute('data-run') === _runFilter) toggleRunFilter(_runFilter);
+        chips.removeChild(oldest);
+    }
+}
+
+function toggleRunFilter(run) {
+    _runFilter = (_runFilter === run) ? null : run;
+    var chips = document.getElementById('runChips');
+    if (chips) Array.prototype.forEach.call(chips.children, function (c) {
+        c.classList.toggle('on', c.getAttribute('data-run') === _runFilter);
+    });
+    var box = _getOutputBox();
+    if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll('.out-line'), function (el) {
+        el.classList.toggle('ll-muted', !!_runFilter && el.getAttribute('data-run') !== _runFilter);
+    });
+}
+
+function setOutputLevel(v) {
+    var box = _getOutputBox();
+    if (!box) return;
+    box.classList.remove('lvl-warn', 'lvl-err');
+    if (v === 'warn') box.classList.add('lvl-warn');
+    if (v === 'err')  box.classList.add('lvl-err');
+}
+
+/// Дописать строку в окно с учётом активного фильтра по нити.
+function _appendLine(box, d) {
+    _noteRun(d.run);
+    box.insertAdjacentHTML('beforeend', LogLine.build(d));
+    var el = box.lastElementChild;
+    if (_runFilter && el && el.getAttribute('data-run') !== _runFilter) el.classList.add('ll-muted');
+    return el;
+}
+
 function loadOutput(id) {
     // load last saved output from DB into bottom box
-    fetch('/scheduler/output?id=' + encodeURIComponent(id))
+    fetch('/tasker/output?id=' + encodeURIComponent(id))
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var box = _getOutputBox();
             if (!box) return;
-            var text = (data.output || '').replace(/\\n/g, '\n');
+            // История из БД приходит без разбивки по нитям: только текст строк.
+            _resetRuns();
+            var text = data.output || '';
             if (!text.trim()) {
                 box.innerHTML = '<div class="out-line empty">(no output yet)</div>';
             } else {
-                var timestamp = new Date().toLocaleString('en-US', {hour12: false});
-                box.innerHTML = text.split('\n').map(function(line) {
-                    var level = 'INFO';
-                    if (/\[ERROR\]|\[ERR\]/i.test(line))        level = 'ERROR';
-                    else if (/\[WARNING\]|\[WARN\]/i.test(line)) level = 'WARNING';
-                    else if (/\[DEBUG\]/i.test(line))            level = 'DEBUG';
-                    return '<div class="out-line ' + level + '"><span class="out-line-text">' + escHtml(line) + '</span><span class="out-line-timestamp">' + timestamp + '</span></div>';
-                }).join('');
+                box.innerHTML = renderOutputLines(text);
                 box.scrollTop = box.scrollHeight;
             }
         }).catch(function() {});
@@ -1536,8 +1651,9 @@ function reloadOutput() {
 
 function startSseOutput(id) {
     if (_sseOutput) { _sseOutput.close(); _sseOutput = null; }
+    _resetRuns();
 
-    _sseOutput = new EventSource('/scheduler/output/stream?id=' + encodeURIComponent(id));
+    _sseOutput = new EventSource('/tasker/output/stream?id=' + encodeURIComponent(id));
 
     _sseOutput.addEventListener('output', function(e) {
         try {
@@ -1545,30 +1661,29 @@ function startSseOutput(id) {
             var box   = _getOutputBox();
             var badge = _getLiveBadge();
             if (!box) return;
-            if (d.done) { if (badge) badge.style.display = 'none'; return; }
-            if (d.clear) { box.innerHTML = ''; }
+            if (d.done)  { if (badge) badge.style.display = 'none'; return; }
+            if (d.clear) { box.innerHTML = ''; _resetRuns(); }
             var empty = box.querySelector('.out-line.empty');
             if (empty) empty.remove();
-            var level       = (d.level || 'INFO').toUpperCase();
-            var atBottom    = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-            var line        = d.line || '';
-            var last        = box.lastElementChild;
-            var replaceLast = !!d.replace_last;
-            var timestamp   = new Date().toLocaleString('en-US', {hour12: false});
+
+            var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+            var plain    = LogLine.plain(d.line || '');
+            var last     = box.lastElementChild;
+
+            // Прогресс-строка одной нити перерисовывается на месте, а не копится.
             function progressPrefix(s) { return s.replace(/[\d%\[\]]+.*$/, '').trim(); }
+            var lastSpan = last ? last.querySelector('.out-line-text') : null;
+            var lastText = lastSpan ? lastSpan.textContent : '';
             var sameProgress = last && last.classList.contains('out-line') && !last.classList.contains('empty')
-                && progressPrefix(line).length > 3 && progressPrefix(line) === progressPrefix(last.querySelector('.out-line-text') ? last.querySelector('.out-line-text').textContent : last.textContent);
-            if (replaceLast || sameProgress) {
-                last.className   = 'out-line ' + level;
-                var textSpan = last.querySelector('.out-line-text');
-                var timeSpan = last.querySelector('.out-line-timestamp');
-                if (textSpan) textSpan.textContent = line;
-                else {
-                    last.innerHTML = '<span class="out-line-text">' + escHtml(line) + '</span><span class="out-line-timestamp">' + timestamp + '</span>';
-                }
-                if (timeSpan) timeSpan.textContent = timestamp;
+                && (last.getAttribute('data-run') || '') === (d.run || '')
+                && progressPrefix(plain).length > 3
+                && progressPrefix(plain) === progressPrefix(lastText);
+
+            if (d.replace_last || sameProgress) {
+                _noteRun(d.run);
+                last.outerHTML = LogLine.build(d);
             } else {
-                box.insertAdjacentHTML('beforeend', '<div class="out-line ' + level + '"><span class="out-line-text">' + escHtml(line) + '</span><span class="out-line-timestamp">' + timestamp + '</span></div>');
+                _appendLine(box, d);
             }
             if (atBottom) box.scrollTop = box.scrollHeight;
             if (badge) badge.style.display = 'inline-block';
@@ -1590,12 +1705,13 @@ function startSseOutput(id) {
 
 async function clearOutputBottom() {
     if (!selectedId || selectedId === '__new__') return;
-    await fetch('/scheduler/clear-output', {
+    await fetch('/tasker/clear-output', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ id: selectedId })
     });
     var box = _getOutputBox();
     if (box) box.innerHTML = '<div class="out-line empty">(no output yet)</div>';
+    _resetRuns();
     var s = schedules.find(function(x) { return x.id === selectedId; });
     if (s) s.last_output = '';
 }
@@ -1654,7 +1770,7 @@ async function clearLogsPanel() {
     try {
         await fetch('/clear', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task_id: curTaskId}) });
         if (selectedId && selectedId !== '__new__') {
-            await fetch('/scheduler/clear-output', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: selectedId}) });
+            await fetch('/tasker/clear-output', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: selectedId}) });
             var s = schedules.find(function(x) { return x.id === selectedId; });
             if (s) s.last_output = '';
         }
@@ -1705,7 +1821,7 @@ async function loadLogs() {
 async function showOutputFallback(el) {
     if (!selectedId || selectedId === '__new__') { el.innerHTML = '<div class="log-empty">No logs</div>'; return; }
     try {
-        var res  = await fetch('/scheduler/output?id=' + encodeURIComponent(selectedId));
+        var res  = await fetch('/tasker/output?id=' + encodeURIComponent(selectedId));
         var data = await res.json();
         var text = (data && data.output ? data.output.trim() : '').replace(/\\n/g, '\n');
         if (!text) { el.innerHTML = '<div class="log-empty">No logs</div>'; return; }
@@ -1762,17 +1878,15 @@ function openAiForTask(id) {
 
 async function openInTerminal(id) {
     try {
-        var res  = await fetch('/scheduler/open-terminal?id=' + encodeURIComponent(id));
+        var res  = await fetch('/tasker/open-terminal?id=' + encodeURIComponent(id));
         var data = await res.json();
         if (!data.ok) Dialog.error(data.error || 'Cannot open terminal');
     } catch(e) { Dialog.error(e.message); }
 }
 
-/// Save собирает только те поля, которые есть на текущем табе: Settings и
-/// Schedule живут в одном detailBody, и одновременно на экране только один.
-async function saveSchedule(existingId) {
-    var prev    = schedules.find(function(x) { return x.id === selectedId; }) || {};
-    var payload = { id: existingId || undefined };
+// Capture mounted fields only; values from other tabs remain in the draft.
+function collectScheduleFields(prev) {
+    var payload = {};
 
     if (document.getElementById('f_name')) {
         var maxThreadsEl = document.getElementById('f_max_threads');
@@ -1796,20 +1910,32 @@ async function saveSchedule(existingId) {
     if (modeEl) {
         var mode = modeEl.value;
         payload.schedule_mode = mode;
-        payload.cron          = mode === 'cron' ? (_val('f_cron', '').trim()) : '';
-        payload.schedule_json = mode === 'zp'   ? JSON.stringify(collectZp()) : '';
+        if (document.getElementById('f_cron')) payload.cron = _val('f_cron', '');
+        if (document.getElementById('z_how')) payload.schedule_json = JSON.stringify(collectZp());
         payload.enabled       = mode === 'off' ? 'false' : _val('f_enabled', 'true');
+    }
+    return payload;
+}
 
-        // Включение расписания заново начинает отсчёт повторений и сетку «Регулярно».
-        if (mode !== 'off' && (prev.schedule_mode !== mode || prev.schedule_json !== payload.schedule_json)) {
-            payload.sched_runs       = '0';
-            payload.sched_started_at = new Date().toISOString();
-        }
+async function saveSchedule(existingId) {
+    captureTaskDraft();
+    var prev = schedules.find(function(x) { return x.id === selectedId; }) || {};
+    var payload = { id: existingId || undefined };
+    ['name', 'executor', 'script_path', 'args', 'on_overlap', 'max_threads',
+     'use_venv', 'browser_json', 'schedule_mode', 'cron', 'schedule_json', 'enabled'].forEach(function(key) {
+        if (taskDraft && taskDraft[key] !== undefined) payload[key] = taskDraft[key];
+    });
+    var mode = payload.schedule_mode || 'off';
+    payload.cron = mode === 'cron' ? (payload.cron || '').trim() : '';
+    payload.schedule_json = mode === 'zp' ? (payload.schedule_json || '') : '';
+    if (mode !== 'off' && (prev.schedule_mode !== mode || prev.schedule_json !== payload.schedule_json)) {
+        payload.sched_runs = '0';
+        payload.sched_started_at = new Date().toISOString();
     }
 
-    var res  = await fetch('/scheduler/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    var res  = await fetch('/tasker/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     var data = await res.json();
-    if (data.ok) { selectedId = data.id; formDirty = false; await loadList(); selectRow(data.id); }
+    if (data.ok) { selectedId = data.id; taskDraft = null; formDirty = false; await loadList(); selectRow(data.id); }
     else Dialog.error(data.error || 'Save failed');
 }
 
@@ -1826,7 +1952,7 @@ async function duplicateSchedule(id) {
     var s = schedules.find(function(x) { return x.id === id; });
     if (!s) return;
     var newName = _nextDuplicateName(s.name || 'task', schedules.map(function(x) { return x.name || ''; }));
-    var res  = await fetch('/scheduler/save', {
+    var res  = await fetch('/tasker/save', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ name:newName, executor:s.executor, script_path:s.script_path, args:s.args,
             enabled:'false', cron:s.cron, on_overlap:s.on_overlap, max_threads:s.max_threads,
@@ -1835,10 +1961,10 @@ async function duplicateSchedule(id) {
     var data = await res.json();
     if (!data.ok) { Dialog.error(data.error || 'Duplicate: save failed'); return; }
     try {
-        var pRes  = await fetch('/scheduler/payload?id=' + encodeURIComponent(id));
+        var pRes  = await fetch('/tasker/payload?id=' + encodeURIComponent(id));
         var pData = await pRes.json();
         if (pData.schema || pData.values)
-            await fetch('/scheduler/payload', { method:'POST', headers:{'Content-Type':'application/json'},
+            await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({ id:data.id, schema:pData.schema, values:pData.values }) });
     } catch(e) {}
     await loadList();
@@ -1847,7 +1973,7 @@ async function duplicateSchedule(id) {
 
 async function deleteSchedule(id, name) {
     if (!(await Dialog.confirm('Eliminate "' + (name||id) + '"?', '✕ Eliminate', true))) return;
-    await fetch('/scheduler/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+    await fetch('/tasker/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
     selectedId = null;
     closeSse();
     document.getElementById('detailHeader').style.display  = 'none';
@@ -1862,7 +1988,7 @@ async function deleteSchedule(id, name) {
 
 async function exportPayload(id) {
     try {
-        var res  = await fetch('/scheduler/payload?id=' + encodeURIComponent(id));
+        var res  = await fetch('/tasker/payload?id=' + encodeURIComponent(id));
         var data = await res.json();
         await navigator.clipboard.writeText(JSON.stringify({ schema:data.schema, values:data.values }, null, 2));
         Dialog.alert('Payload JSON copied to clipboard.', 'Exported');
@@ -1871,7 +1997,7 @@ async function exportPayload(id) {
 
 async function openScriptFile(filePath) {
     try {
-        var res  = await fetch('/scheduler/open-file?path=' + encodeURIComponent(filePath));
+        var res  = await fetch('/tasker/open-file?path=' + encodeURIComponent(filePath));
         var data = await res.json();
         if (!data.ok) Dialog.error(data.error || 'Cannot open file');
     } catch(e) { Dialog.error(e.message); }
@@ -1879,7 +2005,7 @@ async function openScriptFile(filePath) {
 
 async function openScriptFolder(filePath) {
     try {
-        var res  = await fetch('/scheduler/open-folder?path=' + encodeURIComponent(filePath));
+        var res  = await fetch('/tasker/open-folder?path=' + encodeURIComponent(filePath));
         var data = await res.json();
         if (!data.ok) Dialog.error(data.error || 'Cannot open folder');
     } catch(e) { Dialog.error(e.message); }
@@ -1889,12 +2015,18 @@ async function toggleEnabled(id, current) {
     var newVal = current === 'true' ? 'false' : 'true';
     var s = schedules.find(function(x) { return x.id === id; });
     if (!s) return;
-    await fetch('/scheduler/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(Object.assign({}, s, {enabled: newVal})) });
+    await fetch('/tasker/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(Object.assign({}, s, {enabled: newVal})) });
+    await loadList();
+}
+
+async function resumeSchedule(id) {
+    var res = await fetch('/tasker/resume', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:id}) });
+    if (!res.ok) { alert((await res.json()).error || 'Could not resume schedule'); return; }
     await loadList();
 }
 
 async function runNow(id) {
-    await fetch('/scheduler/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+    await fetch('/tasker/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
     await loadList();
     startSseOutput(id);
 }
@@ -1903,7 +2035,7 @@ async function buildCsx(id) {
     var btn = event.target;
     btn.disabled = true; btn.textContent = '⏳...';
     try {
-        var res  = await fetch('/scheduler/build', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+        var res  = await fetch('/tasker/build', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
         var data = await res.json();
         if (data.ok) { btn.textContent = '✅ OK'; btn.style.borderColor = '#3fb950'; btn.style.color = '#3fb950'; }
         else { btn.textContent = '❌ Err'; btn.style.borderColor = '#f85149'; btn.style.color = '#f85149'; await Dialog.alert(data.errors.join('\n'), '🔨 Check errors'); }
@@ -1912,17 +2044,17 @@ async function buildCsx(id) {
 }
 
 async function stopNow(id) {
-    var res       = await fetch('/scheduler/instances?id=' + encodeURIComponent(id));
+    var res       = await fetch('/tasker/instances?id=' + encodeURIComponent(id));
     var instances = await res.json().catch(function() { return []; }) || [];
     if (instances.length === 0) {
-        await fetch('/scheduler/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+        await fetch('/tasker/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
     } else if (instances.length === 1) {
         if (!(await Dialog.confirm('Kill running instance?', '■ Interrupt', true))) return;
-        await fetch('/scheduler/kill-instance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id, runId:instances[0].runId}) });
+        await fetch('/tasker/kill-instance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id, runId:instances[0].runId}) });
     } else {
         var chosen = await _pickInstanceToKill(id, instances);
         if (chosen === null) return;
-        var url = chosen === '__all__' ? '/scheduler/stop' : '/scheduler/kill-instance';
+        var url = chosen === '__all__' ? '/tasker/stop' : '/tasker/kill-instance';
         var body = chosen === '__all__' ? {id:id} : {id:id, runId:chosen};
         await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     }
@@ -1930,9 +2062,9 @@ async function stopNow(id) {
 }
 
 async function restartNow(id) {
-    await fetch('/scheduler/stop', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
+    await fetch('/tasker/stop', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
     await new Promise(function(r) { setTimeout(r, 800); });
-    await fetch('/scheduler/run', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
+    await fetch('/tasker/run', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
     await loadList();
     startSseOutput(id);
 }
@@ -1966,22 +2098,34 @@ function _pickInstanceToKill(id, instances) {
 }
 
 async function killOneInstance(id, runId) {
-    await fetch('/scheduler/kill-instance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id, runId:runId}) });
+    await fetch('/tasker/kill-instance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id, runId:runId}) });
 }
 
 async function clearQueue(id) {
-    await fetch('/scheduler/clear-queue', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+    await fetch('/tasker/clear-queue', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
 }
 
-function onOverlapChanged() {
-    var val   = document.getElementById('f_on_overlap').value;
-    var label = document.getElementById('f_max_threads_label');
-    var input = document.getElementById('f_max_threads');
-    if (!label || !input) return;
-    var show = val === 'parallel';
-    label.style.display = show ? '' : 'none';
-    input.style.display = show ? '' : 'none';
+var OVERLAP_LABELS = { skip: 'Skip', parallel: 'Queue', kill_restart: 'Kill & restart' };
+
+/// Подсказка под блоком Threads: словами то же, что решает FireSchedule.
+function onThreadsChanged() {
+    var hint  = document.getElementById('f_threads_hint');
+    var tEl   = document.getElementById('f_max_threads');
+    var oEl   = document.getElementById('f_on_overlap');
+    if (!hint || !tEl || !oEl) return;
+
+    var n    = parseInt(tEl.value, 10) || 1;
+    var full = { skip:         'лишние заходы расписания пропускаются',
+                 parallel:     'лишние заходы копятся в очереди и стартуют по мере освобождения',
+                 kill_restart: 'работающие инстансы сносятся и запускаются заново' }[oEl.value] || '';
+
+    hint.textContent = n > 1
+        ? 'Планировщик доливает до ' + n + ' нитей, старты разносятся на 1–5 с. '
+          + 'Когда все заняты — ' + full + '.'
+        : 'Одна нить. Пока она занята — ' + full + '.';
 }
+
+function onOverlapChanged() { onThreadsChanged(); }
 
 // ── Resizers ──────────────────────────────────────────────────────────────────
 
@@ -2085,7 +2229,7 @@ var FIELD_TYPES  = ['text','password','boolean','select','multiselect','file','s
 
 async function _loadPayload(id) {
     try {
-        var res  = await fetch('/scheduler/payload?id=' + encodeURIComponent(id));
+        var res  = await fetch('/tasker/payload?id=' + encodeURIComponent(id));
         var data = await res.json();
         pmSchema = data.schema ? JSON.parse(data.schema) : [];
         pmValues = data.values ? JSON.parse(data.values) : {};
@@ -2126,7 +2270,7 @@ async function confirmImportPayload() {
     try { parsed = JSON.parse(raw); } catch(e) { alert('Invalid JSON: ' + e.message); return; }
     if (!parsed.schema || !parsed.values) { alert('Missing schema or values fields'); return; }
     try {
-        var res = await fetch('/scheduler/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:_importPayloadId, schema:parsed.schema, values:parsed.values}) });
+        var res = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:_importPayloadId, schema:parsed.schema, values:parsed.values}) });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         closeImportPayload();
         var s = schedules.find(function(x) { return x.id === _importPayloadId || x.id === selectedId; });
@@ -2254,7 +2398,7 @@ async function saveSchema() {
         if (f.type !== 'section' && f.type !== 'html' && f.type !== 'tab' && !f.key.trim()) { Dialog.error('Field #'+(i+1)+' must have a key.'); return; }
     }
     try {
-        var res  = await fetch('/scheduler/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:pmScheduleId, schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues)}) });
+        var res  = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:pmScheduleId, schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues)}) });
         var data = await res.json();
         if (data.ok) closeSchemaModal(); else Dialog.error(data.error||'Save failed');
     } catch(e) { Dialog.error(e.message); }
@@ -2264,7 +2408,7 @@ async function saveValues() {
     if (!pmScheduleId) return;
     document.querySelectorAll('#valuesBody [data-vkey]').forEach(function(el) { pmValues[el.dataset.vkey] = el.type==='checkbox'?(el.checked?'true':'false'):el.value; });
     try {
-        var res  = await fetch('/scheduler/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:pmScheduleId, schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues)}) });
+        var res  = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:pmScheduleId, schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues)}) });
         var data = await res.json();
         if (data.ok) closeValuesModal(); else Dialog.error(data.error||'Save failed');
     } catch(e) { Dialog.error(e.message); }
@@ -2299,7 +2443,7 @@ function pickPath(mode) {
         'exe': 'exe', 'cmd': 'cmd', 'bat': 'cmd', 'bash': 'sh'
     };
 
-    var url = '/scheduler/pick?mode=' + encodeURIComponent(mode)
+    var url = '/tasker/pick?mode=' + encodeURIComponent(mode)
             + '&ext=' + encodeURIComponent(extByExec[exec] || '')
             + '&start=' + encodeURIComponent(field.value || '');
 
@@ -2307,7 +2451,7 @@ function pickPath(mode) {
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (!d.ok)   { alert('Не удалось открыть диалог: ' + (d.error || '')); return; }
-            if (d.path)  { field.value = d.path; }
+            if (d.path && field.isConnected) { field.value = d.path; markTaskDirty(); }
         })
         .catch(function(e) { alert('Не удалось открыть диалог: ' + e); });
 }

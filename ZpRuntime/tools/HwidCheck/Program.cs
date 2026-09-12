@@ -1,4 +1,4 @@
-// Сверка HWID: наш DevDeck.SAFU против эталонного z3n7 Safu8.
+// Сверка HWID: наш z3nDash.SAFU против эталонного z3n7 Safu8.
 //
 // Логика z3n7 воспроизведена здесь дословно (Safu8.cs:102-153), потому что сам
 // z3n7 собран под net48 и ссылается на ZennoLab — из net10 его не подключить.
@@ -30,13 +30,13 @@ string firstTwoHwid = z3n7Components.Count >= 2
     : "<мало компонентов>";
 
 string ourHwid;
-try   { ourHwid = DevDeck.SAFU.GetStableHWId() ?? "<null>"; }
+try   { ourHwid = z3nDash.SAFU.GetStableHWId() ?? "<null>"; }
 catch (Exception ex) { ourHwid = $"<ошибка: {ex.Message}>"; }
 
 Console.WriteLine("=== HWID ===");
 Console.WriteLine($"  z3n7 (все компоненты)   {z3n7Hwid}");
 Console.WriteLine($"  только первые два       {firstTwoHwid}");
-Console.WriteLine($"  наш DevDeck.SAFU        {ourHwid}");
+Console.WriteLine($"  наш z3nDash.SAFU        {ourHwid}");
 Console.WriteLine();
 
 Console.WriteLine("=== вывод ===");
@@ -49,7 +49,7 @@ else if (ourHwid == firstTwoHwid)
 {
     Console.WriteLine("  РАСХОДИТСЯ, и ровно на серийнике системного диска:");
     Console.WriteLine("  наш хеш равен хешу первых двух компонентов z3n7.");
-    Console.WriteLine("  Значит всё, что зашифровал DevDeck, z3n7 прочитать не может.");
+    Console.WriteLine("  Значит всё, что зашифровал z3nDash, z3n7 прочитать не может.");
     Console.WriteLine("  Наш GetStableHWId надо привести к составу z3n7.");
 }
 else

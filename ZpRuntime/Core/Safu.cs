@@ -5,7 +5,7 @@ using System.Text;
 using System.Management;
 #endif
 
-namespace DevDeck;
+namespace z3nDash;
 
 public class SAFU
 {

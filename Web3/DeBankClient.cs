@@ -8,7 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DevDeck;
+namespace z3nDash;
 
 internal sealed class DeBankClient : IDisposable
 {

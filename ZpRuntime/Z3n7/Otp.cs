@@ -2,7 +2,7 @@
 //
 // Наш Tools.OtpCode из ZennoStub.cs был этим же кодом под другим именем — снят.
 // Namespace здесь z3n7.Tools, то есть Tools у эталона не класс, а пространство
-// имён; наш одноимённый класс DevDeck.Tools удалён, иначе в файле с обоими
+// имён; наш одноимённый класс z3nDash.Tools удалён, иначе в файле с обоими
 // using имя Tools стало бы неоднозначным.
 using System;
 using System.Threading;

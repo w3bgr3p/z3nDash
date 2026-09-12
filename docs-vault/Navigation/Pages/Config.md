@@ -1,6 +1,6 @@
 # Config
 
-Страница `/config.html` управляет локальной конфигурацией DevDeck.
+Страница `/config.html` управляет локальной конфигурацией z3nDash.
 
 ## Server Status
 

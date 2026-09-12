@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="/css/themes.css">
-    <script src="/js/theme.js"></script>
-    <script src="/js/nav.js"></script>
+<script src="/js/theme.js"></script>
+<script src="/js/nav.js"></script>
+<script src="/js/zp-settings.js"></script>
+<script src="/js/zp-thread-filter.js"></script>
 
     <title>ZP7</title>
 
@@ -411,6 +413,32 @@
         .tab-pane { display: none; padding: 10px 14px; }
         .tab-pane.active { display: block; }
 
+        .nodes-entry { display: flex; gap: 7px; align-items: stretch; }
+        .nodes-entry .field-textarea { min-height: 58px; flex: 1; }
+        .nodes-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+        .node-row {
+            display: grid;
+            grid-template-columns: minmax(130px, 1.2fr) minmax(130px, 1fr) auto auto;
+            gap: 10px;
+            align-items: center;
+            padding: 8px 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-size: 10px;
+        }
+        .node-machine { color: var(--text-hi); font-weight: 600; overflow-wrap: anywhere; }
+        .node-address { color: var(--text2); overflow-wrap: anywhere; }
+        .node-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .node-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; }
+        .node-status.online { color: var(--green); }
+        .node-status.online::before { background: var(--green); box-shadow: 0 0 7px var(--green); }
+        .node-status.offline { color: var(--red); }
+        .node-status.offline::before { background: var(--red); }
+        .node-delete { padding: 3px 7px; }
+        .nodes-empty { color: var(--muted); text-align: center; padding: 18px; }
+        .nodes-error { color: var(--red); font-size: 10px; min-height: 14px; margin-top: 5px; }
+
         .field-multiselect {
             display: flex; flex-wrap: wrap; gap: 3px; padding: 4px;
             background: var(--bg); border: 1px solid var(--border); border-radius: 4px; min-height: 28px;
@@ -446,6 +474,19 @@
             display: flex; align-items: center; gap: 5px; flex-shrink: 0; justify-content: space-between;
         }
         .lp-title { font-size: 10px; font-weight: 600; color: var(--accent); }
+        .thread-chips {
+            display: flex; gap: 3px; align-items: center; flex: 1 1 0;
+            min-width: 0; overflow-x: auto; scrollbar-width: none;
+        }
+        .thread-chips::-webkit-scrollbar { height: 0; }
+        .thread-chips:empty { display: none; }
+        .thread-chip {
+            flex-shrink: 0; padding: 1px 5px; border-radius: 3px; cursor: pointer;
+            border: 1px solid var(--border); color: var(--green-hi); background: transparent;
+            font: 8px 'Consolas', monospace;
+        }
+        .thread-chip:hover { background: var(--bg2); }
+        .thread-chip.on { border-color: var(--green); background: rgba(63,185,80,0.18); }
         .lp-clear-btn { background: none; border: none; cursor: pointer; color: var(--muted2); font-size: 12px; padding: 0 2px; line-height: 1; }
         .lp-clear-btn:hover { color: var(--red); }
         .lp-controls {
@@ -467,18 +508,18 @@
             padding: 2px 9px; border-bottom: 1px solid var(--bg2); border-left: 3px solid transparent;
         }
         .tl-entry.ERROR   { border-left-color: var(--red); background: var(--red-tint2); }
-        .tl-entry.WARNING { border-left-color: var(--yellow); }
+        .tl-entry.WARNING, .tl-entry.WARN { border-left-color: var(--yellow); }
         .tl-header { display: flex; gap: 5px; align-items: center; }
         .tl-ts  { color: var(--text3); font-family: monospace; font-size: 9px; flex-shrink: 0; }
         .tl-lvl { padding: 1px 3px; border-radius: 3px; font-size: 8px; font-family: monospace; text-transform: uppercase; flex-shrink: 0; }
         .tl-lvl.ERROR   { background: rgba(248,81,73,0.15);  color: var(--red-lo); }
-        .tl-lvl.WARNING { background: rgba(210,153,34,0.15); color: var(--yellow-lo); }
+        .tl-lvl.WARNING, .tl-lvl.WARN { background: rgba(210,153,34,0.15); color: var(--yellow-lo); }
         .tl-lvl.INFO    { background: rgba(56,139,253,0.15); color: var(--accent-lo); }
         .tl-lvl.DEBUG   { background: rgba(110,118,129,0.1); color: var(--text2); }
         .tl-acc { color: var(--green-hi); font-size: 9px; }
         .tl-msg {
             color: var(--text); font-size: 10px; padding: 1px 0;
-            word-break: break-word; line-height: 1.35;
+            word-break: break-word; line-height: 1.35; white-space: pre-wrap;
             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
         }
         .tl-msg:hover { -webkit-line-clamp: unset; background: rgba(110,118,129,0.07); cursor: pointer; }
@@ -657,6 +698,7 @@
         <div class="hstat">Stopped: <span id="hStopped">0</span></div>
     </div>
     <button class="auto-badge on" id="autoBtn" onclick="toggleAuto()">AUTO ON</button>
+    <button class="auto-badge" onclick="openNodesModal()" title="Manage ZP nodes">NODES</button>
     <button class="auto-badge" id="themeBtn" onclick="cycleTheme()" title="Switch theme">THEME</button>
 </div>
 
@@ -720,14 +762,14 @@
             <div class="logs-panel" id="lpLogsPanel">
                 <div class="lp-header">
                     <span class="lp-title">📋 Logs</span>
-                    <button class="lp-clear-btn" onclick="clearLogsByTask()" title="Delete logs for this task">🗑</button>
+                    <div class="thread-chips" id="zpThreadChips" title="Threads: click to show only one"></div>
                 </div>
                 <div class="lp-controls">
                     <select id="lp_level" onchange="refreshTaskLogs()">
                         <option value="">All Levels</option>
                         <option value="DEBUG">DEBUG</option>
                         <option value="INFO">INFO</option>
-                        <option value="WARNING">WARNING</option>
+                        <option value="WARN">WARN</option>
                         <option value="ERROR">ERROR</option>
                     </select>
                     <input type="number" id="lp_limit" value="50" min="10" max="500" step="10" style="width:46px;" onchange="refreshTaskLogs()">
@@ -773,6 +815,52 @@
     </div>
 </div>
 
+<!-- ZP Nodes Modal -->
+<div class="modal-overlay" id="nodesModal" onclick="if(event.target===this) closeNodesModal()">
+    <div class="modal" style="width:680px;">
+        <div class="modal-header">
+            <h3>ZP Nodes</h3>
+            <button class="auto-badge" onclick="loadNodes()">↻ Refresh</button>
+            <button class="modal-close" onclick="closeNodesModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:14px;">
+            <label class="field-label" for="nodeJson">Node registration JSON</label>
+            <div class="nodes-entry">
+                <textarea class="field-textarea" id="nodeJson" spellcheck="false"
+                    placeholder='{"machine":"NS341956","host":"5.196.90.154","external":"5.196.90.154","port":22222,"firewall":"on","portRule":"no"}'></textarea>
+                <button class="btn btn-start" id="nodeSaveBtn" onclick="saveNode()">Add / Update</button>
+            </div>
+            <div class="nodes-error" id="nodesError"></div>
+            <div class="nodes-list" id="nodesList">
+                <div class="nodes-empty">Loading...</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-update" onclick="closeNodesModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Input Settings Modal -->
+<div class="modal-overlay" id="inputSettingsModal">
+    <div class="modal" style="width:680px;">
+        <div class="modal-header">
+            <h3 id="inputSettingsModalTitle">Input Settings</h3>
+            <button class="modal-close" onclick="closeInputSettingsModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:14px;">
+            <label class="field-label" for="inputSettingsJson">Variables JSON</label>
+            <textarea class="field-textarea" id="inputSettingsJson" spellcheck="false" style="min-height:320px;"></textarea>
+            <div class="nodes-error" id="inputSettingsError"></div>
+            <div style="margin-top:8px;color:var(--muted);font-size:9px;">Empty values are ignored by ZennoPoster and do not clear variables.</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-update" onclick="closeInputSettingsModal()">Cancel</button>
+            <button class="btn btn-start" id="inputSettingsSaveBtn" onclick="saveInputSettings()">💾 Apply</button>
+        </div>
+    </div>
+</div>
+
 <!-- Execution Settings Modal -->
 <div class="modal-overlay" id="execModal">
     <div class="modal" style="width:460px;">
@@ -809,6 +897,7 @@
     let selectedTaskId = null;
     let autoInterval = null;
     let autoOn = true;
+    let nodesRefreshTimer = null;
 
     // Active tag filters (Set of tag strings)
     let activeTagFilters = new Set();
@@ -871,6 +960,104 @@
             btn.textContent = 'AUTO OFF';
             btn.classList.remove('on');
             clearInterval(autoInterval);
+        }
+    }
+
+    // ── ZP nodes ──
+    function openNodesModal() {
+        document.getElementById('nodesModal').classList.add('open');
+        loadNodes();
+        clearInterval(nodesRefreshTimer);
+        nodesRefreshTimer = setInterval(loadNodes, 5000);
+        setTimeout(() => document.getElementById('nodeJson')?.focus(), 50);
+    }
+
+    function closeNodesModal() {
+        document.getElementById('nodesModal').classList.remove('open');
+        clearInterval(nodesRefreshTimer);
+        nodesRefreshTimer = null;
+    }
+
+    async function loadNodes() {
+        const list = document.getElementById('nodesList');
+        const error = document.getElementById('nodesError');
+        error.textContent = '';
+
+        try {
+            const response = await fetch(`${SERVER}/zp/nodes`, { cache: 'no-store' });
+            if (!response.ok) throw new Error(await readNodeApiError(response));
+            const nodes = await response.json();
+
+            if (!Array.isArray(nodes) || nodes.length === 0) {
+                list.innerHTML = '<div class="nodes-empty">No nodes registered</div>';
+                return;
+            }
+
+            list.innerHTML = nodes.map(node => `
+                <div class="node-row">
+                    <div class="node-machine">
+                        ${escHtml(node.machine)}
+                        <div style="font-size:9px;color:var(--muted);font-weight:400;margin-top:2px;">${escHtml(node.updated_at || '')}</div>
+                    </div>
+                    <div class="node-address">${escHtml(node.host)}:${escHtml(node.port)}</div>
+                    <span class="node-status ${node.available ? 'online' : 'offline'}">${node.available ? 'Available' : 'Unavailable'}</span>
+                    <button class="btn btn-stop node-delete" data-machine="${escHtml(node.machine)}">Delete</button>
+                </div>`).join('');
+
+            list.querySelectorAll('.node-delete').forEach(button => {
+                button.addEventListener('click', () => deleteNode(button.dataset.machine || ''));
+            });
+        } catch (e) {
+            list.innerHTML = '<div class="nodes-empty">Failed to load nodes</div>';
+            error.textContent = e.message || String(e);
+        }
+    }
+
+    async function saveNode() {
+        const input = document.getElementById('nodeJson');
+        const button = document.getElementById('nodeSaveBtn');
+        const error = document.getElementById('nodesError');
+        error.textContent = '';
+        button.disabled = true;
+
+        try {
+            const response = await fetch(`${SERVER}/zp/nodes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: input.value.trim()
+            });
+            if (!response.ok) throw new Error(await readNodeApiError(response));
+            input.value = '';
+            await loadNodes();
+            refreshTasks();
+        } catch (e) {
+            error.textContent = e.message || String(e);
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    async function deleteNode(machine) {
+        if (!machine || !await _dialog.confirm(`Delete node ${machine}?`, 'Delete ZP Node', true)) return;
+
+        const error = document.getElementById('nodesError');
+        error.textContent = '';
+        try {
+            const response = await fetch(`${SERVER}/zp/nodes?machine=${encodeURIComponent(machine)}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error(await readNodeApiError(response));
+            await loadNodes();
+            refreshTasks();
+        } catch (e) {
+            error.textContent = e.message || String(e);
+        }
+    }
+
+    async function readNodeApiError(response) {
+        try {
+            const body = await response.json();
+            return body.error || `HTTP ${response.status}`;
+        } catch {
+            return `HTTP ${response.status}`;
         }
     }
 
@@ -1138,30 +1325,17 @@
 
     // ── TASK LOGS & HTTP ──
     let _currentTaskId = null;
-    let _sseLog  = null;
+    let _currentTaskMachine = '';
+    let _currentTaskProject = '';
+    let _zpLogPoll = null;
+    let _zpLogLoading = false;
+    let _zpLogEntries = [];
+    let _zpThreadFilter = null;
     let _sseHttp = null;
 
     function _closeSse() {
-        if (_sseLog)  { _sseLog.close();  _sseLog  = null; }
+        if (_zpLogPoll) { clearInterval(_zpLogPoll); _zpLogPoll = null; }
         if (_sseHttp) { _sseHttp.close(); _sseHttp = null; }
-    }
-
-    function _appendLogEntry(log) {
-        const c = document.getElementById('lpLogsContent');
-        const empty = c.querySelector('.lp-empty');
-        if (empty) empty.remove();
-        const lvl = (log.level || '').toUpperCase();
-        const div = document.createElement('div');
-        div.className = `tl-entry ${lvl}`;
-        div.innerHTML = `
-            <div class="tl-header">
-                <span class="tl-ts">${log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}</span>
-                <span class="tl-lvl ${lvl}">${lvl}</span>
-                <span class="tl-acc">${escHtml(log.account || '')}</span>
-            </div>
-            <div class="tl-msg">${escHtml(log.message || '')}</div>`;
-        c.appendChild(div);
-        c.scrollTop = c.scrollHeight;
     }
 
     function _appendHttpEntry(log) {
@@ -1185,49 +1359,98 @@
         c.scrollTop = c.scrollHeight;
     }
 
-    function showLogsArea(taskId) {
+    function showLogsArea(task) {
         _closeSse();
-        _currentTaskId = taskId;
+        _currentTaskId = task.Id;
+        _currentTaskMachine = task.machine || '';
+        _currentTaskProject = task.Name || '';
+        _zpLogEntries = [];
+        _zpThreadFilter = null;
+        document.getElementById('zpThreadChips').innerHTML = '';
         document.getElementById('logsArea').classList.add('visible');
 
         // Initial fetch (history)
         refreshTaskLogs();
         refreshTaskHttp();
 
-        // SSE for live updates
-        _sseLog = new EventSource(`${SERVER}/logs/stream?task_id=${encodeURIComponent(taskId)}`);
-        _sseLog.onmessage = e => {
-            try { _appendLogEntry(JSON.parse(e.data)); } catch {}
-        };
+        // ZpServer exposes logs by polling, not SSE.
+        _zpLogPoll = setInterval(refreshTaskLogs, 3000);
 
-        _sseHttp = new EventSource(`${SERVER}/http-logs/stream?task_id=${encodeURIComponent(taskId)}`);
+        _sseHttp = new EventSource(`${SERVER}/http-logs/stream?task_id=${encodeURIComponent(task.Id)}`);
         _sseHttp.onmessage = e => {
             try { _appendHttpEntry(JSON.parse(e.data)); } catch {}
         };
     }
 
     async function refreshTaskLogs() {
-        if (!_currentTaskId) return;
+        if (!_currentTaskId || !_currentTaskMachine || _zpLogLoading) return;
         const level = document.getElementById('lp_level')?.value || '';
         const limit = document.getElementById('lp_limit')?.value || 50;
-        let url = `${SERVER}/logs?limit=${limit}&task_id=${encodeURIComponent(_currentTaskId)}`;
-        if (level) url += `&level=${encodeURIComponent(level)}`;
+        const requestTaskId = _currentTaskId;
+        let url = `${SERVER}/zp/log?machine=${encodeURIComponent(_currentTaskMachine)}`
+            + `&kind=execution&process=ZennoPoster&n=${encodeURIComponent(limit)}`
+            + `&project=${encodeURIComponent(_currentTaskProject)}`;
+        _zpLogLoading = true;
         try {
             const r = await fetch(url);
-            const logs = await r.json();
+            const data = await r.json();
+            if (_currentTaskId !== requestTaskId) return;
             const c = document.getElementById('lpLogsContent');
-            if (!logs.length) { c.innerHTML = '<div class="lp-empty">No logs</div>'; return; }
-            c.innerHTML = logs.map(log => `
+            if (!r.ok || data.error) {
+                c.innerHTML = `<div class="lp-empty">${escHtml(data.error || `HTTP ${r.status}`)}</div>`;
+                return;
+            }
+            _zpLogEntries = Array.isArray(data.entries) ? data.entries : [];
+            renderTaskLogs(level);
+        } catch(e) {
+            if (_currentTaskId === requestTaskId)
+                document.getElementById('lpLogsContent').innerHTML = `<div class="lp-empty">${escHtml(e.message || String(e))}</div>`;
+        } finally {
+            _zpLogLoading = false;
+        }
+    }
+
+    function renderTaskLogs(level = document.getElementById('lp_level')?.value || '') {
+        const c = document.getElementById('lpLogsContent');
+        const threads = ZpThreadFilter.threads(_zpLogEntries);
+        if (_zpThreadFilter && !threads.includes(_zpThreadFilter)) _zpThreadFilter = null;
+        renderZpThreadChips(threads);
+
+        const logs = ZpThreadFilter.apply(_zpLogEntries, _zpThreadFilter, level);
+        if (!logs.length) {
+            c.innerHTML = '<div class="lp-empty">No logs</div>';
+            return;
+        }
+
+        c.innerHTML = logs.map(log => `
                 <div class="tl-entry ${log.level || ''}">
                     <div class="tl-header">
-                        <span class="tl-ts">${log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}</span>
+                        <span class="tl-ts">${escHtml(log.ts || '')}</span>
                         <span class="tl-lvl ${log.level || ''}">${log.level || ''}</span>
-                        <span class="tl-acc">${escHtml(log.account || '')}</span>
+                        <span class="tl-acc">${escHtml(log.thread || '')}</span>
+                        <span class="tl-acc">${escHtml(log.logger || '')}</span>
                     </div>
-                    <div class="tl-msg">${escHtml(log.message || '')}</div>
+                    <div class="tl-msg">${escHtml(log.text || '')}</div>
                 </div>
             `).join('');
-        } catch(e) { console.error('task logs failed', e); }
+    }
+
+    function renderZpThreadChips(threads) {
+        const container = document.getElementById('zpThreadChips');
+        container.innerHTML = '';
+        threads.forEach(thread => {
+            const chip = document.createElement('button');
+            chip.className = 'thread-chip' + (_zpThreadFilter === thread ? ' on' : '');
+            chip.textContent = thread;
+            chip.title = `Show only ${thread}`;
+            chip.onclick = () => toggleZpThreadFilter(thread);
+            container.appendChild(chip);
+        });
+    }
+
+    function toggleZpThreadFilter(thread) {
+        _zpThreadFilter = ZpThreadFilter.toggle(_zpThreadFilter, thread);
+        renderTaskLogs();
     }
 
     async function refreshTaskHttp() {
@@ -1261,19 +1484,6 @@
                 </div>`;
             }).join('');
         } catch(e) { console.error('task http failed', e); }
-    }
-
-    async function clearLogsByTask() {
-        if (!_currentTaskId) return;
-        if (!await _dialog.confirm('Delete all logs for this task?', 'Clear Logs', true)) return;
-        try {
-            const r = await fetch(`${SERVER}/clear-logs-by-task`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({task_id: _currentTaskId})
-            });
-            const data = await r.json();
-            document.getElementById('lpLogsContent').innerHTML = '<div class="lp-empty">Cleared (' + (data.removed||0) + ' entries)</div>';
-        } catch(e) { await _dialog.error('Error: ' + e.message); }
     }
 
     async function clearHttpLogsByTask() {
@@ -1374,7 +1584,7 @@
     function renderDetail(t) {
         hideHeatmapPane();
         document.getElementById('detailTaskId').textContent = `#${t.Id}`;
-        showLogsArea(t.Id);
+        showLogsArea(t);
 
         const status = t.ExecutionSettings_Status || '';
         const stClass = status ? `st-${status}` : 'st-empty';
@@ -1394,7 +1604,7 @@
                 <button class="btn btn-start" onclick="sendCommand('${t.Id}','start')">▶ Start</button>
                 <button class="btn btn-stop" onclick="sendCommand('${t.Id}','stop')">■ Stop</button>
                 <button class="btn btn-stop" onclick="sendCommand('${t.Id}','interrupt')" style="background:#7c2d12;border-color:#c2410c;">⚡ Interrupt</button>
-                <button class="btn btn-update" onclick="sendCommand('${t.Id}','update_settings')">↺ Apply</button>
+                <button class="btn btn-update" onclick="openInputSettingsModal('${t.Id}','${escHtml(t.Name)}')">⚙ Input Settings</button>
                 <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','add_tries')">+ Tries</button>
                 <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','set_tries')">= Tries</button>
                 <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','set_threads')">⚙ Threads</button>
@@ -1435,15 +1645,21 @@
         `;
     }
 
+    async function postCommand(taskId, action, payload = '') {
+        const machine = allTasks.find(t => t.Id === taskId)?.machine || '';
+        const r = await fetch(`${SERVER}/zp/commands`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId, action, payload, machine })
+        });
+        const result = await r.json();
+        if (!r.ok || result.error) throw new Error(result.error || `HTTP ${r.status}`);
+        return result;
+    }
+
     async function sendCommand(taskId, action, payload = '') {
         try {
-            const machine = allTasks.find(t => t.Id === taskId)?.machine || '';
-            const r = await fetch(`${SERVER}/zp/commands`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: taskId, action, payload, machine })
-            });
-            const result = await r.json();
+            const result = await postCommand(taskId, action, payload);
             console.log(`Command sent: ${action} → ${taskId}`, result);
         } catch (e) { console.error('Send command failed:', e); }
     }
@@ -1462,6 +1678,67 @@
 
     document.getElementById('execModal').addEventListener('click', function(e) { if (e.target === this) closeExecModal(); });
     document.getElementById('schedulerModal').addEventListener('click', function(e) { if (e.target === this) closeSchedulerModal(); });
+    document.getElementById('inputSettingsModal').addEventListener('click', function(e) { if (e.target === this) closeInputSettingsModal(); });
+
+    // ── INPUT SETTINGS MODAL ──
+    let inputSettingsTaskId = null;
+    let inputSettingsXmlB64 = '';
+
+    async function openInputSettingsModal(taskId, taskName) {
+        const task = allTasks.find(t => t.Id === taskId) || {};
+        inputSettingsTaskId = taskId;
+        inputSettingsXmlB64 = '';
+        document.getElementById('inputSettingsModalTitle').textContent = `Input Settings: ${taskName}`;
+        document.getElementById('inputSettingsJson').value = '';
+        document.getElementById('inputSettingsJson').disabled = true;
+        document.getElementById('inputSettingsSaveBtn').disabled = true;
+        document.getElementById('inputSettingsError').textContent = 'Loading...';
+        document.getElementById('inputSettingsModal').classList.add('open');
+
+        try {
+            const url = `${SERVER}/zp/task/settings?machine=${encodeURIComponent(task.machine || '')}&task_id=${encodeURIComponent(taskId)}`;
+            const response = await fetch(url, { cache: 'no-store' });
+            const data = await response.json();
+            if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`);
+            if (inputSettingsTaskId !== taskId) return;
+
+            const settings = ZpSettings.decodeInputSettings(data);
+            inputSettingsXmlB64 = settings.xmlB64;
+            document.getElementById('inputSettingsJson').value = JSON.stringify(settings.values, null, 2);
+            document.getElementById('inputSettingsJson').disabled = false;
+            document.getElementById('inputSettingsSaveBtn').disabled = false;
+            document.getElementById('inputSettingsError').textContent = '';
+        } catch (e) {
+            if (inputSettingsTaskId === taskId)
+                document.getElementById('inputSettingsError').textContent = e.message || String(e);
+        }
+    }
+
+    function closeInputSettingsModal() {
+        document.getElementById('inputSettingsModal').classList.remove('open');
+        inputSettingsTaskId = null;
+        inputSettingsXmlB64 = '';
+    }
+
+    async function saveInputSettings() {
+        if (!inputSettingsTaskId || !inputSettingsXmlB64) return;
+        const error = document.getElementById('inputSettingsError');
+        const button = document.getElementById('inputSettingsSaveBtn');
+        error.textContent = '';
+        button.disabled = true;
+
+        try {
+            const payload = ZpSettings.buildInputPayload(
+                inputSettingsXmlB64,
+                document.getElementById('inputSettingsJson').value
+            );
+            await postCommand(inputSettingsTaskId, 'set_input_settings', payload);
+            closeInputSettingsModal();
+        } catch (e) {
+            error.textContent = e.message || String(e);
+            button.disabled = false;
+        }
+    }
 
     // ── EXECUTION MODAL ──
     let execTaskId = null;
@@ -1498,6 +1775,8 @@
             ${f('Done All', 'DoneAll', t.ExecutionSettings_DoneAll)}
             ${f('Number of Tries', 'NumberOfTries', t.ExecutionSettings_NumberOfTries)}
             <div class="section-divider">Stop Conditions</div>
+            ${f('Timeout (seconds)', 'Timeout', t.ExecutionSettings_Timeout)}
+            ${fsel('BadEnd on Interrupt', 'PerformBadEndOnInterrupt', t.ExecutionSettings_PerformBadEndOnInterrupt, ['True','False'])}
             ${f('Max Success Stop', 'MaxNumOfSuccessStop', t.ExecutionSettings_MaxNumOfSuccessStop)}
             ${f('Max Fail Stop', 'MaxNumOfFailStop', t.ExecutionSettings_MaxNumOfFailStop)}
             <div class="section-divider">Other</div>
@@ -1509,7 +1788,7 @@
 
     async function saveExecSettings() {
         if (!execTaskId) return;
-        const keys = ['LimitOfThreads','Priority','DoneSuccessfully','DoneAll','NumberOfTries','MaxNumOfSuccessStop','MaxNumOfFailStop','Status','Proxy','GroupLabels'];
+        const keys = ['LimitOfThreads','Priority','DoneSuccessfully','DoneAll','NumberOfTries','Timeout','PerformBadEndOnInterrupt','MaxNumOfSuccessStop','MaxNumOfFailStop','Status','Proxy','GroupLabels'];
         const payload = {};
         keys.forEach(k => { const el = document.getElementById('exec_' + k); if (el) payload[k] = el.value; });
         await sendCommand(execTaskId, 'set_execution_settings', JSON.stringify(payload));

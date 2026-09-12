@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using System;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
-using DevDeck;
+using z3nDash;
 
 //using System.Text.Json;
 
@@ -13,11 +13,12 @@ public class ZB
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
-    private static string _baseUrl = "http://localhost:8160/v1/";
+    private readonly string _baseUrl;
 
-    public ZB(string apiKey)
+    public ZB(string apiKey, string? baseUrl = null)
     {
         _apiKey = apiKey;
+        _baseUrl = NormalizeBaseUrl(baseUrl);
 
         var baseHandler = new HttpClientHandler
         {
@@ -35,6 +36,12 @@ public class ZB
         {
             Timeout = TimeSpan.FromSeconds(30)
         };
+    }
+
+    internal static string NormalizeBaseUrl(string? host)
+    {
+        var root = string.IsNullOrWhiteSpace(host) ? "http://localhost:8160" : host.Trim().TrimEnd('/');
+        return root.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? root + "/" : root + "/v1/";
     }
 
     public async Task<string> ZBGetAsync(string apiCommand)

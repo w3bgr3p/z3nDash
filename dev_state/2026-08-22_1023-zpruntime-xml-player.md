@@ -6,7 +6,7 @@
 
 ## 1. Что это за работа
 
-DevDeck должен проигрывать XML-шаблоны ZennoPoster **без самого ZennoPoster**.
+z3nDash должен проигрывать XML-шаблоны ZennoPoster **без самого ZennoPoster**.
 Скрипты пишутся под библиотеку `z3n7` и пушатся в ZP, поэтому совместимость с
 ней — приоритет номер один.
 
@@ -21,7 +21,7 @@ DevDeck должен проигрывать XML-шаблоны ZennoPoster **б�
 
 ## 2. Репозитории и границы
 
-- `W:\code_hard\.net\DevDeck` — рабочий репозиторий, ветка `zpruntime-extraction`.
+- `W:\code_hard\.net\z3nDash` — рабочий репозиторий, ветка `zpruntime-extraction`.
 - `W:\code_hard\.net\z3n7` — **эталон, read-only**. Правок в нём не делать. Если
   найден баг эталона — копировать как есть и сообщать Master, чинить там.
 - `z3n7.Numelx`, `z3n7.Captcha` — **внешние зависимости**, переносу не подлежат.
@@ -129,7 +129,7 @@ ZP-шного proxifier.
 3. `AttachAsync` патчей Patchright не даёт: при подключении по CDP отпечаток
    держит ZennoBrowser. Если боевой путь — ZB, это нормально, но проговорено не
    было.
-4. Профили копятся в `%TEMP%\devdeck-xml\`. При работе по `runId` они
+4. Профили копятся в `%TEMP%\z3nDash-xml\`. При работе по `runId` они
    одноразовые и будут накапливаться — нужна ли уборка.
 
 ## 7. Грабли, на которые я уже наступил
@@ -173,11 +173,11 @@ ZP-шного proxifier.
 ## 8. Как собирать и не спотыкаться
 
 ```bash
-dotnet build DevDeck.sln            # обе цели: net10.0-windows и net10.0
+dotnet build z3nDash.sln            # обе цели: net10.0-windows и net10.0
 python ZpRuntime/tools/ext_inventory.py
 ```
 
-Если сборка падает на «file is locked by DevDeck» — запущено приложение. **Своё**
+Если сборка падает на «file is locked by z3nDash» — запущено приложение. **Своё**
 можно погасить, **чужое (Master работает) — нет**. Проверять путь процесса:
 запуск из `bin\Debug\...` обычно наш, из установленной папки — его. Отдельно
 собирается `dotnet build ZpRuntime/ZpRuntime.csproj` — это не трогает `bin`

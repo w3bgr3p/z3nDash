@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 /// <summary>
 /// Диапазон «точное число или случайное из интервала» — в планировщике
@@ -228,8 +228,22 @@ public static class ZpSchedule
     /// Состояние задачи, от которого зависит решение. LastRun — время старта
     /// последнего запуска, пока он идёт, и время завершения после него.
     /// Runs — сколько запусков сделало текущее расписание (без ручных).
+    /// Active — сколько инстансов задачи живо прямо сейчас, MaxThreads — сколько
+    /// их разрешено держать одновременно (поле Threads в настройках задачи).
     /// </summary>
-    public readonly record struct State(DateTime? LastRun, int Runs, DateTime? StartedAt, bool IsRunning);
+    public readonly record struct State(DateTime? LastRun, int Runs, DateTime? StartedAt, int Active, int MaxThreads)
+    {
+        /// <summary>Потоков не может быть меньше одного, чем бы ни было в БД.</summary>
+        public int Threads => Math.Max(1, MaxThreads);
+
+        public bool IsRunning  => Active > 0;
+
+        /// <summary>Все потоки заняты — новую нить наливать некуда.</summary>
+        public bool AtCapacity => Active >= Threads;
+
+        /// <summary>Сколько нитей можно долить прямо сейчас.</summary>
+        public int Free => Math.Max(0, Threads - Active);
+    }
 
     /// <summary>Fire — пора запускать, Attempts — сколько запусков поставить.</summary>
     public readonly record struct Decision(bool Fire, int Attempts)
@@ -254,7 +268,11 @@ public static class ZpSchedule
 
         return spec.RepeatMode switch
         {
-            "back_to_back" => state.IsRunning ? Decision.No : new Decision(true, spec.Attempts.Pick(rnd)),
+            // «Подряд» в ZP держит все потоки занятыми, поэтому за одно срабатывание
+            // доливаются сразу все свободные нити, а не одна.
+            "back_to_back" => state.AtCapacity
+                                  ? Decision.No
+                                  : new Decision(true, Math.Max(spec.Attempts.Pick(rnd), state.Free)),
             "pause"        => PauseDecision(spec, state, now, rnd),
             "regular"      => RegularDecision(spec, state, now, rnd),
             "spread"       => SpreadDecision(spec, state, now),
@@ -281,14 +299,17 @@ public static class ZpSchedule
         _         => false,
     };
 
-    /// <summary>«Подряд с паузой»: пауза отсчитывается от завершения предыдущего запуска.</summary>
+    /// <summary>
+    /// «Подряд с паузой»: пауза отсчитывается от завершения предыдущего запуска.
+    /// Как и «Подряд», после паузы наливает все свободные нити разом.
+    /// </summary>
     private static Decision PauseDecision(ZpScheduleSpec spec, State state, DateTime now, Random rnd)
     {
-        if (state.IsRunning) return Decision.No;
+        if (state.AtCapacity) return Decision.No;
         if (state.LastRun.HasValue
             && (now - state.LastRun.Value).TotalMinutes < spec.RepeatMinutes.Pick(rnd))
             return Decision.No;
-        return new Decision(true, spec.Attempts.Pick(rnd));
+        return new Decision(true, Math.Max(spec.Attempts.Pick(rnd), state.Free));
     }
 
     /// <summary>
@@ -381,7 +402,7 @@ public static class ZpSchedule
 
         while (cursor < limit && result.Count < count)
         {
-            var state    = new State(lastRun, runs, startedAt, IsRunning: false);
+            var state    = new State(lastRun, runs, startedAt, Active: 0, MaxThreads: 1);
             var decision = ShouldFire(spec, state, cursor);
             if (decision.Fire)
             {

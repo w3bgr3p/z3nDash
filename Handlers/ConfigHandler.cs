@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
 
-namespace DevDeck;
+namespace z3nDash;
 
 internal sealed class ConfigHandler
 {
@@ -79,6 +79,7 @@ internal sealed class ConfigHandler
                 dict[p.Name] = p.Value;
 
         dict["securityConfig"] = new { jVarsPath = Config.SecurityConfig.JVarsPath };
+        dict["browsersApi"] = Config.BrowsersApi;
 
         await HttpHelpers.WriteJson(response, dict);
     }
@@ -104,6 +105,7 @@ internal sealed class ConfigHandler
                 ["dbConfig"]   = "DbConfig",
                 ["logsConfig"] = "LogsConfig",
                 ["apiConfig"]  = "ApiConfig",
+                ["browsersApi"] = "BrowsersApi",
                 ["crx"]        = "Crx",
             };
 

@@ -1,6 +1,6 @@
 window.NAV_CONFIG = {
     hotkeys: {
-        'alt+Digit1': '/?page=scheduler',
+        'alt+Digit1': '/?page=tasker',
         'alt+Digit2': '/?page=zp7',
         'alt+Digit3': '/?page=zb',
         'alt+Digit4': '/?page=logs',
@@ -13,7 +13,7 @@ window.NAV_CONFIG = {
     },
     items: [
 
-        { id: 'scheduler', label: 'Scheduler',  href: '/scheduler.html', hotkey: '1' },
+        { id: 'tasker', label: 'Tasker',  href: '/tasker.html', hotkey: '1' },
         { id: 'zp7',       label: 'ZP7',         href: '/?page=zp7',     hotkey: '2' },
         { id: 'zb',        label: 'ZB',         href: '/?page=zb',       hotkey: '3' },
         { id: 'logs',      label: 'Logs',       href: '/?page=logs',     hotkey: '4' },

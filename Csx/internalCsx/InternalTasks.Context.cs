@@ -3,7 +3,7 @@
 using ZennoLab.InterfacesLibrary.ProjectModel;
 using z3n7;   // VarsFromDict и прочие расширения, перенесённые из эталона
 
-namespace DevDeck;
+namespace z3nDash;
 
 public static partial class InternalTasks
 {

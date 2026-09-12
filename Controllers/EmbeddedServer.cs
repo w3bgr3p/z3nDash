@@ -16,7 +16,7 @@
 
 using System.Net;
 using System.Text;
-using DevDeck;
+using z3nDash;
 
 public class EmbeddedServer
 {
@@ -47,7 +47,7 @@ public class EmbeddedServer
     private readonly SqliteViewerHandler _sqliteViewerHandler;
 
     
-    private const int DefaultPort = 10993;
+    private const int DefaultPort = 33333;
 
     public EmbeddedServer(LogsConfig config, DbConnectionService dbService)
     {
@@ -58,39 +58,49 @@ public class EmbeddedServer
         if (Uri.TryCreate(config.TrafficHost, UriKind.Absolute, out var trafficUri)) ports.Add(trafficUri.Port);
 
         var listeningPorts = new List<int>();
+        var listenErrors = new List<Exception>();
         foreach (var port in ports)
         {
             try
             {
-                var test = new HttpListener();
+                using var test = new HttpListener();
                 test.Prefixes.Add($"http://*:{port}/");
                 test.Start(); test.Stop(); test.Close();
                 _listener.Prefixes.Add($"http://*:{port}/");
                 listeningPorts.Add(port);
             }
-            catch { Console.WriteLine($"Port {port} already in use, skipping"); }
+            catch (Exception ex)
+            {
+                listenErrors.Add(new InvalidOperationException($"http://*:{port}/: {ex.Message}", ex));
+                Console.WriteLine($"Port {port} unavailable: {ex.Message}");
+            }
         }
 
         if (listeningPorts.Count == 0)
         {
             // fallback: найти любой свободный порт
-            for (int fallback = 10993; fallback < 11100; fallback++)
+            for (int fallback = 33333; fallback < 33440; fallback++)
             {
                 try
                 {
-                    var test = new HttpListener();
+                    using var test = new HttpListener();
                     test.Prefixes.Add($"http://*:{fallback}/");
                     test.Start(); test.Stop(); test.Close();
                     _listener.Prefixes.Add($"http://*:{fallback}/");
                     listeningPorts.Add(fallback);
                     break;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    listenErrors.Add(new InvalidOperationException($"http://*:{fallback}/: {ex.Message}", ex));
+                }
             }
         }
 
         if (listeningPorts.Count == 0)
-            throw new InvalidOperationException("No ports available to listen on");
+            throw new InvalidOperationException("Cannot start HTTP server; fallback ports 33333-33439 unavailable. See crash.log for ports and causes.", new AggregateException(listenErrors));
+
+        _port = listeningPorts.Contains(_port) ? _port : listeningPorts[0];
 
         Console.WriteLine($"Listening ports: {string.Join(", ", listeningPorts)}");
 
@@ -137,6 +147,7 @@ public class EmbeddedServer
     }
 
     public string WwwrootPath => _wwwrootPath;
+    public int Port => _port;
 
     public void RegisterHandler(IScriptHandler handler)
     {

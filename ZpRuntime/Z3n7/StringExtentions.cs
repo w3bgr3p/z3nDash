@@ -2,7 +2,7 @@
 // теперь целиком — прежний частичный перенос (ToBase64, FromBase64, ParseJwt,
 // позже JsonToDic) заменён полным файлом, так что diff против эталона нулевой.
 //
-// Из Web3/StringExtentions.cs (namespace DevDeck) сняты StringToHex и
+// Из Web3/StringExtentions.cs (namespace z3nDash) сняты StringToHex и
 // HexToString: они были посимвольной копией эталонных. Остальное там —
 // криптография адресов и ключей, эталонного аналога не имеет и остаётся нашим.
 using ZennoLab.InterfacesLibrary.ProjectModel;

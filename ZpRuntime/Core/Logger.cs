@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace DevDeck
+namespace z3nDash
 {
     public enum LogLevel
     {
@@ -81,7 +81,7 @@ namespace DevDeck
         private readonly bool            _fAcc, _fTime, _fCaller, _fWrap, _fForce;
         internal readonly Stopwatch       _stopwatch;
         private readonly Action<string>? _sink;
-        private readonly string _source = "DevDeck";
+        private readonly string _source = "z3nDash";
         #endregion
 
         // ── Constructor ───────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ namespace DevDeck
             string          acc            = "",
             string          taskId         = "",
             string          session        = "",
-            string          project        = "DevDeck",
+            string          project        = "z3nDash",
             string          cfgLog         = "caller,wrap,acc,stopwatch",
             Action<string>? sink           = null)
         {
@@ -247,7 +247,7 @@ namespace DevDeck
         private static object BuildPayload(int timezone, LogLevel level, string body, string caller, Logger ctx) => new
         {
             machine  = Environment.MachineName,
-            project  = !string.IsNullOrEmpty(ctx.Project) ? ctx.Project : "DevDeck",
+            project  = !string.IsNullOrEmpty(ctx.Project) ? ctx.Project : "z3nDash",
             timestamp = DateTime.UtcNow.AddHours(timezone).ToString("yyyy-MM-dd HH:mm:ss"),
             level    = level.ToString().ToUpper(),
             account  = !string.IsNullOrEmpty(ctx.Acc)     ? ctx.Acc     : "-",
@@ -257,7 +257,7 @@ namespace DevDeck
             task_id  = !string.IsNullOrEmpty(ctx.TaskId)  ? ctx.TaskId  : "-",
             caller,
             message  = body.Trim(),
-            origin = "DevDeck",
+            origin = "z3nDash",
             elapsed_ms = ctx._stopwatch?.ElapsedMilliseconds ?? -1,
         };
     }

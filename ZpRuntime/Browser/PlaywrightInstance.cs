@@ -6,9 +6,9 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
-using DevDeck.Browser;
+using z3nDash.Browser;
 
-namespace DevDeck.Browser
+namespace z3nDash.Browser
 {
     public sealed partial class PlaywrightInstance : IBrowserInstance
     {

@@ -19,7 +19,7 @@
 
 using Microsoft.Playwright;
 
-namespace DevDeck.Browser;
+namespace z3nDash.Browser;
 
 internal static class RegexSelector
 {

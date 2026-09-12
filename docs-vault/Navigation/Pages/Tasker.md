@@ -1,6 +1,6 @@
 # Tasker
 
-Tasker — страница `/scheduler.html` для хранения расписаний и запуска локальных задач.
+Tasker — страница `/tasker.html` для хранения расписаний и запуска локальных задач.
 
 ## Список
 
@@ -64,16 +64,19 @@ Payload состоит из schema и values. Его можно редактир
 
 ## API
 
+Управление из работающего скрипта без поиска ID: [[Task API]].
+Доступны отсрочка следующего запуска, пауза и возобновление расписания.
+
 Основные маршруты:
 
-- `GET /scheduler/list`
-- `POST /scheduler/save`
-- `POST /scheduler/delete`
-- `POST /scheduler/run`
-- `POST /scheduler/stop`
-- `GET /scheduler/instances`
-- `POST /scheduler/kill-instance`
-- `GET|POST /scheduler/payload`
-- `GET /scheduler/output/stream`
-- `GET /scheduler/queue`
-- `POST /scheduler/clear-queue`
+- `GET /tasker/list`
+- `POST /tasker/save`
+- `POST /tasker/delete`
+- `POST /tasker/run`
+- `POST /tasker/stop`
+- `GET /tasker/instances`
+- `POST /tasker/kill-instance`
+- `GET|POST /tasker/payload`
+- `GET /tasker/output/stream`
+- `GET /tasker/queue`
+- `POST /tasker/clear-queue`

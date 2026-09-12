@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace DevDeck;
+namespace z3nDash;
 
 public static class CsxExecutor
 {
@@ -50,7 +50,7 @@ public static class CsxExecutor
                 "System.Threading.Tasks",
                 "Newtonsoft.Json",
                 "Newtonsoft.Json.Linq",
-                "DevDeck",
+                "z3nDash",
                 "z3n7",
                 "ZennoLab.InterfacesLibrary.ProjectModel",
                 "ZennoLab.InterfacesLibrary.Enums.Log",

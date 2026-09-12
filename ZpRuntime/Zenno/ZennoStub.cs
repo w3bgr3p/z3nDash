@@ -13,7 +13,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using DevDeck;
+using z3nDash;
 using z3n7;   // Var/Int и прочие перенесённые из эталона расширения
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -481,8 +481,8 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         private readonly StubProfile        _profile   = new StubProfile();
         private readonly DynamicJson        _json      = new DynamicJson();
         // Квалифицировано: после переноса z3n7.Logger имя стало неоднозначным.
-        // Здесь именно приложенческий логгер DevDeck, а не проектный из эталона.
-        public DevDeck.Logger? Logger { get; set; }
+        // Здесь именно приложенческий логгер z3nDash, а не проектный из эталона.
+        public z3nDash.Logger? Logger { get; set; }
         public Action<string>? OnLog { get; set; }
 
         private readonly ListCollection  _lists   = new ListCollection();
@@ -565,7 +565,7 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
         // Квалифицировано: после переноса z3n7.Db имя стало неоднозначным.
         // Здесь нужен именно приложенческий — его настраивает DbConnectionService,
         // и приложенческий код зовёт его методы напрямую, мимо расширений.
-        public DevDeck.Db Db { get; set; }
+        public z3nDash.Db Db { get; set; }
 
         public void LoadAccount(string jsonFilePath)
         {
@@ -653,7 +653,7 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel
 // FunctionStorage  —  stub
 // ─────────────────────────────────────────────────────────────────────────────
 
-namespace DevDeck
+namespace z3nDash
 {
     public static class FunctionStorage
     {
@@ -667,7 +667,7 @@ namespace DevDeck
 // Эмулируют публичный API из Vars.cs, Rqst.cs, DbExtencions.cs
 // ─────────────────────────────────────────────────────────────────────────────
 
-namespace DevDeck
+namespace z3nDash
 {
     using System.Globalization;
     using System.Net.Http;
@@ -698,7 +698,7 @@ namespace DevDeck
 
     // DbKey перенесён в Z3n7/DbExtencions.cs (класс Get) из эталона. Наш снят.
     // Он работал иначе: брал plaintext-ключ и расшифровывал через
-    // DevDeck.SAFU.Decode(raw, pin, acc), то есть на обеих целях сборки.
+    // z3nDash.SAFU.Decode(raw, pin, acc), то есть на обеих целях сборки.
     // Эталонный зовёт z3n7.SAFU.Decode(project, resp), а тот под #if WINDOWS —
     // поэтому и Get.DbKey там доступен только в net10.0-windows.
 
@@ -723,7 +723,7 @@ namespace DevDeck
     {
         // Db-расширения (GetDb/DicToDb/JsonToDb/DbUpd/DbQ/DbGet/DbGetColumns/
         // DbDone) перенесены в Z3n7/DbExtencions.cs из эталона. Наши удалены:
-        // они ходили в DevDeck.Db через StubProject.Db, эталон поднимает Sql по
+        // они ходили в z3nDash.Db через StubProject.Db, эталон поднимает Sql по
         // строке подключения из переменной dbSource.
         
     }

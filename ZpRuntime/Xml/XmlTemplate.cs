@@ -33,7 +33,7 @@
 
 using System.Xml.Linq;
 
-namespace DevDeck.Xml;
+namespace z3nDash.Xml;
 
 /// <summary>Адрес ветки: узел плюс ветка внутри него.</summary>
 public readonly record struct BranchRef(string StepId, string BranchId)

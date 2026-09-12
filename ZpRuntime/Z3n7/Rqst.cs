@@ -39,7 +39,7 @@ namespace z3n7
             _rqst = new Request();
             _logHost = !string.IsNullOrEmpty(_project.GVar("logHost")) 
                 ? _project.GVar("logHost").Replace("/log", "/http-log")
-                : "http://localhost:10993/http-log";
+                : "http://localhost:33333/http-log";
             _mask = mask;
         }
 

@@ -15,7 +15,7 @@ using z3n7;                 // GetHe/HeClick/HeSet/HeGet — перенесён�
 using ZennoLab.CommandCenter;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace DevDeck.Xml;
+namespace z3nDash.Xml;
 
 /// <summary>Что ветка вернула: текст для OutputVariable, если он есть.</summary>
 public readonly record struct BranchResult(string Output)

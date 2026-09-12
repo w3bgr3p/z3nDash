@@ -1,6 +1,6 @@
-# DevDeck
+# z3nDash
 
-DevDeck is a local Windows control center for automation workflows. It combines
+z3nDash is a local Windows control center for automation workflows. It combines
 task scheduling, ZennoPoster and ZennoBrowser operations, logs, HTTP inspection,
 system snapshots, Web3 tools, and day-to-day utilities in one embedded dashboard.
 
@@ -31,51 +31,51 @@ dashboard and local API are served by the built-in HTTP server.
 ZennoPoster, ZennoBrowser, and OmniRoute are required only for the dashboard
 features that integrate with those services.
 
-PostgreSQL stores DevDeck application data. The SQLite page in the dashboard is
-a standalone viewer for local SQLite files; it is not the default DevDeck
+PostgreSQL stores z3nDash application data. The SQLite page in the dashboard is
+a standalone viewer for local SQLite files; it is not the default z3nDash
 datastore.
 
 ## Build from source
 
 ```powershell
-git clone https://github.com/w3bgr3p/DevDeck.git
-cd DevDeck
-dotnet restore DevDeck.sln
-dotnet build DevDeck.csproj -c Release -f net10.0-windows
+git clone https://github.com/w3bgr3p/z3nDash.git
+cd z3nDash
+dotnet restore z3nDash.sln
+dotnet build z3nDash.csproj -c Release -f net10.0-windows
 ```
 
 To create a self-contained Windows build:
 
 ```powershell
-dotnet publish DevDeck.csproj `
+dotnet publish z3nDash.csproj `
   -c Release `
   -f net10.0-windows `
   -r win-x64 `
   --self-contained true `
-  -o publish/DevDeck
+  -o publish/z3nDash
 ```
 
 Build output and installers are intentionally excluded from Git.
 
 ## First launch
 
-The embedded server uses port `10993` by default. Because DevDeck registers an
+The embedded server uses port `33333` by default. Because z3nDash registers an
 `HttpListener` wildcard prefix, reserve the URL once from an elevated terminal:
 
 ```powershell
-netsh http add urlacl url=http://*:10993/ user=Everyone
+netsh http add urlacl url=http://*:33333/ user=Everyone
 ```
 
 Start the application:
 
 ```powershell
-dotnet run --project DevDeck.csproj -f net10.0-windows
+dotnet run --project z3nDash.csproj -f net10.0-windows
 ```
 
-When no valid configuration exists, DevDeck opens:
+When no valid configuration exists, z3nDash opens:
 
 ```text
-http://localhost:10993/?page=config
+http://localhost:33333/?page=config
 ```
 
 In **Config**:
@@ -89,14 +89,14 @@ In **Config**:
 Example connection string:
 
 ```text
-Host=127.0.0.1;Port=5432;Database=devdeck;Username=devdeck;Password=change-me;Search Path=devdeck
+Host=127.0.0.1;Port=5432;Database=z3nDash;Username=z3nDash;Password=change-me;Search Path=z3nDash
 ```
 
-`Search Path` selects the PostgreSQL schema. If it is omitted, DevDeck uses
+`Search Path` selects the PostgreSQL schema. If it is omitted, z3nDash uses
 `public`.
 
 After configuration, the application connects to PostgreSQL and opens the
-Scheduler. Startup failures are written to `crash.log` next to the executable.
+Tasker. Startup failures are written to `crash.log` next to the executable.
 
 ## Configuration and secrets
 
@@ -110,11 +110,11 @@ real configuration file or paste its contents into an issue.
 
 ## Dashboard
 
-The default dashboard address is `http://localhost:10993`.
+The default dashboard address is `http://localhost:33333`.
 
 | Section | Purpose |
 |---|---|
-| Scheduler | Configure, run, stop, and monitor scheduled tasks |
+| Tasker | Configure, run, stop, and monitor scheduled tasks |
 | ZP7 | Manage ZennoPoster workers and jobs |
 | ZB | Work with ZennoBrowser profiles and processes |
 | Logs | Inspect application logs |
@@ -125,13 +125,13 @@ The default dashboard address is `http://localhost:10993`.
 | System | Capture and compare system state |
 | Graph | Explore C# source relationships |
 | Config | Configure PostgreSQL, services, storage, and watchdog |
-| Docs | Open the bundled DevDeck documentation |
+| Docs | Open the bundled z3nDash documentation |
 
 The navigation dock also shows the current keyboard shortcuts for these pages.
 
 ## Network safety
 
-DevDeck is designed for a trusted local machine or private network. Its embedded
+z3nDash is designed for a trusted local machine or private network. Its embedded
 server listens on all interfaces and exposes operational endpoints. Do not
 publish the dashboard port directly to the internet. Restrict access with the
 Windows firewall or place it behind an authenticated reverse proxy.
@@ -154,5 +154,5 @@ templates/    dashboard and report templates
 
 ## License
 
-DevDeck is distributed under the
+z3nDash is distributed under the
 [GNU Affero General Public License v3.0](LICENSE).

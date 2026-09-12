@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <!--
-      Диагностика: сверяет HWID нашего DevDeck.SAFU с HWID эталонного z3n7 Safu8.
+      Диагностика: сверяет HWID нашего z3nDash.SAFU с HWID эталонного z3n7 Safu8.
 
       Оба выводят ключ одинаково (PBKDF2-HMAC-SHA256, 100000, 32 байта, соль из
       safu.key), поэтому расшифровка совпадёт только при совпадении HWID. У z3n7
@@ -18,7 +18,7 @@
         <Nullable>disable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <AssemblyName>HwidCheck</AssemblyName>
-        <RootNamespace>DevDeck.Tools.HwidCheck</RootNamespace>
+        <RootNamespace>z3nDash.Tools.HwidCheck</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Newtonsoft.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 public sealed class ImportHandler : IScriptHandler
 {

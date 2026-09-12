@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 /// <summary>
 /// Откуда брать браузер для xml-шаблона. Patchright поднимает свой, остальные
@@ -9,7 +9,7 @@ namespace DevDeck;
 /// </summary>
 public sealed class BrowserConfig
 {
-    public string Mode = "patchright";   // patchright | zennobrowser | cdp | api
+    public string Mode = "patchright";   // patchright | zennobrowser | shardx | cdp | api
     public string Profile = "";          // id профиля по умолчанию, payload его перекрывает
     public string Cdp = "";              // готовый эндпоинт для mode=cdp
 
@@ -17,6 +17,7 @@ public sealed class BrowserConfig
     public string ApiUrl      = "";
     public string ApiBody     = "";
     public string ApiWs       = "";      // шаблон эндпоинта: {data.ws.puppeteer}
+    public string ApiToken    = "";      // Bearer-токен для API, если требуется
     public string StopMethod  = "GET";
     public string StopUrl     = "";
 
@@ -44,6 +45,7 @@ public sealed class BrowserConfig
         cfg.ApiUrl     = Str(api, "url", "");
         cfg.ApiBody    = Str(api, "body", "");
         cfg.ApiWs      = Str(api, "ws", "");
+        cfg.ApiToken   = Str(api, "token", "");
         cfg.StopMethod = Str(api, "stopMethod", "GET").ToUpperInvariant();
         cfg.StopUrl    = Str(api, "stopUrl", "");
         return cfg;
@@ -58,7 +60,7 @@ public sealed class BrowserConfig
 }
 
 /// <summary>
-/// Обобщённый клиент локального API антидетект-браузера. Разные антики отдают
+/// Клиент локальных API антидетект-браузеров, включая отдельный контракт ShardX. Разные антики отдают
 /// эндпоинт по-разному: AdsPower одним полем data.ws.puppeteer, Dolphin —
 /// портом и путём по отдельности. Поэтому эндпоинт не «путь к полю», а шаблон,
 /// в который подставляются любые поля ответа: ws://127.0.0.1:{automation.port}{automation.wsEndpoint}.
@@ -67,9 +69,23 @@ public static class BrowserProvider
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(60) };
 
+    internal static bool UsesProviderApi(string mode)
+        => mode.Equals("api", StringComparison.OrdinalIgnoreCase)
+           || mode.Equals("shardx", StringComparison.OrdinalIgnoreCase);
+
+    internal static void ApplyGlobalConfig(BrowserConfig cfg, BrowsersApiConfig global)
+    {
+        if (!cfg.Mode.Equals("shardx", StringComparison.OrdinalIgnoreCase)) return;
+        cfg.ApiUrl = global.ShardX.Host;
+        cfg.ApiToken = global.ShardX.Token;
+    }
+
     /// <summary>Запустить профиль и получить CDP-эндпоинт. Пустая строка — не получилось.</summary>
     public static async Task<string> StartAsync(BrowserConfig cfg, string profile, Action<string>? log = null)
     {
+        if (cfg.Mode.Equals("shardx", StringComparison.OrdinalIgnoreCase))
+            return await StartShardXAsync(cfg, profile, log);
+
         if (string.IsNullOrWhiteSpace(cfg.ApiUrl)) { log?.Invoke("[br] не задан URL старта профиля"); return ""; }
         if (string.IsNullOrWhiteSpace(cfg.ApiWs))  { log?.Invoke("[br] не задан шаблон CDP-эндпоинта"); return ""; }
 
@@ -98,6 +114,12 @@ public static class BrowserProvider
     /// <summary>Закрыть профиль. Отказ не считается ошибкой прогона — шаблон уже отработал.</summary>
     public static async Task StopAsync(BrowserConfig cfg, string profile, Action<string>? log = null)
     {
+        if (cfg.Mode.Equals("shardx", StringComparison.OrdinalIgnoreCase))
+        {
+            await StopShardXAsync(cfg, profile, log);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(cfg.StopUrl)) return;
 
         var url = Substitute(cfg.StopUrl, profile, null);
@@ -107,6 +129,75 @@ public static class BrowserProvider
             log?.Invoke($"[br] профиль закрыт: {url}");
         }
         catch (Exception ex) { log?.Invoke($"[br] закрыть профиль не удалось: {ex.Message}"); }
+    }
+
+    private static async Task<string> StartShardXAsync(BrowserConfig cfg, string profile, Action<string>? log)
+    {
+        if (string.IsNullOrWhiteSpace(profile)) { log?.Invoke("[br] ShardX: не задан UUID профиля"); return ""; }
+        if (string.IsNullOrWhiteSpace(cfg.ApiUrl)) { log?.Invoke("[br] ShardX: не задан URL API"); return ""; }
+        if (string.IsNullOrWhiteSpace(cfg.ApiToken)) { log?.Invoke("[br] ShardX: не задан Bearer-токен"); return ""; }
+
+        using var req = CreateShardXRequest(cfg, profile, stop: false);
+        log?.Invoke($"[br] ShardX: POST {req.RequestUri}");
+        try
+        {
+            using var res = await Http.SendAsync(req);
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                log?.Invoke($"[br] ShardX: HTTP {(int)res.StatusCode}: {Trim(body)}");
+                return "";
+            }
+
+            var ws = ExtractShardXCdp(body);
+            if (string.IsNullOrWhiteSpace(ws))
+            {
+                log?.Invoke($"[br] ShardX не отдал cdp.web_socket_debugger_url: {Trim(body)}");
+                return "";
+            }
+
+            log?.Invoke($"[br] ShardX: подключаюсь к {ws}");
+            return ws;
+        }
+        catch (Exception ex) { log?.Invoke($"[br] ShardX: запрос запуска не прошёл: {ex.Message}"); return ""; }
+    }
+
+    private static async Task StopShardXAsync(BrowserConfig cfg, string profile, Action<string>? log)
+    {
+        if (string.IsNullOrWhiteSpace(profile) || string.IsNullOrWhiteSpace(cfg.ApiUrl) || string.IsNullOrWhiteSpace(cfg.ApiToken))
+            return;
+
+        using var req = CreateShardXRequest(cfg, profile, stop: true);
+        try
+        {
+            using var res = await Http.SendAsync(req);
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+                log?.Invoke($"[br] ShardX: закрытие вернуло HTTP {(int)res.StatusCode}: {Trim(body)}");
+            else
+                log?.Invoke($"[br] ShardX: профиль закрыт {profile}");
+        }
+        catch (Exception ex) { log?.Invoke($"[br] ShardX: закрыть профиль не удалось: {ex.Message}"); }
+    }
+
+    internal static HttpRequestMessage CreateShardXRequest(BrowserConfig cfg, string profile, bool stop)
+    {
+        var baseUrl = cfg.ApiUrl.Trim().TrimEnd('/');
+        var action = stop ? "stop" : "start";
+        var url = $"{baseUrl}/profiles/{Uri.EscapeDataString(profile.Trim())}/{action}";
+        var req = new HttpRequestMessage(HttpMethod.Post, url);
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cfg.ApiToken.Trim());
+        return req;
+    }
+
+    internal static string ExtractShardXCdp(string body)
+    {
+        using var doc = JsonDocument.Parse(body);
+        if (!doc.RootElement.TryGetProperty("cdp", out var cdp) || cdp.ValueKind != JsonValueKind.Object)
+            return "";
+        if (!cdp.TryGetProperty("web_socket_debugger_url", out var ws) || ws.ValueKind != JsonValueKind.String)
+            return "";
+        return ws.GetString() ?? "";
     }
 
     private static async Task<string> SendAsync(string method, string url, string body)

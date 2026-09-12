@@ -19,7 +19,7 @@
         <Nullable>disable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <AssemblyName>XmlInspect</AssemblyName>
-        <RootNamespace>DevDeck.Tools.XmlInspect</RootNamespace>
+        <RootNamespace>z3nDash.Tools.XmlInspect</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

@@ -1,4 +1,4 @@
-﻿namespace DevDeck;
+﻿namespace z3nDash;
 
 /// <summary>
 /// Редиректит Console.Out в log sink на время блока using.

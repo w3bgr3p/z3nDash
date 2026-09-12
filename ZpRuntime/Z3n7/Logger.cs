@@ -1,6 +1,6 @@
 ﻿// Перенесено из z3n7/Essentials/Logger.cs. Копия дословная.
 //
-// Не заменяет DevDeck.Logger: тот приложенческий, этот проектно-скоупленный.
+// Не заменяет z3nDash.Logger: тот приложенческий, этот проектно-скоупленный.
 // Привязка к project у эталона вынужденная — в ZennoPoster иначе логировать
 // нельзя, всё идёт через project.SendToLog. Namespace разные, оба сосуществуют.
 //
@@ -72,7 +72,7 @@ namespace z3n7
 
             _logHost = !string.IsNullOrEmpty(logHost)                   ? logHost
                      : !string.IsNullOrEmpty(_project?.GVar("logHost")) ? _project.GVar("logHost")
-                     : "http://localhost:10993/log";
+                     : "http://localhost:33333/log";
 
             string cfg = _project?.Var("cfgLog") ?? "";
             _http    = http && cfg.Contains("http");
@@ -100,7 +100,7 @@ namespace z3n7
             string   classEmoji     = null)
         {
             _minLevel = logLevel;
-            _logHost  = logHost ?? "http://localhost:10993/log";
+            _logHost  = logHost ?? "http://localhost:33333/log";
             _http     = http;
             _timezone = timezoneOffset;
             Emoji     = classEmoji;

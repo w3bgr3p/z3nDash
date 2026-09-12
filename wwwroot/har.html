@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>DevDeck | HAR</title>
+    <title>z3nDash | HAR</title>
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
@@ -108,6 +108,35 @@
         .controls button.danger:hover {
             background: var(--red-bg);
             filter: brightness(1.15);
+        }
+
+        .resource-filters {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        .resource-filters label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text);
+            font-size: 11px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .controls .resource-filters input {
+            width: 13px;
+            height: 13px;
+            margin: 0;
+            padding: 0;
+            accent-color: var(--accent);
+            cursor: pointer;
         }
 
         .container {
@@ -633,6 +662,17 @@
         <option value="">All Projects</option>
     </select>
 
+    <div class="resource-filters" id="resourceFilters">
+        <label><input type="checkbox" class="resourceTypeFilter" value="document" checked onchange="refresh()">Document</label>
+        <label><input type="checkbox" class="resourceTypeFilter" value="xhr" checked onchange="refresh()">XHR / Fetch</label>
+        <label><input type="checkbox" class="resourceTypeFilter" value="javascript" checked onchange="refresh()">JavaScript</label>
+        <label><input type="checkbox" class="resourceTypeFilter" value="css" checked onchange="refresh()">CSS</label>
+        <label><input type="checkbox" class="resourceTypeFilter" value="image" checked onchange="refresh()">Image</label>
+        <label><input type="checkbox" class="resourceTypeFilter" value="font" checked onchange="refresh()">Font</label>
+        <label><input type="checkbox" class="resourceTypeFilter" value="media" checked onchange="refresh()">Media</label>
+        <label><input type="checkbox" class="resourceTypeFilter" value="other" checked onchange="refresh()">Other</label>
+    </div>
+
     <input type="number" id="limitInput" value="200" min="10" max="1000" step="10" onchange="refresh()">
 
     <input type="file" id="harFileInput" accept=".har,application/json" hidden onchange="loadHarFile(event)">
@@ -715,6 +755,7 @@
             statusFilter:  document.getElementById('statusFilter').value,
             urlFilter:     document.getElementById('urlFilter').value,
             projectFilter: document.getElementById('projectFilter').value,
+            resourceTypes: selectedResourceTypes(),
             limitInput:    document.getElementById('limitInput').value,
             selectedIdx:   selectedIdx
         });
@@ -744,7 +785,7 @@
         }
     }
 
-    const HAR_DB_NAME = 'DevDeckHar';
+    const HAR_DB_NAME = 'z3nDashHar';
     const HAR_DB_STORE = 'state';
     const HAR_DB_KEY = 'current';
 
@@ -815,6 +856,48 @@
         return postData.params.map(p => `${encodeURIComponent(p.name || '')}=${encodeURIComponent(p.value || '')}`).join('&');
     }
 
+    function classifyHarResource(rawType, mimeType, url) {
+        const type = String(rawType || '').toLowerCase();
+        const mime = String(mimeType || '').toLowerCase().split(';')[0].trim();
+        const path = String(url || '').toLowerCase().split(/[?#]/)[0];
+        const ext = path.includes('.') ? path.substring(path.lastIndexOf('.') + 1) : '';
+
+        if (type === 'document') return 'document';
+        if (['xhr', 'fetch', 'eventsource', 'websocket'].includes(type)) return 'xhr';
+        if (type === 'script') return 'javascript';
+        if (type === 'stylesheet') return 'css';
+        if (type === 'image') return 'image';
+        if (type === 'font') return 'font';
+        if (['media', 'texttrack'].includes(type)) return 'media';
+
+        if (mime.includes('javascript') || mime.includes('ecmascript') || ['js', 'mjs', 'cjs'].includes(ext)) return 'javascript';
+        if (mime === 'text/css' || ext === 'css') return 'css';
+        if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp'].includes(ext)) return 'image';
+        if (mime.startsWith('font/') || mime.includes('woff') || ['woff', 'woff2', 'ttf', 'otf', 'eot'].includes(ext)) return 'font';
+        if (mime.startsWith('audio/') || mime.startsWith('video/') || ['mp3', 'mp4', 'webm', 'ogg', 'wav', 'm4a', 'mov'].includes(ext)) return 'media';
+        if (mime.includes('html') || mime.includes('xhtml') || ['html', 'htm', 'xhtml'].includes(ext)) return 'document';
+        if (mime.includes('json') || mime.includes('xml')) return 'xhr';
+        return 'other';
+    }
+
+    function responseContentType(headers) {
+        const line = harHeaders(headers).find(header => header.toLowerCase().startsWith('content-type:'));
+        return line ? line.substring(line.indexOf(':') + 1).trim() : '';
+    }
+
+    function selectedResourceTypes() {
+        return [...document.querySelectorAll('.resourceTypeFilter:checked')].map(input => input.value);
+    }
+
+    function filterAndLimitHarLogs(logs, enabledTypes, limit) {
+        const enabled = new Set(enabledTypes);
+        const filtered = logs
+            .filter(log => enabled.has(log.resourceType || classifyHarResource('', responseContentType(log.response?.headers), log.url)))
+            .sort((a, b) => (Date.parse(a.timestamp) || 0) - (Date.parse(b.timestamp) || 0));
+        const count = parseInt(limit) || 200;
+        return filtered.slice(Math.max(0, filtered.length - count));
+    }
+
     function harEntryToLog(entry, pageTitles) {
         const requestHeaders = harHeaders(entry.request?.headers);
         const requestCookies = harCookies(entry.request?.cookies);
@@ -832,6 +915,7 @@
             statusCode: Number(entry.response?.status) || 0,
             timestamp: entry.startedDateTime || new Date().toISOString(),
             durationMs: Number.isFinite(entry.time) && entry.time >= 0 ? Math.round(entry.time) : null,
+            resourceType: classifyHarResource(entry._resourceType, entry.response?.content?.mimeType, entry.request?.url),
             machine: null,
             project: pageTitles.get(entry.pageref) || null,
             origin: 'HAR',
@@ -861,7 +945,7 @@
             const pageTitles = new Map((har.log.pages || []).map(p => [p.id, p.title || p.id]));
             harLogs = har.log.entries
                 .map(entry => harEntryToLog(entry, pageTitles))
-                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                .sort((a, b) => (Date.parse(a.timestamp) || 0) - (Date.parse(b.timestamp) || 0));
 
             await savePersistedHar(file.name, harLogs);
 
@@ -893,7 +977,7 @@
         if (url)     logs = logs.filter(l => (l.url || '').toLowerCase().includes(url.toLowerCase()));
         if (project) logs = logs.filter(l => (l.project || '') === project);
 
-        currentLogs = logs.slice(0, parseInt(limit) || 200);
+        currentLogs = filterAndLimitHarLogs(logs, selectedResourceTypes(), limit);
         renderRequests(currentLogs);
         updateStats();
 
@@ -1273,7 +1357,8 @@
         document.getElementById('statusFilter').value = '';
         document.getElementById('urlFilter').value = '';
         document.getElementById('projectFilter').value = '';
-        PageState.save({ methodFilter: '', statusFilter: '', urlFilter: '', projectFilter: '' });
+        document.querySelectorAll('.resourceTypeFilter').forEach(input => { input.checked = true; });
+        PageState.save({ methodFilter: '', statusFilter: '', urlFilter: '', projectFilter: '', resourceTypes: null });
         refresh();
     }
 
@@ -1917,10 +2002,14 @@
         if (st.statusFilter  != null) document.getElementById('statusFilter').value  = st.statusFilter;
         if (st.urlFilter     != null) document.getElementById('urlFilter').value     = st.urlFilter;
         if (st.limitInput    != null) document.getElementById('limitInput').value    = st.limitInput;
+        if (Array.isArray(st.resourceTypes)) {
+            const enabled = new Set(st.resourceTypes);
+            document.querySelectorAll('.resourceTypeFilter').forEach(input => { input.checked = enabled.has(input.value); });
+        }
         try {
             const saved = await loadPersistedHar();
             if (saved && Array.isArray(saved.logs)) {
-                harLogs = saved.logs;
+                harLogs = saved.logs.sort((a, b) => (Date.parse(a.timestamp) || 0) - (Date.parse(b.timestamp) || 0));
                 document.getElementById('harFileName').textContent =
                     `${saved.fileName || 'Saved HAR'} · ${harLogs.length} requests`;
             }

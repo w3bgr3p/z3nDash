@@ -1,13 +1,13 @@
 ﻿// StubSmokeTest.cs — проверка что DLL собирается и типы резолвятся.
 // Удали после успешной сборки.
 
-using DevDeck;
+using z3nDash;
 using ZennoLab.CommandCenter;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 using ZennoLab.InterfacesLibrary.Enums.Log;
 using ZennoLab.InterfacesLibrary.ProjectModel.Collections;
 
-namespace DevDeck.StubSmoke;
+namespace z3nDash.StubSmoke;
 
 internal static class StubSmokeTest
 {

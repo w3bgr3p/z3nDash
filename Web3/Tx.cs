@@ -12,9 +12,9 @@ using System.Threading.Tasks;
 using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Web3;
-using DevDeck;
+using z3nDash;
 
-namespace DevDeck
+namespace z3nDash
 {
     /// <summary>
     /// Универсальный RPC клиент с двумя режимами работы:

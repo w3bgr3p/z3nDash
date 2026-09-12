@@ -1,9 +1,9 @@
 <Project>
     <PropertyGroup>
-        <Version>1.0.0.13</Version>
+        <Version>1.0.1.0</Version>
 
         <AssemblyTitle>$(MSBuildProjectName)</AssemblyTitle>
-        <Product>DevDeck</Product>
+        <Product>z3nDash</Product>
         <Copyright>Copyright © w3bgr3p 2026</Copyright>
         <Company>w3bgr3p</Company>
         <Authors>w3bgr3p</Authors>

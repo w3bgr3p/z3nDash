@@ -3,7 +3,7 @@
 
 using Newtonsoft.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 public static partial class InternalTasks
 {
@@ -32,7 +32,7 @@ public static partial class InternalTasks
             
             
             //string outDir = Path.Combine(AppContext.BaseDirectory, "templates");
-            string outDir = Path.Combine("W:\\code_hard\\.net\\DevDeck", "templates");
+            string outDir = Path.Combine("W:\\code_hard\\.net\\z3nDash", "templates");
             Directory.CreateDirectory(outDir);
 
             // ── db_template.json ─────────────────────────────────────────────

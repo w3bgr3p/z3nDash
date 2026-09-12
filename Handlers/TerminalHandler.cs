@@ -5,7 +5,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 public sealed class TerminalHandler : IScriptHandler
 {

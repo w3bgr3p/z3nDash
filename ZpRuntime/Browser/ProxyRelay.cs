@@ -44,7 +44,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace DevDeck.Browser;
+namespace z3nDash.Browser;
 
 public sealed class ProxyRelay : IDisposable
 {

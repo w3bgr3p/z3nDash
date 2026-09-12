@@ -16,7 +16,7 @@
 using ZennoLab.CommandCenter;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace DevDeck.Xml;
+namespace z3nDash.Xml;
 
 public sealed record PlayResult(
     bool       Success,

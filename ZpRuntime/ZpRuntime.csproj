@@ -5,7 +5,7 @@
         <OutputType>Library</OutputType>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>DevDeck</RootNamespace>
+        <RootNamespace>z3nDash</RootNamespace>
         <AssemblyName>ZpRuntime</AssemblyName>
         <NoWarn>$(NoWarn);8625;8618;8604;8603;8602;8600;8601;8619</NoWarn>
     </PropertyGroup>
@@ -59,7 +59,7 @@
              тянет System.Drawing.Common, который нужен Tools/Img.cs. -->
         <PackageReference Include="ZXing.Net.Bindings.Windows.Compatibility" Version="0.16.12" />
         <!-- Tools/SysAudit.cs читает счётчики производительности и службы Windows.
-             Версия ровно та, что стоит в DevDeck.csproj: библиотека не должна
+             Версия ровно та, что стоит в z3nDash.csproj: библиотека не должна
              тянуть приложение вверх — иначе NU1605 «package downgrade», и не
              собирается уже приложение, а не мы. -->
         <PackageReference Include="System.Diagnostics.PerformanceCounter"    Version="6.0.0" />

@@ -17,7 +17,7 @@ using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 internal sealed class SystemSnapshotHandler
 {

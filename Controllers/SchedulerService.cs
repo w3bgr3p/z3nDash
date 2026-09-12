@@ -4,17 +4,30 @@ using System.Text;
 using System.Text.Json;
 using Cronos;
 using NBitcoin.Protocol;
-using DevDeck;
+using z3nDash;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace DevDeck;
+namespace z3nDash;
 
-public sealed class SchedulerService : IDisposable
+public sealed partial class SchedulerService : IDisposable
 {
     private readonly DbConnectionService _dbService;
     private readonly System.Threading.Timer _timer;
     internal readonly ConcurrentDictionary<string, RunningProcess> _running = new();
     private readonly Logger? _log;
+
+    /// <summary>Нити, уже занятые запуском, но ещё не зарегистрированные в _running.</summary>
+    private readonly ConcurrentDictionary<string, int> _reserved = new();
+
+    /// <summary>Когда по каждой задаче в последний раз стартовала нить.</summary>
+    private readonly ConcurrentDictionary<string, DateTime> _lastLaunch = new();
+
+    /// <summary>Минимальный зазор между доливами нитей одной задачи.</summary>
+    private static readonly TimeSpan RefillFloor = TimeSpan.FromSeconds(2);
+
+    /// <summary>Границы паузы между стартами соседних нитей одной пачки.</summary>
+    private const int StaggerMinMs = 1000;
+    private const int StaggerMaxMs = 5000;
     private readonly ConcurrentDictionary<string, Func<Dictionary<string, string>, CancellationToken, Action<string>, Task<string>>> _internalTasks = new();
     public void RegisterTask(string name, Func<Dictionary<string, string>, CancellationToken, Action<string>, Task<string>> handler)
         => _internalTasks[name] = handler;
@@ -29,17 +42,21 @@ public sealed class SchedulerService : IDisposable
     {
         _dbService = dbService;
         _log       = log;
-        _timer = new System.Threading.Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+        _timer = new System.Threading.Timer(Tick, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
 
     public void Init()
     {
-        if (!_dbService.TryGetDb(out var db) || db == null) return;
+        if (!_dbService.TryGetDb(out var db) || db == null)
+        {
+            _timer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(1));
+            return;
+        }
         db.PrepareTable(DbSchema.Schedules.Columns, Table);
         db.PrepareTable(DbSchema.ScheduleQueue.Columns, QueueTable);
         RepairShiftedScheduleColumns(db);
-        SeedDefaults(db);
         RestoreRunningProcesses(db);
+        _timer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(1));
     }
 
     private void RepairShiftedScheduleColumns(Db db)
@@ -77,6 +94,7 @@ public sealed class SchedulerService : IDisposable
 
         _log?.Info($"[SchedulerService] Found {rows.Count} tasks with status=running, restarting...");
 
+        var restoreStagger = TimeSpan.Zero;
         foreach (var row in rows)
         {
             var record = ParseRow(row, columns);
@@ -88,66 +106,13 @@ public sealed class SchedulerService : IDisposable
 
             _log?.Info($"[SchedulerService] Restarting task: {name} (id={id})");
 
-            // Перезапустить процесс
-            _ = LaunchAsync(db, record, DateTime.UtcNow);
+            // Перезапустить процесс — тоже вразнос, иначе после падения всё
+            // недоделанное поднимется одной пачкой.
+            StartInstance(db, record, DateTime.UtcNow, delay: restoreStagger);
+            restoreStagger += NextStaggerGap();
         }
     }
 
-private static void SeedDefaults(Db db)
-{
-    var baseDir = AppContext.BaseDirectory;
-
-    var rows = new[]
-    {
-        (
-            id:             "0d1d2d4e-d033-4661-8198-f85ad1e8d906",
-            name:           "internal.0. env-check",
-            executor:       "ps1",
-            scriptPath:     Path.Combine(baseDir, "Tasks", "ps1", "check-env.ps1"),
-            payloadSchema:  ""
-        ),
-        (
-            id:             "4d8ead14-37ab-4081-97bf-9785929e055e",
-            name:           "internal.1.env-set",
-            executor:       "ps1",
-            scriptPath:     Path.Combine(baseDir, "Tasks", "ps1", "setup-env.ps1"),
-            payloadSchema:  ""
-        ),
-        (
-            id:             "ab7cfd05-43ae-49b2-a102-b832fb5572b2",
-            name:           "internal.GenerateClientBundle",
-            executor:       "internal",
-            scriptPath:     "GenerateClientBundle",
-            payloadSchema:  "[{\"key\":\"clientHwid\",\"label\":\"hwID\",\"type\":\"text\",\"options\":\"\"},{\"key\":\"clientName\",\"label\":\"Roman001\",\"type\":\"text\",\"options\":\"\"},{\"key\":\"outputFolder\",\"label\":\"output\",\"type\":\"text\",\"options\":\"\"}]"
-        ),
-        (
-            id:             "8b02699c-8198-4f19-ae8d-17ae17e8f850",
-            name:           "example.csx.sysinfo",
-            executor:       "csx",
-            scriptPath:     Path.Combine(baseDir, "Tasks", "examples", "sysinfo.csx"),
-            payloadSchema:  ""
-        ),
-        (
-            id:             "bfd48f48-26f8-4e88-8a87-b4dbcce5e49d",
-            name:           "example.zp_csx.rabby_zb",
-            executor:       "csx-internal",
-            scriptPath:     Path.Combine(baseDir, "Tasks", "examples", "rabby.csx"),
-            payloadSchema:  ""
-        ),
-    };
-
-    foreach (var r in rows)
-    {
-        var path   = r.scriptPath.Replace("'", "''");
-        var schema = r.payloadSchema.Replace("'", "''");
-        db.Query($"""
-            INSERT OR IGNORE INTO "{Table}"
-                ("id","name","executor","script_path","enabled","on_overlap","status","payload_schema")
-            VALUES
-                ('{r.id}','{r.name}','{r.executor}','{path}','true','skip','idle','{schema}')
-            """);
-    }
-}
     private void Tick(object? _)
     {
         if (!_dbService.TryGetDb(out var db) || db == null) return;
@@ -160,43 +125,108 @@ private static void SeedDefaults(Db db)
 
         foreach (var row in rows)
         {
-            var record     = ParseRow(row, columns);
-            var id         = record.GetValueOrDefault("id", "");
-            var active     = CountActiveInstances(id);
-
-            var decision = Decide(record, now, isRunning: active > 0);
-            if (!decision.Fire) continue;
-
-            NoteScheduledFire(db, id, record, decision.Attempts);
-
-            var overlap    = record.GetValueOrDefault("on_overlap", "skip");
-            var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
-
-            // «Сколько делать» из ZP: первая попытка идёт сразу, остальные в очередь.
-            for (var extra = 1; extra < decision.Attempts; extra++)
-                EnqueueItem(db, id, record, priority: 10);
-
-            switch (overlap)
-            {
-                case "skip":
-                    if (active > 0) continue;
-                    break;
-                case "kill_restart":
-                    if (active > 0) { KillAllInstances(id); RemoveInstancesFromRunning(id); }
-                    break;
-                case "parallel":
-                    if (active >= maxThreads) { EnqueueItem(db, id, record, priority: 10); continue; }
-                    break;
-            }
-
-            _ = LaunchAsync(db, record, now);
+            var record = ParseRow(row, columns);
+            var id     = record.GetValueOrDefault("id", "");
+            FireSchedule(db, record, id, now);
         }
 
         DrainQueue(db, now);
     }
 
+    /// <summary>
+    /// Одно срабатывание расписания для конкретной задачи. Threads — это ёмкость:
+    /// сколько инстансов задачи держать одновременно. Расписание говорит, сколько
+    /// запусков заказать; сколько из них стартует прямо сейчас, решает свободная
+    /// ёмкость, а что делать с хвостом — on_overlap.
+    /// </summary>
+    private void FireSchedule(Db db, Dictionary<string, string> record, string id, DateTime now)
+    {
+        lock (_controlGate)
+        {
+            if (!AutomaticLaunchAllowed(db, id)) return;
+            FireScheduleCore(db, record, id, now);
+        }
+    }
+
+    private void FireScheduleCore(Db db, Dictionary<string, string> record, string id, DateTime now)
+    {
+        var maxThreads = ReadThreads(record);
+        var active     = CountActiveInstances(id);
+
+        var decision = Decide(record, now, active, maxThreads);
+        if (!decision.Fire) return;
+
+        var overlap = record.GetValueOrDefault("on_overlap", "skip");
+
+        // kill&restart освобождает все нити разом — свободные считаем уже после.
+        if (overlap == "kill_restart" && active > 0)
+        {
+            KillAllInstances(id);
+            RemoveInstancesFromRunning(id);
+            active = 0;
+        }
+
+        var free = Math.Max(0, maxThreads - active);
+        var want = Math.Max(1, decision.Attempts);
+        var take = Math.Min(want, free);
+
+        // Нити заняты: parallel копит очередь, skip и kill_restart пропускают заход.
+        if (take == 0)
+        {
+            if (overlap != "parallel") return;
+            for (var i = 0; i < want; i++) EnqueueItem(db, id, record, priority: 10);
+            NoteScheduledFire(db, id, record, want);
+            return;
+        }
+
+        if (take > 1)
+            _log?.Info($"[{record.GetValueOrDefault("name", id)}] наливаю {take} нитей с разносом {StaggerMinMs / 1000}–{StaggerMaxMs / 1000} с");
+
+        var stagger = TimeSpan.Zero;
+        for (var i = 0; i < take; i++)
+        {
+            StartInstance(db, record, now, delay: stagger);
+            stagger += NextStaggerGap();
+        }
+
+        // Хвост сверх ёмкости имеет смысл копить только в режиме очереди.
+        var queued = 0;
+        if (overlap == "parallel")
+            for (var i = take; i < want; i++) { EnqueueItem(db, id, record, priority: 10); queued++; }
+
+        NoteScheduledFire(db, id, record, take + queued);
+    }
+
+    /// <summary>
+    /// Прогнать расписание одной задачи прямо сейчас, не дожидаясь минутного тика:
+    /// «Начать сразу» в ZP означает сразу, а не «в течение ближайшей минуты».
+    /// </summary>
+    public void EvaluateNow(string id, Db db)
+    {
+        var cols = db.GetTableColumns(Table);
+        if (cols.Count == 0) return;
+
+        var rows = db.GetLines(string.Join(",", cols), Table, where: $"\"id\" = '{id}'");
+        if (rows.Count == 0) return;
+
+        var record = ParseRow(rows[0], cols);
+        if (record.GetValueOrDefault("enabled", "") != "true") return;
+
+        FireSchedule(db, record, id, DateTime.UtcNow);
+    }
+
+    /// <summary>Ёмкость задачи в нитях. Пустое или битое значение — одна нить.</summary>
+    private static int ReadThreads(Dictionary<string, string> record)
+        => int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) && mt > 0 ? mt : 1;
+
+    /// <summary>
+    /// Занятые нити: живые инстансы плюс зарезервированные, но ещё не
+    /// зарегистрированные слоты. Без резерва пачка запусков в одном тике увидела
+    /// бы ёмкость свободной столько раз, сколько нитей запрашивает.
+    /// </summary>
     private int CountActiveInstances(string scheduleId)
-        => _running.Count(kv => kv.Key.StartsWith(scheduleId + ":") && !kv.Value.HasExited);
+        => _running.Count(kv => kv.Key.StartsWith(scheduleId + ":") && !kv.Value.HasExited)
+         + _reserved.GetValueOrDefault(scheduleId, 0);
 
     private void RemoveInstancesFromRunning(string scheduleId)
     {
@@ -224,41 +254,33 @@ private static void SeedDefaults(Db db)
         }, QueueTable);
     }
 
+    /// <summary>Общий проход по очереди: каждой задаче доливаем её свободные нити.</summary>
     private void DrainQueue(Db db, DateTime now)
     {
-        var schedCols = db.GetTableColumns(Table);
-        if (schedCols.Count == 0) return;
-
         var qCols = db.GetTableColumns(QueueTable);
         if (qCols.Count == 0) return;
 
-        var colsSql = string.Join(", ", qCols.Select(c => $"\"{c}\""));
-        var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"status\" = 'pending' ORDER BY \"priority\" ASC, \"queued_at\" ASC");
+        var raw = db.Query($"SELECT \"schedule_id\" FROM \"{QueueTable}\" WHERE \"status\" = 'pending' ORDER BY \"priority\" ASC, \"queued_at\" ASC");
         if (string.IsNullOrWhiteSpace(raw)) return;
 
-        foreach (var qRow in raw.Split('·').Where(r => !string.IsNullOrWhiteSpace(r)))
+        foreach (var scheduleId in raw.Split('·')
+                                      .Select(s => s.Trim())
+                                      .Where(s => s.Length > 0)
+                                      .Distinct())
+            DrainQueueFor(db, scheduleId);
+    }
+
+    /// <summary>Разобрать очередь одной задачи ровно до заполнения её нитей.</summary>
+    private void DrainQueueFor(Db db, string scheduleId)
+    {
+        lock (_controlGate)
         {
-            var qRecord    = ParseRow(qRow, qCols);
-            var scheduleId = qRecord.GetValueOrDefault("schedule_id", "");
-            if (string.IsNullOrEmpty(scheduleId)) continue;
-
-            var schedRows = db.GetLines(string.Join(",", schedCols), Table, where: $"\"id\" = '{scheduleId}'");
-            if (schedRows.Count == 0) continue;
-
-            var record     = ParseRow(schedRows[0], schedCols);
-            var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
-            if (CountActiveInstances(scheduleId) >= maxThreads) continue;
-
-            var qUuid   = qRecord.GetValueOrDefault("uuid", "");
-            var argsB64 = qRecord.GetValueOrDefault("args_b64", "");
-            db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'running' WHERE \"uuid\" = '{qUuid}'");
-
-            if (!string.IsNullOrWhiteSpace(argsB64)) record["args"] = argsB64;
-            _ = LaunchFromQueue(db, record, now, qUuid);
+            if (!AutomaticLaunchAllowed(db, scheduleId)) return;
+            DrainQueueForCore(db, scheduleId);
         }
     }
 
-    private void TryDrainOne(Db db, string scheduleId)
+    private void DrainQueueForCore(Db db, string scheduleId)
     {
         var schedCols = db.GetTableColumns(Table);
         if (schedCols.Count == 0) return;
@@ -267,23 +289,60 @@ private static void SeedDefaults(Db db)
         if (schedRows.Count == 0) return;
 
         var record     = ParseRow(schedRows[0], schedCols);
-        var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
-        if (CountActiveInstances(scheduleId) >= maxThreads) return;
+        var maxThreads = ReadThreads(record);
 
         var qCols = db.GetTableColumns(QueueTable);
         if (qCols.Count == 0) return;
-
         var colsSql = string.Join(", ", qCols.Select(c => $"\"{c}\""));
-        var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"status\" = 'pending' AND \"schedule_id\" = '{scheduleId}' ORDER BY \"priority\" ASC, \"queued_at\" ASC LIMIT 1");
-        if (string.IsNullOrWhiteSpace(raw)) return;
 
-        var qRecord = ParseRow(raw.Split('·')[0], qCols);
-        var qUuid   = qRecord.GetValueOrDefault("uuid", "");
-        var argsB64 = qRecord.GetValueOrDefault("args_b64", "");
-        db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'running' WHERE \"uuid\" = '{qUuid}'");
+        var stagger = TimeSpan.Zero;
+        while (CountActiveInstances(scheduleId) < maxThreads)
+        {
+            var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"status\" = 'pending' AND \"schedule_id\" = '{scheduleId}' ORDER BY \"priority\" ASC, \"queued_at\" ASC LIMIT 1");
+            if (string.IsNullOrWhiteSpace(raw)) return;
 
-        if (!string.IsNullOrWhiteSpace(argsB64)) record["args"] = argsB64;
-        _ = LaunchFromQueue(db, record, DateTime.UtcNow, qUuid);
+            var qRecord = ParseRow(raw.Split('·')[0], qCols);
+            var qUuid   = qRecord.GetValueOrDefault("uuid", "");
+            if (string.IsNullOrEmpty(qUuid)) return;
+
+            var argsB64 = qRecord.GetValueOrDefault("args_b64", "");
+            db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'running' WHERE \"uuid\" = '{qUuid}'");
+
+            var own = new Dictionary<string, string>(record);
+            if (!string.IsNullOrWhiteSpace(argsB64)) own["args"] = argsB64;
+            StartInstance(db, own, DateTime.UtcNow, qUuid, delay: stagger);
+            stagger += NextStaggerGap();
+        }
+    }
+
+    /// <summary>
+    /// Нить освободилась: сперва добираем очередь, потом — если расписание просит
+    /// держать потоки занятыми («Подряд», «Подряд с паузой») — доливаем из него.
+    /// </summary>
+    private void TopUp(Db db, string scheduleId)
+    {
+        DrainQueueFor(db, scheduleId);
+
+        var schedCols = db.GetTableColumns(Table);
+        if (schedCols.Count == 0) return;
+
+        var schedRows = db.GetLines(string.Join(",", schedCols), Table, where: $"\"id\" = '{scheduleId}'");
+        if (schedRows.Count == 0) return;
+
+        var record = ParseRow(schedRows[0], schedCols);
+        if (record.GetValueOrDefault("enabled", "") != "true") return;
+        if (CountActiveInstances(scheduleId) >= ReadThreads(record)) return;
+
+        // Скрипт, падающий за миллисекунду, в режиме «Подряд» иначе крутился бы вхолостую.
+        var since = DateTime.UtcNow - _lastLaunch.GetValueOrDefault(scheduleId, DateTime.MinValue);
+        if (since < RefillFloor)
+        {
+            _ = Task.Delay(RefillFloor - since)
+                    .ContinueWith(_ => { try { TopUp(db, scheduleId); } catch { } });
+            return;
+        }
+
+        FireSchedule(db, record, scheduleId, DateTime.UtcNow);
     }
 
     private static void FinishQueueEntry(Db db, string? queueUuid, string status, string runId)
@@ -292,10 +351,86 @@ private static void SeedDefaults(Db db)
         db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = '{status}', \"run_id\" = '{runId}' WHERE \"uuid\" = '{queueUuid}'");
     }
 
-    private Task LaunchAsync(Db db, Dictionary<string, string> record, DateTime firedAt)
-        => LaunchFromQueue(db, record, firedAt, queueUuid: null);
+    /// <summary>
+    /// Занять нить и запустить инстанс. Слот резервируется синхронно: иначе пачка
+    /// запусков из одного тика посчитала бы ёмкость свободной столько раз, сколько
+    /// нитей запрашивает, — регистрация в _running происходит уже после await.
+    /// </summary>
+    private void StartInstance(Db db, Dictionary<string, string> record, DateTime firedAt, string? queueUuid = null, TimeSpan delay = default, bool automatic = true)
+    {
+        var id   = record.GetValueOrDefault("id", "");
+        var slot = Reserve(id);
+        _lastLaunch[id] = DateTime.UtcNow;
 
-    private async Task LaunchFromQueue(Db db, Dictionary<string, string> record, DateTime firedAt, string? queueUuid)
+        // Своя копия записи на каждую нить: запуск дописывает в неё служебные поля
+        // прогона, и общий словарь пять нитей растащили бы.
+        var own = new Dictionary<string, string>(record);
+
+        _ = Task.Run(async () =>
+        {
+            TaskRunContext? runContext = null;
+            try
+            {
+                // Слот занят до паузы: иначе за время разноса тик или TopUp увидели бы
+                // ёмкость свободной и подняли лишние нити сверх Threads.
+                if (delay > TimeSpan.Zero) await Task.Delay(delay);
+
+                lock (_controlGate)
+                {
+                    if (automatic && !AutomaticLaunchAllowed(db, id))
+                    {
+                        if (queueUuid != null)
+                            db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'pending' WHERE \"uuid\" = '{SqlValue(queueUuid)}'");
+                        return;
+                    }
+                    runContext = RegisterRun(id);
+                }
+
+                // Время старта, а не время решения: иначе uptime нити врал бы на разнос.
+                var startedAt = delay > TimeSpan.Zero ? DateTime.UtcNow : firedAt;
+                using (TaskRunContext.Enter(runContext))
+                    await LaunchFromQueue(db, own, startedAt, queueUuid, runContext.RunId, slot);
+            }
+            catch (Exception ex) { _log?.Error($"[scheduler] launch failed id={id}: {ex.Message}"); }
+            finally
+            {
+                if (runContext != null) _runContexts.TryRemove(runContext.Token, out _);
+                slot.Dispose();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Пауза до следующей нити пачки — 1–5 секунд. Смещение копит вызывающий:
+    /// считать его заново на каждую нить нельзя, иначе соседние старты случайно
+    /// сходятся в один момент. Пять браузеров, поднятых разом, дерутся за CPU и
+    /// выглядят синхронной пачкой — это бьёт по результату прогона.
+    /// </summary>
+    private static TimeSpan NextStaggerGap()
+        => TimeSpan.FromMilliseconds(Random.Shared.Next(StaggerMinMs, StaggerMaxMs + 1));
+
+    private IDisposable Reserve(string id)
+    {
+        _reserved.AddOrUpdate(id, 1, (_, v) => v + 1);
+        return new Slot(this, id);
+    }
+
+    /// <summary>Резерв нити. Освобождается один раз — при регистрации инстанса.</summary>
+    private sealed class Slot : IDisposable
+    {
+        private SchedulerService? _owner;
+        private readonly string   _id;
+
+        public Slot(SchedulerService owner, string id) { _owner = owner; _id = id; }
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            owner?._reserved.AddOrUpdate(_id, 0, (_, v) => Math.Max(0, v - 1));
+        }
+    }
+
+    private async Task LaunchFromQueue(Db db, Dictionary<string, string> record, DateTime firedAt, string? queueUuid, string runId, IDisposable? threadSlot = null)
     {
         var id         = record.GetValueOrDefault("id", "");
         var name       = record.GetValueOrDefault("name", id);
@@ -320,7 +455,6 @@ private static void SeedDefaults(Db db)
         
 
         // ── уникальный id прогона ──────────────────────────────────────────────
-        var runId       = Guid.NewGuid().ToString("N")[..12];
         var instanceKey = $"{id}:{runId}";
         var scheduleTag = BuildScheduleTag(name);
 
@@ -359,8 +493,15 @@ private static void SeedDefaults(Db db)
             args = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
         }
         
+        // run в событии — чтобы UI мог развести по цветам логи параллельных нитей.
         Action<string> broadcast = line =>
-            SseHub.BroadcastOutput(JsonSerializer.Serialize(new { line, level = line.StartsWith("[ERR]") ? "ERROR" : "INFO" }), id);
+            SseHub.BroadcastOutput(JsonSerializer.Serialize(new
+            {
+                line,
+                run   = runId,
+                ts    = DateTime.UtcNow.ToString("o"),
+                level = line.StartsWith("[ERR]") ? "ERROR" : "INFO",
+            }), id);
 
         if (executor == "internal")
         {
@@ -376,6 +517,7 @@ private static void SeedDefaults(Db db)
 
             var rp  = new RunningProcess(null, firedAt, cts, broadcast);
             _running[instanceKey] = rp;
+            threadSlot?.Dispose();
 
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine($"[LIVE] internal task started id={id} name={name} run={runId} key={instanceKey}");
@@ -393,7 +535,7 @@ private static void SeedDefaults(Db db)
                 payload["__scheduleTag"] = scheduleTag;
 
                 var output = await handler(payload, cts.Token, rp.AddLine);
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
                 rp.Result = output ?? "";
                 RunLogger(scheduleTag, runId)?.Info($"[{name}] done run={runId}");
                 _running.TryRemove(instanceKey, out _);
@@ -403,7 +545,7 @@ private static void SeedDefaults(Db db)
             catch (Exception ex)
             {
                 rp.AddLine("[ERR] " + ex.Message);
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
                 var runLog = RunLogger(scheduleTag, runId);
                 runLog?.Error($"[{name}] internal task failed: {ex.Message}");
                 rp.Result = ex.Message;
@@ -414,7 +556,7 @@ private static void SeedDefaults(Db db)
             finally
             {
                 cts.Dispose();
-                TryDrainOne(db, id);
+                TopUp(db, id);
             }
 
             return;
@@ -433,6 +575,7 @@ private static void SeedDefaults(Db db)
             var cts = new CancellationTokenSource();
             var rp  = new RunningProcess(null, firedAt, cts, broadcast);
             _running[instanceKey] = rp;
+            threadSlot?.Dispose();
 
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine($"[LIVE] csx task started id={id} name={name} run={runId} script={Path.GetFileName(scriptPath)}");
@@ -474,10 +617,10 @@ private static void SeedDefaults(Db db)
                 keepBrowser      = payload.GetValueOrDefault("browser_keep", "false") == "true";
                 zbId = ctx.Project.Variables["zb_id"].Value;
                 zb = needsBrowser && !string.IsNullOrWhiteSpace(zbId)
-                    ? new ZB(Config.ApiConfig.ZB)
+                    ? new ZB(Config.BrowsersApi.ZennoBrowser.Token, Config.BrowsersApi.ZennoBrowser.Host)
                     : null;
 
-                DevDeck.Browser.PlaywrightInstance? instance = null;
+                z3nDash.Browser.PlaywrightInstance? instance = null;
 
                 if (zb != null)
                 {
@@ -489,7 +632,7 @@ private static void SeedDefaults(Db db)
                         var context = browser.Contexts[0];
                         var page    = context.Pages.FirstOrDefault()
                                       ?? await context.NewPageAsync();
-                        instance    = new DevDeck.Browser.PlaywrightInstance(page);
+                        instance    = new z3nDash.Browser.PlaywrightInstance(page);
                         // чтобы ZennoPoster.HTTP.Request мог уйти с сессией браузера
                         ZennoLab.CommandCenter.ZennoPoster.AttachBrowser(instance);
                     }
@@ -506,7 +649,7 @@ private static void SeedDefaults(Db db)
                 await CsxExecutor.RunAsync<CsxGlobals>(scriptPath, globals, cts.Token);
 
                 ctx.Release("idle");
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
                 rp.Result = "ok";
                 RunLogger(scheduleTag, runId)?.Info($"[{name}] csx done run={runId}");
                 _running.TryRemove(instanceKey, out _);
@@ -526,7 +669,7 @@ private static void SeedDefaults(Db db)
                 foreach (var frame in scriptFrames ?? Enumerable.Empty<string>())
                     rp.AddLine("[ERR] " + frame);
 
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
                 RunLogger(scheduleTag, runId)?.Error($"[{name}] csx failed: {ex.Message}");
                 rp.Result = ex.Message;
                 _running.TryRemove(instanceKey, out _);
@@ -539,7 +682,7 @@ private static void SeedDefaults(Db db)
                 try { if (!keepBrowser) pw?.Dispose(); } catch { }
                 if (!released) try { ctx?.Release("fail"); } catch { }
                 cts.Dispose();
-                TryDrainOne(db, id);
+                TopUp(db, id);
             }
 
             return;
@@ -560,21 +703,23 @@ private static void SeedDefaults(Db db)
             var cts = new CancellationTokenSource();
             var rp  = new RunningProcess(null, firedAt, cts, broadcast);
             _running[instanceKey] = rp;
+            threadSlot?.Dispose();
 
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine($"[LIVE] xml started id={id} name={name} run={runId} template={Path.GetFileName(scriptPath)}");
             Console.ResetColor();
 
-            DevDeck.Browser.BrowserSession? session = null;
+            z3nDash.Browser.BrowserSession? session = null;
             // Профиль антика, который мы обязаны закрыть за собой; null — не наш.
             string? externalProfile = null;
             var brConfig = BrowserConfig.Parse(record.GetValueOrDefault("browser_json", ""));
+            BrowserProvider.ApplyGlobalConfig(brConfig, Config.BrowsersApi);
             try
             {
                 var project = new StubProject { Name = name, OnLog = rp.AddLine };
                 project.Variables["dbSource"].Value = db.Source;
 
-                var tpl = DevDeck.Xml.XmlTemplate.Load(scriptPath);
+                var tpl = z3nDash.Xml.XmlTemplate.Load(scriptPath);
 
                 // Прокси задаётся при запуске браузера и на живом инстансе не
                 // меняется, поэтому берём его до старта — из поля задачи, а иначе
@@ -587,7 +732,7 @@ private static void SeedDefaults(Db db)
                 var rawProxy = payload.GetValueOrDefault("proxy", "");
                 if (string.IsNullOrWhiteSpace(rawProxy))
                     rawProxy = tpl.Variables.GetValueOrDefault("proxy", "");
-                var proxy = DevDeck.Browser.BrowserSession.NormalizeProxy(rawProxy);
+                var proxy = z3nDash.Browser.BrowserSession.NormalizeProxy(rawProxy);
 
                 // Чем поднимать браузер — настройка задачи; какой именно профиль
                 // открывать — данные запуска, поэтому payload перекрывает настройку.
@@ -604,9 +749,11 @@ private static void SeedDefaults(Db db)
                 if (mode == "zennobrowser" && !string.IsNullOrWhiteSpace(profile))
                 {
                     // Боевой путь: профиль ZennoBrowser со своим отпечатком.
-                    var ws = await new ZB(Config.ApiConfig.ZB).RunProfile(profile);
+                    var ws = await new ZB(
+                        Config.BrowsersApi.ZennoBrowser.Token,
+                        Config.BrowsersApi.ZennoBrowser.Host).RunProfile(profile);
                     if (!string.IsNullOrWhiteSpace(ws))
-                        session = await DevDeck.Browser.BrowserSession.AttachAsync(ws);
+                        session = await z3nDash.Browser.BrowserSession.AttachAsync(ws);
                     else
                         rp.AddLine($"[br] ZennoBrowser не отдал эндпоинт для профиля {profile}");
                 }
@@ -617,15 +764,15 @@ private static void SeedDefaults(Db db)
                     else
                     {
                         rp.AddLine($"[br] подключаюсь к {brConfig.Cdp}");
-                        session = await DevDeck.Browser.BrowserSession.AttachAsync(brConfig.Cdp);
+                        session = await z3nDash.Browser.BrowserSession.AttachAsync(brConfig.Cdp);
                     }
                 }
-                else if (mode == "api")
+                else if (BrowserProvider.UsesProviderApi(mode))
                 {
                     var ws = await BrowserProvider.StartAsync(brConfig, profile, rp.AddLine);
                     if (!string.IsNullOrWhiteSpace(ws))
                     {
-                        session = await DevDeck.Browser.BrowserSession.AttachAsync(ws);
+                        session = await z3nDash.Browser.BrowserSession.AttachAsync(ws);
                         externalProfile = brConfig.CloseAfterRun ? profile : null;
                     }
                 }
@@ -653,18 +800,18 @@ private static void SeedDefaults(Db db)
                     var slot = acc.Length > 0 ? acc : runId;
                     var safe = string.Concat((name + "-" + slot).Select(
                         c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
-                    var profileDir = Path.Combine(Path.GetTempPath(), "devdeck-xml", "profile-" + safe);
+                    var profileDir = Path.Combine(Path.GetTempPath(), "z3nDash-xml", "profile-" + safe);
                     rp.AddLine($"[br] Patchright, профиль {profileDir}"
                                + (proxy.Length > 0 ? $", прокси {proxy}" : ", без прокси"));
-                    session = await DevDeck.Browser.BrowserSession.LaunchAsync(
+                    session = await z3nDash.Browser.BrowserSession.LaunchAsync(
                         profileDir, headless: false, proxy: proxy.Length > 0 ? proxy : null,
                         log: rp.AddLine);
                 }
 
-                var player = new DevDeck.Xml.XmlPlayer(project, session.Instance, rp.AddLine);
+                var player = new z3nDash.Xml.XmlPlayer(project, session.Instance, rp.AddLine);
                 var res    = player.Play(tpl, Path.GetDirectoryName(Path.GetFullPath(scriptPath))!, cts.Token);
 
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
 
                 if (!res.Success)
                 {
@@ -686,7 +833,7 @@ private static void SeedDefaults(Db db)
             catch (Exception ex)
             {
                 rp.AddLine("[ERR] " + ex.Message);
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
                 RunLogger(scheduleTag, runId)?.Error($"[{name}] xml failed: {ex.Message}");
                 rp.Result = ex.Message;
                 _running.TryRemove(instanceKey, out _);
@@ -701,7 +848,7 @@ private static void SeedDefaults(Db db)
                 if (externalProfile is not null)
                     await BrowserProvider.StopAsync(brConfig, externalProfile, rp.AddLine);
                 cts.Dispose();
-                TryDrainOne(db, id);
+                TopUp(db, id);
             }
 
             return;
@@ -719,6 +866,7 @@ private static void SeedDefaults(Db db)
             var cts = new CancellationTokenSource();
             var rp  = new RunningProcess(null, firedAt, cts, broadcast);
             _running[instanceKey] = rp;
+            threadSlot?.Dispose();
 
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine($"[LIVE] csx-zp7 started id={id} name={name} run={runId} script={Path.GetFileName(scriptPath)}");
@@ -745,7 +893,7 @@ private static void SeedDefaults(Db db)
                 {
                     rp.AddLine("[ERR] " + result.Exception?.Message);
                     if (result.Snippet != null) rp.AddLine(result.Snippet.ToString());
-                    SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                    SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
                     RunLogger(scheduleTag, runId)?.Error($"[{name}] csx-zp7 failed: {result.Exception?.Message}");
                     rp.Result = result.Exception?.Message ?? "error";
                     _running.TryRemove(instanceKey, out _);
@@ -754,7 +902,7 @@ private static void SeedDefaults(Db db)
                     return;
                 }
 
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
                 rp.Result = "ok";
                 RunLogger(scheduleTag, runId)?.Info($"[{name}] csx-zp7 done run={runId}");
                 _running.TryRemove(instanceKey, out _);
@@ -764,7 +912,7 @@ private static void SeedDefaults(Db db)
             catch (Exception ex)
             {
                 rp.AddLine("[ERR] " + ex.Message);
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
                 RunLogger(scheduleTag, runId)?.Error($"[{name}] csx-zp7 failed: {ex.Message}");
                 rp.Result = ex.Message;
                 _running.TryRemove(instanceKey, out _);
@@ -774,7 +922,7 @@ private static void SeedDefaults(Db db)
             finally
             {
                 cts.Dispose();
-                TryDrainOne(db, id);
+                TopUp(db, id);
             }
 
             return;
@@ -801,6 +949,10 @@ private static void SeedDefaults(Db db)
         };
         psi.Environment["PYTHONIOENCODING"] = "utf-8";
         psi.Environment["PYTHONUNBUFFERED"] = "1";
+        TaskRunContext.Current.ApplyEnvironment(psi.Environment);
+        var sdkPath = Path.Combine(AppContext.BaseDirectory, "sdk", "python");
+        psi.Environment["PYTHONPATH"] = sdkPath + (psi.Environment.TryGetValue("PYTHONPATH", out var pythonPath)
+            && !string.IsNullOrEmpty(pythonPath) ? Path.PathSeparator + pythonPath : "");
 
         var process = new System.Diagnostics.Process { StartInfo = psi, EnableRaisingEvents = true };
         var rp2     = new RunningProcess(process, firedAt, null, broadcast);
@@ -814,13 +966,14 @@ private static void SeedDefaults(Db db)
             process.Start();
 
             _running[instanceKey] = rp2;
+            threadSlot?.Dispose();
 
             var stdoutTask = ReadStreamAsync(process.StandardOutput.BaseStream, rp2, prefix: "");
             var stderrTask = ReadStreamAsync(process.StandardError.BaseStream,  rp2, prefix: "");
 
             await Task.WhenAll(stdoutTask, stderrTask, process.WaitForExitAsync());
 
-            SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true }), id);
+            SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
 
             string output = rp2.Snapshot();
             _log?.Info($"[{name}] exit {process.ExitCode} run={runId}");
@@ -838,7 +991,7 @@ private static void SeedDefaults(Db db)
         finally
         {
             process.Dispose();
-            TryDrainOne(db, id);
+            TopUp(db, id);
         }
     }
 
@@ -923,14 +1076,14 @@ private static void SeedDefaults(Db db)
     /// вручную, cron — выражение из колонки cron, zp — модель планировщика
     /// ZennoPoster из schedule_json.
     /// </summary>
-    private static ZpSchedule.Decision Decide(Dictionary<string, string> r, DateTime now, bool isRunning)
-        => r.GetValueOrDefault("schedule_mode", "off") switch
+    private static ZpSchedule.Decision Decide(Dictionary<string, string> r, DateTime now, int active, int maxThreads)
+        => IsHeld(r, now) ? ZpSchedule.Decision.No : r.GetValueOrDefault("schedule_mode", "off") switch
         {
             "cron" => CronFires(r.GetValueOrDefault("cron", ""), now)
                           ? new ZpSchedule.Decision(true, 1)
                           : ZpSchedule.Decision.No,
             "zp"   => ZpSchedule.ShouldFire(ZpSchedule.Parse(r.GetValueOrDefault("schedule_json", "")),
-                                            ReadState(r, isRunning), now),
+                                            ReadState(r, active, maxThreads), now),
             _      => ZpSchedule.Decision.No,
         };
 
@@ -946,12 +1099,12 @@ private static void SeedDefaults(Db db)
         catch { return false; }
     }
 
-    private static ZpSchedule.State ReadState(Dictionary<string, string> r, bool isRunning)
+    private static ZpSchedule.State ReadState(Dictionary<string, string> r, int active, int maxThreads)
     {
         DateTime? lastRun = DateTime.TryParse(r.GetValueOrDefault("last_run", ""), out var lr) ? lr : null;
         DateTime? started = DateTime.TryParse(r.GetValueOrDefault("sched_started_at", ""), out var sa) ? sa : null;
         var runs = int.TryParse(r.GetValueOrDefault("sched_runs", "0"), out var n) ? n : 0;
-        return new ZpSchedule.State(lastRun, runs, started, isRunning);
+        return new ZpSchedule.State(lastRun, runs, started, active, maxThreads);
     }
 
     /// <summary>
@@ -1048,6 +1201,26 @@ private static void SeedDefaults(Db db)
         return string.Join("\n\n", keys
             .Where(k => _running.ContainsKey(k))
             .Select(k => $"── {k[(id.Length + 1)..]} ──\n{_running[k].Snapshot()}"));
+    }
+
+    /// <summary>
+    /// Снимок живого вывода как готовые SSE-события: строка, время и id нити.
+    /// Догруженная при переподписке история раскрашивается так же, как поток.
+    /// </summary>
+    public List<string> GetLiveEvents(string id)
+    {
+        return _running
+            .Where(kv => kv.Key.StartsWith(id + ":"))
+            .SelectMany(kv => kv.Value.Lines().Select(l => (l.At, l.Text, Run: kv.Key[(id.Length + 1)..])))
+            .OrderBy(e => e.At)
+            .Select(e => JsonSerializer.Serialize(new
+            {
+                line  = e.Text,
+                run   = e.Run,
+                ts    = e.At.ToString("o"),
+                level = e.Text.StartsWith("[ERR]") ? "ERROR" : "INFO",
+            }))
+            .ToList();
     }
 
     public string GetResult(string id)
@@ -1185,26 +1358,37 @@ private static void SeedDefaults(Db db)
         _running.TryRemove(key, out _);
     }
 
+    /// <summary>
+    /// Ручной запуск. Наливает все свободные нити задачи: если в настройках стоит
+    /// пять потоков, кнопка Run поднимает пять инстансов, а не один.
+    /// </summary>
     public void FireNow(string id, Dictionary<string, string> record, Db db)
     {
         var overlap    = record.GetValueOrDefault("on_overlap", "skip");
-        var maxThreads = int.TryParse(record.GetValueOrDefault("max_threads", "1"), out var mt) ? mt : 1;
+        var maxThreads = ReadThreads(record);
         var active     = CountActiveInstances(id);
 
-        switch (overlap)
+        if (overlap == "kill_restart" && active > 0)
         {
-            case "skip":
-                if (active > 0) return;
-                break;
-            case "kill_restart":
-                if (active > 0) { KillAllInstances(id); RemoveInstancesFromRunning(id); }
-                break;
-            case "parallel":
-                if (active >= maxThreads) { EnqueueItem(db, id, record, priority: 0); return; }
-                break;
+            KillAllInstances(id);
+            RemoveInstancesFromRunning(id);
+            active = 0;
         }
 
-        _ = LaunchAsync(db, record, DateTime.UtcNow);
+        var free = Math.Max(0, maxThreads - active);
+        if (free == 0)
+        {
+            // Свободных нитей нет: очередь копит только режим parallel.
+            if (overlap == "parallel") EnqueueItem(db, id, record, priority: 0);
+            return;
+        }
+
+        var stagger = TimeSpan.Zero;
+        for (var i = 0; i < free; i++)
+        {
+            StartInstance(db, record, DateTime.UtcNow, delay: stagger, automatic: false);
+            stagger += NextStaggerGap();
+        }
     }
 
     public void Dispose()
@@ -1220,7 +1404,7 @@ private static void SeedDefaults(Db db)
     {
         private readonly System.Diagnostics.Process? _process;
         private readonly CancellationTokenSource?    _cts;
-        private readonly List<string>                _lines = new();
+        private readonly List<(DateTime At, string Text)> _lines = new();
         private readonly object                      _lock  = new();
         private readonly Action<string>?             _broadcast;
 
@@ -1267,7 +1451,7 @@ private static void SeedDefaults(Db db)
 
         public void AddLine(string line)
         {
-            lock (_lock) { _lines.Add(line); if (_lines.Count > 2000) _lines.RemoveAt(0); }
+            lock (_lock) { _lines.Add((DateTime.UtcNow, line)); if (_lines.Count > 2000) _lines.RemoveAt(0); }
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine($"[LIVE+] {line}");
             Console.ResetColor();
@@ -1276,7 +1460,13 @@ private static void SeedDefaults(Db db)
 
         public string Snapshot()
         {
-            lock (_lock) { return string.Join("\n", _lines); }
+            lock (_lock) { return string.Join("\n", _lines.Select(l => l.Text)); }
+        }
+
+        /// <summary>Строки со временем — для восстановления цветного лога при переподписке.</summary>
+        public List<(DateTime At, string Text)> Lines()
+        {
+            lock (_lock) { return new List<(DateTime, string)>(_lines); }
         }
 
         public void Clear()

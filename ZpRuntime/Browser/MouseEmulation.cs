@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DevDeck.Browser
+namespace z3nDash.Browser
 {
     /// <summary>
     /// Курсор страницы: где он сейчас и как доходит до цели.

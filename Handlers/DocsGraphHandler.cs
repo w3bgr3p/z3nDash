@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace DevDeck;
+namespace z3nDash;
 
 internal sealed class DocsGraphHandler
 {

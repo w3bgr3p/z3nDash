@@ -1,24 +1,24 @@
 ﻿using System.Net;
 using System.Text;
 using System.Text.Json;
-using DevDeck;
+using z3nDash;
 
-namespace DevDeck;
+namespace z3nDash;
 
 /// <summary>
 /// Маршруты:
-///   GET  /scheduler          — HTML страница
-///   GET  /scheduler/list     — список расписаний из БД
-///   POST /scheduler/save     — создать / обновить запись
-///   POST /scheduler/delete   — удалить по id
-///   POST /scheduler/run      — запустить вручную немедленно
-///   POST /scheduler/stop     — Kill процесса по id
-///   GET  /scheduler/output   — last_output из БД по ?id=
-///   GET  /scheduler/pick     — системный диалог выбора файла или каталога
+///   GET  /tasker          — HTML страница
+///   GET  /tasker/list     — список расписаний из БД
+///   POST /tasker/save     — создать / обновить запись
+///   POST /tasker/delete   — удалить по id
+///   POST /tasker/run      — запустить вручную немедленно
+///   POST /tasker/stop     — Kill процесса по id
+///   GET  /tasker/output   — last_output из БД по ?id=
+///   GET  /tasker/pick     — системный диалог выбора файла или каталога
 /// </summary>
 public sealed class SchedulerHandler : IScriptHandler
 {
-    public string PathPrefix => "/scheduler";
+    public string PathPrefix => "/tasker";
 
     private readonly DbConnectionService _dbService;
     private readonly SchedulerService    _scheduler;
@@ -51,7 +51,7 @@ public sealed class SchedulerHandler : IScriptHandler
         var path   = context.Request.Url?.AbsolutePath.ToLower() ?? "";
         var method = context.Request.HttpMethod;
 
-        if (!path.StartsWith("/scheduler")) return false;
+        if (!path.StartsWith("/tasker")) return false;
 
         if (!_dbService.TryGetDb(out var db) || db == null)
         {
@@ -61,50 +61,62 @@ public sealed class SchedulerHandler : IScriptHandler
 
         try
         {
-            if (path == "/scheduler" || path == "/scheduler/" || path == "/scheduler.html")           { await ServePage(context.Response);          return true; }
-            if (path == "/scheduler/list"    && method == "GET")         { await List(context, db);                    return true; }
-            if (path == "/scheduler/save"    && method == "POST")        { await Save(context, db);                    return true; }
-            if (path == "/scheduler/delete"  && method == "POST")        { await Delete(context, db);                  return true; }
-            if (path == "/scheduler/run"     && method == "POST")        { await RunNow(context, db);                  return true; }
-            if (path == "/scheduler/stop"    && method == "POST")        { await Stop(context);                        return true; }
-            if (path == "/scheduler/output"       && method == "GET")  { await Output(context, db);    return true; }
-            if (path == "/scheduler/live-output"  && method == "GET")  { await LiveOutput(context);     return true; }
-            if (path == "/scheduler/clear-output" && method == "POST") { await ClearOutput(context, db); return true; }
-            if (path == "/scheduler/payload"      && method == "GET")  { await GetPayload(context, db); return true; }
-            if (path == "/scheduler/pick"         && method == "GET")  { await Pick(context);           return true; }
-            if (path == "/scheduler/payload" && method == "POST")        { await SavePayload(context, db);             return true; }
-            if (path == "/scheduler/process-stats" && method == "GET") { await ProcessStats(context); return true; }
-            if (path == "/scheduler/instances"     && method == "GET")  { await Instances(context); return true; }
-            if (path == "/scheduler/kill-instance" && method == "POST") { await KillInstance(context); return true; }
-            if (path == "/scheduler/queue"         && method == "GET")  { await QueueItems(context, db); return true; }
-            if (path == "/scheduler/clear-queue"   && method == "POST") { await ClearQueue(context, db); return true; }
-            if (path == "/scheduler/output/stream" && method == "GET")
+            if (path == "/tasker" || path == "/tasker/" || path == "/tasker.html")           { await ServePage(context.Response);          return true; }
+            if (path == "/tasker/list"    && method == "GET")         { await List(context, db);                    return true; }
+            if (path == "/tasker/save"    && method == "POST")        { await Save(context, db);                    return true; }
+            if (path == "/tasker/delete"  && method == "POST")        { await Delete(context, db);                  return true; }
+            if (path == "/tasker/run"     && method == "POST")        { await RunNow(context, db);                  return true; }
+            if (path == "/tasker/defer" && method == "POST")
             {
-                var sid      = context.Request.QueryString["id"] ?? "";
-                var snapshot = _scheduler.GetLiveOutput(sid);
-                var lines    = string.IsNullOrEmpty(snapshot)
-                    ? null
-                    : snapshot.Split('\n').Where(l => l.Length > 0);
-                await SseHub.SubscribeOutput(context.Response, sid, GetDisconnectToken(context), lines);
+                var id = context.Request.QueryString["id"] ?? "";
+                var (until, reason) = await TaskControlHandler.ReadDefer(context.Request);
+                await HttpHelpers.WriteJson(context.Response, _scheduler.DeferTask(id, until, reason));
                 return true;
             }
-            if (path == "/scheduler/build"         && method == "POST") { await Build(context, db); return true; }
-            if (path == "/scheduler/open-file"   && method == "GET") { await OpenFile(context);   return true; }
-            if (path == "/scheduler/open-folder" && method == "GET") { await OpenFolder(context); return true; }
-            if (path == "/scheduler/scan-folder" && method == "GET") { await ScanFolder(context, db); return true; }
-            if (path == "/scheduler/package-scripts" && method == "GET") { await PackageScripts(context, db); return true; }
-            if (path == "/scheduler/config-file" && method == "GET") { await GetConfigFile(context, db); return true; }
-            if (path == "/scheduler/config-file" && method == "POST") { await SaveConfigFile(context); return true; }
-            if (path == "/scheduler/ensure-venv" && method == "POST") { await EnsureVenv(context, db); return true; }
-            if (path == "/scheduler/internal-tasks" && method == "GET") { await InternalTasks(context); return true; }
-            if (path == "/scheduler/schedule-preview" && method == "POST") { await SchedulePreview(context); return true; }
-            if (path == "/scheduler/install/stream" && method == "GET") { await InstallStream(context, db); return true; }
-            if (path == "/scheduler/open-terminal" && method == "GET") { await OpenTerminal(context, db); return true; }
+            if ((path == "/tasker/pause" || path == "/tasker/resume") && method == "POST")
+            {
+                var json = await ReadJson(context.Request);
+                var id = json?.GetProperty("id").GetString() ?? "";
+                await HttpHelpers.WriteJson(context.Response, _scheduler.PauseTask(id, path.EndsWith("/pause")));
+                return true;
+            }
+            if (path == "/tasker/stop"    && method == "POST")        { await Stop(context);                        return true; }
+            if (path == "/tasker/output"       && method == "GET")  { await Output(context, db);    return true; }
+            if (path == "/tasker/live-output"  && method == "GET")  { await LiveOutput(context);     return true; }
+            if (path == "/tasker/clear-output" && method == "POST") { await ClearOutput(context, db); return true; }
+            if (path == "/tasker/payload"      && method == "GET")  { await GetPayload(context, db); return true; }
+            if (path == "/tasker/pick"         && method == "GET")  { await Pick(context);           return true; }
+            if (path == "/tasker/payload" && method == "POST")        { await SavePayload(context, db);             return true; }
+            if (path == "/tasker/process-stats" && method == "GET") { await ProcessStats(context); return true; }
+            if (path == "/tasker/instances"     && method == "GET")  { await Instances(context); return true; }
+            if (path == "/tasker/kill-instance" && method == "POST") { await KillInstance(context); return true; }
+            if (path == "/tasker/queue"         && method == "GET")  { await QueueItems(context, db); return true; }
+            if (path == "/tasker/clear-queue"   && method == "POST") { await ClearQueue(context, db); return true; }
+            if (path == "/tasker/output/stream" && method == "GET")
+            {
+                var sid    = context.Request.QueryString["id"] ?? "";
+                var events = _scheduler.GetLiveEvents(sid);
+                await SseHub.SubscribeOutput(context.Response, sid, GetDisconnectToken(context),
+                                             events.Count == 0 ? null : events);
+                return true;
+            }
+            if (path == "/tasker/build"         && method == "POST") { await Build(context, db); return true; }
+            if (path == "/tasker/open-file"   && method == "GET") { await OpenFile(context);   return true; }
+            if (path == "/tasker/open-folder" && method == "GET") { await OpenFolder(context); return true; }
+            if (path == "/tasker/scan-folder" && method == "GET") { await ScanFolder(context, db); return true; }
+            if (path == "/tasker/package-scripts" && method == "GET") { await PackageScripts(context, db); return true; }
+            if (path == "/tasker/config-file" && method == "GET") { await GetConfigFile(context, db); return true; }
+            if (path == "/tasker/config-file" && method == "POST") { await SaveConfigFile(context); return true; }
+            if (path == "/tasker/ensure-venv" && method == "POST") { await EnsureVenv(context, db); return true; }
+            if (path == "/tasker/internal-tasks" && method == "GET") { await InternalTasks(context); return true; }
+            if (path == "/tasker/schedule-preview" && method == "POST") { await SchedulePreview(context); return true; }
+            if (path == "/tasker/install/stream" && method == "GET") { await InstallStream(context, db); return true; }
+            if (path == "/tasker/open-terminal" && method == "GET") { await OpenTerminal(context, db); return true; }
 
         }
         catch (Exception ex)
         {
-            context.Response.StatusCode = 500;
+            context.Response.StatusCode = ex is ArgumentException or JsonException ? 400 : ex is KeyNotFoundException ? 404 : 500;
             await HttpHelpers.WriteJson(context.Response, new { error = ex.Message });
         }
 
@@ -121,7 +133,10 @@ public sealed class SchedulerHandler : IScriptHandler
         cols = cols.Where(c => c != "last_output").ToList();
         var rows = db.GetLines(string.Join(",", cols), Table, where: "\"id\" != ''");
 
-        await HttpHelpers.WriteJson(ctx.Response, RowsToList(rows, cols));
+        var tasks = RowsToList(rows, cols);
+        foreach (var task in tasks)
+            task["defer_reason"] = SchedulerService.DecodeReason(task.GetValueOrDefault("defer_reason", ""));
+        await HttpHelpers.WriteJson(ctx.Response, tasks);
     }
 
     private async Task Save(HttpListenerContext ctx, Db db)
@@ -155,6 +170,9 @@ public sealed class SchedulerHandler : IScriptHandler
             record["last_output"] = "";
             db.InsertDic(record, Table);
         }
+
+        // «Начать сразу» должно значить сразу, а не «на ближайшем минутном тике».
+        _scheduler.EvaluateNow(id, db);
 
         await HttpHelpers.WriteJson(ctx.Response, new { ok = true, id });
     }
@@ -322,7 +340,7 @@ public sealed class SchedulerHandler : IScriptHandler
 
     private async Task ServePage(HttpListenerResponse response)
     {
-        string filePath = Path.Combine(_wwwrootPath, "scheduler.html");
+        string filePath = Path.Combine(_wwwrootPath, "tasker.html");
         if (File.Exists(filePath))
         {
             var bytes = await File.ReadAllBytesAsync(filePath);
@@ -333,7 +351,7 @@ public sealed class SchedulerHandler : IScriptHandler
         else
         {
             response.StatusCode = 404;
-            var bytes = Encoding.UTF8.GetBytes($"scheduler.html not found at: {filePath}");
+            var bytes = Encoding.UTF8.GetBytes($"tasker.html not found at: {filePath}");
             await response.OutputStream.WriteAsync(bytes);
         }
         response.Close();

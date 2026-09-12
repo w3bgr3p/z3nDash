@@ -1,4 +1,4 @@
-﻿namespace DevDeck
+﻿namespace z3nDash
 {
     
     public class TableSchema
@@ -8,7 +8,7 @@
     }
     
     /// <summary>
-    /// Централизованное хранилище схем таблиц, которые DevDeck использует напрямую.
+    /// Централизованное хранилище схем таблиц, которые z3nDash использует напрямую.
     /// </summary>
     public static class DbSchema
     {
@@ -56,6 +56,9 @@
                 { "sched_runs",       "TEXT DEFAULT '0'" },
                 { "sched_started_at", "TEXT DEFAULT ''" },
                 { "browser_json",     "TEXT DEFAULT ''" },
+                { "deferred_until",   "TEXT DEFAULT ''" },
+                { "defer_reason",     "TEXT DEFAULT ''" },
+                { "schedule_paused",  "TEXT DEFAULT 'false'" },
             }
         };
 

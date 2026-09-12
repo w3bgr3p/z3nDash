@@ -1,4 +1,4 @@
-﻿namespace DevDeck;
+﻿namespace z3nDash;
 
 public class DbConfig
 {
@@ -29,6 +29,25 @@ public class ApiConfig
     // ZB API base URL. Default: http://localhost:8160
     public string ZbHost { get; set; } = string.Empty;
 }
+
+public class BrowserApiConfig
+{
+    public string Host { get; set; } = string.Empty;
+    public string Token { get; set; } = string.Empty;
+}
+
+public class BrowsersApiConfig
+{
+    public BrowserApiConfig ZennoBrowser { get; set; } = new() { Host = "http://localhost:8160" };
+    public BrowserApiConfig ShardX { get; set; } = new() { Host = "http://127.0.0.1:40325" };
+
+    public void UseLegacy(ApiConfig legacy)
+    {
+        if (!string.IsNullOrWhiteSpace(legacy.ZbHost)) ZennoBrowser.Host = legacy.ZbHost;
+        if (!string.IsNullOrWhiteSpace(legacy.ZB)) ZennoBrowser.Token = legacy.ZB;
+    }
+}
+
 public class SecurityConfig
 {
     public string JVarsPath { get; set; } = string.Empty;

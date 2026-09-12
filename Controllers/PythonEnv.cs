@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace DevDeck;
+namespace z3nDash;
 
 /// <summary>
 /// Каталог зависимостей рядом со скриптом. Интерпретатор остаётся системным:

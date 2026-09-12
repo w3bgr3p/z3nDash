@@ -2,7 +2,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 public class CliplatesHandler : IScriptHandler
 {

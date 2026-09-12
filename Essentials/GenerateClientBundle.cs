@@ -5,7 +5,7 @@
 using Newtonsoft.Json;
 using z3n7;   // FromBase64 — перенесённое из эталона расширение
 
-namespace DevDeck;
+namespace z3nDash;
 
 public static partial class InternalTasks
 {

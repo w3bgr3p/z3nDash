@@ -6,7 +6,7 @@ Dock подключается страницами через `wwwroot/js/nav.js
 
 | ID | Страница | Хоткей |
 |---|---|---|
-| `scheduler` | [[Tasker]] | `Alt+1` |
+| `tasker` | [[Tasker]] | `Alt+1` |
 | `zp7` | [[ZP7]] | `Alt+2` |
 | `zb` | [[ZB]] | `Alt+3` |
 | `logs` | [[Logs]] | `Alt+4` |

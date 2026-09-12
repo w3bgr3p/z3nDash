@@ -20,7 +20,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace DevDeck.Xml;
+namespace z3nDash.Xml;
 
 /// <summary>Правила генерации из &lt;Profile&gt;. Всё необязательно.</summary>
 public sealed class ProfileRules

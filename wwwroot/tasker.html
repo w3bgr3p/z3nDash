@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/python/python.min.js"></script>
 
-    <title>DevDeck | Scheduler</title>
+    <title>z3nDash | Tasker</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -133,14 +133,82 @@
         .live-badge { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--green-bg, rgba(63,185,80,0.15)); color: var(--green, #3fb950); animation: blink 1.2s infinite; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
         .output-box { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; overflow-y: auto; height: calc(100% - 40px); min-height: 100px; }
-        .out-line { padding: 2px 10px; border-bottom: 1px solid var(--bg2); font-family: 'Consolas', monospace; font-size: 10px; line-height: 1.6; word-break: break-all; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        /* ── Цветной лог ──────────────────────────────────────────────
+           Тон тега и нити задаётся инлайново через --ll-h, насыщенность и
+           светлота живут здесь: в светлой теме те же тона должны быть темнее. */
+        :root                { --ll-s: 62%; --ll-l: 68%; }
+        [data-theme="light"] { --ll-s: 58%; --ll-l: 34%; }
+
+        /* Базовая ANSI-палитра для вывода скриптов: 0–7 обычные, 8–15 яркие */
+        :root {
+            --ansi-0:#4b5263;  --ansi-1:#ff5566;  --ansi-2:#4ecca3;  --ansi-3:#ffd566;
+            --ansi-4:#4e9eff;  --ansi-5:#c678dd;  --ansi-6:#56b6c2;  --ansi-7:#c8d0e8;
+            --ansi-8:#5a6480;  --ansi-9:#ff7b86;  --ansi-10:#7ee2c0; --ansi-11:#ffe08a;
+            --ansi-12:#7ab8ff; --ansi-13:#d79bf0; --ansi-14:#7fd3dd; --ansi-15:#e6edf3;
+        }
+        [data-theme="light"] {
+            --ansi-0:#24292f;  --ansi-1:#cf222e;  --ansi-2:#1a7f37;  --ansi-3:#9a6700;
+            --ansi-4:#0969da;  --ansi-5:#8250df;  --ansi-6:#1b7c83;  --ansi-7:#57606a;
+            --ansi-8:#6e7781;  --ansi-9:#a40e26;  --ansi-10:#116329; --ansi-11:#7d4e00;
+            --ansi-12:#0550ae; --ansi-13:#6639ba; --ansi-14:#3192aa; --ansi-15:#1f2328;
+        }
+
+        .out-line { padding: 2px 10px; border-bottom: 1px solid var(--bg2); border-left: 2px solid transparent; font-family: 'Consolas', monospace; font-size: 10px; line-height: 1.6; word-break: break-all; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
         .out-line-text { flex: 1; min-width: 0; }
         .out-line-timestamp { font-size: 8px; color: var(--text2); opacity: 0.4; white-space: nowrap; flex-shrink: 0; font-family: 'Consolas', monospace; }
         .out-line.ERROR   { color: var(--red, #f85149); }
         .out-line.WARNING { color: var(--yellow, #d29922); }
         .out-line.INFO    { color: var(--text); }
+        .out-line.OK      { color: var(--text); }
         .out-line.DEBUG   { color: var(--text2); }
         .out-line.empty   { color: var(--text2); padding: 12px; text-align: center; display: block; }
+
+        /* Нить: полоса слева всегда, бейдж — только когда нитей больше одной */
+        .out-line[data-run] { border-left-color: hsl(var(--ll-h) var(--ll-s) var(--ll-l) / 0.5); }
+        .out-line-run { display: none; }
+        #outputBox.multi-run .out-line-run {
+            display: inline-block; flex-shrink: 0; font-size: 8px; letter-spacing: 0.5px;
+            padding: 0 4px; border-radius: 3px; font-family: 'Consolas', monospace;
+            color: hsl(var(--ll-h) var(--ll-s) var(--ll-l));
+            background: hsl(var(--ll-h) var(--ll-s) var(--ll-l) / 0.14);
+        }
+
+        /* Тег в начале строки */
+        .ll-tag { display: inline-block; margin-right: 5px; padding: 0 4px; border-radius: 3px; font-weight: 600;
+                  color: hsl(var(--ll-h) var(--ll-s) var(--ll-l));
+                  background: hsl(var(--ll-h) var(--ll-s) var(--ll-l) / 0.14); }
+        .ll-tag.ll-ERROR   { color: var(--red);      background: rgba(255,85,102,0.15); }
+        .ll-tag.ll-WARNING { color: var(--yellow);   background: rgba(255,213,102,0.15); }
+        .ll-tag.ll-OK      { color: var(--green);    background: rgba(78,204,163,0.15); }
+        .ll-tag.ll-DEBUG   { color: var(--text-dim); background: rgba(128,128,128,0.13); }
+
+        /* Подсветка внутри строки */
+        .ll-url { color: var(--accent); text-decoration: underline; text-decoration-color: rgba(78,158,255,0.35); }
+        .ll-str { color: var(--string-color); }
+        .ll-key { color: var(--key-color); }
+        .ll-val { color: var(--text-hi); }
+        .ll-num { color: var(--number-color); }
+        .ll-op  { color: var(--text-dim); }
+
+        /* Фильтры по уровню и по нити */
+        #outputBox.lvl-warn .out-line.INFO,
+        #outputBox.lvl-warn .out-line.OK,
+        #outputBox.lvl-warn .out-line.DEBUG,
+        #outputBox.lvl-err  .out-line:not(.ERROR),
+        .out-line.ll-muted { display: none; }
+
+        /* Чипы нитей занимают остаток шапки и скроллятся внутри себя, чтобы не
+           выталкивать кнопки панели; сами кнопки не сжимаются никогда. */
+        .run-chips { display: flex; gap: 3px; align-items: center; margin-left: 6px;
+                     flex: 1 1 0; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+        .run-chips::-webkit-scrollbar { height: 0; }
+        .run-chips:empty { display: none; }
+        .log-panel-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; margin-left: 6px; }
+
+        .run-chip { flex-shrink: 0; font-size: 8px; padding: 1px 5px; border-radius: 3px; cursor: pointer; font-family: 'Consolas', monospace;
+                    border: 1px solid hsl(var(--ll-h) var(--ll-s) var(--ll-l) / 0.5);
+                    color: hsl(var(--ll-h) var(--ll-s) var(--ll-l)); background: transparent; }
+        .run-chip.on { background: hsl(var(--ll-h) var(--ll-s) var(--ll-l) / 0.2); }
 
         .h-resizer { height: 5px; background: var(--bg2); cursor: row-resize; flex-shrink: 0; margin: 1px 0; border-radius: 2px; }
         .h-resizer:hover { background: var(--accent); }
@@ -150,6 +218,10 @@
         .bottom-panels { display: flex; flex-shrink: 0; height: 220px; gap: 0; overflow: hidden; }
         .log-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 4px; background: var(--bg1); min-width: 80px; }
         .log-panel-header { padding: 4px 8px; border-bottom: 1px solid var(--border); display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+        /* На узкой панели сжимается заголовок, а не кнопки: до них должно быть
+           можно дотянуться при любой ширине. */
+        .log-panel-header > .log-panel-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .log-panel-header > #liveBadgeBottom { flex-shrink: 0; }
         .log-panel-title  { font-size: 10px; font-weight: 700; color: var(--accent); flex: 1; display: flex; align-items: center; gap: 5px; }
         .log-panel-title .icon { font-size: 11px; }
         .log-panel-filter { display: flex; gap: 4px; align-items: center; }
@@ -247,7 +319,7 @@
         .cm-close:hover { color: var(--text); }
 
         /* Overview (no selection) — stats for all tasks */
-        .ov-wrap    { display: flex; flex-direction: column; gap: 12px; max-width: 1100px; margin: 0 auto; min-height: 100%; box-sizing: border-box; }
+        .ov-wrap    { display: flex; flex-direction: column; gap: 12px; width: 100%; min-height: 100%; box-sizing: border-box; }
         .ov-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
         .ov-stat    { background: var(--bg1); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px 8px; display: flex; flex-direction: column; gap: 2px; }
         .ov-stat-num   { font-size: 20px; font-weight: 700; color: var(--text-hi, var(--text)); line-height: 1.1; }
@@ -332,7 +404,13 @@
                 <div class="log-panel-header">
                     <div class="log-panel-title"><span class="icon">▶</span> Output</div>
                     <span id="liveBadgeBottom" style="display:none;font-size:9px;padding:2px 6px;border-radius:3px;background:var(--green-bg,rgba(63,185,80,0.15));color:var(--green,#3fb950);animation:blink 1.2s infinite;">LIVE</span>
-                    <div style="margin-left:auto;display:flex;gap:4px;align-items:center;">
+                    <div id="runChips" class="run-chips" title="Нити прогона: клик — показать только её"></div>
+                    <div class="log-panel-actions">
+                        <select id="outLevel" class="panel-refresh" style="padding:1px 3px;" onchange="setOutputLevel(this.value)" title="Показывать уровни">
+                            <option value="all">all</option>
+                            <option value="warn">warn+</option>
+                            <option value="err">errors</option>
+                        </select>
                         <button class="panel-refresh" onclick="reloadOutput()" title="Refresh">↺</button>
                         <button class="panel-refresh" onclick="clearOutputBottom()" style="color:var(--red,#f85149);border-color:var(--red,#f85149);" title="Clear output">🗑</button>
                     </div>
@@ -408,6 +486,7 @@
 </div>
 
 <script src="/js/ai-panel.js"></script>
-<script src="/js/scheduler.js?v=1777149946"></script>
+<script src="/js/logline.js?v=1"></script>
+<script src="/js/tasker.js?v=1777240001"></script>
 </body>
 </html>

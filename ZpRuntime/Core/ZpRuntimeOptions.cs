@@ -1,9 +1,9 @@
-namespace DevDeck;
+namespace z3nDash;
 
 /// <summary>
 /// Настройки ZpRuntime, которые проставляет хост-приложение при старте.
 /// Нужны, чтобы рантайм не зависел от <see cref="Config"/> — иначе получается
-/// цикл ZpRuntime → DevDeck → ZpRuntime.
+/// цикл ZpRuntime → z3nDash → ZpRuntime.
 /// </summary>
 public static class ZpRuntimeOptions
 {

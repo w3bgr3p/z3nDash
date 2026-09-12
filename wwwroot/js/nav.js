@@ -24,7 +24,7 @@ window.PageState = {
     function activePage() {
         const p = location.pathname;
         const q = location.search;
-        if (p.includes('scheduler')) return 'scheduler';
+        if (p.includes('tasker')) return 'tasker';
         if (q.includes('page=zp7'))     return 'zp7';
         if (q.includes('page=logs'))   return 'logs';
         if (q.includes('page=http'))   return 'http';

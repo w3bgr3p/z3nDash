@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 
-namespace DevDeck;
+namespace z3nDash;
 
 public class Config
 {
@@ -11,6 +11,7 @@ public class Config
     public static DbConfig DbConfig { get; private set; } = new();
     public static LogsConfig LogsConfig { get; private set; } = new();
     public static ApiConfig ApiConfig { get; private set; } = new();
+    public static BrowsersApiConfig BrowsersApi { get; private set; } = new();
     
     public static SecurityConfig SecurityConfig { get; private set; } = new();
     public static AiConfig       AiConfig       { get; private set; } = new();
@@ -35,6 +36,9 @@ public class Config
         DbConfig = config.GetSection("DbConfig").Get<DbConfig>() ?? new();
         LogsConfig = config.GetSection("LogsConfig").Get<LogsConfig>() ?? new();
         ApiConfig = config.GetSection("ApiConfig").Get<ApiConfig>() ?? new();
+        var browsersSection = config.GetSection("BrowsersApi");
+        BrowsersApi = browsersSection.Get<BrowsersApiConfig>() ?? new();
+        if (!browsersSection.Exists()) BrowsersApi.UseLegacy(ApiConfig);
         SecurityConfig = config.GetSection("SecurityConfig").Get<SecurityConfig>() ?? new();
         AiConfig       = config.GetSection("AiConfig").Get<AiConfig>()             ?? new();
         WatchdogConfig = config.GetSection("WatchdogConfig").Get<WatchdogConfig>() ?? new();

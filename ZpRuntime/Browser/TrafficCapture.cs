@@ -7,7 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
-namespace DevDeck.Browser
+namespace z3nDash.Browser
 {
     /// <summary>
     /// Захват трафика вкладки для ZP-шного Tab.GetTraffic.

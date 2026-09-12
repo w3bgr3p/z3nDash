@@ -4,6 +4,6 @@
         <TargetFramework>net8.0-windows</TargetFramework>
     </PropertyGroup>
     <ItemGroup>
-        <ProjectReference Include="..\z3nStub\DevDeck.Stub.csproj" />
+        <ProjectReference Include="..\z3nStub\z3nDash.Stub.csproj" />
     </ItemGroup>
 </Project>

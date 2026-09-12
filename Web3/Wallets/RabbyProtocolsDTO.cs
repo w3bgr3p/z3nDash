@@ -1,4 +1,4 @@
-﻿namespace DevDeck;
+﻿namespace z3nDash;
 
 public class RootObject
 {

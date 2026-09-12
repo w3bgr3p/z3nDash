@@ -1,4 +1,4 @@
-﻿namespace DevDeck;
+﻿namespace z3nDash;
 
 internal static class ExceptionExtensions
 {

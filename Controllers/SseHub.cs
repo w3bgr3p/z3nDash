@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text;
 
-namespace DevDeck;
+namespace z3nDash;
 
 /// <summary>
 /// Центральный хаб SSE-подписок.
@@ -40,7 +40,7 @@ internal static class SseHub
         HttpListenerResponse res,
         string scheduleId,
         CancellationToken ct,
-        IEnumerable<string>? initialLines = null)
+        IEnumerable<string>? initialEvents = null)
     {
         var id  = Guid.NewGuid();
         var sub = new Subscriber(res, scheduleId, ct);
@@ -52,16 +52,12 @@ internal static class SseHub
 
         try { await WriteEvent(res, "ping", "{}"); } catch { return; }
 
-        if (initialLines != null)
+        // Элементы уже сериализованы вызывающим: там известны id нити и время строки.
+        if (initialEvents != null)
         {
-            foreach (var line in initialLines)
+            foreach (var json in initialEvents)
             {
-                try
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(
-                        new { line, level = line.StartsWith("[ERR]") ? "ERROR" : "INFO" });
-                    await WriteEvent(res, "output", json);
-                }
+                try   { await WriteEvent(res, "output", json); }
                 catch { return; }
             }
         }

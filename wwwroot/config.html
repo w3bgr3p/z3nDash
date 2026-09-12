@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DevDeck | Config</title>
+    <title>z3nDash | Config</title>
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
@@ -214,9 +214,27 @@
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 10px;
         }
+        .browser-api-row {
+            display: grid;
+            grid-template-columns: 120px repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            align-items: end;
+        }
+        .browser-api-row + .browser-api-row {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+        .browser-api-name {
+            align-self: center;
+            color: var(--green);
+            font-size: 11px;
+            font-weight: 700;
+        }
         @media (max-width: 560px) {
             .field-row,
             .field-row-3,
+            .browser-api-row,
             .status-grid { grid-template-columns: 1fr; }
         }
 
@@ -510,11 +528,11 @@
             <div class="field-row-3">
                 <div class="field">
                     <label>Dashboard Port</label>
-                    <input id="cfgDashboardPort" type="text" placeholder="10993">
+                    <input id="cfgDashboardPort" type="text" placeholder="33333">
                 </div>
                 <div class="field">
                     <label>Log Host</label>
-                    <input id="cfgLogHost" type="text" placeholder="http://localhost:10994">
+                    <input id="cfgLogHost" type="text" placeholder="http://localhost:33334">
                 </div>
                 <div class="field">
                     <label>Traffic Host</label>
@@ -545,15 +563,27 @@
             </section>
 
             <section class="card config-card">
-            <div class="card-hdr"><h2>ZB API</h2></div>
-            <div class="field-row">
+            <div class="card-hdr"><h2>Browsers API</h2></div>
+            <div class="browser-api-row">
+                <div class="browser-api-name">ZennoBrowser</div>
                 <div class="field">
-                    <label>ZB Host</label>
-                    <input id="cfgZbHost" type="text" placeholder="http://localhost:8160">
+                    <label>Host</label>
+                    <input id="cfgZennoBrowserHost" type="text" placeholder="http://localhost:8160">
                 </div>
                 <div class="field">
-                    <label>ZB API Key</label>
-                    <input id="cfgZbKey" type="password" placeholder="••••••••">
+                    <label>API Key</label>
+                    <input id="cfgZennoBrowserToken" type="password" autocomplete="off" placeholder="••••••••">
+                </div>
+            </div>
+            <div class="browser-api-row">
+                <div class="browser-api-name">ShardX</div>
+                <div class="field">
+                    <label>Host</label>
+                    <input id="cfgShardXHost" type="text" placeholder="http://127.0.0.1:40325">
+                </div>
+                <div class="field">
+                    <label>Bearer Token</label>
+                    <input id="cfgShardXToken" type="password" autocomplete="off" placeholder="••••••••">
                 </div>
             </div>
 
@@ -814,6 +844,9 @@
             const dbConfig   = d.dbConfig   ?? d.DbConfig   ?? {};
             const logsConfig = d.logsConfig ?? d.LogsConfig ?? {};
             const apiConfig  = d.apiConfig  ?? d.ApiConfig  ?? {};
+            const browsersApi = d.browsersApi ?? d.BrowsersApi ?? {};
+            const zennoBrowser = browsersApi.zennoBrowser ?? browsersApi.ZennoBrowser ?? {};
+            const shardX = browsersApi.shardX ?? browsersApi.ShardX ?? {};
 
             setVal('cfgDbType',        (dbConfig.type ?? dbConfig.Type ?? 'sqlite').toLowerCase());
             setVal('cfgSqlitePath',    dbConfig.sqlitePath ?? dbConfig.SqlitePath ?? '');
@@ -825,8 +858,10 @@
             setVal('cfgTempFolder',    logsConfig.tempFolder ?? logsConfig.TempFolder ?? '');
             setVal('cfgReportsFolder', logsConfig.reportsFolder ?? logsConfig.ReportsFolder ?? '');
             setVal('cfgMaxFileSizeMb', logsConfig.maxFileSizeMb ?? logsConfig.MaxFileSizeMb ?? '');
-            setVal('cfgZbKey',         apiConfig.zb ?? apiConfig.ZB ?? '');
-            setVal('cfgZbHost',        apiConfig.zbHost ?? apiConfig.ZbHost ?? '');
+            setVal('cfgZennoBrowserHost', zennoBrowser.host ?? zennoBrowser.Host ?? apiConfig.zbHost ?? apiConfig.ZbHost ?? 'http://localhost:8160');
+            setVal('cfgZennoBrowserToken', zennoBrowser.token ?? zennoBrowser.Token ?? apiConfig.zb ?? apiConfig.ZB ?? '');
+            setVal('cfgShardXHost', shardX.host ?? shardX.Host ?? 'http://127.0.0.1:40325');
+            setVal('cfgShardXToken', shardX.token ?? shardX.Token ?? '');
             setVal('cfgJVarsPath',     d.securityConfig?.jVarsPath ?? '');
 
             // AI
@@ -920,9 +955,15 @@
                 reportsFolder:  document.getElementById('cfgReportsFolder').value,
                 maxFileSizeMb:  parseInt(document.getElementById('cfgMaxFileSizeMb').value) || 0,
             },
-            apiConfig: {
-                zb: document.getElementById('cfgZbKey').value,
-                zbHost: document.getElementById('cfgZbHost').value,
+            browsersApi: {
+                zennoBrowser: {
+                    host: document.getElementById('cfgZennoBrowserHost').value,
+                    token: document.getElementById('cfgZennoBrowserToken').value,
+                },
+                shardX: {
+                    host: document.getElementById('cfgShardXHost').value,
+                    token: document.getElementById('cfgShardXToken').value,
+                },
             }
         };
 

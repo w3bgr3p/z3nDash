@@ -1,4 +1,4 @@
-﻿using DevDeck;
+﻿using z3nDash;
 using z3n7;                    // HeSet/HeClick/Go — эталонные расширения
 using ZennoLab.CommandCenter;  // Instance — приёмник этих расширений
 
@@ -11,7 +11,7 @@ public class Rabby
 
     private const string DefaultExtId = "acmacodkjbdgmoleebolmdjonilkdbch";
 
-    public Rabby(Instance instance, DevDeck.Db db, int acc = 0, string extId = null)
+    public Rabby(Instance instance, z3nDash.Db db, int acc = 0, string extId = null)
     {
         _instance = instance;
         _password = db.Get("evm", "_addresses", where: $"id = {acc}");

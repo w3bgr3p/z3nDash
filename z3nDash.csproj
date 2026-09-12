@@ -8,7 +8,7 @@
 
         <ApplicationIcon Condition="'$(TargetFramework)' == 'net10.0-windows'">icon.ico</ApplicationIcon>
 
-        <RootNamespace>DevDeck</RootNamespace>
+        <RootNamespace>z3nDash</RootNamespace>
         <PublishSingleFile>true</PublishSingleFile>
         <SelfContained>true</SelfContained>
         <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
@@ -16,6 +16,10 @@
         <!--   <ApplicationManifest>app.manifest</ApplicationManifest> -->
         <NoWarn>$(NoWarn);8625;8618;8604;8603;8602;8600;8601;8619</NoWarn>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Update="sdk\python\*.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    </ItemGroup>
 
     <!-- Windows-only SDK features -->
     <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
@@ -71,9 +75,9 @@
         <None Update="wwwroot\static\fonts\JetBrainsMonoNerdFont-Regular.ttf">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Remove="media\DevDeck__.mp4" />
-        <None Remove="media\DevDeck_done.mp4" />
-        <None Remove="media\DevDecklogo.mp4" />
+        <None Remove="media\z3nDash__.mp4" />
+        <None Remove="media\z3nDash_done.mp4" />
+        <None Remove="media\z3nDashlogo.mp4" />
         <None Remove="media\**" />
   
     </ItemGroup>
@@ -90,6 +94,7 @@
         </None>
         <None Update="icon.ico">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
         </None>
         <None Remove="z3nStub\**" />
         <None Remove="installer_output\**" />

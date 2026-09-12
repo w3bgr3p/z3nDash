@@ -5,7 +5,7 @@ using System.Diagnostics;
 using Newtonsoft.Json;
 
 
-namespace DevDeck
+namespace z3nDash
 {
     public class HttpCallDiagnostics
     {
@@ -105,7 +105,7 @@ namespace DevDeck
         private static readonly HttpClient _logClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         private readonly string _taskId;
         private readonly string _account;
-        private readonly string _source = "DevDeck";
+        private readonly string _source = "z3nDash";
         public HttpDebugHandler(string projectName, 
             string logHost = "http://localhost:38109/http-log", 
             string trafficHost = "http://localhost:38109/traffic",

@@ -4,8 +4,8 @@
         <OutputType>Library</OutputType>
         <TargetFramework>net8.0-windows</TargetFramework>
         <UseWindowsForms>false</UseWindowsForms>
-        <RootNamespace>DevDeck</RootNamespace>
-        <AssemblyName>DevDeck.Stub</AssemblyName>
+        <RootNamespace>z3nDash</RootNamespace>
+        <AssemblyName>z3nDash.Stub</AssemblyName>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>

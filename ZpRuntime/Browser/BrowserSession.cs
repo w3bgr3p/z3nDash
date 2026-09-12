@@ -31,7 +31,7 @@
 
 using Microsoft.Playwright;
 
-namespace DevDeck.Browser;
+namespace z3nDash.Browser;
 
 /// <summary>
 /// Живой браузер плюс готовый ZP-шный Instance. Владеет всем, что подняла сама,

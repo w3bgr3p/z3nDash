@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 /// <summary>
 /// Обработчик ZP-роутов.
@@ -11,6 +11,7 @@ namespace DevDeck;
 ///   GET  /zp/nodes       — список зарегистрированных node-сервисов
 ///   GET  /zp/state       — состояние конкретного node
 ///   GET  /zp/state/all   — агрегированное состояние всех node
+///   GET  /zp/task/settings — input settings конкретной задачи
 ///   POST /zp/commands    — отправить команду напрямую node
 /// </summary>
 public class ZpOrchestratorHandler : IScriptHandler
@@ -48,7 +49,11 @@ public class ZpOrchestratorHandler : IScriptHandler
         {
             if (path == "/zp" || path == "/zp/")                    { await ServeZpDashboard(context.Response); return true; }
             if (path == "/zp/commands"       && method == "POST")   { await PostCommand(context, db);     return true; }
-            if (path == "/zp/nodes"  && method == "GET")  { await GetNodes(context, db);  return true; }
+            if (path == "/zp/nodes"          && method == "GET")    { await GetNodes(context, db);        return true; }
+            if (path == "/zp/nodes"          && method == "POST")   { await UpsertNode(context, db);      return true; }
+            if (path == "/zp/nodes"          && method == "DELETE") { await DeleteNode(context, db);      return true; }
+            if (path == "/zp/log"            && method == "GET")    { await GetLog(context, db);          return true; }
+            if (path == "/zp/task/settings"  && method == "GET")    { await GetTaskSettings(context, db); return true; }
             if (path == "/zp/state"  && method == "GET")  { await GetState(context, db);  return true; }
             if (path == "/zp/state/all" && method == "GET") { await GetStateAll(context, db); return true; }
         }
@@ -61,29 +66,167 @@ public class ZpOrchestratorHandler : IScriptHandler
     }
     
     private static readonly System.Net.Http.HttpClient _http = new();
+    private static readonly TimeSpan NodeProbeTimeout = TimeSpan.FromSeconds(2);
 
     private async Task<string?> GetNodeUrl(Db db, string machine)
     {
-        var row = db.Get("host,port", DbSchema.ZpNodes.Name, where: $"\"machine\" = '{machine}'");
-        if (string.IsNullOrEmpty(row)) return null;
-        var parts = row.Split('¦');
-        if (parts.Length < 2) return null;
-        return $"http://{parts[0]}:{parts[1]}";
+        var node = new ZpNodeStore(db).GetAll()
+            .FirstOrDefault(item => item.Machine.Equals(machine, StringComparison.OrdinalIgnoreCase));
+        return node == null ? null : $"http://{node.Host}:{node.Port}";
     }
 
     // ── Handlers ──────────────────────────────────────────────────────────────
     // GET /zp/nodes
     private async Task GetNodes(HttpListenerContext ctx, Db db)
     {
-        var rows = db.GetLines("machine,host,port,updated_at", DbSchema.ZpNodes.Name, where: "1=1");
-        var result = new List<object>();
-        foreach (var row in rows)
+        var store = new ZpNodeStore(db);
+        var probes = store.GetAll().Select(async node => new
         {
-            var p = row.Split('¦');
-            if (p.Length < 4 || string.IsNullOrEmpty(p[0])) continue;
-            result.Add(new { machine = p[0], host = p[1], port = p[2], updated_at = p[3] });
-        }
+            machine = node.Machine,
+            host = node.Host,
+            port = node.Port,
+            updated_at = node.UpdatedAt,
+            available = await ProbeNode(node),
+        });
+
+        var result = await Task.WhenAll(probes);
         await WriteJson(ctx.Response, result);
+    }
+
+    private static async Task UpsertNode(HttpListenerContext ctx, Db db)
+    {
+        var raw = await ReadBody(ctx.Request);
+        if (!ZpNodeStore.TryParse(raw, out var node, out var error))
+        {
+            await WriteError(ctx.Response, 400, error);
+            return;
+        }
+
+        var reachableHost = await new ZpNodeRegistrar(new ZpNodeStore(db)).RegisterAsync(
+            node,
+            Environment.MachineName,
+            ProbeAddress);
+        if (reachableHost == null)
+        {
+            await WriteError(ctx.Response, 502, "node unreachable on loopback, local and external addresses");
+            return;
+        }
+
+        await WriteJson(ctx.Response, new { ok = true, machine = node.Machine, host = reachableHost });
+    }
+
+    private static async Task DeleteNode(HttpListenerContext ctx, Db db)
+    {
+        var machine = ctx.Request.QueryString["machine"]?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(machine))
+        {
+            await WriteError(ctx.Response, 400, "machine required");
+            return;
+        }
+
+        new ZpNodeStore(db).Delete(machine);
+        await WriteJson(ctx.Response, new { ok = true });
+    }
+
+    private static async Task<bool> ProbeNode(ZpNodeRow node)
+        => await ProbeAddress(node.Host, node.Port);
+
+    private static async Task<bool> ProbeAddress(string host, int port)
+    {
+        using var timeout = new CancellationTokenSource(NodeProbeTimeout);
+        try
+        {
+            using var response = await _http.GetAsync($"http://{host}:{port}/state", timeout.Token);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task GetLog(HttpListenerContext ctx, Db db)
+    {
+        var query = ctx.Request.QueryString;
+        var machine = query["machine"]?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(machine))
+        {
+            await WriteError(ctx.Response, 400, "machine required");
+            return;
+        }
+
+        if (!ZpLogRequest.TryCreate(
+                query["kind"], query["process"], query["n"], query["project"],
+                out var logRequest, out var error))
+        {
+            await WriteError(ctx.Response, 400, error);
+            return;
+        }
+
+        var nodeUrl = await GetNodeUrl(db, machine);
+        if (nodeUrl == null)
+        {
+            await WriteError(ctx.Response, 404, $"Node not found: {machine}");
+            return;
+        }
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var response = await _http.GetAsync(nodeUrl + logRequest.BuildPath(), timeout.Token);
+            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            ctx.Response.StatusCode = (int)response.StatusCode;
+            await WriteRaw(ctx.Response, body);
+        }
+        catch (OperationCanceledException)
+        {
+            await WriteError(ctx.Response, 504, "Node log request timed out");
+        }
+        catch (Exception ex)
+        {
+            await WriteError(ctx.Response, 502, $"Node unreachable: {ex.Message}");
+        }
+    }
+
+    private async Task GetTaskSettings(HttpListenerContext ctx, Db db)
+    {
+        var query = ctx.Request.QueryString;
+        var machine = query["machine"]?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(machine))
+        {
+            await WriteError(ctx.Response, 400, "machine required");
+            return;
+        }
+
+        if (!ZpTaskSettingsRequest.TryCreate(query["task_id"], out var settingsRequest, out var error))
+        {
+            await WriteError(ctx.Response, 400, error);
+            return;
+        }
+
+        var nodeUrl = await GetNodeUrl(db, machine);
+        if (nodeUrl == null)
+        {
+            await WriteError(ctx.Response, 404, $"Node not found: {machine}");
+            return;
+        }
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var response = await _http.GetAsync(nodeUrl + settingsRequest.BuildPath(), timeout.Token);
+            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            ctx.Response.StatusCode = (int)response.StatusCode;
+            await WriteRaw(ctx.Response, body);
+        }
+        catch (OperationCanceledException)
+        {
+            await WriteError(ctx.Response, 504, "Node settings request timed out");
+        }
+        catch (Exception ex)
+        {
+            await WriteError(ctx.Response, 502, $"Node unreachable: {ex.Message}");
+        }
     }
 
     private async Task PostCommand(HttpListenerContext ctx, Db db)
@@ -288,10 +431,15 @@ public class ZpOrchestratorHandler : IScriptHandler
 
     private static async Task<JsonElement?> ReadJson(HttpListenerRequest request)
     {
-        using var reader = new StreamReader(request.InputStream);
-        var body = await reader.ReadToEndAsync();
+        var body = await ReadBody(request);
         try { return JsonSerializer.Deserialize<JsonElement>(body); }
         catch { return null; }
+    }
+
+    private static async Task<string> ReadBody(HttpListenerRequest request)
+    {
+        using var reader = new StreamReader(request.InputStream);
+        return await reader.ReadToEndAsync();
     }
 
     private static async Task WriteJson(HttpListenerResponse response, object data)

@@ -3,7 +3,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 
-namespace DevDeck;
+namespace z3nDash;
 
 internal sealed class ZbHandler
 {
@@ -11,11 +11,11 @@ internal sealed class ZbHandler
 
     // ZB API base: из конфига, дефолт localhost:8160
     private static string ZbBase =>
-        !string.IsNullOrWhiteSpace(Config.ApiConfig.ZbHost)
-            ? Config.ApiConfig.ZbHost.TrimEnd('/')
+        !string.IsNullOrWhiteSpace(Config.BrowsersApi.ZennoBrowser.Host)
+            ? Config.BrowsersApi.ZennoBrowser.Host.TrimEnd('/')
             : "http://localhost:8160";
 
-    private static string ZbKey => Config.ApiConfig.ZB;
+    private static string ZbKey => Config.BrowsersApi.ZennoBrowser.Token;
 
     public ZbHandler()
     {

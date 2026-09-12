@@ -4,7 +4,7 @@ PrivateTasks/
 # Только корневой — он локальный. Без ведущей косой черты правило ловило
 # Program.cs на любой глубине, из-за чего в репозиторий не попадали точки входа
 # раннеров: у HwidCheck лежал один csproj, собрать его после клона было нельзя.
-/Program.cs
+
 api-test.http
 riderModule.iml
 .claude/settings.local.json
@@ -94,6 +94,8 @@ __pycache__/
 logs/
 http-logs/
 media/
+docs/
+dev_state/
 *.log
 *.jsonl
 safu.key

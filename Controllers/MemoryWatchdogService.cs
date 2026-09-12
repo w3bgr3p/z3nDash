@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Management;
 #endif
 
-namespace DevDeck;
+namespace z3nDash;
 
 /// <summary>
 /// Фоновый сторож памяти ZennoPoster.

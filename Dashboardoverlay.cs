@@ -35,7 +35,7 @@ using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
-namespace DevDeck;
+namespace z3nDash;
 
 public class DashboardOverlay : Form
 {
@@ -88,7 +88,7 @@ public class DashboardOverlay : Form
 
     private static readonly (string Label, string Match, Func<string, string> Url)[] Tabs =
     [
-        ("⏻ DevDeck",  "page=scheduler", b => b + "/?page=scheduler"),
+        ("⏻ z3nDash",  "page=tasker", b => b + "/?page=tasker"),
         ("߷ ZP7",    "page=zp7",       b => b + "/?page=zp7"),
         ("🌍 ZB",    "page=zb",        b => b + "/?page=zb"),
         ("☰ Logs",   "page=logs",      b => b + "/?page=logs"),
@@ -154,7 +154,7 @@ public class DashboardOverlay : Form
         BackColor       = Color.FromArgb(13, 15, 20);
         Opacity         = _opacity;
         ShowInTaskbar   = true;
-        Text            = "DevDeck";
+        Text            = "z3nDash";
         DoubleBuffered  = true;
         MinimumSize     = new Size(400, 300);
 
@@ -175,7 +175,7 @@ public class DashboardOverlay : Form
         if (!ok)
             MessageBox.Show(
                 $"Hotkey Ctrl+Alt+Z already in use (err {Marshal.GetLastWin32Error()})",
-                "DevDeck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                "z3nDash", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
         Application.AddMessageFilter(new GlobalMouseFilter(this));
     }
@@ -196,7 +196,7 @@ public class DashboardOverlay : Form
 
     private void InitTray()
     {
-        _trayIcon = new NotifyIcon { Text = "DevDeck", Visible = false };
+        _trayIcon = new NotifyIcon { Text = "z3nDash", Visible = false };
 
         try
         {
@@ -290,7 +290,7 @@ public class DashboardOverlay : Form
         {
             MessageBox.Show(
                 $"WebView2 init failed:\n{ex.Message}\n\nInstall WebView2 Runtime.",
-                "DevDeck", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                "z3nDash", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -326,7 +326,7 @@ public class DashboardOverlay : Form
 
         var title = new Label
         {
-            Text      = "DevDeck",
+            Text      = "z3nDash",
             ForeColor = Color.FromArgb(255, 255, 255),
             BackColor = Color.Transparent,
             Font      = new Font(family, 10f, FontStyle.Regular),

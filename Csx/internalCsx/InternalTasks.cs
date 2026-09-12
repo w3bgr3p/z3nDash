@@ -3,7 +3,7 @@
 using Newtonsoft.Json;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 
-namespace DevDeck;
+namespace z3nDash;
 
 public static partial class InternalTasks
 {

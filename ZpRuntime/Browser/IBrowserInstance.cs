@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Drawing;
 
-namespace DevDeck.Browser
+namespace z3nDash.Browser
 {
     public interface IBrowserInstance
     {
