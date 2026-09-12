@@ -29,9 +29,9 @@ namespace z3nDash
         private static Logger _threadLogger;
         public static Logger Current => _threadLogger;
 
-        public static Logger Init(string acc = "", string logHost = null, LogLevel logLevel = LogLevel.Info)
+        public static Logger Init(string acc = "", LogLevel logLevel = LogLevel.Info)
         {
-            _threadLogger = Get(acc, logHost, logLevel);
+            _threadLogger = Get(acc, logLevel);
             return _threadLogger;
         }
 
@@ -46,10 +46,10 @@ namespace z3nDash
 
         private static readonly ConcurrentDictionary<string, Logger> _loggerCache = new();
 
-        public static Logger Get(string acc = "", string logHost = null, LogLevel logLevel = LogLevel.Info)
+        public static Logger Get(string acc = "", LogLevel logLevel = LogLevel.Info)
         {
             string key = string.IsNullOrEmpty(acc) ? "__default__" : acc;
-            return _loggerCache.GetOrAdd(key, _ => new Logger(acc: acc, logHost: logHost, logLevel: logLevel));
+            return _loggerCache.GetOrAdd(key, _ => new Logger(acc: acc, logLevel: logLevel));
         }
 
         public static void ClearCache(string acc = "")
@@ -70,14 +70,11 @@ namespace z3nDash
         public string TaskId  { get; set; }
         public string Session { get; set; }
         public string Project { get; set; }
-        public string LogHost => _logHost;
 
         // Config flags
         private readonly LogLevel        _minLevel;
         private readonly bool            _persistent;
-        private readonly bool            _http;
         private readonly int             _timezone;
-        private readonly string          _logHost;
         private readonly bool            _fAcc, _fTime, _fCaller, _fWrap, _fForce;
         internal readonly Stopwatch       _stopwatch;
         private readonly Action<string>? _sink;
@@ -91,8 +88,6 @@ namespace z3nDash
             string          classEmoji     = null,
             bool            persistent     = true,
             LogLevel        logLevel       = LogLevel.Info,
-            string          logHost        = null,
-            bool            http           = true,
             int             timezoneOffset = -5,
             string          acc            = "",
             string          taskId         = "",
@@ -107,10 +102,8 @@ namespace z3nDash
             Session     = session;
             Project     = project;
             _persistent = persistent;
-            _http       = http;
             _timezone   = timezoneOffset;
             _minLevel   = logLevel;
-            _logHost    = logHost ?? "http://localhost:38109/log";
             _sink       = sink;
             _stopwatch  = persistent ? Stopwatch.StartNew() : null;
 
@@ -146,9 +139,6 @@ namespace z3nDash
             string full   = header + body;
             
             WriteConsole(fullCaller, body, level, full);
-
-            if (_http)
-                HttpSink.Send(_logHost, _timezone, level, body, fullCaller, this);
 
             if (thrw)
                 throw new Exception(full);
@@ -219,50 +209,6 @@ namespace z3nDash
 
         #endregion
     }
-
-    // ── HTTP Sink ─────────────────────────────────────────────────────────────
-    #region HTTP Sink
-
-    internal static class HttpSink
-    {
-        private static readonly HttpClient _client = new() { Timeout = TimeSpan.FromSeconds(5) };
-
-        public static void Send(string logHost, int timezone, LogLevel level, string body, string caller, Logger ctx)
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var payload = BuildPayload(timezone, level, body, caller, ctx);
-                    string json = JsonConvert.SerializeObject(payload);
-
-                    using var cts     = new System.Threading.CancellationTokenSource(1000);
-                    using var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    await _client.PostAsync(logHost, content, cts.Token);
-                }
-                catch { }
-            });
-        }
-
-        private static object BuildPayload(int timezone, LogLevel level, string body, string caller, Logger ctx) => new
-        {
-            machine  = Environment.MachineName,
-            project  = !string.IsNullOrEmpty(ctx.Project) ? ctx.Project : "z3nDash",
-            timestamp = DateTime.UtcNow.AddHours(timezone).ToString("yyyy-MM-dd HH:mm:ss"),
-            level    = level.ToString().ToUpper(),
-            account  = !string.IsNullOrEmpty(ctx.Acc)     ? ctx.Acc     : "-",
-            session  = !string.IsNullOrEmpty(ctx.Session) ? ctx.Session : "-",
-            port     = "-",
-            pid      = "-",
-            task_id  = !string.IsNullOrEmpty(ctx.TaskId)  ? ctx.TaskId  : "-",
-            caller,
-            message  = body.Trim(),
-            origin = "z3nDash",
-            elapsed_ms = ctx._stopwatch?.ElapsedMilliseconds ?? -1,
-        };
-    }
-
-    #endregion
 
     // ── Extension Methods ─────────────────────────────────────────────────────
     #region Extension Methods

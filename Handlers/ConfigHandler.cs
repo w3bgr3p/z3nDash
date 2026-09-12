@@ -259,7 +259,6 @@ internal sealed class ConfigHandler
             isDbConnected  = _dbService.IsConnected,
             dashboardPort  = _port,
             listeningPorts = ports,
-            logHost        = cfg.LogHost,
             logsFolder     = _logPath,
             reportsFolder  = cfg.ReportsFolder,
             tempFolder     = cfg.TempFolder,

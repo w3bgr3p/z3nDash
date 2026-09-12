@@ -6,7 +6,7 @@ namespace z3nDash;
 
 /// <summary>
 /// Центральный хаб SSE-подписок.
-/// Два канала: logs и output (per task id).
+/// Один канал: output (per task id).
 /// </summary>
 internal static class SseHub
 {
@@ -24,13 +24,9 @@ internal static class SseHub
         }
     }
 
-    private static readonly ConcurrentDictionary<Guid, Subscriber> _logs   = new();
     private static readonly ConcurrentDictionary<Guid, Subscriber> _output = new();
 
     // ── Subscribe ─────────────────────────────────────────────────────────────
-
-    public static async Task SubscribeLogs(HttpListenerResponse res, string taskId, CancellationToken ct)
-        => await Keep(_logs, res, taskId, ct);
 
     public static async Task SubscribeOutput(
         HttpListenerResponse res,
@@ -70,9 +66,6 @@ internal static class SseHub
     }
 
     // ── Broadcast ─────────────────────────────────────────────────────────────
-
-    public static void BroadcastLog(string json, string taskId)
-        => Broadcast(_logs, json, taskId);
 
     public static void BroadcastOutput(string line, string scheduleId)
     {

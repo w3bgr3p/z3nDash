@@ -1,4 +1,8 @@
-﻿// Перенесено из z3n7/Essentials/Logger.cs. Копия дословная.
+﻿// Перенесено из z3n7/Essentials/Logger.cs.
+//
+// Отступление от эталона: снят HTTP-sink. Он слал строки лога на /log,
+// а этого маршрута в z3nDash больше нет — приёмник удалён вместе со всем
+// каналом app-логов. Остальное дословно.
 //
 // Не заменяет z3nDash.Logger: тот приложенческий, этот проектно-скоупленный.
 // Привязка к project у эталона вынужденная — в ZennoPoster иначе логировать
@@ -33,13 +37,11 @@ namespace z3n7
         }
 
         public Logger WithInstance(Instance instance)
-            => new Logger(_project, instance, _minLevel, _logHost, _http, _timezone, Emoji);
+            => new Logger(_project, instance, _minLevel, _timezone, Emoji);
 
         // ── Config ────────────────────────────────────────────────────────────
         private readonly IZennoPosterProjectModel _project;
         private readonly LogLevel  _minLevel;
-        private readonly string    _logHost;
-        private readonly bool      _http;
         private readonly int       _timezone;
         private readonly string    _port;
         private readonly string    _pid;
@@ -49,15 +51,12 @@ namespace z3n7
         // cfgLog flags
         private readonly bool _fAcc, _fPort, _fTime, _fCaller, _fWrap, _fForce;
 
-        private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
 
         // ── Constructor ───────────────────────────────────────────────────────
         public Logger(
             IZennoPosterProjectModel project,
             Instance  instance       = null,
             LogLevel  logLevel       = LogLevel.Info,
-            string    logHost        = null,
-            bool      http           = true,
             int       timezoneOffset = -5,
             string    classEmoji     = null)
         {
@@ -70,12 +69,7 @@ namespace z3n7
                 ? parsed
                 : (_project?.Var("debug") == "True" ? LogLevel.Debug : logLevel);
 
-            _logHost = !string.IsNullOrEmpty(logHost)                   ? logHost
-                     : !string.IsNullOrEmpty(_project?.GVar("logHost")) ? _project.GVar("logHost")
-                     : "http://localhost:33333/log";
-
             string cfg = _project?.Var("cfgLog") ?? "";
-            _http    = http && cfg.Contains("http");
             _fAcc    = cfg.Contains("acc");
             _fPort   = cfg.Contains("port");
             _fTime   = cfg.Contains("time");
@@ -94,14 +88,10 @@ namespace z3n7
         /// <summary>Standalone — без ZennoPoster контекста.</summary>
         public Logger(
             LogLevel logLevel       = LogLevel.Info,
-            string   logHost        = null,
-            bool     http           = true,
             int      timezoneOffset = -5,
             string   classEmoji     = null)
         {
             _minLevel = logLevel;
-            _logHost  = logHost ?? "http://localhost:33333/log";
-            _http     = http;
             _timezone = timezoneOffset;
             Emoji     = classEmoji;
             _fCaller  = true;
@@ -138,7 +128,6 @@ namespace z3n7
                 if (thrw) throw new Exception(full);
             }
 
-            if (_http) SendHttp(body, type, caller, level);
         }
 
         public void Debug(object msg, [CallerMemberName] string caller = "")
@@ -176,42 +165,6 @@ namespace z3n7
             return $"\n          {prefix}{text.Trim()}";
         }
 
-        private void SendHttp(string body, LogType type, string caller, LogLevel level)
-        {
-            string prj     = _project?.Name.Replace(".zp", "") ?? "";
-            string acc     = _project?.Var("acc0")             ?? "";
-            string session = _project?.Var("varSessionId")     ?? "";
-            string taskId  = _project?.TaskId                  ?? "";
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var payload = new
-                    {
-                        machine    = Environment.MachineName,
-                        project    = prj,
-                        timestamp  = DateTime.UtcNow.AddHours(_timezone).ToString("yyyy-MM-dd HH:mm:ss"),
-                        level      = level.ToString().ToUpper(),
-                        account    = acc,
-                        session    = session,
-                        port       = _port,
-                        pid        = _pid,
-                        task_id    = taskId,
-                        caller     = caller,
-                        message    = body.Trim(),
-                        origin     = "z3n7",
-                        elapsed_ms = _project.Age<long>(),
-                    };
-
-                    string json = JsonConvert.SerializeObject(payload);
-                    using var cts     = new System.Threading.CancellationTokenSource(1000);
-                    using var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    await _httpClient.PostAsync(_logHost, content, cts.Token);
-                }
-                catch { }
-            });
-        }
     }
 }
 

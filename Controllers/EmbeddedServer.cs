@@ -29,7 +29,6 @@ public class EmbeddedServer
 
     private readonly List<IScriptHandler> _scriptHandlers = new();
 
-    private readonly LogHandler        _logHandler;
     private readonly TrafficHandler    _trafficHandler;
     private readonly ReportHandler     _reportHandler;
     private readonly HttpReplayHandler _replayHandler;
@@ -52,8 +51,12 @@ public class EmbeddedServer
     {
         _port = int.TryParse(config.DashboardPort, out var p) ? p : DefaultPort;
 
+        // Сервер слушает только loopback. Он отдаёт рабочие эндпойнты без
+        // аутентификации — запуск процессов через Tasker, терминал, содержимое
+        // appsettings.secrets.json, — поэтому наружу его открывать нечем.
+        // Побочно: префикс localhost не требует ни прав администратора,
+        // ни резервирования через netsh http add urlacl.
         var ports = new HashSet<int> { _port };
-        if (Uri.TryCreate(config.LogHost,     UriKind.Absolute, out var logUri))     ports.Add(logUri.Port);
 
         var listeningPorts = new List<int>();
         var listenErrors = new List<Exception>();
@@ -62,14 +65,14 @@ public class EmbeddedServer
             try
             {
                 using var test = new HttpListener();
-                test.Prefixes.Add($"http://*:{port}/");
+                test.Prefixes.Add($"http://localhost:{port}/");
                 test.Start(); test.Stop(); test.Close();
-                _listener.Prefixes.Add($"http://*:{port}/");
+                _listener.Prefixes.Add($"http://localhost:{port}/");
                 listeningPorts.Add(port);
             }
             catch (Exception ex)
             {
-                listenErrors.Add(new InvalidOperationException($"http://*:{port}/: {ex.Message}", ex));
+                listenErrors.Add(new InvalidOperationException($"http://localhost:{port}/: {ex.Message}", ex));
                 Console.WriteLine($"Port {port} unavailable: {ex.Message}");
             }
         }
@@ -82,15 +85,15 @@ public class EmbeddedServer
                 try
                 {
                     using var test = new HttpListener();
-                    test.Prefixes.Add($"http://*:{fallback}/");
+                    test.Prefixes.Add($"http://localhost:{fallback}/");
                     test.Start(); test.Stop(); test.Close();
-                    _listener.Prefixes.Add($"http://*:{fallback}/");
+                    _listener.Prefixes.Add($"http://localhost:{fallback}/");
                     listeningPorts.Add(fallback);
                     break;
                 }
                 catch (Exception ex)
                 {
-                    listenErrors.Add(new InvalidOperationException($"http://*:{fallback}/: {ex.Message}", ex));
+                    listenErrors.Add(new InvalidOperationException($"http://localhost:{fallback}/: {ex.Message}", ex));
                 }
             }
         }
@@ -115,7 +118,6 @@ public class EmbeddedServer
         _wwwrootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot");
         EnsureDir(_wwwrootPath, "Wwwroot");
 
-        _logHandler     = new LogHandler(logPath);
         ZpRuntimeOptions.LogsFolder = logPath;
         _trafficHandler = new TrafficHandler();
         _reportHandler = new ReportHandler(reportsPath, _wwwrootPath, dbService);
@@ -137,7 +139,6 @@ public class EmbeddedServer
         int replayPort = _port + 1;
         try
         {
-            //_replayListener.Prefixes.Add($"http://*:{replayPort}/");
             _replayListener.Prefixes.Add($"http://localhost:{replayPort}/");
 
             _replayListener.Start();
@@ -303,12 +304,6 @@ public class EmbeddedServer
                 $"[handler] ZbHandler → {method} {path}".Debug();
                 await _zbHandler.Handle(context);
                  return;
-            }
-            if (_logHandler.Matches(path, method))
-            {
-                if (_debug )  $"[handler] LogHandler → {method} {path}".Debug();
-                await _logHandler.Handle(context);
-                return;
             }
             if (_trafficHandler.Matches(path, method))
             {

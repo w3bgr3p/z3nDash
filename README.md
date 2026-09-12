@@ -59,12 +59,8 @@ Build output and installers are intentionally excluded from Git.
 
 ## First launch
 
-The embedded server uses port `33333` by default. Because z3nDash registers an
-`HttpListener` wildcard prefix, reserve the URL once from an elevated terminal:
-
-```powershell
-netsh http add urlacl url=http://*:33333/ user=Everyone
-```
+The embedded server uses port `33333` by default and binds to loopback only, so
+no URL reservation and no elevation are required.
 
 Start the application:
 
@@ -132,10 +128,16 @@ The navigation dock also shows the current keyboard shortcuts for these pages.
 
 ## Network safety
 
-z3nDash is designed for a trusted local machine or private network. Its embedded
-server listens on all interfaces and exposes operational endpoints. Do not
-publish the dashboard port directly to the internet. Restrict access with the
-Windows firewall or place it behind an authenticated reverse proxy.
+The embedded server binds to `http://localhost:{port}/` and is reachable only
+from the machine it runs on. This is deliberate: its endpoints have no
+authentication and include starting processes through the Tasker, an interactive
+terminal, and reading the contents of `appsettings.secrets.json` - which holds
+the database connection string. Exposing that port would hand anyone who reaches
+it code execution on the machine.
+
+Do not change the prefix to `http://*:{port}/` or forward the port through a
+router. If you need the dashboard from another machine, put it behind an
+authenticated reverse proxy on the same host, or use an SSH tunnel.
 
 ## Repository layout
 

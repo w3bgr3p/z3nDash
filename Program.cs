@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 [w3bgr3p]
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ try
     var logsConfig = Config.IsConfigured ? Config.LogsConfig : new LogsConfig { DashboardPort = "33333" };
 
     var dbConnectionService = new DbConnectionService();
-    var _log = new Logger(logLevel: LogLevel.Error, logHost: logsConfig.LogHost);
+    var _log = new Logger(logLevel: LogLevel.Error);
 
     if (Config.IsConfigured)
     {

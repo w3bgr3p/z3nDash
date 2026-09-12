@@ -392,7 +392,6 @@
             <div class="stat-item"><span class="stat-label">All Ports</span><span class="stat-value" id="sPorts"><span class="pill warn">—</span></span></div>
             <div class="stat-item"><span class="stat-label">DB Mode</span><span class="stat-value mono" id="sDbMode">—</span></div>
             <div class="stat-item"><span class="stat-label">DB Host</span><span class="stat-value mono" id="sDbHost">—</span></div>
-            <div class="stat-item"><span class="stat-label">Log Host</span><span class="stat-value mono" id="sLogHost">—</span></div>
             <div class="stat-item"><span class="stat-label">Logs Folder</span><span class="stat-value mono" id="sLogsFolder" style="font-size:10px">—</span></div>
             <div class="stat-item"><span class="stat-label">Reports Folder</span><span class="stat-value mono" id="sReportsFolder" style="font-size:10px">—</span></div>
             <div class="stat-item"><span class="stat-label">Temp Folder</span><span class="stat-value mono" id="sTempFolder" style="font-size:10px">—</span></div>
@@ -421,7 +420,6 @@
         <div class="file-list" id="fileList"></div>
 
         <div class="btn-row" style="margin-top:16px; justify-content:flex-start; flex-wrap:wrap; gap:8px;">
-            <button class="btn danger" id="clearLogsBtn" onclick="clearLogs('logs')">🗑 Clear App Logs</button>
             <button class="btn danger" id="clearAllBtn" onclick="clearLogs('all')">☠ Clear ALL Logs</button>
         </div>
     </div>
@@ -528,8 +526,6 @@
                     <input id="cfgDashboardPort" type="text" placeholder="33333">
                 </div>
                 <div class="field">
-                    <label>Log Host</label>
-                    <input id="cfgLogHost" type="text" placeholder="http://localhost:33334">
                 </div>
             </div>
             <div class="field-row-3">
@@ -725,7 +721,6 @@
                 : `${d.pgHost ?? ''}:${d.pgPort ?? ''}`;
             setText('sDbHost', host);
 
-            setText('sLogHost', d.logHost || '—');
             setText('sLogsFolder', d.logsFolder || '—');
             setText('sReportsFolder', d.reportsFolder || '—');
             setText('sTempFolder', d.tempFolder || '—');
@@ -792,7 +787,6 @@
 
     // ── Clear Logs ────────────────────────────────────────────────────
     const CLEAR_MAP = {
-        logs:    { url: '/clear',         label: 'App logs' },
         all:     { url: '/clear-all-logs', label: 'ALL logs' },
     };
 
@@ -800,7 +794,7 @@
         const { url, label } = CLEAR_MAP[type];
         if (!await Dialog.confirm(`Clear ${label}? This cannot be undone.`)) return;
 
-        const btnId = { logs:'clearLogsBtn', all:'clearAllBtn' }[type];
+        const btnId = { all: 'clearAllBtn' }[type];
         const btn = document.getElementById(btnId);
         btn.disabled = true;
         btn.textContent = '…';
@@ -817,7 +811,7 @@
             toast('Error: ' + e.message, 'err');
         } finally {
             btn.disabled = false;
-            btn.textContent = btn.id === 'clearAllBtn' ? '☠ Clear ALL Logs' : '🗑 Clear App Logs';
+            btn.textContent = '☠ Clear ALL Logs';
         }
     }
 
@@ -839,7 +833,6 @@
             setVal('cfgSqlitePath',    dbConfig.sqlitePath ?? dbConfig.SqlitePath ?? '');
             setVal('cfgPgConnectionString', dbConfig.postgresConnectionString ?? dbConfig.PostgresConnectionString ?? '');
             setVal('cfgDashboardPort', logsConfig.dashboardPort ?? logsConfig.DashboardPort ?? '');
-            setVal('cfgLogHost',       logsConfig.logHost ?? logsConfig.LogHost ?? '');
             setVal('cfgLogsFolder',    logsConfig.logsFolder ?? logsConfig.LogsFolder ?? '');
             setVal('cfgTempFolder',    logsConfig.tempFolder ?? logsConfig.TempFolder ?? '');
             setVal('cfgReportsFolder', logsConfig.reportsFolder ?? logsConfig.ReportsFolder ?? '');
@@ -934,7 +927,6 @@
             },
             logsConfig: {
                 dashboardPort:  document.getElementById('cfgDashboardPort').value,
-                logHost:        document.getElementById('cfgLogHost').value,
                 logsFolder:     document.getElementById('cfgLogsFolder').value,
                 tempFolder:     document.getElementById('cfgTempFolder').value,
                 reportsFolder:  document.getElementById('cfgReportsFolder').value,

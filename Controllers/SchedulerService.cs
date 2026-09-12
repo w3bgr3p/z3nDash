@@ -1026,8 +1026,7 @@ public sealed partial class SchedulerService : IDisposable
         if (_log == null) return null;
         return new Logger(
             taskId:  scheduleTag,
-            session: runId,
-            logHost: _log.LogHost);
+            session: runId);
     }
 
     private static string BuildScheduleTag(string name)

@@ -25,7 +25,6 @@ function markTaskDirty() {
     captureTaskDraft();
 }
 
-var _sseLog    = null;
 var _httpPoll  = null;
 var _sseOutput = null;
 
@@ -69,7 +68,6 @@ function escHtml(s) {
 // ── SSE ───────────────────────────────────────────────────────────────────────
 
 function closeSse() {
-    if (_sseLog)    { _sseLog.close();    _sseLog    = null; }
     if (_httpPoll)  { clearInterval(_httpPoll); _httpPoll = null; }
 }
 
@@ -80,12 +78,6 @@ function closeSseOutput() {
 function startSse() {
     closeSse();
     if (!curTaskId) return;
-    _sseLog = new EventSource('/logs/stream?task_id=' + encodeURIComponent(curTaskId));
-    _sseLog.addEventListener('message', function(e) {
-        try { appendLogRow(JSON.parse(e.data)); } catch(err) {}
-    });
-    _sseLog.onerror = function() { _sseLog.close(); _sseLog = null; };
-
     _httpPoll = setInterval(loadHttp, 3000);
 }
 
@@ -122,7 +114,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     initResizer();
     initHResizer();
-    initVResizer();
     restoreLayout();
     loadInternalTasks();
     document.getElementById('detailBody').addEventListener('input', markTaskDirty);
@@ -716,31 +707,14 @@ function showBottomPanels(s) {
 function renderDetail(s) {
     if      (activeTab === 'settings') renderSettings(s);
     else if (activeTab === 'schedule') renderSchedule(s);
-    else if (activeTab === 'logs')     renderLogsTab(s);
+    else if (activeTab === 'traffic')  renderTrafficTab(s);
     else                               renderExecution(s);
 }
 
-function renderLogsTab(s) {
+function renderTrafficTab(s) {
     document.getElementById('detailBody').innerHTML =
         '<div style="display:flex;flex-direction:column;gap:5px;height:100%;min-height:0;">'
         + '<div style="display:flex;gap:0;flex:1;min-height:0;overflow:hidden;">'
-        // Logs panel
-        + '<div class="log-panel" id="logPanelLogs" style="flex:1;">'
-        + '<div class="log-panel-header">'
-        + '<div class="log-panel-title"><span class="icon">📋</span> Logs</div>'
-        + '<div class="log-panel-filter">'
-        + '<select id="logLevel" onchange="loadLogs()">'
-        + '<option value="">All Levels</option>'
-        + '<option>INFO</option><option>WARNING</option><option>ERROR</option><option>DEBUG</option>'
-        + '</select>'
-        + '<input id="logLimit" type="number" value="50" min="10" max="500" style="width:46px" onchange="loadLogs()">'
-        + '<button class="panel-refresh" onclick="loadLogs()">↺</button>'
-        + '<button class="panel-refresh" onclick="clearLogsPanel()" style="color:var(--red,#f85149);border-color:var(--red,#f85149);" title="Clear logs">🗑</button>'
-        + '</div></div>'
-        + '<div class="log-panel-scroll" id="logsScroll"><div class="log-empty">No logs</div></div>'
-        + '</div>'
-        // V resizer
-        + '<div class="v-resizer" id="vResizer"></div>'
         // HTTP panel
         + '<div class="log-panel" id="logPanelHttp" style="flex:1;">'
         + '<div class="log-panel-header">'
@@ -756,10 +730,8 @@ function renderLogsTab(s) {
         + '</div>'
         + '</div></div>';
 
-    loadLogs();
     loadHttp();
     startSse();
-    initVResizer();
 }
 
 function switchTab(tab) {
@@ -768,7 +740,7 @@ function switchTab(tab) {
     setActiveTab(tab);
     _PS.save({ activeTab: tab });
     if (tab !== 'execution') stopProcStatsPoll();
-    if (tab !== 'logs') closeSse();
+    if (tab !== 'traffic') closeSse();
     var s = taskDraft || schedules.find(function(x) { return x.id === selectedId; });
     if (!s) return;
     renderDetail(s);
@@ -1718,88 +1690,6 @@ function clearOutputPoll() {
 
 // ── Log / HTTP panels ─────────────────────────────────────────────────────────
 
-function appendLogRow(row) {
-    var el = document.getElementById('logsScroll');
-    if (!el) return;
-    var empty = el.querySelector('.log-empty');
-    if (empty) empty.remove();
-    var lvl    = (row.level || 'INFO').toUpperCase();
-    var cls    = lvl === 'WARNING' ? 'WARN' : lvl;
-    var time   = (row.timestamp || '').slice(11, 19);
-    var acc    = (row.account && row.account !== '-') ? row.account : '';
-    var caller = (row.caller  && row.caller  !== '-') ? row.caller  : '';
-    el.insertAdjacentHTML('beforeend',
-        '<div class="log-row">'
-        + '<span class="log-time">'   + escHtml(time)   + '</span>'
-        + '<span class="log-level '  + cls + '">' + lvl.slice(0,4) + '</span>'
-        + '<span class="log-acc">'   + escHtml(acc)    + '</span>'
-        + '<span class="log-caller">' + escHtml(caller) + '</span>'
-        + '<span class="log-msg">'   + escHtml(row.message || '') + '</span>'
-        + '</div>');
-    el.scrollTop = el.scrollHeight;
-}
-
-async function clearLogsPanel() {
-    if (!curTaskId) return;
-    if (!(await Dialog.confirm('Clear ALL logs?'))) return;
-    try {
-        await fetch('/clear', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task_id: curTaskId}) });
-        if (selectedId && selectedId !== '__new__') {
-            await fetch('/tasker/clear-output', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: selectedId}) });
-            var s = schedules.find(function(x) { return x.id === selectedId; });
-            if (s) s.last_output = '';
-        }
-        document.getElementById('logsScroll').innerHTML = '<div class="log-empty">No logs</div>';
-    } catch(e) { console.error('Clear logs failed:', e); }
-}
-
-async function loadLogs() {
-    if (!curTaskId) return;
-    var level   = document.getElementById('logLevel').value;
-    var limit   = document.getElementById('logLimit').value || 50;
-    var session = '';
-    var url = '/logs?limit=' + limit + '&task_id=' + encodeURIComponent(curTaskId)
-        + (level   ? '&level='   + encodeURIComponent(level)   : '')
-        + (session ? '&session=' + encodeURIComponent(session)  : '');
-    try {
-        var res  = await fetch(url);
-        var data = await res.json();
-        var el   = document.getElementById('logsScroll');
-        if (!data.length) { await showOutputFallback(el); return; }
-        el.innerHTML = data.slice().reverse().map(function(row) {
-            var lvl    = (row.level || 'INFO').toUpperCase();
-            var cls    = lvl === 'WARNING' ? 'WARN' : lvl;
-            var time   = (row.timestamp || '').slice(11, 19);
-            var acc    = (row.account && row.account !== '-') ? row.account : '';
-            var caller = (row.caller  && row.caller  !== '-') ? row.caller  : '';
-            return '<div class="log-row">'
-                + '<span class="log-time">'   + escHtml(time)   + '</span>'
-                + '<span class="log-level '  + cls + '">' + lvl.slice(0,4) + '</span>'
-                + '<span class="log-acc">'   + escHtml(acc)    + '</span>'
-                + '<span class="log-caller">' + escHtml(caller) + '</span>'
-                + '<span class="log-msg">'   + escHtml(row.message || '') + '</span>'
-                + '</div>';
-        }).join('');
-        el.scrollTop = el.scrollHeight;
-    } catch(e) {}
-}
-
-async function showOutputFallback(el) {
-    if (!selectedId || selectedId === '__new__') { el.innerHTML = '<div class="log-empty">No logs</div>'; return; }
-    try {
-        var res  = await fetch('/tasker/output?id=' + encodeURIComponent(selectedId));
-        var data = await res.json();
-        var text = (data && data.output ? data.output.trim() : '').replace(/\\n/g, '\n');
-        if (!text) { el.innerHTML = '<div class="log-empty">No logs</div>'; return; }
-        el.innerHTML = '<div class="log-row" style="opacity:0.45;font-size:9px;padding:2px 8px;border-bottom:1px solid var(--border)">'
-            + '<span class="log-msg">— no logger output, showing task stdout —</span></div>'
-            + text.split('\n').map(function(line) {
-                return '<div class="log-row"><span class="log-msg" style="white-space:pre-wrap">' + escHtml(line) + '</span></div>';
-            }).join('');
-        el.scrollTop = el.scrollHeight;
-    } catch(e) { el.innerHTML = '<div class="log-empty">No logs</div>'; }
-}
-
 async function loadHttp() {
     if (!curTaskId) return;
     var method = document.getElementById('httpMethod').value;
@@ -2111,10 +2001,8 @@ function restoreLayout() {
         var bp = document.getElementById('bottomPanels');
         tp.style.flex = 'none'; tp.style.height = st.detailH + 'px'; bp.style.height = st.bottomH + 'px';
     }
-    if (st.logsFlexPct) {
-        document.getElementById('logPanelLogs').style.flex = '0 0 ' + st.logsFlexPct + '%';
-        document.getElementById('logPanelHttp').style.flex = '1 1 0';
-    }
+    // Вкладка Logs переименована в Traffic — переносим сохранённый выбор.
+    if (st.activeTab === 'logs') st.activeTab = 'traffic';
     if (st.activeTab) { activeTab = st.activeTab; setActiveTab(st.activeTab); }
 }
 
@@ -2153,18 +2041,6 @@ function initHResizer() {
             _PS.save({detailH: topPanel.offsetHeight, bottomH: botPanel.offsetHeight});
         }
     });
-}
-
-function initVResizer() {
-    var resizer    = document.getElementById('vResizer');
-    var leftPanel  = document.getElementById('logPanelLogs');
-    var rightPanel = document.getElementById('logPanelHttp');
-    var container  = document.getElementById('bottomPanels');
-    if (!resizer) return;
-    var dragging = false;
-    resizer.addEventListener('mousedown', function(e) { dragging = true; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; e.preventDefault(); });
-    document.addEventListener('mousemove', function(e) { if (!dragging) return; var rect = container.getBoundingClientRect(); var pct = Math.max(15, Math.min(85, ((e.clientX - rect.left) / rect.width) * 100)); leftPanel.style.flex = '0 0 ' + pct + '%'; rightPanel.style.flex = '1 1 0'; });
-    document.addEventListener('mouseup',   function()  { if (dragging) { dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; var pct = parseFloat(leftPanel.style.flexBasis) || (leftPanel.offsetWidth / container.offsetWidth * 100); _PS.save({logsFlexPct: Math.round(pct)}); } });
 }
 
 // ── Dialog ────────────────────────────────────────────────────────────────────

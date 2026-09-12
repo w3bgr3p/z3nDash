@@ -42,7 +42,7 @@ internal static class StubSmokeTest
         IProfile      profile = project.Profile;
 
         // ── Logger ─────────────────────────────────────────────────
-        var logger = new Logger(logHost: "http://localhost:5000");
+        var logger = new Logger();
         logger.Info("smoke");
         logger.Warn("smoke");
         logger.Error("smoke");

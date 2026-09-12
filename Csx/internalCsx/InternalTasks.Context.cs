@@ -47,7 +47,6 @@ public static partial class InternalTasks
             throw new Exception("DB not connected");
 
         var logger = new Logger(
-            logHost: logsConfig.LogHost,
             project: payload.GetValueOrDefault("__taskName", "").Split('.')[0],
             sink:    sink);
         
