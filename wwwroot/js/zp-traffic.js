@@ -156,29 +156,36 @@ window.ZpTraffic = (() => {
             const nodes = await getJson('/zp/nodes?probe=false', controller.signal);
             if (!Array.isArray(nodes)) throw new Error('Invalid node list');
             if (controller.signal.aborted) return;
-            options('machine', nodes.map(node => node.machine), 'All machines');
 
-            const targets = nodes.filter(node => !value('machine') || node.machine === value('machine'));
             const query = new URLSearchParams({ tail: value('limit') || '200' });
             if (value('project').trim()) query.set('project', value('project').trim());
 
-            const results = await Promise.allSettled(targets.map(async node => {
-                const params = new URLSearchParams(query);
-                params.set('machine', node.machine);
-                const data = await getJson('/zp/traffic?' + params, controller.signal);
+            // Локальный трафик самого дашборда (его пишет ZpRuntime) — такой же
+            // источник, как нода. Машину он сообщает в самих записях, поэтому
+            // фильтр по машине применяется уже к строкам, а не к списку целей.
+            const targets = [
+                { label: 'z3nDash', url: '/traffic?' + query },
+                ...nodes.map(node => {
+                    const params = new URLSearchParams(query);
+                    params.set('machine', node.machine);
+                    return { label: node.machine, machine: node.machine, url: '/zp/traffic?' + params };
+                }),
+            ];
+
+            const results = await Promise.allSettled(targets.map(async target => {
+                const data = await getJson(target.url, controller.signal);
                 if (!Array.isArray(data.entries)) throw new Error('Invalid traffic response');
-                return data.entries.map(entry => ({ ...entry, machine: entry.machine || node.machine }));
+                return data.entries.map(entry => ({ ...entry, machine: entry.machine || target.machine || '' }));
             }));
             if (controller.signal.aborted) return;
 
             rows = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
             rows.sort((a, b) => String(b.timestamp ?? '').localeCompare(String(a.timestamp ?? '')));
+            options('machine', rows.map(row => row.machine).concat(nodes.map(node => node.machine)), 'All machines');
             options('project', rows.map(row => row.project).concat(Array.from(el('project').options, option => option.value)), 'All projects');
 
-            const failures = results.flatMap((result, index) => result.status === 'rejected' ? [`${targets[index].machine}: ${result.reason.message}`] : []);
-            el('note').textContent = targets.length
-                ? `${results.length - failures.length}/${targets.length} nodes · ${new Date().toLocaleTimeString()}${failures.length ? '\n' + failures.join('\n') : ''}`
-                : 'No matching ZP7 nodes registered';
+            const failures = results.flatMap((result, index) => result.status === 'rejected' ? [`${targets[index].label}: ${result.reason.message}`] : []);
+            el('note').textContent = `${results.length - failures.length}/${targets.length} sources · ${new Date().toLocaleTimeString()}${failures.length ? '\n' + failures.join('\n') : ''}`;
             el('note').classList.toggle('error', failures.length > 0);
             render();
         } catch (error) {
@@ -200,6 +207,7 @@ window.ZpTraffic = (() => {
 
     function matches(row) {
         const search = value('search').toLowerCase();
+        if (value('machine') && (row.machine || '') !== value('machine')) return false;
         if (value('method') && row.method !== value('method')) return false;
         if (value('status') && !String(row.statusCode ?? '').startsWith(value('status'))) return false;
         if (value('project') && (row.project || '') !== value('project')) return false;
@@ -862,8 +870,8 @@ window.ZpTraffic = (() => {
             for (const id of ['machine', 'project', 'method', 'status', 'search']) el(id).value = '';
             refresh();
         };
-        for (const id of ['machine', 'project', 'limit']) el(id).onchange = refresh;
-        for (const id of ['method', 'status']) el(id).onchange = () => { render(); save(); };
+        for (const id of ['project', 'limit']) el(id).onchange = refresh;
+        for (const id of ['machine', 'method', 'status']) el(id).onchange = () => { render(); save(); };
         el('search').oninput = () => { render(); save(); };
 
         el('rows').onclick = event => {

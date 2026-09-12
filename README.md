@@ -117,8 +117,9 @@ The default dashboard address is `http://localhost:33333`.
 | Tasker | Configure, run, stop, and monitor scheduled tasks |
 | ZP7 | Manage ZennoPoster workers and jobs |
 | ZB | Work with ZennoBrowser profiles and processes |
-| Logs | Inspect application logs |
-| HTTP | Inspect and replay HTTP requests |
+| allLogs | Combined ZP7 log history from every node (modal on ZP7) |
+| Traffic | Inspect and replay HTTP traffic from the nodes and z3nDash (modal on ZP7) |
+| HAR | Inspect HAR archives and replay requests from them |
 | JSON / Text | Transform and analyze structured or plain text |
 | Clips | Store and copy reusable templates |
 | Treasury | Inspect Web3 assets |
@@ -144,7 +145,7 @@ Controllers/  embedded server, scheduler, and runtime services
 Handlers/     dashboard and local API handlers
 Sql/          PostgreSQL access and schema helpers
 Csx/          C# script execution
-Browser/      browser automation abstractions
+ZpRuntime/    in-process ZennoPoster-compatible runtime and its browser layer
 Api/          external service integrations
 Web3/         blockchain and wallet utilities
 wwwroot/      dashboard HTML, CSS, and JavaScript

@@ -53,7 +53,8 @@ POST http://HOST:PORT/command
 - Task Detail — параметры и действия выбранной задачи;
 - Logs — логи выбранной задачи;
 - allLogs — модальное окно [[Logs|общей истории]] со всех узлов, с фильтрами и сортировкой;
-- HTTP — связанный HTTP-трафик;
+- traffic — модальное окно [[Traffic|HTTP-трафика]] со всех узлов и самого z3nDash;
+- HTTP — трафик выбранной задачи: `GET /zp/traffic?machine=...&task_id=...`, опрос раз в 3 секунды;
 - Projects heatmap — данные проектов из report API.
 
 ## API
@@ -62,4 +63,5 @@ POST http://HOST:PORT/command
 - `GET /zp/state`
 - `GET /zp/state/all`
 - `GET /zp/log`
+- `GET /zp/traffic`
 - `POST /zp/commands`

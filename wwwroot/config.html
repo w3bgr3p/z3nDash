@@ -422,7 +422,6 @@
 
         <div class="btn-row" style="margin-top:16px; justify-content:flex-start; flex-wrap:wrap; gap:8px;">
             <button class="btn danger" id="clearLogsBtn" onclick="clearLogs('logs')">🗑 Clear App Logs</button>
-            <button class="btn danger" id="clearHttpBtn" onclick="clearLogs('http')">🗑 Clear HTTP Logs</button>
             <button class="btn danger" id="clearAllBtn" onclick="clearLogs('all')">☠ Clear ALL Logs</button>
         </div>
     </div>
@@ -794,7 +793,6 @@
     // ── Clear Logs ────────────────────────────────────────────────────
     const CLEAR_MAP = {
         logs:    { url: '/clear',         label: 'App logs' },
-        http:    { url: '/clear-http',    label: 'HTTP logs' },
         all:     { url: '/clear-all-logs', label: 'ALL logs' },
     };
 
@@ -802,7 +800,7 @@
         const { url, label } = CLEAR_MAP[type];
         if (!await Dialog.confirm(`Clear ${label}? This cannot be undone.`)) return;
 
-        const btnId = { logs:'clearLogsBtn', http:'clearHttpBtn', all:'clearAllBtn' }[type];
+        const btnId = { logs:'clearLogsBtn', all:'clearAllBtn' }[type];
         const btn = document.getElementById(btnId);
         btn.disabled = true;
         btn.textContent = '…';
@@ -819,10 +817,7 @@
             toast('Error: ' + e.message, 'err');
         } finally {
             btn.disabled = false;
-            btn.textContent = btn.id === 'clearAllBtn' ? '☠ Clear ALL Logs'
-                : btn.id === 'clearLogsBtn'    ? '🗑 Clear App Logs'
-                    : btn.id === 'clearHttpBtn'    ? '🗑 Clear HTTP Logs'
-                        : '🗑 Clear Traffic Logs';
+            btn.textContent = btn.id === 'clearAllBtn' ? '☠ Clear ALL Logs' : '🗑 Clear App Logs';
         }
     }
 

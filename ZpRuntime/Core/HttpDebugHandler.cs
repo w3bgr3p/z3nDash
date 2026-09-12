@@ -98,15 +98,12 @@ namespace z3nDash
     public class HttpDebugHandler : DelegatingHandler
     {
         private readonly string _projectName;
-        private readonly string _logHost;
         private readonly string _proxy;
         private readonly bool _fallbackToStackTrace;
-        private static readonly HttpClient _logClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         private readonly string _taskId;
         private readonly string _account;
         private readonly string _source = "z3nDash";
         public HttpDebugHandler(string projectName, 
-            string logHost = "http://localhost:38109/http-log", 
             string proxy = "",
             string taskId = "",
             string account = "",
@@ -114,7 +111,6 @@ namespace z3nDash
             )
         {
             _projectName = projectName;
-            _logHost     = logHost;
             _proxy       = proxy;
             _taskId      = taskId;
             _account     = account;
@@ -235,17 +231,11 @@ namespace z3nDash
                     machine = Environment.MachineName,
                     project = _projectName,
                     processId = System.Diagnostics.Process.GetCurrentProcess().Id,
-                    origin = _source
+                    account = _account,
+                    task_id = _taskId,
+                    source = _source
                 };
-                var body = JsonConvert.SerializeObject(httpLog);
-                body.Debug();
-                var content = new StringContent(
-                    body, 
-                    Encoding.UTF8, 
-                    "application/json");
-                if(!string.IsNullOrEmpty (_logHost) )   
-                    await _logClient.PostAsync(_logHost, content);
-                
+                ZpTraffic.Append(JsonConvert.SerializeObject(httpLog, Formatting.None));
             }
             catch (Exception ex) { 
                 Console.WriteLine($"[HttpDebugHandler ERROR] {ex.Message}"); 

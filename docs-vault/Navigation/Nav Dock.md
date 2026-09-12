@@ -9,8 +9,7 @@ Dock подключается страницами через `wwwroot/js/nav.js
 | `tasker` | [[Tasker]] | `Alt+1` |
 | `zp7` | [[ZP7]] | `Alt+2` |
 | `zb` | [[ZB]] | `Alt+3` |
-| `logs` | [[Logs]] | `Alt+4` |
-| `http` | [[HTTP]] | `Alt+5` |
+| `har` | [[HAR]] | — |
 | `json` | [[JSON]] | `Alt+6` |
 | `text` | [[Text Tools]] | `Alt+7` |
 | `treasury` | [[Treasury]] | `Alt+8` |
@@ -20,6 +19,15 @@ Dock подключается страницами через `wwwroot/js/nav.js
 | `dllGraph` | [[dllGraph]] | `Alt+G` |
 | `docsVault` | [[docsVault]] | `Alt+H` |
 | `sql` | [[SQLite]] | — |
+
+## Хоткеи без пункта в доке
+
+Открывают модальные окна на странице [[ZP7]]:
+
+| Хоткей | Окно | Ссылка |
+|---|---|---|
+| `Alt+4` | [[Logs\|allLogs]] | `/?page=zp7#allLogs` |
+| `Alt+5` | [[Traffic\|traffic]] | `/?page=zp7#traffic` |
 
 ## Дополнительно
 

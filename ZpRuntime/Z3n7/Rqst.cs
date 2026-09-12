@@ -26,8 +26,6 @@ namespace z3n7
         private readonly Logger _logger;
         private readonly Request _rqst;
         private readonly bool _mask;
-        private readonly string _logHost;
-        private static readonly HttpClient _httpLogClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         private static readonly object LockObject = new object();
 
         public Rqst(IZennoPosterProjectModel project, bool log = false, bool mask = false)
@@ -37,9 +35,6 @@ namespace z3n7
 
             _logger =  new Logger(project,null,classEmoji: "↑↓", logLevel: (log) ? LogLevel.Info : LogLevel.Off);
             _rqst = new Request();
-            _logHost = !string.IsNullOrEmpty(_project.GVar("logHost")) 
-                ? _project.GVar("logHost").Replace("/log", "/http-log")
-                : "http://localhost:33333/http-log";
             _mask = mask;
         }
 
@@ -566,19 +561,17 @@ namespace z3n7
         #endregion
 
         #region Logging
-        private void LogHttpTransaction(Request req)
+        // Заголовки ответа лежат в сыром Response до первой пустой строки.
+        // При BodyOnly их там нет вовсе.
+        private static string ResponseHeaders(Request req)
         {
-            Task.Run(async () =>
-            {
-                try
-                {
-                    await SendLogAsync(req);
-                }
-                catch { }
-            });
+            var raw = req.Response ?? "";
+            if (req.ResponceType == ResponceType.BodyOnly || !raw.StartsWith("HTTP/", StringComparison.OrdinalIgnoreCase)) return "";
+            var end = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            return end < 0 ? "" : raw.Substring(0, end);
         }
 
-        private async Task SendLogAsync(Request req)
+        private void LogHttpTransaction(Request req)
         {
             try
             {
@@ -587,6 +580,7 @@ namespace z3n7
                 var httpLog = new
                 {
                     timestamp = DateTime.UtcNow.AddHours(-5).ToString("yyyy-MM-dd HH:mm:ss.fff"),
+                    startedDateTime = req.StartTime.ToString("o"),
                     method = req.Method,
                     url = req.Url,
                     statusCode = req.StatusCode,
@@ -595,12 +589,15 @@ namespace z3n7
                     request = new
                     {
                         headers = req.Headers,
+                        contentType = req.ContentType,
+                        userAgent = req.UserAgent,
                         cookies = req.Cookies,
                         cookiesSource = req.CookieSource,
                         body = req.Body,
                     },
                     response = new
                     {
+                        headers = ResponseHeaders(req),
                         body = req.ResponseBody
                     },
                     machine = Environment.MachineName,
@@ -613,11 +610,13 @@ namespace z3n7
                     source = req.Source
                 };
 
-                string json = JsonConvert.SerializeObject(httpLog);
-                using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-                    await _httpLogClient.PostAsync(_logHost, content);
+                z3nDash.ZpTraffic.Append(JsonConvert.SerializeObject(httpLog, Formatting.None));
             }
-            catch { }
+            catch (Exception ex)
+            {
+                try { _logger?.Send($"!W Traffic JSONL write failed: {ex.Message}"); }
+                catch { }
+            }
         }
 
         

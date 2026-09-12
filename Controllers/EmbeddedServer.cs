@@ -30,7 +30,7 @@ public class EmbeddedServer
     private readonly List<IScriptHandler> _scriptHandlers = new();
 
     private readonly LogHandler        _logHandler;
-    private readonly HttpLogHandler    _httpLogHandler;
+    private readonly TrafficHandler    _trafficHandler;
     private readonly ReportHandler     _reportHandler;
     private readonly HttpReplayHandler _replayHandler;
     private readonly ConfigHandler     _configHandler; 
@@ -116,7 +116,8 @@ public class EmbeddedServer
         EnsureDir(_wwwrootPath, "Wwwroot");
 
         _logHandler     = new LogHandler(logPath);
-        _httpLogHandler = new HttpLogHandler(logPath);
+        ZpRuntimeOptions.LogsFolder = logPath;
+        _trafficHandler = new TrafficHandler();
         _reportHandler = new ReportHandler(reportsPath, _wwwrootPath, dbService);
         _zbHandler = new ZbHandler();
         _replayHandler  = new HttpReplayHandler();
@@ -131,7 +132,9 @@ public class EmbeddedServer
         _terminalHandler = new TerminalHandler(_wwwrootPath);
         _sqliteViewerHandler = new SqliteViewerHandler();
 
-        int replayPort = int.TryParse(config.ReplayPort, out var rp) ? rp : _port + 1;
+        // Порт replay жёстко привязан к порту панели: фронт (окно traffic и har.html)
+        // вычисляет его как port + 1 и спросить настройку не может.
+        int replayPort = _port + 1;
         try
         {
             //_replayListener.Prefixes.Add($"http://*:{replayPort}/");
@@ -307,10 +310,10 @@ public class EmbeddedServer
                 await _logHandler.Handle(context);
                 return;
             }
-            if (_httpLogHandler.Matches(path, method))
+            if (_trafficHandler.Matches(path, method))
             {
-                if (_debug )  $"[handler] HttpLogHandler → {method} {path}".Debug();
-                await _httpLogHandler.Handle(context);
+                if (_debug )  $"[handler] TrafficHandler → {method} {path}".Debug();
+                await _trafficHandler.Handle(context);
                 return;
             }
             if (_zbHandler.Matches(path))

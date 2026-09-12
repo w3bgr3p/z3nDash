@@ -26,7 +26,7 @@ function markTaskDirty() {
 }
 
 var _sseLog    = null;
-var _sseHttp   = null;
+var _httpPoll  = null;
 var _sseOutput = null;
 
 var curProject = '';
@@ -70,7 +70,7 @@ function escHtml(s) {
 
 function closeSse() {
     if (_sseLog)    { _sseLog.close();    _sseLog    = null; }
-    if (_sseHttp)   { _sseHttp.close();   _sseHttp   = null; }
+    if (_httpPoll)  { clearInterval(_httpPoll); _httpPoll = null; }
 }
 
 function closeSseOutput() {
@@ -86,11 +86,7 @@ function startSse() {
     });
     _sseLog.onerror = function() { _sseLog.close(); _sseLog = null; };
 
-    _sseHttp = new EventSource('/http-logs/stream?task_id=' + encodeURIComponent(curTaskId));
-    _sseHttp.addEventListener('message', function(e) {
-        try { appendHttpRow(JSON.parse(e.data)); } catch(err) {}
-    });
-    _sseHttp.onerror = function() { _sseHttp.close(); _sseHttp = null; };
+    _httpPoll = setInterval(loadHttp, 3000);
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -755,7 +751,6 @@ function renderLogsTab(s) {
         + '<input id="httpUrl" placeholder="URL..." style="width:80px" oninput="loadHttp()">'
         + '<input id="httpLimit" type="number" value="50" min="10" max="500" style="width:46px" onchange="loadHttp()">'
         + '<button class="panel-refresh" onclick="loadHttp()">↺</button>'
-        + '<button class="panel-refresh" onclick="clearHttpPanel()" style="color:var(--red,#f85149);border-color:var(--red,#f85149);" title="Clear HTTP">🗑</button>'
         + '</div></div>'
         + '<div class="log-panel-scroll" id="httpScroll"><div class="log-empty">No traffic</div></div>'
         + '</div>'
@@ -1744,26 +1739,6 @@ function appendLogRow(row) {
     el.scrollTop = el.scrollHeight;
 }
 
-function appendHttpRow(row) {
-    var el = document.getElementById('httpScroll');
-    if (!el) return;
-    var empty = el.querySelector('.log-empty');
-    if (empty) empty.remove();
-    var sc  = row.statusCode || 0;
-    var cls = sc >= 500 ? 's5xx' : sc >= 400 ? 's4xx' : 's2xx';
-    var host = '';
-    try { host = new URL(row.url || '').host; } catch(e) { host = row.url || ''; }
-    var dur = row.durationMs != null ? row.durationMs + 'ms' : '';
-    el.insertAdjacentHTML('beforeend',
-        '<div class="http-row">'
-        + '<span class="http-method">' + escHtml(row.method || '') + '</span>'
-        + '<span class="http-status ' + cls + '">' + sc + '</span>'
-        + '<span class="http-url" title="' + escHtml(row.url||'') + '">' + escHtml(host) + '</span>'
-        + '<span class="http-dur">' + escHtml(dur) + '</span>'
-        + '</div>');
-    el.scrollTop = el.scrollHeight;
-}
-
 async function clearLogsPanel() {
     if (!curTaskId) return;
     if (!(await Dialog.confirm('Clear ALL logs?'))) return;
@@ -1776,15 +1751,6 @@ async function clearLogsPanel() {
         }
         document.getElementById('logsScroll').innerHTML = '<div class="log-empty">No logs</div>';
     } catch(e) { console.error('Clear logs failed:', e); }
-}
-
-async function clearHttpPanel() {
-    if (!curTaskId) return;
-    if (!(await Dialog.confirm('Clear HTTP logs for task: ' + curTaskId + '?'))) return;
-    try {
-        await fetch('/clear-http-logs-by-task', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task_id: curTaskId}) });
-        document.getElementById('httpScroll').innerHTML = '<div class="log-empty">No traffic</div>';
-    } catch(e) { console.error('Clear HTTP logs failed:', e); }
 }
 
 async function loadLogs() {
@@ -1840,14 +1806,22 @@ async function loadHttp() {
     var status = document.getElementById('httpStatus').value;
     var urlFlt = document.getElementById('httpUrl').value;
     var limit  = document.getElementById('httpLimit').value || 50;
-    var url = '/http-logs?limit=' + limit + '&task_id=' + encodeURIComponent(curTaskId)
-        + (method ? '&method=' + encodeURIComponent(method) : '')
-        + (status ? '&status=' + encodeURIComponent(status) : '')
-        + (urlFlt ? '&url='    + encodeURIComponent(urlFlt) : '');
+    // Трафик лежит в trafficLog.jsonl; фильтры метода, статуса и URL — на клиенте,
+    // эндпоинт знает только project и task_id.
+    var url = '/traffic?tail=' + limit + '&task_id=' + encodeURIComponent(curTaskId);
     try {
-        var res  = await fetch(url);
-        var data = await res.json();
+        var res  = await fetch(url, { cache: 'no-store' });
+        var text = await res.text();
         var el   = document.getElementById('httpScroll');
+        var page;
+        try { page = JSON.parse(text); }
+        catch (err) { el.innerHTML = '<div class="log-empty">HTTP ' + res.status + ', not JSON: ' + escHtml(text.trim().slice(0, 200) || '(empty body)') + '</div>'; return; }
+        if (!res.ok || page.error) { el.innerHTML = '<div class="log-empty">' + escHtml(page.error || ('HTTP ' + res.status)) + '</div>'; return; }
+
+        var data = Array.isArray(page.entries) ? page.entries : [];
+        if (method) data = data.filter(function(r) { return r.method === method; });
+        if (status) data = data.filter(function(r) { return String(r.statusCode == null ? '' : r.statusCode).indexOf(status) === 0; });
+        if (urlFlt) data = data.filter(function(r) { return String(r.url || '').toLowerCase().indexOf(urlFlt.toLowerCase()) !== -1; });
         if (!data.length) { el.innerHTML = '<div class="log-empty">No traffic</div>'; return; }
         el.innerHTML = data.map(function(row) {
             var sc  = row.statusCode || 0;
