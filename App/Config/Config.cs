@@ -46,9 +46,6 @@ public class Config
 
         Crx = config.GetSection("Crx").Get<Dictionary<string, CrxItem>>() ?? new();
 
-        // пробрасываем в ZpRuntime то, что ему нужно, — сам он Config не видит
-        ZpRuntimeOptions.TrafficHost = LogsConfig.TrafficHost;
-
         IsConfigured = DbConfig.Mode == dbMode.SQLite
             ? !string.IsNullOrWhiteSpace(DbConfig.SqlitePath)
             : !string.IsNullOrWhiteSpace(DbConfig.PostgresConnectionString);

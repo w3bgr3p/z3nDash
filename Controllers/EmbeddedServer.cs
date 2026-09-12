@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2026 [w3bgr3p]
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -31,7 +31,6 @@ public class EmbeddedServer
 
     private readonly LogHandler        _logHandler;
     private readonly HttpLogHandler    _httpLogHandler;
-    //private readonly TrafficHandler    _trafficHandler;
     private readonly ReportHandler     _reportHandler;
     private readonly HttpReplayHandler _replayHandler;
     private readonly ConfigHandler     _configHandler; 
@@ -55,7 +54,6 @@ public class EmbeddedServer
 
         var ports = new HashSet<int> { _port };
         if (Uri.TryCreate(config.LogHost,     UriKind.Absolute, out var logUri))     ports.Add(logUri.Port);
-        if (Uri.TryCreate(config.TrafficHost, UriKind.Absolute, out var trafficUri)) ports.Add(trafficUri.Port);
 
         var listeningPorts = new List<int>();
         var listenErrors = new List<Exception>();
@@ -119,7 +117,6 @@ public class EmbeddedServer
 
         _logHandler     = new LogHandler(logPath);
         _httpLogHandler = new HttpLogHandler(logPath);
-        //_trafficHandler = new TrafficHandler(logPath);
         _reportHandler = new ReportHandler(reportsPath, _wwwrootPath, dbService);
         _zbHandler = new ZbHandler();
         _replayHandler  = new HttpReplayHandler();

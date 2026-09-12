@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
@@ -260,7 +260,6 @@ internal sealed class ConfigHandler
             dashboardPort  = _port,
             listeningPorts = ports,
             logHost        = cfg.LogHost,
-            trafficHost    = cfg.TrafficHost,
             logsFolder     = _logPath,
             reportsFolder  = cfg.ReportsFolder,
             tempFolder     = cfg.TempFolder,

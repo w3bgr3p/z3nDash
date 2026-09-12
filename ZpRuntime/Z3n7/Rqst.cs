@@ -615,13 +615,7 @@ namespace z3n7
 
                 string json = JsonConvert.SerializeObject(httpLog);
                 using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-                {
                     await _httpLogClient.PostAsync(_logHost, content);
-                    
-                    string trafficHost = _logHost.Replace("/http-log", "/traffic");
-                    if (trafficHost != _logHost)
-                        await _httpLogClient.PostAsync(trafficHost, content);
-                }
             }
             catch { }
         }

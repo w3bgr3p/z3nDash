@@ -699,6 +699,7 @@
     </div>
     <button class="auto-badge on" id="autoBtn" onclick="toggleAuto()">AUTO ON</button>
     <button class="auto-badge" id="allLogs" onclick="ZpAllLogs.open()" title="Logs from all ZP7 projects">allLogs</button>
+    <button class="auto-badge" id="allTraffic" onclick="ZpTraffic.open()" title="HTTP traffic from all ZP7 nodes">traffic</button>
     <button class="auto-badge" onclick="openNodesModal()" title="Manage ZP nodes">NODES</button>
     <button class="auto-badge" id="themeBtn" onclick="cycleTheme()" title="Switch theme">THEME</button>
 </div>
@@ -786,7 +787,7 @@
             <div class="logs-panel" id="lpHttpPanel">
                 <div class="lp-header">
                     <span class="lp-title">🌐 HTTP</span>
-                    <button class="lp-clear-btn" onclick="clearHttpLogsByTask()" title="Delete HTTP logs for this task">🗑</button>
+                    <button class="lp-clear-btn" onclick="ZpTraffic.open()" title="Open full traffic view">⤢</button>
                 </div>
                 <div class="lp-controls">
                     <select id="lp_method" onchange="refreshTaskHttp()">
@@ -818,6 +819,8 @@
 
 <link rel="stylesheet" href="/css/zp-all-logs.css">
 <script src="/js/zp-all-logs.js"></script>
+<link rel="stylesheet" href="/css/zp-traffic.css">
+<script src="/js/zp-traffic.js"></script>
 
 <!-- ZP Nodes Modal -->
 <div class="modal-overlay" id="nodesModal" onclick="if(event.target===this) closeNodesModal()">
@@ -1392,32 +1395,12 @@
     let _zpLogLoading = false;
     let _zpLogEntries = [];
     let _zpThreadFilter = null;
-    let _sseHttp = null;
+    let _zpHttpPoll = null;
+    let _zpHttpLoading = false;
 
     function _closeSse() {
         if (_zpLogPoll) { clearInterval(_zpLogPoll); _zpLogPoll = null; }
-        if (_sseHttp) { _sseHttp.close(); _sseHttp = null; }
-    }
-
-    function _appendHttpEntry(log) {
-        const c = document.getElementById('lpHttpContent');
-        const empty = c.querySelector('.lp-empty');
-        if (empty) empty.remove();
-        const method = log.method || '';
-        const sc = log.statusCode || 0;
-        const scClass = sc>=200&&sc<300?'s2xx':sc>=300&&sc<400?'s3xx':sc>=400&&sc<500?'s4xx':'s5xx';
-        const ts = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '';
-        const div = document.createElement('div');
-        div.className = 'th-entry';
-        div.innerHTML = `
-            <span class="tl-ts">${ts}</span>
-            <span class="th-method ${method}">${method}</span>
-            <span class="th-url" title="${escHtml(log.url||'')}">${escHtml(log.url||'')}</span>
-            <span class="th-status ${scClass}">${sc}</span>
-            <span class="th-dur">${log.durationMs ? log.durationMs+'ms' : '-'}</span>
-            <span class="th-acc">${escHtml(log.account||'-')}</span>`;
-        c.appendChild(div);
-        c.scrollTop = c.scrollHeight;
+        if (_zpHttpPoll) { clearInterval(_zpHttpPoll); _zpHttpPoll = null; }
     }
 
     function showLogsArea(task) {
@@ -1434,13 +1417,9 @@
         refreshTaskLogs();
         refreshTaskHttp();
 
-        // ZpServer exposes logs by polling, not SSE.
+        // ZpServer отдаёт и логи, и трафик по опросу — стрима у ноды нет.
         _zpLogPoll = setInterval(refreshTaskLogs, 3000);
-
-        _sseHttp = new EventSource(`${SERVER}/http-logs/stream?task_id=${encodeURIComponent(task.Id)}`);
-        _sseHttp.onmessage = e => {
-            try { _appendHttpEntry(JSON.parse(e.data)); } catch {}
-        };
+        _zpHttpPoll = setInterval(refreshTaskHttp, 3000);
     }
 
     async function refreshTaskLogs() {
@@ -1514,20 +1493,37 @@
         renderTaskLogs();
     }
 
+    // Трафик задачи берётся с ноды: /zp/traffic отдаёт хвост trafficLog.jsonl,
+    // отфильтрованный по task_id. Фильтры метода, статуса и URL — на клиенте,
+    // нода их не знает.
     async function refreshTaskHttp() {
-        if (!_currentTaskId) return;
+        const c = document.getElementById('lpHttpContent');
+        if (!c) return;
+        if (!_currentTaskId || !_currentTaskMachine) { c.innerHTML = '<div class="lp-empty">No machine for this task</div>'; return; }
+        if (_zpHttpLoading) return;
+
         const method = document.getElementById('lp_method')?.value || '';
         const status = document.getElementById('lp_status')?.value || '';
-        const url    = document.getElementById('lp_url')?.value || '';
+        const url    = (document.getElementById('lp_url')?.value || '').toLowerCase();
         const limit  = document.getElementById('lp_hlimit')?.value || 50;
-        let apiUrl = `${SERVER}/http-logs?limit=${limit}&task_id=${encodeURIComponent(_currentTaskId)}`;
-        if (method) apiUrl += `&method=${encodeURIComponent(method)}`;
-        if (status) apiUrl += `&status=${encodeURIComponent(status)}`;
-        if (url)    apiUrl += `&url=${encodeURIComponent(url)}`;
+        const query  = new URLSearchParams({ machine: _currentTaskMachine, task_id: _currentTaskId, tail: limit });
+
+        _zpHttpLoading = true;
         try {
-            const r = await fetch(apiUrl);
-            const logs = await r.json();
-            const c = document.getElementById('lpHttpContent');
+            const r = await fetch(`${SERVER}/zp/traffic?${query}`, { cache: 'no-store' });
+            const text = await r.text();
+            let data;
+            // Показываем то, что ответил сервер: пустое тело и страницу ошибки
+            // иначе не отличить от битого JSON.
+            try { data = JSON.parse(text); }
+            catch { c.innerHTML = `<div class="lp-empty">HTTP ${r.status}, not JSON: ${escHtml(text.trim().slice(0, 200) || '(empty body)')}</div>`; return; }
+            if (!r.ok || data.error) { c.innerHTML = `<div class="lp-empty">${escHtml(data.error || ('HTTP ' + r.status))}</div>`; return; }
+
+            let logs = Array.isArray(data.entries) ? data.entries : [];
+            if (method) logs = logs.filter(l => l.method === method);
+            if (status) logs = logs.filter(l => String(l.statusCode ?? '').startsWith(status));
+            if (url)    logs = logs.filter(l => String(l.url || '').toLowerCase().includes(url));
+
             if (!logs.length) { c.innerHTML = '<div class="lp-empty">No traffic</div>'; return; }
             c.innerHTML = logs.map(log => {
                 const method = log.method || '';
@@ -1544,20 +1540,11 @@
                     <span class="th-acc">${escHtml(log.account||'-')}</span>
                 </div>`;
             }).join('');
-        } catch(e) { console.error('task http failed', e); }
-    }
-
-    async function clearHttpLogsByTask() {
-        if (!_currentTaskId) return;
-        if (!await _dialog.confirm('Delete all HTTP logs for this task?', 'Clear HTTP Logs', true)) return;
-        try {
-            const r = await fetch(`${SERVER}/clear-http-logs-by-task`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({task_id: _currentTaskId})
-            });
-            const data = await r.json();
-            document.getElementById('lpHttpContent').innerHTML = '<div class="lp-empty">Cleared (' + (data.removed||0) + ' entries)</div>';
-        } catch(e) { await _dialog.error('Error: ' + e.message); }
+        } catch(e) {
+            c.innerHTML = `<div class="lp-empty">${escHtml(e.message)}</div>`;
+        } finally {
+            _zpHttpLoading = false;
+        }
     }
 
     function initLogsResizer() {

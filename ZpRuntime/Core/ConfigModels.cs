@@ -13,7 +13,6 @@ public class DbConfig
 public class LogsConfig
 {
     public string LogHost { get; set; } = string.Empty;
-    public string TrafficHost { get; set; } = string.Empty;
     public string DashboardPort { get; set; } = string.Empty;
     public string ReplayPort { get; set; } = string.Empty;
     public string LogsFolder { get; set; } = string.Empty;

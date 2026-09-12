@@ -9,6 +9,7 @@ namespace z3nDash;
 ///
 /// Роуты:
 ///   GET  /zp/nodes       — список зарегистрированных node-сервисов
+///   GET  /zp/traffic     — HTTP-трафик с ноды (хвост trafficLog.jsonl)
 ///   GET  /zp/state       — состояние конкретного node
 ///   GET  /zp/state/all   — агрегированное состояние всех node
 ///   GET  /zp/task/settings — input settings конкретной задачи
@@ -53,6 +54,7 @@ public class ZpOrchestratorHandler : IScriptHandler
             if (path == "/zp/nodes"          && method == "POST")   { await UpsertNode(context, db);      return true; }
             if (path == "/zp/nodes"          && method == "DELETE") { await DeleteNode(context, db);      return true; }
             if (path == "/zp/log"            && method == "GET")    { await GetLog(context, db);          return true; }
+            if (path == "/zp/traffic"        && method == "GET")    { await GetTraffic(context, db);      return true; }
             if (path == "/zp/task/settings"  && method == "GET")    { await GetTaskSettings(context, db); return true; }
             if (path == "/zp/state"  && method == "GET")  { await GetState(context, db);  return true; }
             if (path == "/zp/state/all" && method == "GET") { await GetStateAll(context, db); return true; }
@@ -68,6 +70,7 @@ public class ZpOrchestratorHandler : IScriptHandler
     private static readonly System.Net.Http.HttpClient _http = new();
     private static readonly TimeSpan NodeProbeTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan NodeStateTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan NodeTrafficTimeout = TimeSpan.FromSeconds(20);
 
     private async Task<string?> GetNodeUrl(Db db, string machine)
     {
@@ -193,6 +196,53 @@ public class ZpOrchestratorHandler : IScriptHandler
         catch (OperationCanceledException)
         {
             await WriteError(ctx.Response, 504, "Node log request timed out");
+        }
+        catch (Exception ex)
+        {
+            await WriteError(ctx.Response, 502, $"Node unreachable: {ex.Message}");
+        }
+    }
+
+    // GET /zp/traffic?machine=PC&tail=200&project=…&task_id=…
+    //
+    // Проброс к ноде один-в-один, как GetLog. Таймаут больше: в записи трафика
+    // лежат тела запросов и ответов, страница на 2000 записей весит заметно
+    // больше страницы текстового лога.
+    private async Task GetTraffic(HttpListenerContext ctx, Db db)
+    {
+        var query = ctx.Request.QueryString;
+        var machine = query["machine"]?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(machine))
+        {
+            await WriteError(ctx.Response, 400, "machine required");
+            return;
+        }
+
+        if (!ZpTrafficRequest.TryCreate(query["tail"], query["project"], query["task_id"],
+                out var trafficRequest, out var error))
+        {
+            await WriteError(ctx.Response, 400, error);
+            return;
+        }
+
+        var nodeUrl = await GetNodeUrl(db, machine);
+        if (nodeUrl == null)
+        {
+            await WriteError(ctx.Response, 404, $"Node not found: {machine}");
+            return;
+        }
+
+        using var timeout = new CancellationTokenSource(NodeTrafficTimeout);
+        try
+        {
+            using var response = await _http.GetAsync(nodeUrl + trafficRequest.BuildPath(), timeout.Token);
+            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            ctx.Response.StatusCode = (int)response.StatusCode;
+            await WriteRaw(ctx.Response, body);
+        }
+        catch (OperationCanceledException)
+        {
+            await WriteError(ctx.Response, 504, "Node traffic request timed out");
         }
         catch (Exception ex)
         {

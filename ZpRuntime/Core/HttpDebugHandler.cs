@@ -99,7 +99,6 @@ namespace z3nDash
     {
         private readonly string _projectName;
         private readonly string _logHost;
-        private readonly string _trafficHost;
         private readonly string _proxy;
         private readonly bool _fallbackToStackTrace;
         private static readonly HttpClient _logClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
@@ -108,7 +107,6 @@ namespace z3nDash
         private readonly string _source = "z3nDash";
         public HttpDebugHandler(string projectName, 
             string logHost = "http://localhost:38109/http-log", 
-            string trafficHost = "http://localhost:38109/traffic",
             string proxy = "",
             string taskId = "",
             string account = "",
@@ -117,7 +115,6 @@ namespace z3nDash
         {
             _projectName = projectName;
             _logHost     = logHost;
-            _trafficHost = trafficHost;
             _proxy       = proxy;
             _taskId      = taskId;
             _account     = account;
@@ -248,8 +245,6 @@ namespace z3nDash
                     "application/json");
                 if(!string.IsNullOrEmpty (_logHost) )   
                     await _logClient.PostAsync(_logHost, content);
-                if(!string.IsNullOrEmpty (_trafficHost) )   
-                    await _logClient.PostAsync(_trafficHost, content);
                 
             }
             catch (Exception ex) { 
