@@ -20,7 +20,7 @@ window.ZpAllLogs = (() => {
             <header><h2 id="zal-title">allLogs</h2><span id="zal-count"></span><button id="zal-close" aria-label="Close all logs">✕</button></header>
             <div class="zal-controls">
                 <select id="zal-machine" aria-label="Machine"><option value="">All machines</option></select>
-                <input id="zal-project" list="zal-projects" placeholder="All projects" aria-label="Project (exact name)"><datalist id="zal-projects"></datalist>
+                <select id="zal-project" aria-label="Project"><option value="">All projects</option></select>
                 <select id="zal-level" aria-label="Level"><option value="">All levels</option></select>
                 <select id="zal-thread" aria-label="Thread"><option value="">All threads</option></select>
                 <select id="zal-module" aria-label="Module"><option value="">All modules</option></select>
@@ -39,10 +39,14 @@ window.ZpAllLogs = (() => {
     }
 
     function options(id, items, label) {
+        const select = el(id);
+        // Do not disturb an open native picker during background refreshes.
+        if (document.activeElement === select) return;
         const previous = value(id);
         const values = [...new Set([...items, previous].filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-        el(id).replaceChildren(new Option(label, ''), ...values.map(item => new Option(item, item)));
-        el(id).value = previous;
+        if (select.options.length === values.length + 1 && values.every((item, index) => select.options[index + 1].value === item)) return;
+        select.replaceChildren(new Option(label, ''), ...values.map(item => new Option(item, item)));
+        select.value = previous;
     }
 
     function save() {
@@ -54,7 +58,7 @@ window.ZpAllLogs = (() => {
             const state = JSON.parse(sessionStorage.getItem(stateKey) || '{}');
             for (const id of fields) {
                 if (typeof state[id] !== 'string') continue;
-                if (['machine', 'level', 'thread', 'module'].includes(id) && state[id]) el(id).add(new Option(state[id], state[id]));
+                if (['machine', 'project', 'level', 'thread', 'module'].includes(id) && state[id]) el(id).add(new Option(state[id], state[id]));
                 el(id).value = state[id];
             }
             if (columns.some(([id]) => id === state.sortKey)) sortKey = state.sortKey;
@@ -122,8 +126,9 @@ window.ZpAllLogs = (() => {
             if (controller.signal.aborted) return;
             rows = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
             for (const id of ['level', 'thread', 'module']) options(id, rows.map(row => row[id]), `All ${id === 'level' ? 'levels' : id === 'thread' ? 'threads' : 'modules'}`);
-            const projects = [...new Set([...rows.map(row => row.project), ...(typeof allTasks === 'undefined' ? [] : allTasks.map(task => task.Name)), value('project')].filter(Boolean))].sort();
-            el('projects').replaceChildren(...projects.map(project => new Option(project, project)));
+            const projects = [...rows.map(row => row.project), ...(typeof allTasks === 'undefined' ? [] : allTasks.map(task => task.Name)),
+                ...Array.from(el('project').options, option => option.value)];
+            options('project', projects, 'All projects');
             const failures = results.flatMap((result, index) => result.status === 'rejected' ? [`${targets[index].machine}: ${result.reason.message}`] : []);
             el('status').textContent = targets.length ? `${results.length - failures.length}/${targets.length} nodes · ${new Date().toLocaleTimeString()}${failures.length ? '\n' + failures.join('\n') : ''}` : 'No matching ZP7 nodes registered';
             el('status').classList.toggle('error', failures.length > 0);
