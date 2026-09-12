@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Docs</title>
+    <title>docsVault</title>
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
@@ -69,8 +69,10 @@
 </head>
 <body>
 <div id="topbar">
-    <span class="logo">&#x2234; docs-graph</span>
-    <input id="vault-path" type="text" placeholder="vault path…" style="flex:1;max-width:400px;background:var(--bg);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:5px 10px;outline:none;" />
+    <span class="logo">&#x2234; docsVault</span>
+    <input id="vault-path" type="hidden" value="VAULT_PATH_PLACEHOLDER" />
+    <button class="btn" id="pick-vault" onclick="pickFolder()">Choose folder</button>
+    <span id="vault-label" title="VAULT_PATH_PLACEHOLDER" style="flex:1;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">VAULT_PATH_PLACEHOLDER</span>
     <button class="btn" onclick="generate()">Generate</button>
     <button class="btn" onclick="reload()">Reload</button>
     <input id="search" type="text" placeholder="search note&#8230;" />
@@ -157,10 +159,29 @@
     var link, nodeG, label;
     var selected = null;
 
+    async function pickFolder() {
+        var btn = document.getElementById('pick-vault');
+        btn.disabled = true;
+        try {
+            var start = document.getElementById('vault-path').value;
+            var res = await fetch('/docsVault/pick?start=' + encodeURIComponent(start));
+            var data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+            if (!data.path) return;
+            document.getElementById('vault-path').value = data.path;
+            document.getElementById('vault-label').textContent = data.path;
+            document.getElementById('vault-label').title = data.path;
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
     function generate() {
         var p = document.getElementById('vault-path').value.trim();
         if (!p) return;
-        fetch('/docs-graph/generate?vaultPath=' + encodeURIComponent(p), { method: 'POST' })
+        fetch('/docsVault/generate?vaultPath=' + encodeURIComponent(p), { method: 'POST' })
             .then(function(r) { return r.json(); })
             .then(function(d) { if (d.ok) location.reload(); else alert(d.error); });
     }

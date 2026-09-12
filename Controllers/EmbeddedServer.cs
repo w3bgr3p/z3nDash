@@ -252,11 +252,12 @@ public class EmbeddedServer
                 }
             }
             
-            if (path.StartsWith("/docs-graph")) { await _docsGraphHandler.Handle(context); return; }
+            if (path.StartsWith("/docsvault")) { await _docsGraphHandler.Handle(context); return; }
             // Docs
-            if (method == "GET" && path.StartsWith("/docs"))
+            if (method == "GET" && (path == "/docs" || path == "/docs/"))
             {
-                await _docsGraphHandler.Handle(context);
+                response.Redirect("/docsVault");
+                response.Close();
                 return;
                 
             }
@@ -274,7 +275,7 @@ public class EmbeddedServer
             }
 
 // Domain handlers
-            if (path.StartsWith("/graph"))
+            if (path == "/dllgraph" || path.StartsWith("/dllgraph/"))
             {
                 await _graphHandler.Handle(context); 
                 return;

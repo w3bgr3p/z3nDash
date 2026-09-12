@@ -83,7 +83,7 @@ window.ICONS = {
                   <circle cx="128" cy="128" r="40" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                   <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M130 206.1h-4L94 224a105 105 0 0 1-34.1-19.2l-.1-36-2-3.4-31.9-18.2a99 99 0 0 1 0-38.4l31.8-18.1 2-3.4.2-36A105 105 0 0 1 94 32l32 17.9h4L162 32a105 105 0 0 1 34.1 19.2l.1 36 2 3.4 31.9 18.2a99 99 0 0 1 0 38.4l-31.9 18.1-2 3.4-.1 36A105 105 0 0 1 162 224Z"/>
                 </svg>`,
-    docs:    `<svg viewBox="0 0 256 256">
+    docsVault: `<svg viewBox="0 0 256 256">
                   <path fill="none" d="M0 0h256v256H0z"/>
                   <circle cx="128" cy="128" r="24" opacity=".2"/>
                   <circle cx="128" cy="128" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
@@ -116,7 +116,7 @@ window.ICONS = {
                     <rect width="176" height="176" x="40" y="40" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" rx="8"/>
                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M136 40v32l20.69 20.69"/>
                 </svg>`,
-    graph: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+    dllGraph: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
                   <path fill="none" d="M0 0h256v256H0z"/>
                   <circle cx="128" cy="128" r="24" opacity=".2"/>
                   <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m118.25 106.07-12.5-28.14M177.23 111.59l-26.46 8.82M181.06 169.27l-34.12-26.54M110.06 143.94l-36.12 32.12"/>

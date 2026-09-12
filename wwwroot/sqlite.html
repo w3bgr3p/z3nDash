@@ -629,19 +629,62 @@
             let sortDir = 1; // 1 = asc, -1 = desc
             let sortedRows = []; // lastRows after sort applied
 
+            async function sqliteFileState(mode, file) {
+                const db = await new Promise((resolve, reject) => {
+                    const request = indexedDB.open("z3nDashSqlite", 1);
+                    request.onupgradeneeded = () => request.result.createObjectStore("state");
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+                try {
+                    return await new Promise((resolve, reject) => {
+                        const transaction = db.transaction("state", mode);
+                        const store = transaction.objectStore("state");
+                        const request = mode === "readonly"
+                            ? store.get("currentFile")
+                            : store.put(file, "currentFile");
+                        transaction.oncomplete = () => resolve(request.result);
+                        transaction.onabort = () => reject(transaction.error || new Error("File storage aborted"));
+                        transaction.onerror = () => reject(transaction.error);
+                    });
+                } finally {
+                    db.close();
+                }
+            }
+
+            async function restoreFile() {
+                try {
+                    const file = await sqliteFileState("readonly");
+                    if (!file || currentFile) return;
+                    currentFile = file;
+                    document.getElementById("fileLabel").textContent = file.name;
+                    await loadTables();
+                } catch (e) {
+                    setStatus("Could not restore file: " + e.message, true);
+                }
+            }
+
             // ── file picker ────────────────────────────────────────────────────────────
 
             document
                 .getElementById("filePicker")
-                .addEventListener("change", function () {
+                .addEventListener("change", async function () {
                     const f = this.files[0];
                     if (!f) return;
                     currentFile = f;
                     document.getElementById("fileLabel").textContent = f.name;
                     colOrder = [];
                     hiddenCols = new Set();
-                    loadTables();
                     this.value = "";
+                    let storageError = null;
+                    try {
+                        await sqliteFileState("readwrite", f);
+                    } catch (e) {
+                        storageError = e;
+                    }
+                    await loadTables();
+                    if (storageError)
+                        setStatus("File opened, but could not be saved: " + storageError.message, true);
                 });
 
             document
@@ -1256,6 +1299,7 @@
                 currentFile = new File([blob], currentFile.name, {
                     type: blob.type,
                 });
+                await sqliteFileState("readwrite", currentFile);
             }
 
             // ── helpers ────────────────────────────────────────────────────────────────
@@ -1292,6 +1336,8 @@
                 document.getElementById("statusBar").className =
                     "status-bar" + (isErr ? " err" : "");
             }
+
+            restoreFile();
 
             AiPanel.setContext(function () {
                 if (!currentFile) return "";

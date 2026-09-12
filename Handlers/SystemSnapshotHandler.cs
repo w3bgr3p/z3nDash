@@ -2,11 +2,6 @@
 //
 // Endpoints:
 //   POST   /system-snapshot/capture        → native C# collection, returns { raw }
-//   POST   /system-snapshot/save           { raw } → { id }
-//   POST   /system-snapshot/read-file      { path } → { raw }
-//   GET    /system-snapshot/list           → { snapshots: [{id, ts, host}] }
-//   GET    /system-snapshot/get?id=N       → { id, ts, host, raw }
-//   DELETE /system-snapshot/delete?id=N   → { ok }
 //   POST   /system-snapshot/ai-audit       { model, raw } → { analysis, model, ts }
 //   GET    /system-snapshot/ai-cache       → { entry } | { entry: null }
 //   DELETE /system-snapshot/ai-cache       → { ok }
@@ -24,7 +19,6 @@ internal sealed class SystemSnapshotHandler
     private readonly DbConnectionService _dbService;
     private readonly AiClient _aiClient;
 
-    private static string SnapshotTable => DbSchema.SystemSnapshots.Name;
     private static string AiCacheTable  => DbSchema.SystemSnapshotAiCache.Name;
     private const string Lang          = "russian";
 
@@ -42,11 +36,6 @@ internal sealed class SystemSnapshotHandler
         var method = ctx.Request.HttpMethod;
 
         if (method == "POST"   && path == "/system-snapshot/capture")   { await Capture(ctx);       return; }
-        if (method == "POST"   && path == "/system-snapshot/save")      { await Save(ctx);          return; }
-        if (method == "POST"   && path == "/system-snapshot/read-file") { await ReadFile(ctx);      return; }
-        if (method == "GET"    && path == "/system-snapshot/list")      { await List(ctx);          return; }
-        if (method == "GET"    && path == "/system-snapshot/get")       { await Get(ctx);           return; }
-        if (method == "DELETE" && path == "/system-snapshot/delete")    { await Delete(ctx);        return; }
         if (method == "POST"   && path == "/system-snapshot/ai-audit")  { await AiAudit(ctx);       return; }
         if (method == "GET"    && path == "/system-snapshot/ai-cache")  { await AiCacheGet(ctx);    return; }
         if (method == "DELETE" && path == "/system-snapshot/ai-cache")  { await AiCacheDelete(ctx); return; }
@@ -220,103 +209,6 @@ internal sealed class SystemSnapshotHandler
         return sb.ToString();
     }
 
-    // ── POST /system-snapshot/save ────────────────────────────────────────────
-
-    private async Task Save(HttpListenerContext ctx)
-    {
-        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
-
-        string raw;
-        try
-        {
-            using var reader = new StreamReader(ctx.Request.InputStream);
-            var json = JsonSerializer.Deserialize<JsonElement>(await reader.ReadToEndAsync());
-            raw = json.TryGetProperty("raw", out var rp) ? rp.GetString() ?? "" : "";
-        }
-        catch { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "invalid body" }); return; }
-
-        if (string.IsNullOrWhiteSpace(raw)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "empty raw" }); return; }
-
-        EnsureSnapshotTable(db!);
-        var ts   = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
-        var host = ExtractField(raw, "Hostname");
-        db!.Query($"INSERT INTO \"{SnapshotTable}\" (\"ts\", \"host\", \"raw\") VALUES ('{Esc(ts)}', '{Esc(host)}', '{Esc(raw)}')");
-        db.Query($"DELETE FROM \"{SnapshotTable}\" WHERE id NOT IN (SELECT id FROM \"{SnapshotTable}\" ORDER BY id DESC LIMIT 20)");
-
-        var idRow = db.GetLines("id", tableName: SnapshotTable, where: $"ts = '{Esc(ts)}'").FirstOrDefault() ?? "0";
-        _ = int.TryParse(idRow.Trim(), out var newId);
-        await HttpHelpers.WriteJson(ctx.Response, new { id = newId });
-    }
-
-    // ── POST /system-snapshot/read-file ───────────────────────────────────────
-
-    private async Task ReadFile(HttpListenerContext ctx)
-    {
-        string path;
-        try
-        {
-            using var reader = new StreamReader(ctx.Request.InputStream);
-            var json = JsonSerializer.Deserialize<JsonElement>(await reader.ReadToEndAsync());
-            path = json.TryGetProperty("path", out var pp) ? pp.GetString() ?? "" : "";
-        }
-        catch { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "invalid body" }); return; }
-
-        if (string.IsNullOrWhiteSpace(path)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "path required" }); return; }
-        if (!File.Exists(path))              { ctx.Response.StatusCode = 404; await HttpHelpers.WriteJson(ctx.Response, new { error = $"file not found: {path}" }); return; }
-
-        try { await HttpHelpers.WriteJson(ctx.Response, new { raw = await File.ReadAllTextAsync(path, Encoding.UTF8) }); }
-        catch (Exception ex) { ctx.Response.StatusCode = 500; await HttpHelpers.WriteJson(ctx.Response, new { error = ex.Message }); }
-    }
-
-    // ── GET /system-snapshot/list ─────────────────────────────────────────────
-
-    private async Task List(HttpListenerContext ctx)
-    {
-        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
-        EnsureSnapshotTable(db!);
-
-        var snapshots = db!.GetLines("id, ts, host", tableName: SnapshotTable, where: "1=1")
-            .Where(l => !string.IsNullOrWhiteSpace(l))
-            .Select(l => { var c = l.Split('|');
-                return new { id = int.TryParse(c.ElementAtOrDefault(0)?.Trim(), out var i) ? i : 0,
-                             ts = c.ElementAtOrDefault(1)?.Trim() ?? "", host = c.ElementAtOrDefault(2)?.Trim() ?? "" }; })
-            .Where(s => s.id > 0).OrderByDescending(s => s.id).ToList();
-
-        await HttpHelpers.WriteJson(ctx.Response, new { snapshots });
-    }
-
-    // ── GET /system-snapshot/get?id=N ─────────────────────────────────────────
-
-    private async Task Get(HttpListenerContext ctx)
-    {
-        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
-        if (!int.TryParse(ctx.Request.QueryString["id"], out var id)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "id required" }); return; }
-
-        EnsureSnapshotTable(db!);
-        var line = db!.GetLines("id, ts, host, raw", tableName: SnapshotTable, where: $"id = {id}")
-            .FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
-        if (line == null) { ctx.Response.StatusCode = 404; await HttpHelpers.WriteJson(ctx.Response, new { error = "not found" }); return; }
-
-        var i1 = line.IndexOf('|'); var i2 = i1 >= 0 ? line.IndexOf('|', i1+1) : -1; var i3 = i2 >= 0 ? line.IndexOf('|', i2+1) : -1;
-        await HttpHelpers.WriteJson(ctx.Response, new {
-            id   = i1 > 0 ? int.TryParse(line[..i1].Trim(), out var si) ? si : 0 : 0,
-            ts   = i1 >= 0 && i2 > i1 ? line[(i1+1)..i2].Trim() : "",
-            host = i2 >= 0 && i3 > i2 ? line[(i2+1)..i3].Trim() : "",
-            raw  = i3 >= 0 ? line[(i3+1)..] : ""
-        });
-    }
-
-    // ── DELETE /system-snapshot/delete?id=N ───────────────────────────────────
-
-    private async Task Delete(HttpListenerContext ctx)
-    {
-        if (!_dbService.TryGetDb(out var db)) { ctx.Response.StatusCode = 503; await HttpHelpers.WriteJson(ctx.Response, new { error = "db" }); return; }
-        if (!int.TryParse(ctx.Request.QueryString["id"], out var id)) { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "id required" }); return; }
-        EnsureSnapshotTable(db!);
-        db!.Del(tableName: SnapshotTable, where: $"id = {id}");
-        await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
-    }
-
     // ── POST /system-snapshot/ai-audit ────────────────────────────────────────
 
     private async Task AiAudit(HttpListenerContext ctx)
@@ -406,9 +298,6 @@ internal sealed class SystemSnapshotHandler
     }
 
     // ── DB helpers ────────────────────────────────────────────────────────────
-
-    private static void EnsureSnapshotTable(Db db) =>
-        db.CreateTable(DbSchema.SystemSnapshots.Columns, SnapshotTable);
 
     private static void EnsureAiCacheTable(Db db) =>
         db.CreateTable(DbSchema.SystemSnapshotAiCache.Columns, AiCacheTable);

@@ -123,9 +123,9 @@ The default dashboard address is `http://localhost:33333`.
 | Clips | Store and copy reusable templates |
 | Treasury | Inspect Web3 assets |
 | System | Capture and compare system state |
-| Graph | Explore C# source relationships |
+| dllGraph | Choose a DLL file and explore its C# relationships |
 | Config | Configure PostgreSQL, services, storage, and watchdog |
-| Docs | Open the bundled z3nDash documentation |
+| docsVault | Browse the bundled documentation or choose a Markdown folder |
 
 The navigation dock also shows the current keyboard shortcuts for these pages.
 

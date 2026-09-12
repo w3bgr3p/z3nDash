@@ -97,7 +97,7 @@ public class DashboardOverlay : Form
         ("¶ TXT",    "/text",           b => b + "/text"),
         ("☻ Clips",  "/clips",          b => b + "/?page=clips"),
         ("⚙ Config", "/page=config",    b => b + "/?page=config"),
-        ("❓ Docs",  "/docs",           b => b + "/docs"),
+        ("❓ docsVault",  "/docsVault",           b => b + "/docsVault"),
     ];
 
     // ── Поля ──────────────────────────────────────────────────────────────────

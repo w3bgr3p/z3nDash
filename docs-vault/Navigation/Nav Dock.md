@@ -17,8 +17,8 @@ Dock подключается страницами через `wwwroot/js/nav.js
 | `config` | [[Config]] | `Alt+0` |
 | `clips` | [[Clips]] | `Alt+C` |
 | `system` | [[System Snapshot]] | `Alt+S` |
-| `graph` | [[Graph]] | `Alt+G` |
-| `help` | [[Docs]] | `Alt+H` |
+| `dllGraph` | [[dllGraph]] | `Alt+G` |
+| `docsVault` | [[docsVault]] | `Alt+H` |
 | `sql` | [[SQLite]] | — |
 
 ## Дополнительно

@@ -67,6 +67,7 @@ public class ZpOrchestratorHandler : IScriptHandler
     
     private static readonly System.Net.Http.HttpClient _http = new();
     private static readonly TimeSpan NodeProbeTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan NodeStateTimeout = TimeSpan.FromSeconds(10);
 
     private async Task<string?> GetNodeUrl(Db db, string machine)
     {
@@ -80,6 +81,17 @@ public class ZpOrchestratorHandler : IScriptHandler
     private async Task GetNodes(HttpListenerContext ctx, Db db)
     {
         var store = new ZpNodeStore(db);
+        if (ctx.Request.QueryString["probe"] == "false")
+        {
+            await WriteJson(ctx.Response, store.GetAll().Select(node => new
+            {
+                machine = node.Machine,
+                host = node.Host,
+                port = node.Port,
+                updated_at = node.UpdatedAt,
+            }));
+            return;
+        }
         var probes = store.GetAll().Select(async node => new
         {
             machine = node.Machine,
@@ -271,8 +283,10 @@ public class ZpOrchestratorHandler : IScriptHandler
         string raw;
         try
         {
-            var resp = await _http.GetAsync($"{url}/state");
-            raw = await resp.Content.ReadAsStringAsync();
+            using var timeout = new CancellationTokenSource(NodeStateTimeout);
+            using var resp = await _http.GetAsync($"{url}/state", timeout.Token);
+            resp.EnsureSuccessStatusCode();
+            raw = await resp.Content.ReadAsStringAsync(timeout.Token);
         }
         catch (Exception ex)
         {

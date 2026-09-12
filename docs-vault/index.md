@@ -25,8 +25,8 @@ z3nDash — локальная Windows-панель для расписаний,
 | [[Config]] | База, сервер, OmniRoute и watchdog | `Alt+0` |
 | [[Clips]] | Шаблоны для копирования | `Alt+C` |
 | [[System Snapshot]] | Снимки состояния Windows | `Alt+S` |
-| [[Graph]] | Граф C#-кода | `Alt+G` |
-| [[Docs]] | Этот vault | `Alt+H` |
+| [[dllGraph]] | Граф C#-кода | `Alt+G` |
+| [[docsVault]] | Этот vault | `Alt+H` |
 | [[SQLite]] | Просмотр выбранной SQLite-базы | — |
 
 ## Хранилище

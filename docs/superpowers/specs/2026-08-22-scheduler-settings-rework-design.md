@@ -1,4 +1,4 @@
-# Переработка страницы Scheduler: Settings и расписание
+# Переработка страницы Tasker: Settings и расписание
 
 Дата: 2026-08-22
 Статус: утверждено, готово к планированию
@@ -72,7 +72,7 @@ Settings отвечает за «чем и как запускать», Schedule
 - `internal` и `csx-internal` — `args` это base64 JSON-payload, любой текст
   руками роняет запуск. Payload редактируется через модалку Values.
 
-Для `internal` добавляется эндпоинт `GET /scheduler/internal-tasks`,
+Для `internal` добавляется эндпоинт `GET /tasker/internal-tasks`,
 возвращающий ключи `SchedulerService._internalTasks`.
 
 Попутно `npm` добавляется в группу `_isJs` (и в серверный `IsJs`), чтобы
@@ -96,7 +96,7 @@ Settings отвечает за «чем и как запускать», Schedule
 - Кнопка `📦 pip install` начинает работать через
   `<venv>/Scripts/python.exe -m pip install -r requirements.txt`.
 - Поле пути и кнопка Detect удаляются.
-- `GET /scheduler/detect-venv` заменяется на `POST /scheduler/ensure-venv`,
+- `GET /tasker/detect-venv` заменяется на `POST /tasker/ensure-venv`,
   создающий каталог по требованию.
 
 ## 4. Таб Schedule
@@ -181,13 +181,13 @@ JSON в колонке — уже принятый в этой таблице п
 
 Настройка терминала — и глобальная, и per-task — убирается.
 
-Удаляется из `wwwroot/js/scheduler.js`: секция Terminal в `renderSettings`,
+Удаляется из `wwwroot/js/tasker.js`: секция Terminal в `renderSettings`,
 функции `_globalTerminalLabel`, `onTerminalOverrideChange`,
 `_checkTerminalOverrideNote`, `loadTerminalConfig`, `_updateTerminalUI`,
 `saveTerminalConfig`, поля `terminal_override` и `terminal_init_cmd`
 из payload `saveSchedule`.
 
-Удаляется с сервера: эндпоинт `GET /scheduler/terminal-config`, метод
+Удаляется с сервера: эндпоинт `GET /tasker/terminal-config`, метод
 `TerminalConfig`, `FindGitBash` в `SchedulerHandler`, свойства
 `Config.Terminal` и `Config.TerminalPath` (используются только здесь).
 

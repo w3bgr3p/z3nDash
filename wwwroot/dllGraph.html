@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>z3nDash | Graph</title>
+    <title>z3nDash | dllGraph</title>
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
@@ -90,15 +90,16 @@
 <div id="app">
 
     <div class="main-header">
-        <h1>cs-graph</h1>
+        <h1>dllGraph</h1>
         <div class="header-right">
             <button class="btn" onclick="openInTab()" id="btnOpenTab" disabled>Open in tab</button>
         </div>
     </div>
 
     <div class="toolbar">
-        <span class="toolbar-label">repo path</span>
-        <input type="text" id="repoPath" placeholder="C:\path\to\repo" />
+        <input type="hidden" id="repoPath" />
+        <button class="btn" id="btnPick" onclick="pickFile()">Choose DLL</button>
+        <span id="fileLabel" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">No file selected</span>
         <button class="btn primary" id="btnGenerate" onclick="generate()">Generate</button>
         <div class="toolbar-sep"></div>
         <button class="btn" onclick="reload()" id="btnReload" disabled>Reload</button>
@@ -114,7 +115,7 @@
         <div id="emptyState">
             <div class="empty-icon">⬡</div>
             <div class="empty-title">No graph loaded</div>
-            <div class="empty-sub">Enter repo path and click Generate</div>
+            <div class="empty-sub">Choose a DLL file and click Generate</div>
         </div>
     </div>
 
@@ -130,16 +131,34 @@
         txt.textContent = text || '—';
     }
 
+    async function pickFile() {
+        var btn = document.getElementById('btnPick');
+        btn.disabled = true;
+        try {
+            var res = await fetch('/dllGraph/pick?start=' + encodeURIComponent(document.getElementById('repoPath').value));
+            var data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+            if (!data.path) return;
+            document.getElementById('repoPath').value = data.path;
+            document.getElementById('fileLabel').textContent = data.path;
+            document.getElementById('fileLabel').title = data.path;
+        } catch (e) {
+            setStatus('err', e.message);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
     async function generate() {
         var repoPath = document.getElementById('repoPath').value.trim();
-        if (!repoPath) { Dialog.error('repoPath is required.'); return; }
+        if (!repoPath) { Dialog.error('Choose a DLL file first.'); return; }
 
         var btnG = document.getElementById('btnGenerate');
         btnG.disabled = true;
         setStatus('busy', 'Generating…');
 
         try {
-            var res  = await fetch('/graph/generate?repoPath=' + encodeURIComponent(repoPath), { method: 'POST' });
+            var res  = await fetch('/dllGraph/generate?repoPath=' + encodeURIComponent(repoPath), { method: 'POST' });
             var data = await res.json();
 
             if (!res.ok || data.error) {
@@ -164,7 +183,7 @@
         var btnR   = document.getElementById('btnReload');
         var btnTab = document.getElementById('btnOpenTab');
 
-        frame.src = '/graph?' + Date.now();
+        frame.src = '/dllGraph?' + Date.now();
         frame.className = 'visible';
         empty.className = 'hidden';
         btnR.disabled   = false;
@@ -178,12 +197,9 @@
 
     function openInTab() {
         if (!_generated) return;
-        window.open('/graph', '_blank');
+        window.open('/dllGraph', '_blank');
     }
 
-    document.getElementById('repoPath').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') generate();
-    });
 </script>
 </body>
 </html>

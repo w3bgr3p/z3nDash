@@ -171,28 +171,6 @@
         }
         .ai-meta.show { display: flex; }
 
-        /* ── Snapshot list in sidebar ── */
-        .snap-item {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 3px 4px; border-radius: 3px; cursor: pointer;
-            border: 1px solid transparent; gap: 4px;
-        }
-        .snap-item:hover { background: var(--bg2); }
-        .snap-item.active { background: var(--bg2); border-color: var(--accent); }
-        .snap-ts   { font-size: 9px; color: var(--text); }
-        .snap-host { font-size: 8px; color: var(--text2); }
-        .snap-del  { font-size: 9px; color: var(--text2); cursor: pointer; padding: 0 2px; flex-shrink: 0; }
-        .snap-del:hover { color: var(--red, #f85149); }
-
-        /* ── Upload drop area ── */
-        .drop-area {
-            border: 1px dashed var(--border); border-radius: 4px;
-            padding: 10px; text-align: center; color: var(--text2);
-            font-size: 10px; cursor: pointer; margin-bottom: 6px;
-            transition: border-color 0.15s;
-        }
-        .drop-area:hover, .drop-area.drag { border-color: var(--accent); color: var(--text); }
-
         /* ── Spinners ── */
         .spinner-inline {
             display: inline-block; width: 8px; height: 8px;
@@ -233,21 +211,12 @@
             <div class="stat-item"><span class="stat-label">TCP Conns:</span><span class="stat-val" id="sTcp">—</span></div>
         </div>
         <div class="header-right">
-            <button class="btn" onclick="captureNow()">▶ Capture Now</button>
+            <button class="btn" id="captureBtn" onclick="captureNow()">↻ Refresh</button>
         </div>
     </div>
 
     <!-- Toolbar -->
     <div class="toolbar">
-        <span class="toolbar-label">Load:</span>
-        <button class="btn" onclick="document.getElementById('fileInput').click()">From File (.txt)</button>
-        <input type="file" id="fileInput" accept=".txt,.log" style="display:none" onchange="loadFile(this)">
-        <div class="toolbar-sep"></div>
-        <span class="toolbar-label">Last output:</span>
-        <input type="text" id="snapFilePath" placeholder="C:\path\to\system_snapshot_last.txt"
-               style="width:320px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:10px;font-family:inherit;outline:none;">
-        <button class="btn" onclick="loadLastOutput()">Load</button>
-        <div class="toolbar-sep"></div>
         <span class="toolbar-label">Filter:</span>
         <input type="text" id="globalFilter" placeholder="process / port / address…"
                style="width:180px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:10px;font-family:inherit;outline:none;"
@@ -261,15 +230,15 @@
 
         <!-- Section nav -->
         <div class="section-nav" id="sectionNav">
-            <div id="snapTs" class="nav-ts">No snapshot loaded</div>
+            <div id="snapTs" class="nav-ts">Loading system data…</div>
             <div class="no-data" style="padding:20px 0;text-align:center;">—</div>
         </div>
 
         <!-- Content area + sidebar -->
         <div class="content-area" id="contentArea">
             <div class="empty-state" id="emptyState">
-                <div class="empty-state-title">No snapshot loaded</div>
-                <div class="empty-state-sub">Capture now or load a .txt file from a PS1 run</div>
+                <div class="empty-state-title">Loading system data…</div>
+                <div class="empty-state-sub">Collecting current system data</div>
             </div>
         </div>
 
@@ -278,12 +247,6 @@
 
         <!-- Sidebar -->
         <div class="sidebar" id="sidebarPanel">
-
-            <!-- Saved snapshots -->
-            <div class="sidebar-section">
-                <div class="sidebar-title">Saved Snapshots</div>
-                <div id="snapList"><div class="no-data">None</div></div>
-            </div>
 
             <!-- AI Audit -->
             <div class="sidebar-section">
@@ -312,66 +275,40 @@
     const API = window.location.origin;
 
     // ── State ─────────────────────────────────────────────────────────────────
-    let currentRaw    = '';   // raw text of loaded snapshot
+    let currentRaw    = '';   // current live system data
     let currentSections = []; // [{title, raw, type, rows, headers}]
-    let currentSnapId = null; // id of snapshot in DB (if saved)
+    let capturing = false;
     let sortState     = {};   // sectionTitle -> {col, asc}
     let globalFilter  = '';
 
     // ── Init ──────────────────────────────────────────────────────────────────
     loadModels();
-    loadSnapList();
-    loadAiCache();
+    captureNow();
     initResizer();
 
-    // ── File load ─────────────────────────────────────────────────────────────
-    function loadFile(input) {
-        const f = input.files[0];
-        if (!f) return;
-        const r = new FileReader();
-        r.onload = e => ingestRaw(e.target.result, f.name);
-        r.readAsText(f, 'utf-8');
-        input.value = '';
-    }
-
-    async function loadLastOutput() {
-        const path = document.getElementById('snapFilePath').value.trim();
-        if (!path) { document.getElementById('captureStatus').textContent = 'Enter file path first'; return; }
-        document.getElementById('captureStatus').textContent = 'Loading…';
-        try {
-            const r = await fetch(`${API}/system-snapshot/read-file`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path })
-            });
-            if (!r.ok) { document.getElementById('captureStatus').textContent = `Error: ${await r.text()}`; return; }
-            const d = await r.json();
-            if (d.error) { document.getElementById('captureStatus').textContent = 'Error: ' + d.error; return; }
-            ingestRaw(d.raw, path);
-            document.getElementById('captureStatus').textContent = 'Loaded';
-        } catch(e) {
-            document.getElementById('captureStatus').textContent = 'Error: ' + e.message;
-        }
-    }
-
     async function captureNow() {
+        if (capturing) return;
+        capturing = true;
+        document.getElementById('captureBtn').disabled = true;
         document.getElementById('captureStatus').textContent = 'Capturing…';
         try {
             const r = await fetch(`${API}/system-snapshot/capture`, { method: 'POST' });
+            if (!r.ok) throw new Error(await r.text());
             const d = await r.json();
             if (d.error) { document.getElementById('captureStatus').textContent = 'Error: ' + d.error; return; }
-            ingestRaw(d.raw, 'live');
-            await saveSnapshot(d.raw);
+            ingestRaw(d.raw);
             document.getElementById('captureStatus').textContent = 'Done';
         } catch(e) {
             document.getElementById('captureStatus').textContent = 'Error: ' + e.message;
+        } finally {
+            capturing = false;
+            document.getElementById('captureBtn').disabled = false;
         }
     }
 
     // ── Ingest & parse ────────────────────────────────────────────────────────
-    function ingestRaw(raw, label) {
+    function ingestRaw(raw) {
         currentRaw = raw;
-        currentSnapId = null;
         currentSections = parseSnapshot(raw);
         renderNav();
         renderAllSections();
@@ -454,13 +391,9 @@
         const nav = document.getElementById('sectionNav');
         // Extract timestamp from raw
         const tsMatch = currentRaw.match(/Captured\s*:\s*(.+)/);
-        const hostMatch = currentRaw.match(/Hostname\s*:\s*(.+)/);
-        document.getElementById('snapTs').textContent =
-            (tsMatch ? tsMatch[1].trim() : '') +
-            (hostMatch ? ' · ' + hostMatch[1].trim() : '');
-
         nav.innerHTML = '';
         const tsEl = document.createElement('div');
+        tsEl.id = 'snapTs';
         tsEl.className = 'nav-ts';
         tsEl.textContent = tsMatch ? tsMatch[1].trim() : 'Loaded';
         nav.appendChild(tsEl);
@@ -639,60 +572,6 @@
         }
     }
 
-    // ── Snapshot persistence ──────────────────────────────────────────────────
-    async function saveSnapshot(raw) {
-        try {
-            const r = await fetch(`${API}/system-snapshot/save`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ raw })
-            });
-            const d = await r.json();
-            if (d.id) { currentSnapId = d.id; await loadSnapList(); }
-        } catch(e) {}
-    }
-
-    async function loadSnapList() {
-        try {
-            const r = await fetch(`${API}/system-snapshot/list`);
-            const d = await r.json();
-            const list = document.getElementById('snapList');
-            if (!d.snapshots?.length) { list.innerHTML = '<div class="no-data">None</div>'; return; }
-            list.innerHTML = d.snapshots.map(s => `
-                <div class="snap-item ${s.id === currentSnapId ? 'active' : ''}" onclick="loadSnap(${s.id})">
-                    <div>
-                        <div class="snap-ts">${esc(s.ts)}</div>
-                        <div class="snap-host">${esc(s.host || '?')}</div>
-                    </div>
-                    <span class="snap-del" onclick="event.stopPropagation();deleteSnap(${s.id})">✕</span>
-                </div>`).join('');
-        } catch(e) {}
-    }
-
-    async function loadSnap(id) {
-        try {
-            const r = await fetch(`${API}/system-snapshot/get?id=${id}`);
-            const d = await r.json();
-            if (d.raw) { ingestRaw(d.raw, d.ts); currentSnapId = id; await loadSnapList(); }
-        } catch(e) {}
-    }
-
-    async function deleteSnap(id) {
-        try {
-            await fetch(`${API}/system-snapshot/delete?id=${id}`, { method: 'DELETE' });
-            if (currentSnapId === id) {
-                currentRaw = '';
-                currentSections = [];
-                document.getElementById('contentArea').querySelectorAll('.section-panel').forEach(el=>el.remove());
-                document.getElementById('emptyState').style.display = '';
-                document.getElementById('sectionNav').innerHTML =
-                    '<div class="nav-ts">No snapshot loaded</div><div class="no-data" style="padding:20px 0;text-align:center;">—</div>';
-                document.getElementById('aiBtnRun').disabled = true;
-            }
-            await loadSnapList();
-        } catch(e) {}
-    }
-
     // ── AI Audit ──────────────────────────────────────────────────────────────
     async function loadModels() {
         try {
@@ -702,14 +581,6 @@
             if (d.models?.length) {
                 sel.innerHTML = d.models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
             }
-        } catch(e) {}
-    }
-
-    async function loadAiCache() {
-        try {
-            const r = await fetch(`${API}/system-snapshot/ai-cache`);
-            const d = await r.json();
-            if (d.entry) aiShowResult(d.entry.analysis, d.entry.model, d.entry.ts, true);
         } catch(e) {}
     }
 

@@ -24,6 +24,8 @@ window.PageState = {
     function activePage() {
         const p = location.pathname;
         const q = location.search;
+        if (p.toLowerCase().includes('docsvault')) return 'docsVault';
+        if (p.toLowerCase().includes('dllgraph') || q.includes('page=dllGraph')) return 'dllGraph';
         if (p.includes('tasker')) return 'tasker';
         if (q.includes('page=zp7'))     return 'zp7';
         if (q.includes('page=logs'))   return 'logs';

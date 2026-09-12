@@ -102,18 +102,6 @@
             }
         };
 
-        public static readonly TableSchema SystemSnapshots = new()
-        {
-            Name = "system_snapshots",
-            Columns = new()
-            {
-                { "id",   "INTEGER PRIMARY KEY" },
-                { "ts",   "TEXT" },
-                { "host", "TEXT" },
-                { "raw",  "TEXT" },
-            }
-        };
-
         public static readonly TableSchema SystemSnapshotAiCache = new()
         {
             Name = "system_snapshot_ai_cache",

@@ -698,6 +698,7 @@
         <div class="hstat">Stopped: <span id="hStopped">0</span></div>
     </div>
     <button class="auto-badge on" id="autoBtn" onclick="toggleAuto()">AUTO ON</button>
+    <button class="auto-badge" id="allLogs" onclick="ZpAllLogs.open()" title="Logs from all ZP7 projects">allLogs</button>
     <button class="auto-badge" onclick="openNodesModal()" title="Manage ZP nodes">NODES</button>
     <button class="auto-badge" id="themeBtn" onclick="cycleTheme()" title="Switch theme">THEME</button>
 </div>
@@ -815,6 +816,9 @@
     </div>
 </div>
 
+<link rel="stylesheet" href="/css/zp-all-logs.css">
+<script src="/js/zp-all-logs.js"></script>
+
 <!-- ZP Nodes Modal -->
 <div class="modal-overlay" id="nodesModal" onclick="if(event.target===this) closeNodesModal()">
     <div class="modal" style="width:680px;">
@@ -898,6 +902,8 @@
     let autoInterval = null;
     let autoOn = true;
     let nodesRefreshTimer = null;
+    const taskNodes = new Map();
+    let taskNodesLoading = false;
 
     // Active tag filters (Set of tag strings)
     let activeTagFilters = new Set();
@@ -1063,21 +1069,75 @@
 
     // ── TASKS ──
     async function refreshTasks() {
+        taskNodes.forEach(node => refreshNodeTasks(node));
+        if (taskNodesLoading) return;
+        taskNodesLoading = true;
         try {
-            const r    = await fetch(`${SERVER}/zp/state/all`);
-            const data = await r.json();
-            allTasks = (data.tasks || []).filter(t => t.Name && t.Name.trim() !== '');
-            updateHeaderStats();
-            updateTagFilterBar();
-            applyFilters();
-            // restore selected task detail on first load
-            if (selectedTaskId && !_currentTaskId) {
-                const task = allTasks.find(t => t.Id === selectedTaskId);
-                if (task) renderDetail(task);
-                else selectedTaskId = null;
+            const response = await fetch(`${SERVER}/zp/nodes?probe=false`, {
+                cache: 'no-store', signal: AbortSignal.timeout(12000)
+            });
+            if (!response.ok) throw new Error(await readNodeApiError(response));
+            const nodes = await response.json();
+            if (!Array.isArray(nodes)) throw new Error('Invalid node list');
+            const machines = new Set(nodes.map(node => node.machine));
+            let changed = false;
+            for (const [machine, node] of taskNodes) {
+                if (machines.has(machine)) continue;
+                node.controller?.abort();
+                taskNodes.delete(machine);
+                changed = true;
             }
+            for (const node of nodes) {
+                const current = taskNodes.get(node.machine);
+                if (current && current.host === node.host && current.port === node.port) continue;
+                current?.controller?.abort();
+                const entry = { ...node, tasks: [], loaded: false, controller: null };
+                taskNodes.set(node.machine, entry);
+                refreshNodeTasks(entry);
+                changed = true;
+            }
+            if (changed || taskNodes.size === 0) renderNodeTasks();
         } catch (e) {
-            console.error('Tasks fetch failed:', e);
+            console.error('Task nodes fetch failed:', e);
+        } finally {
+            taskNodesLoading = false;
+        }
+    }
+
+    async function refreshNodeTasks(node) {
+        if (node.controller) return;
+        node.controller = new AbortController();
+        const timeout = setTimeout(() => node.controller?.abort(), 12000);
+        try {
+            const response = await fetch(`${SERVER}/zp/state?machine=${encodeURIComponent(node.machine)}`, {
+                cache: 'no-store', signal: node.controller.signal
+            });
+            if (!response.ok) throw new Error(await readNodeApiError(response));
+            const data = await response.json();
+            if (!Array.isArray(data.tasks)) throw new Error('Invalid task list');
+            node.tasks = data.tasks.filter(t => t.Name && t.Name.trim() !== '');
+        } catch (e) {
+            node.tasks = [];
+            if (taskNodes.get(node.machine) === node)
+                console.error(`Tasks fetch failed (${node.machine}):`, e);
+        } finally {
+            clearTimeout(timeout);
+            node.controller = null;
+            node.loaded = true;
+            if (taskNodes.get(node.machine) === node) renderNodeTasks();
+        }
+    }
+
+    function renderNodeTasks() {
+        allTasks = [...taskNodes.values()].flatMap(node => node.tasks);
+        updateHeaderStats();
+        updateTagFilterBar();
+        applyFilters();
+        // A saved selection may belong to a node that has not answered yet.
+        if (selectedTaskId && !_currentTaskId) {
+            const task = allTasks.find(t => t.Id === selectedTaskId);
+            if (task) renderDetail(task);
+            else if ([...taskNodes.values()].every(node => node.loaded)) selectedTaskId = null;
         }
     }
 
@@ -1119,7 +1179,8 @@
         const allTags = getAllTags();
 
         // Keep only valid active filters
-        activeTagFilters = new Set([...activeTagFilters].filter(t => allTags.includes(t)));
+        if ([...taskNodes.values()].every(node => node.loaded))
+            activeTagFilters = new Set([...activeTagFilters].filter(t => allTags.includes(t)));
 
         const clearBtn = document.getElementById('tagClearAll');
         clearBtn.style.display = activeTagFilters.size > 0 ? 'inline-block' : 'none';

@@ -16,28 +16,35 @@ internal sealed class GraphHandler
 
     private string? _lastHtml;
 
-    public bool Matches(string path) => path.StartsWith("/graph");
+    public bool Matches(string path) => path == "/dllgraph" || path.StartsWith("/dllgraph/");
 
     public async Task Handle(HttpListenerContext ctx)
     {
         var path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
         var method = ctx.Request.HttpMethod;
 
-        if (method == "GET"  && path == "/graph")          { await Serve(ctx);    return; }
-        if (method == "POST" && path == "/graph/generate") { await Generate(ctx); return; }
+        if (method == "GET" && path == "/dllgraph/pick")
+        {
+            var picked = SchedulerHandler.ShowPicker("file", "dll", ctx.Request.QueryString["start"] ?? "");
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, path = picked });
+            return;
+        }
+
+        if (method == "GET"  && path == "/dllgraph")          { await Serve(ctx);    return; }
+        if (method == "POST" && path == "/dllgraph/generate") { await Generate(ctx); return; }
 
         ctx.Response.StatusCode = 404;
         ctx.Response.Close();
     }
 
-    // ── GET /graph ────────────────────────────────────────────────────────────
+    // ── GET /dllgraph ────────────────────────────────────────────────────────────
 
     private async Task Serve(HttpListenerContext ctx)
     {
         if (_lastHtml is null)
         {
             ctx.Response.StatusCode = 404;
-            await HttpHelpers.WriteJson(ctx.Response, new { error = "No graph generated yet. POST /graph/generate?repoPath=..." });
+            await HttpHelpers.WriteJson(ctx.Response, new { error = "No graph generated yet. POST /dllgraph/generate?repoPath=..." });
             return;
         }
 
@@ -49,7 +56,7 @@ internal sealed class GraphHandler
         ctx.Response.Close();
     }
 
-    // ── POST /graph/generate?repoPath=... ─────────────────────────────────────
+    // ── POST /dllgraph/generate?repoPath=... ─────────────────────────────────────
 
     private async Task Generate(HttpListenerContext ctx)
     {

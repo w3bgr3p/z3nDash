@@ -1014,7 +1014,7 @@ public sealed class SchedulerHandler : IScriptHandler
     /// Владелец — скрытая форма поверх остальных: иначе диалог уходит за окно
     /// приложения и выглядит как зависание.
     /// </summary>
-    private static string ShowPicker(string mode, string ext, string start)
+    internal static string ShowPicker(string mode, string ext, string start)
     {
         var result = "";
         var thread = new Thread(() =>
@@ -1068,12 +1068,13 @@ public sealed class SchedulerHandler : IScriptHandler
         "js"      => "JavaScript (*.js;*.ts)|*.js;*.ts|Все файлы (*.*)|*.*",
         "ps1"     => "PowerShell (*.ps1)|*.ps1|Все файлы (*.*)|*.*",
         "exe"     => "Программа (*.exe)|*.exe|Все файлы (*.*)|*.*",
+        "dll"     => "Библиотека .NET (*.dll)|*.dll",
         "cmd"     => "Пакетный файл (*.cmd;*.bat)|*.cmd;*.bat|Все файлы (*.*)|*.*",
         "sh"      => "Shell (*.sh)|*.sh|Все файлы (*.*)|*.*",
         _         => "Все файлы (*.*)|*.*",
     };
 #else
-    private static string ShowPicker(string mode, string ext, string start)
+    internal static string ShowPicker(string mode, string ext, string start)
         => throw new PlatformNotSupportedException(
             "Выбор пути через системный диалог доступен только в сборке под Windows.");
 #endif

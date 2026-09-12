@@ -16,20 +16,29 @@ internal sealed class DocsGraphHandler
     private string? _lastHtml;
     private string? _lastGraphJson;
 
-    public bool Matches(string path) => path.StartsWith("/docs-graph");
+    public bool Matches(string path) => path.StartsWith("/docsvault");
 
     public async Task Handle(HttpListenerContext ctx)
     {
         var path   = ctx.Request.Url?.AbsolutePath.ToLower() ?? "";
         var method = ctx.Request.HttpMethod;
 
-        if (method == "GET" && (path == "/docs-graph" || path == "/docs" || path == "/docs/"))
+        if (method == "GET" && (path == "/docsvault" || path == "/docsvault/"))
         { await Serve(ctx); return; }
+
+        if (method == "GET" && path == "/docsvault/pick")
+        {
+            var start = ctx.Request.QueryString["start"] ?? "docs-vault";
+            if (!Path.IsPathRooted(start)) start = Path.Combine(AppContext.BaseDirectory, start);
+            var picked = SchedulerHandler.ShowPicker("folder", "", start);
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, path = picked });
+            return;
+        }
         
-        if (method == "POST" && path == "/docs-graph/generate") 
+        if (method == "POST" && path == "/docsvault/generate")
         { await Generate(ctx); return; }
         
-        if (method == "GET" && path == "/docs-graph/export")
+        if (method == "GET" && path == "/docsvault/export")
         {
             if (_lastGraphJson is null)
             {
@@ -44,7 +53,7 @@ internal sealed class DocsGraphHandler
             var bytes = Encoding.UTF8.GetBytes(export);
             ctx.Response.StatusCode      = 200;
             ctx.Response.ContentType     = "text/html; charset=utf-8";
-            ctx.Response.Headers["Content-Disposition"] = "attachment; filename=\"docs.html\"";
+            ctx.Response.Headers["Content-Disposition"] = "attachment; filename=\"docsVault.html\"";
             ctx.Response.ContentLength64 = bytes.Length;
             await ctx.Response.OutputStream.WriteAsync(bytes);
             ctx.Response.Close();
@@ -55,7 +64,7 @@ internal sealed class DocsGraphHandler
         ctx.Response.Close();
     }
 
-    // ── GET /docs-graph ───────────────────────────────────────────────────────
+    // ── GET /docsvault ───────────────────────────────────────────────────────
 
     private async Task Serve(HttpListenerContext ctx)
     {
@@ -65,7 +74,7 @@ internal sealed class DocsGraphHandler
         {
             html = template
                 .Replace("DOCS_GRAPH_DATA_PLACEHOLDER", "{\"nodes\":[],\"edges\":[]}")
-                .Replace("vault path…", "vault path…\" value=\"docs-vault");
+                .Replace("VAULT_PATH_PLACEHOLDER", "docs-vault");
         }
         else
         {
@@ -79,7 +88,7 @@ internal sealed class DocsGraphHandler
         ctx.Response.Close();
     }
 
-    // ── POST /docs-graph/generate?vaultPath=... ───────────────────────────────
+    // ── POST /docsvault/generate?vaultPath=... ───────────────────────────────
 
     private async Task Generate(HttpListenerContext ctx)
     {
@@ -117,7 +126,8 @@ internal sealed class DocsGraphHandler
 
             var template  = await File.ReadAllTextAsync(TemplatePath);
             _lastGraphJson = graphJson;
-            _lastHtml      = template.Replace("DOCS_GRAPH_DATA_PLACEHOLDER", graphJson);
+            _lastHtml      = template.Replace("DOCS_GRAPH_DATA_PLACEHOLDER", graphJson)
+                .Replace("VAULT_PATH_PLACEHOLDER", WebUtility.HtmlEncode(vaultPath));
 
             await HttpHelpers.WriteJson(ctx.Response, new { ok = true, vaultPath });
         }
