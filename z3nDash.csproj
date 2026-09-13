@@ -9,9 +9,18 @@
         <ApplicationIcon Condition="'$(TargetFramework)' == 'net10.0-windows'">icon.ico</ApplicationIcon>
 
         <RootNamespace>z3nDash</RootNamespace>
-        <PublishSingleFile>true</PublishSingleFile>
+        <!-- Публикуемся папкой, а не одним файлом.
+             Проверено на отдельном стенде: в single-file у упакованных сборок
+             Assembly.Location пуст, а Roslyn без него не строит ссылки —
+             ScriptOptions.AddReferences падает с «Can't create a metadata
+             reference to an assembly without location», то есть не работает
+             ни один csx и ни один OwnCode в xml-шаблоне.
+             IncludeAllContentForSelfExtract это чинит, но уводит
+             AppContext.BaseDirectory во временный каталог, а по нему ищутся
+             wwwroot, Prompts, sdk и туда же пишется appsettings.secrets.json —
+             конфигурация терялась бы при каждом обновлении. -->
+        <PublishSingleFile>false</PublishSingleFile>
         <SelfContained>true</SelfContained>
-        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
         <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
         <!--   <ApplicationManifest>app.manifest</ApplicationManifest> -->
         <NoWarn>$(NoWarn);8625;8618;8604;8603;8602;8600;8601;8619</NoWarn>
