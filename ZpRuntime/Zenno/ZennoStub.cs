@@ -20,27 +20,33 @@ using z3n7;   // Var/Int и прочие перенесённые из этал�
 // ZennoLab.InterfacesLibrary.Enums
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Состав и порядок значений сняты с ZennoLab.InterfacesLibrary 7.9.1.0
+// рефлексией и должны ему соответствовать: шаблоны пишут под настоящий
+// ZennoPoster, и урезанный стаб валит их компиляцию на ровном месте —
+// так шаблон и упал на LogColor.Gray, которого здесь не было.
+// Порядок важен: значения приводят к int.
+
 namespace ZennoLab.InterfacesLibrary.Enums.Log
 {
     public enum LogType  { Info, Warning, Error }
-    public enum LogColor { Default, Red, Green, Yellow, Blue, Orange }
+    public enum LogColor { Default, Gray, Green, Turquoise, LightBlue, Blue, Violet, Pink, Red, Orange, Yellow }
 }
 
 namespace ZennoLab.InterfacesLibrary.Enums.Browser
 {
-    public enum BrowserType   { Chromium, ChromiumFromZB, WithoutBrowser }
-    public enum TimezoneMode  { Disable, Emulate, Manual }
+    public enum BrowserType   { WithoutBrowser, Firefox45, Firefox52, Firefox52x64, Chrome, Chromium, ChromiumFromZB, ConnectToDevtools }
+    public enum TimezoneMode  { Default, Emulate }
 }
 
 namespace ZennoLab.InterfacesLibrary.Enums.Db
 {
-    public enum DbProvider { Odbc, OleDb, SqlServer, MySql, Postgre, SQLite }
+    public enum DbProvider { SqlClient, MySqlClient, OleDb, Odbc }
 }
 
 namespace ZennoLab.InterfacesLibrary.Enums.Http
 {
-    public enum HttpMethod { Get, Post, Put, Delete, Head, Patch }
-    public enum ResponceType { HeaderAndBody, BodyOnly, HeaderOnly }
+    public enum HttpMethod { GET, POST, PUT, HEAD, DELETE, OPTIONS, TRACE, PATCH }
+    public enum ResponceType { BodyOnly, HeaderOnly, HeaderAndBody, File, FileAndHeaders }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

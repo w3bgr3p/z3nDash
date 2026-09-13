@@ -253,7 +253,7 @@ namespace ZennoLab.CommandCenter
             int timeout = 30000, string cookies = "", string userAgent = "", bool useRedirect = true,
             int maxRedirectCount = 5, string[] additionalHeaders = null, string downloadPath = "",
             bool useOriginalUrl = false)
-            => HTTP.Request(InterfacesLibrary.Enums.Http.HttpMethod.Get, url, "", "", proxy, encoding,
+            => HTTP.Request(InterfacesLibrary.Enums.Http.HttpMethod.GET, url, "", "", proxy, encoding,
                 respType, timeout / 1000, cookies, userAgent, useRedirect, maxRedirectCount,
                 additionalHeaders, "", false, false, null);
 
@@ -263,7 +263,7 @@ namespace ZennoLab.CommandCenter
             int timeout = 30000, string cookies = "", string userAgent = "", bool useRedirect = true,
             int maxRedirectCount = 5, string[] additionalHeaders = null, string downloadPath = "",
             bool useOriginalUrl = false)
-            => HTTP.Request(InterfacesLibrary.Enums.Http.HttpMethod.Post, url, content, contentPostingType,
+            => HTTP.Request(InterfacesLibrary.Enums.Http.HttpMethod.POST, url, content, contentPostingType,
                 proxy, encoding, respType, timeout / 1000, cookies, userAgent, useRedirect,
                 maxRedirectCount, additionalHeaders, "", false, true, null);
 
