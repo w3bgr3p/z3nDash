@@ -78,6 +78,9 @@
         <None Update="docs-vault\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Update="docs-vault-en\**\*">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Update="templates\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
@@ -146,6 +149,7 @@
 
     <ItemGroup>
         <Folder Include="docs-vault\" />
+        <Folder Include="docs-vault-en\" />
     </ItemGroup>
 
     <ItemGroup>
