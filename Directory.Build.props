@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
     <PropertyGroup>
         <Version>1.0.0.0</Version>
 
@@ -9,5 +9,9 @@
         <Authors>w3bgr3p</Authors>
 
         <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+        <!-- Переводы сообщений сторонних библиотек: 13 папок и 15 МБ рядом с exe.
+             Интерфейс английский, показывать их некому. -->
+        <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     </PropertyGroup>
 </Project>
