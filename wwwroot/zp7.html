@@ -144,6 +144,11 @@
         .group-count { font-size: 9px; color: var(--text2); background: var(--bg2); padding: 1px 5px; border-radius: 8px; }
         .group-chevron { font-size: 9px; color: var(--text2); transition: transform 0.15s; display: inline-block; }
         .group-chevron.collapsed { transform: rotate(-90deg); }
+        .group-header.machine-header { z-index: 3; border-top-color: var(--accent); }
+        .group-header.machine-header .group-dot { background: var(--green); }
+        .group-header.nested { padding-left: 20px; border-top-width: 1px; position: static; }
+        .group-header.nested .group-name { font-weight: 600; color: var(--text2); }
+        .group-header.nested .group-dot { width: 4px; height: 4px; }
 
         /* ── Schedule rows ── */
         .schedule-row {
@@ -1252,10 +1257,40 @@
         _saveState();
     }
 
-    // collapsed state per project key
-    // _groupCollapsed keys: "machine::project" for project groups, "machine::" for machine groups
+    // Свёрнутые секции. Ключи: "machine::" — машина, "machine::project" — проект
+    // внутри неё. Проект живёт в пределах машины: одноимённые проекты на разных
+    // узлах сворачиваются независимо.
     const _groupCollapsed = {};
-    let _groupsInitialized = false;
+    const machineKey = machine => machine + '::';
+    const projectKey = (machine, project) => machine + '::' + project;
+    const isCollapsed = key => _groupCollapsed[key] === false;
+
+    // Имя проекта — префикс до первой точки. Без точки проект не выделяется.
+    function grpOf(task) {
+        const name = task.Name || '';
+        const dot = name.indexOf('.');
+        return dot > 0 ? name.substring(0, dot).trim() : '';
+    }
+
+    const machineOf = task => task.machine || '—';
+
+    function runningDots(tasks) {
+        const running = tasks.filter(t => t.ExecutionSettings_IsWork === 'True').length;
+        if (!running) return '';
+        const dot = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:2px"></span>';
+        return '<span>' + Array(Math.min(running, 5)).fill(dot).join('') + '</span>';
+    }
+
+    function sectionHeader(key, name, tasks, extraClass) {
+        return `<div class="group-header${extraClass}" onclick="toggleGroupFlat('${escHtml(key)}',this)">`
+            + `<span class="group-dot"></span>`
+            + `<span class="group-name">${escHtml(name)}</span>`
+            + runningDots(tasks)
+            + `<span class="group-count">${tasks.length}</span>`
+            + `<span class="group-chevron${isCollapsed(key) ? ' collapsed' : ''}">&#9660;</span>`
+            + `</div>`;
+    }
+
     function renderTasks(tasks) {
         const container = document.getElementById('tasksList');
         if (!tasks.length) {
@@ -1263,110 +1298,96 @@
             return;
         }
 
-        // getGroupName: prefix before first "."
-        function grpOf(t) {
-            const name = t.Name || '';
-            const dot  = name.indexOf('.');
-            return dot > 0 ? name.substring(0, dot).trim() : '';
-        }
-
-        // Count members per group
-        const groupCounts = {};
-        tasks.forEach(t => {
-            const g = grpOf(t);
-            if (g) groupCounts[g] = (groupCounts[g] || 0) + 1;
+        // Первый уровень — машины.
+        const machines = new Map();
+        tasks.forEach(task => {
+            const name = machineOf(task);
+            if (!machines.has(name)) machines.set(name, []);
+            machines.get(name).push(task);
         });
-
-        // Sort: grouped (size>1) first by group name; ungrouped last
-        const sorted = [...tasks].sort((a, b) => {
-            const ga = grpOf(a), gb = grpOf(b);
-            const showA = ga && groupCounts[ga] > 1;
-            const showB = gb && groupCounts[gb] > 1;
-            if (showA && !showB) return -1;
-            if (!showA && showB) return 1;
-            if (showA && showB) return ga < gb ? -1 : ga > gb ? 1 : 0;
-            return 0;
-        });
-
-        if (!_groupsInitialized) {
-            _groupsInitialized = true;
-            Object.keys(groupCounts).forEach(function(g) {
-                if (groupCounts[g] > 1 && !(_groupCollapsed[g] === true))
-                    _groupCollapsed[g] = false;
-            });
-        }
 
         let html = '';
-        let lastGrp = null;
-        let firstUngrouped = true;
-
-        sorted.forEach(t => {
-            const grp     = grpOf(t);
-            const showGrp = grp && groupCounts[grp] > 1;
-            const groupKey = grp;
-            const collapsed = showGrp && _groupCollapsed[groupKey] === false;
-
-            // Group header
-            if (showGrp && grp !== lastGrp) {
-                const grpRunning = sorted.filter(x => grpOf(x) === grp && x.ExecutionSettings_IsWork === 'True').length;
-                const dots = grpRunning > 0
-                    ? Array(Math.min(grpRunning, 5)).fill('<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:2px"></span>').join('')
-                    : '';
-                const isCollapsed = _groupCollapsed[groupKey] === false;
-                html += `<div class="group-header" onclick="toggleGroupFlat('${escHtml(groupKey)}',this)">`
-                    + `<span class="group-dot"></span>`
-                    + `<span class="group-name">${escHtml(grp)}</span>`
-                    + (dots ? `<span>${dots}</span>` : '')
-                    + `<span class="group-count">${groupCounts[grp]}</span>`
-                    + `<span class="group-chevron${isCollapsed ? ' collapsed' : ''}">&#9660;</span>`
-                    + `</div>`;
-                lastGrp = grp;
-            } else if (!showGrp) {
-                if (lastGrp !== null && firstUngrouped) {
-                    html += '<div class="ungrouped-separator"></div>';
-                    firstUngrouped = false;
-                }
-                if (lastGrp !== null) lastGrp = null;
-            }
-
-            if (collapsed) return;
-
-            const status   = t.ExecutionSettings_Status || '';
-            const stClass  = status ? `st-${status}` : 'st-empty';
-            const isWork   = t.ExecutionSettings_IsWork === 'True';
-            const done     = t.ExecutionSettings_DoneSuccessfully || '0';
-            const total    = t.ExecutionSettings_DoneAll || '0';
-            const isActive = t.Id === selectedTaskId;
-            const machine  = t.machine || '';
-
-            const shortName = showGrp && t.Name.startsWith(grp + '.')
-                ? t.Name.substring(grp.length + 1)
-                : t.Name;
-
-            const subLine = machine ? `<span class="machine-badge">${escHtml(machine)}</span>` : '';
-
-            html += `<div class="schedule-row${showGrp ? ' group-child' : ''}${isActive ? ' active' : ''}" onclick="selectTask('${escHtml(t.Id)}')">`
-                + `<span class="row-dot ${isWork ? 'working' : 'enabled'}" title="${isWork ? 'Running' : 'Idle'}"></span>`
-                + `<div class="row-info">`
-                + `<div class="row-name">${escHtml(shortName)}</div>`
-                + (subLine ? `<div class="row-sub">${subLine}</div>` : '')
-                + `</div>`
-                + `<div class="row-right">`
-                + `<span class="task-status ${stClass}">${status || '—'}</span>`
-                + `<span class="row-counts"><span class="row-done">${done}</span><span class="row-total"> / ${total}</span></span>`
-                + `</div>`
-                + `</div>`;
-        });
+        for (const name of [...machines.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) {
+            const onMachine = machines.get(name);
+            const key = machineKey(name);
+            html += sectionHeader(key, name, onMachine, ' machine-header');
+            if (!isCollapsed(key)) html += renderMachineTasks(name, onMachine);
+        }
 
         container.innerHTML = html || '<div class="empty-msg">No results</div>';
     }
 
+    // Второй уровень — прежнее правило: проекты с двумя и более задачами
+    // получают свой заголовок, остальные задачи идут следом одним списком.
+    function renderMachineTasks(machine, tasks) {
+        const counts = {};
+        tasks.forEach(task => {
+            const project = grpOf(task);
+            if (project) counts[project] = (counts[project] || 0) + 1;
+        });
+        const grouped = task => { const p = grpOf(task); return p && counts[p] > 1; };
+
+        const sorted = [...tasks].sort((a, b) => {
+            const ga = grpOf(a), gb = grpOf(b);
+            if (grouped(a) && !grouped(b)) return -1;
+            if (!grouped(a) && grouped(b)) return 1;
+            if (grouped(a) && grouped(b)) return ga < gb ? -1 : ga > gb ? 1 : 0;
+            return 0;
+        });
+
+        let html = '';
+        let lastProject = null;
+        let firstUngrouped = true;
+
+        for (const task of sorted) {
+            const project = grpOf(task);
+            const inGroup = grouped(task);
+            const key = projectKey(machine, project);
+
+            if (inGroup && project !== lastProject) {
+                html += sectionHeader(key, project, sorted.filter(x => grpOf(x) === project), ' nested');
+                lastProject = project;
+            } else if (!inGroup) {
+                if (lastProject !== null && firstUngrouped) {
+                    html += '<div class="ungrouped-separator"></div>';
+                    firstUngrouped = false;
+                }
+                lastProject = null;
+            }
+
+            if (inGroup && isCollapsed(key)) continue;
+            html += taskRow(task, inGroup ? project : '');
+        }
+        return html;
+    }
+
+    function taskRow(task, project) {
+        const status = task.ExecutionSettings_Status || '';
+        const isWork = task.ExecutionSettings_IsWork === 'True';
+        const done = task.ExecutionSettings_DoneSuccessfully || '0';
+        const total = task.ExecutionSettings_DoneAll || '0';
+        const isActive = task.Id === selectedTaskId;
+
+        // Машина уже названа в заголовке секции, в строке её не повторяем;
+        // имя проекта тоже, если оно вынесено в заголовок.
+        const shortName = project && task.Name.startsWith(project + '.')
+            ? task.Name.substring(project.length + 1)
+            : task.Name;
+
+        return `<div class="schedule-row${project ? ' group-child' : ''}${isActive ? ' active' : ''}" onclick="selectTask('${escHtml(task.Id)}')">`
+            + `<span class="row-dot ${isWork ? 'working' : 'enabled'}" title="${isWork ? 'Running' : 'Idle'}"></span>`
+            + `<div class="row-info"><div class="row-name">${escHtml(shortName)}</div></div>`
+            + `<div class="row-right">`
+            + `<span class="task-status ${status ? 'st-' + status : 'st-empty'}">${status || '—'}</span>`
+            + `<span class="row-counts"><span class="row-done">${done}</span><span class="row-total"> / ${total}</span></span>`
+            + `</div>`
+            + `</div>`;
+    }
+
     function toggleGroupFlat(key, header) {
-        const isOpen = _groupCollapsed[key] !== false;
-        _groupCollapsed[key] = isOpen ? false : true;
+        _groupCollapsed[key] = isCollapsed(key) ? true : false;
         const chevron = header.querySelector('.group-chevron');
-        if (chevron) chevron.classList.toggle('collapsed', !isOpen);
-        // re-render to show/hide children
+        if (chevron) chevron.classList.toggle('collapsed', isCollapsed(key));
         applyFilters();
         _saveState();
     }
@@ -1386,9 +1407,9 @@
         const task = allTasks.find(t => t.Id === id);
         if (!task) return;
 
-        // auto-expand group if collapsed
-        const proj = getProject(task);
-        if (_groupCollapsed[proj] === false) _groupCollapsed[proj] = true;
+        // Разворачиваем обе секции выбранной задачи: и машину, и проект в ней.
+        delete _groupCollapsed[machineKey(machineOf(task))];
+        delete _groupCollapsed[projectKey(machineOf(task), getProject(task))];
 
         applyFilters();
         renderDetail(task);

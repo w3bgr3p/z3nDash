@@ -172,22 +172,44 @@ window.ZpTraffic = (() => {
                 }),
             ];
 
-            const results = await Promise.allSettled(targets.map(async target => {
-                const data = await getJson(target.url, controller.signal);
-                if (!Array.isArray(data.entries)) throw new Error('Invalid traffic response');
-                return data.entries.map(entry => ({ ...entry, machine: entry.machine || target.machine || '' }));
+            // Источники опрашиваются параллельно и рисуются по мере ответа:
+            // недоступная нода держит свой запрос до таймаута прокси, и ждать
+            // её всем остальным незачем. Старый список остаётся на экране,
+            // пока не приедет первый ответ этого прохода.
+            const collected = [];
+            const failures = [];
+            let answered = 0;
+
+            const status = () => {
+                el('note').textContent = `${answered - failures.length}/${targets.length} sources · ${new Date().toLocaleTimeString()}`
+                    + (answered < targets.length ? ' · loading...' : '')
+                    + (failures.length ? '\n' + failures.join('\n') : '');
+                el('note').classList.toggle('error', failures.length > 0);
+            };
+            status();
+
+            await Promise.all(targets.map(async target => {
+                try {
+                    const data = await getJson(target.url, controller.signal);
+                    if (controller.signal.aborted) return;
+                    if (!Array.isArray(data.entries)) throw new Error('Invalid traffic response');
+
+                    collected.push(...data.entries.map(entry => ({ ...entry, machine: entry.machine || target.machine || '' })));
+                    rows = collected.slice().sort((a, b) => String(b.timestamp ?? '').localeCompare(String(a.timestamp ?? '')));
+                    options('machine', rows.map(row => row.machine).concat(nodes.map(node => node.machine)), 'All machines');
+                    options('project', rows.map(row => row.project).concat(Array.from(el('project').options, option => option.value)), 'All projects');
+                    render();
+                } catch (error) {
+                    if (controller.signal.aborted) return;
+                    failures.push(`${target.label}: ${error.message}`);
+                } finally {
+                    if (!controller.signal.aborted) { answered++; status(); }
+                }
             }));
             if (controller.signal.aborted) return;
 
-            rows = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
-            rows.sort((a, b) => String(b.timestamp ?? '').localeCompare(String(a.timestamp ?? '')));
-            options('machine', rows.map(row => row.machine).concat(nodes.map(node => node.machine)), 'All machines');
-            options('project', rows.map(row => row.project).concat(Array.from(el('project').options, option => option.value)), 'All projects');
-
-            const failures = results.flatMap((result, index) => result.status === 'rejected' ? [`${targets[index].label}: ${result.reason.message}`] : []);
-            el('note').textContent = `${results.length - failures.length}/${targets.length} sources · ${new Date().toLocaleTimeString()}${failures.length ? '\n' + failures.join('\n') : ''}`;
-            el('note').classList.toggle('error', failures.length > 0);
-            render();
+            // Все источники молчат — показываем пустой список, а не прошлый.
+            if (!collected.length) { rows = []; render(); }
         } catch (error) {
             if (controller.signal.aborted) return;
             rows = []; render();
