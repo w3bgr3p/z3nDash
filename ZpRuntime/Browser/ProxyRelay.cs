@@ -339,7 +339,7 @@ public sealed class ProxyRelay : IDisposable
         {
             if (!await AuthenticateAsync(up, cfg))
             {
-                Log?.Invoke($"прокси отклонил авторизацию ({cfg.Host}:{cfg.Port})");
+                // Причину уже назвал AuthenticateAsync — со словами самого прокси.
                 if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
                 return false;
             }
@@ -411,7 +411,35 @@ public sealed class ProxyRelay : IDisposable
 
         await up.WriteAsync(auth, _cts.Token);
         var status = await ReadExactAsync(up, 2);
-        return status[1] == 0x00;
+        if (status[1] == 0x00) return true;
+
+        // Провайдер нередко дописывает к отказу свой текст — и это единственное
+        // место, где видно настоящую причину. Проверено на plainproxies: после
+        // байтов ответа приходит «key not found in keystore», а без него отказ
+        // выглядит одинаково и при неверном пароле, и при незнакомом ключе.
+        var tail = await ReadPendingTextAsync(up);
+        Log?.Invoke($"прокси отказал в авторизации ({cfg.Host}:{cfg.Port}), "
+                  + $"ответ {status[0]:X2} {status[1]:X2}"
+                  + (tail.Length > 0 ? $", сервер: {tail}" : ", текста сервер не прислал"));
+        return false;
+    }
+
+    /// <summary>
+    /// Дочитать то, что сервер успел дописать после ответа. Молчание — обычное
+    /// дело, поэтому ждём недолго и не считаем пустоту ошибкой.
+    /// </summary>
+    private static async Task<string> ReadPendingTextAsync(NetworkStream s)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var buf = new byte[256];
+            var n = await s.ReadAsync(buf.AsMemory(), timeout.Token);
+            if (n <= 0) return "";
+            var text = Encoding.ASCII.GetString(buf, 0, n);
+            return new string([.. text.Where(c => c >= 32 && c < 127)]).Trim();
+        }
+        catch { return ""; }
     }
 
     /// <summary>
