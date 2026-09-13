@@ -99,6 +99,21 @@
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
             <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
         </None>
+    </ItemGroup>
+
+    <!-- Драйвер Patchright (.playwright: node.exe и js-пакет) должен лежать на диске
+         рядом с exe: Playwright.CreateAsync ищет его там. При PublishSingleFile он
+         иначе запекается внутрь exe, publish отдаёт .playwright без node.exe,
+         и любой запуск браузера падает с «Driver not found». -->
+    <Target Name="PlaywrightDriverOutOfSingleFile" AfterTargets="ComputeResolvedFilesToPublishList">
+        <ItemGroup>
+            <ResolvedFileToPublish Update="@(ResolvedFileToPublish)"
+                                   Condition="$([System.String]::Copy('%(RelativePath)').StartsWith('.playwright'))"
+                                   ExcludeFromSingleFile="true" />
+        </ItemGroup>
+    </Target>
+
+    <ItemGroup>
         <None Remove="z3nStub\**" />
         <None Remove="installer_output\**" />
         <None Remove="publish-new\**" />

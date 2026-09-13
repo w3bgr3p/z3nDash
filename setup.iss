@@ -26,12 +26,14 @@ ArchitecturesInstallIn64BitMode=x64
 
 [Files]
 Source: "publish-new\z3nDash.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish-new\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish-new\wwwroot\*"; DestDir: "{app}\wwwroot"; Flags: ignoreversion recursesubdirs
 Source: "publish-new\templates\*"; DestDir: "{app}\Templates"; Flags: ignoreversion recursesubdirs
 Source: "publish-new\docs-vault\*"; DestDir: "{app}\docs-vault"; Flags: ignoreversion recursesubdirs
 Source: "publish-new\Prompts\*"; DestDir: "{app}\Prompts"; Flags: ignoreversion recursesubdirs
 Source: "publish-new\sdk\*"; DestDir: "{app}\sdk"; Flags: ignoreversion recursesubdirs
+; Driver Patchright: without .playwright any browser launch dies with "Driver not found"
+Source: "publish-new\.playwright\*"; DestDir: "{app}\.playwright"; Flags: ignoreversion recursesubdirs
 Source: "publish-new\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "zpServer.zp"; DestDir: "{app}"; Flags: ignoreversion
 
