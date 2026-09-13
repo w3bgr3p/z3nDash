@@ -689,9 +689,8 @@ public sealed partial class SchedulerService : IDisposable
         }
         if (executor == "xml")
         {
-            // Проигрывание шаблона ZennoPoster. Ветка стоит рядом с csx-zp7 не
-            // случайно: у них одна модель проекта и один слой z3n7, отличается
-            // только источник — там файл со скриптом, здесь граф из XML.
+            // Проигрывание шаблона ZennoPoster: граф из XML исполняет
+            // встроенный рантайм поверх слоя z3n7, без конвертации в csx.
             if (!File.Exists(scriptPath))
             {
                 _log?.Error($"[{name}] xml template not found: {scriptPath}");
@@ -847,80 +846,6 @@ public sealed partial class SchedulerService : IDisposable
                 // при прогоне по аккаунтам иначе накопятся десятки открытых окон.
                 if (externalProfile is not null)
                     await BrowserProvider.StopAsync(brConfig, externalProfile, rp.AddLine);
-                cts.Dispose();
-                TopUp(db, id);
-            }
-
-            return;
-        }
-        if (executor == "csx-zp7")
-        {
-            if (!File.Exists(scriptPath))
-            {
-                _log?.Error($"[{name}] csx script not found: {scriptPath}");
-                UpdateStatus(db, id, "error", firedAt, "-1", $"script not found: {scriptPath}", runId);
-                return;
-            }
-
-            UpdateStatus(db, id, "running", firedAt, "", "", runId);
-            var cts = new CancellationTokenSource();
-            var rp  = new RunningProcess(null, firedAt, cts, broadcast);
-            _running[instanceKey] = rp;
-            threadSlot?.Dispose();
-
-            Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"[LIVE] csx-zp7 started id={id} name={name} run={runId} script={Path.GetFileName(scriptPath)}");
-            Console.ResetColor();
-
-            try
-            {
-                var project = new StubProject { Name = name, OnLog = rp.AddLine };
-                // Скрипты csx-zp7 ходят в базу через перенесённые из эталона
-                // Db-расширения, а те берут соединение из переменной dbSource.
-                project.Variables["dbSource"].Value = db.Source;
-
-                var globals = new CsxZp7Globals
-                {
-                    project  = project,
-                    instance = new ZennoLab.CommandCenter.Instance(),
-                    log      = RunLogger(scheduleTag, runId) ?? _log!,
-                };
-
-
-                var result = await CsxExecutor.RunAsync<CsxZp7Globals>(scriptPath, globals, cts.Token);
-
-                if (!result.Success)
-                {
-                    rp.AddLine("[ERR] " + result.Exception?.Message);
-                    if (result.Snippet != null) rp.AddLine(result.Snippet.ToString());
-                    SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
-                    RunLogger(scheduleTag, runId)?.Error($"[{name}] csx-zp7 failed: {result.Exception?.Message}");
-                    rp.Result = result.Exception?.Message ?? "error";
-                    _running.TryRemove(instanceKey, out _);
-                    UpdateStatus(db, id, "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
-                    FinishQueueEntry(db, queueUuid, "error", runId);
-                    return;
-                }
-
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
-                rp.Result = "ok";
-                RunLogger(scheduleTag, runId)?.Info($"[{name}] csx-zp7 done run={runId}");
-                _running.TryRemove(instanceKey, out _);
-                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
-                FinishQueueEntry(db, queueUuid, "done", runId);
-            }
-            catch (Exception ex)
-            {
-                rp.AddLine("[ERR] " + ex.Message);
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
-                RunLogger(scheduleTag, runId)?.Error($"[{name}] csx-zp7 failed: {ex.Message}");
-                rp.Result = ex.Message;
-                _running.TryRemove(instanceKey, out _);
-                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
-                FinishQueueEntry(db, queueUuid, "error", runId);
-            }
-            finally
-            {
                 cts.Dispose();
                 TopUp(db, id);
             }

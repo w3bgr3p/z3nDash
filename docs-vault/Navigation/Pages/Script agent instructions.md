@@ -76,7 +76,7 @@ except TemporaryServiceError:
 
 ## C# / CSX / XML OwnCode
 
-В `csx-internal`, `csx-zp7` и XML OwnCode, исполняемых именно z3nDash,
+В `csx-internal` и XML OwnCode, исполняемых именно z3nDash,
 объект `current_task` предоставляется средой. Не создавай его самостоятельно.
 
 ```csharp

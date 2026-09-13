@@ -574,7 +574,7 @@ namespace ZennoLab.CommandCenter
         private readonly IBrowserInstance? _br;
 
         /// <summary>
-        /// Безбраузерный режим — для скриптов из чистого кода (путь csx-zp7).
+        /// Безбраузерный режим — для кода, которому браузер не нужен.
         /// Любое обращение к браузеру бросит NotSupportedException с пояснением.
         /// </summary>
         public Instance() => _br = null;

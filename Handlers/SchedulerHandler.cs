@@ -411,15 +411,13 @@ public sealed class SchedulerHandler : IScriptHandler
         var scriptPath = db.Get("script_path", Table, where: $"\"id\" = '{id}'");
         var executor   = db.Get("executor",    Table, where: $"\"id\" = '{id}'");
 
-        if (executor != "csx-internal" && executor != "csx-zp7")
+        if (executor != "csx-internal")
         {
             await HttpHelpers.WriteJson(ctx.Response, new { ok = true, errors = Array.Empty<string>(), message = "not a csx task" });
             return;
         }
 
-        var errors = executor == "csx-zp7"
-            ? await CsxExecutor.CompileAsync<CsxZp7Globals>(scriptPath)
-            : await CsxExecutor.CompileAsync<CsxGlobals>(scriptPath);
+        var errors = await CsxExecutor.CompileAsync<CsxGlobals>(scriptPath);
 
         if (errors.Count == 0)
             await HttpHelpers.WriteJson(ctx.Response, new { ok = true, errors = Array.Empty<string>() });

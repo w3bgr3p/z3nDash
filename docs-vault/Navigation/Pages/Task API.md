@@ -32,7 +32,7 @@ current_task.defer(until="2026-12-01T12:00:00Z", reason="До указанног
 
 ## C# и XML OwnCode
 
-В `csx-internal`, `csx-zp7` и блоках XML OwnCode доступен объект `current_task`:
+В `csx-internal` и блоках XML OwnCode доступен объект `current_task`:
 
 ```csharp
 await current_task.DeferAsync(3600, "Сервис недоступен");

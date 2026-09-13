@@ -900,7 +900,7 @@ function newSchedule() {
 // у internal и csx-internal в args лежит base64-payload.
 
 var EXECUTORS = ['python','node','ts-node','npm','exe','cmd','bat','bash','ps1',
-                 'csx','csx-internal','csx-zp7','xml','internal'];
+                 'csx','csx-internal','xml','internal'];
 
 var EXECUTOR_SPEC = {
     'python':       { label: 'Script (.py)',      pick: 'file'   },
@@ -914,7 +914,6 @@ var EXECUTOR_SPEC = {
     'ps1':          { label: 'Script (.ps1)',     pick: 'file'   },
     'csx':          { label: 'Script (.csx)',     pick: 'file'   },
     'csx-internal': { label: 'Script (.csx)',     pick: 'file',   noArgs: true },
-    'csx-zp7':      { label: 'Script (.csx)',     pick: 'file'   },
     'xml':          { label: 'Template (.xml)',   pick: 'file'   },
     'internal':     { label: 'Task',              pick: 'task',   noArgs: true },
 };
@@ -2288,7 +2287,7 @@ function pickPath(mode) {
     var exec  = (document.getElementById('f_executor') || {}).value || '';
 
     var extByExec = {
-        'xml': 'xml', 'csx': 'csx', 'csx-internal': 'csx', 'csx-zp7': 'csx',
+        'xml': 'xml', 'csx': 'csx', 'csx-internal': 'csx',
         'python': 'py', 'node': 'js', 'ts-node': 'js', 'ps1': 'ps1',
         'exe': 'exe', 'cmd': 'cmd', 'bat': 'cmd', 'bash': 'sh'
     };
