@@ -102,7 +102,6 @@ internal sealed class DocsGraphHandler
         }
         if (!Path.IsPathRooted(vaultPath))
             vaultPath = Path.Combine(AppContext.BaseDirectory, vaultPath);
-            vaultPath = Path.Combine(AppContext.BaseDirectory, vaultPath);
 
         if (!Directory.Exists(vaultPath))
         {

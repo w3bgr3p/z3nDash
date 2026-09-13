@@ -25,10 +25,10 @@ z3nDash — дашборд для расписаний, ZennoPoster-узлов, 
 | [[HAR]] | Просмотр HAR-архивов и replay | — |
 | [[JSON]] | Просмотр и анализ JSON | `Alt+6` |
 | [[Text Tools]] | Текстовые преобразования | `Alt+7` |
-| [[Treasury]] | Сводка Web3-активов | `Alt+8` |
+| [[Treasury]] | Сводка Web3-активов | — |
 | [[Config]] | База, сервер, OmniRoute и watchdog | `Alt+0` |
 | [[Clips]] | Шаблоны для копирования | `Alt+C` |
-| [[System Snapshot]] | Снимки состояния Windows | `Alt+S` |
+| [[System Snapshot]] | Снимки состояния Windows | — |
 | [[dllGraph]] | Граф C#-кода | `Alt+G` |
 | [[docsVault]] | Этот vault | `Alt+H` |
 | [[SQLite]] | Просмотр выбранной SQLite-базы | — |

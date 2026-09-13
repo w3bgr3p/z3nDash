@@ -12,10 +12,10 @@ Dock подключается страницами через `wwwroot/js/nav.js
 | `har` | [[HAR]] | — |
 | `json` | [[JSON]] | `Alt+6` |
 | `text` | [[Text Tools]] | `Alt+7` |
-| `treasury` | [[Treasury]] | `Alt+8` |
+| `treasury` | [[Treasury]] | — |
 | `config` | [[Config]] | `Alt+0` |
 | `clips` | [[Clips]] | `Alt+C` |
-| `system` | [[System Snapshot]] | `Alt+S` |
+| `system` | [[System Snapshot]] | — |
 | `dllGraph` | [[dllGraph]] | `Alt+G` |
 | `docsVault` | [[docsVault]] | `Alt+H` |
 | `sql` | [[SQLite]] | — |
@@ -28,6 +28,16 @@ Dock подключается страницами через `wwwroot/js/nav.js
 |---|---|---|
 | `Alt+4` | [[Logs\|allLogs]] | `/?page=zp7#allLogs` |
 | `Alt+5` | [[Traffic\|traffic]] | `/?page=zp7#traffic` |
+
+## Хоткеи самого дока
+
+Привязаны в `nav.js`, а не в списке элементов, и никуда не ведут:
+
+| Хоткей | Что делает |
+|---|---|
+| `Alt+X` | генератор OTP |
+| `Alt+T` | переключает тему |
+| `Alt+P` | переносит док к следующему краю |
 
 ## Дополнительно
 
