@@ -89,8 +89,11 @@
         <None Update="appsettings.json">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <!-- Секреты нужны при отладке рядом с bin, но в publish им нельзя:
+             иначе строка подключения с паролем уедет в портабл-архив. -->
         <None Update="appsettings.secrets.json">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <CopyToPublishDirectory>Never</CopyToPublishDirectory>
         </None>
         <None Update="icon.ico">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>

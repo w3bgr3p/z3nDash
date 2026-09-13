@@ -53,6 +53,9 @@ http-client.private.env.json
 [Oo]ut/
 installer_output/
 
+# Portable build: assembled for a release, never tracked
+portable/
+
 # Generated installers, executables, packages and archives
 *.exe
 *.dll
