@@ -51,8 +51,98 @@
         });
     }
 
+    // ── Разбор InputSettings XML ──────────────────────────────────────────────
+    // Порт ParseInputSettingsXml из z3nIO. Ключ поля лежит в OutputVariable
+    // как {-Variable.имя-}; подпись приходит с HTML-разметкой, её снимаем.
+
+    function fieldKey(outputVariable) {
+        return String(outputVariable || '').replace('{-Variable.', '').replace('-}', '').trim();
+    }
+
+    function fieldLabel(name) {
+        var holder = document.createElement('div');
+        holder.innerHTML = String(name || '');
+        return (holder.textContent || '').trim();
+    }
+
+    function childText(element, tag) {
+        var node = element.getElementsByTagName(tag)[0];
+        return node ? node.textContent || '' : '';
+    }
+
+    /// Список полей в порядке XML. Tab и Comment остаются в списке: по ним
+    /// строятся вкладки и разделители, ключа у них нет.
+    function parseFields(xmlB64, values) {
+        var xml = decodeBase64Utf8(xmlB64);
+        var doc = new DOMParser().parseFromString(xml, 'application/xml');
+        if (doc.getElementsByTagName('parsererror').length)
+            throw new Error('Input settings XML is not well-formed');
+
+        var current = values || {};
+        var nodes = doc.getElementsByTagName('InputSetting');
+        var fields = [];
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            var outputVariable = childText(node, 'OutputVariable');
+            var key = fieldKey(outputVariable);
+            fields.push({
+                type: childText(node, 'Type') || 'Text',
+                key: key,
+                label: fieldLabel(childText(node, 'Name')),
+                value: Object.prototype.hasOwnProperty.call(current, key) ? current[key] : childText(node, 'Value'),
+                outputVar: outputVariable,
+                help: childText(node, 'Help')
+            });
+        }
+        return fields;
+    }
+
+    /// Варианты для DropDown берутся из подписи: «Прокси {http|socks5}».
+    function fieldOptions(label) {
+        var match = /\{([^}]+)\}/.exec(String(label || ''));
+        return match ? match[1].split('|').map(function (o) { return o.trim(); }) : null;
+    }
+
+    /// Подпись без блока вариантов; если не осталось ничего — показываем ключ.
+    function cleanLabel(field) {
+        return String(field.label || '').replace(/\{[^}]+\}/g, '').trim() || field.key || '';
+    }
+
+    /// Тип поля ProjectMaker → тип в схеме payload планировщика.
+    function schemaType(type) {
+        switch (type) {
+            case 'Tab': return 'tab';
+            case 'Comment': return 'section';
+            case 'Boolean': return 'boolean';
+            case 'DropDown': return 'select';
+            case 'DropDownMultiSelect': return 'multiselect';
+            case 'Password': return 'password';
+            default: return 'text';
+        }
+    }
+
+    /// Payload планировщика: schema описывает поля, values — текущие значения.
+    function buildSchedulerPayload(fields, values) {
+        var schema = fields.map(function (field) {
+            var type = schemaType(field.type);
+            var item = { key: field.key || '', label: cleanLabel(field), type: type };
+            var options = fieldOptions(field.label);
+            if (options && (type === 'select' || type === 'multiselect')) item.options = options.join(', ');
+            if (field.help) item.help = field.help;
+            return item;
+        });
+        return JSON.stringify({
+            schema: JSON.stringify(schema),
+            values: JSON.stringify(requireFlatStringObject(values))
+        });
+    }
+
     return {
         decodeInputSettings: decodeInputSettings,
-        buildInputPayload: buildInputPayload
+        buildInputPayload: buildInputPayload,
+        parseFields: parseFields,
+        fieldOptions: fieldOptions,
+        cleanLabel: cleanLabel,
+        buildSchedulerPayload: buildSchedulerPayload
     };
 });

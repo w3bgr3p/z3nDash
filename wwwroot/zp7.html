@@ -855,15 +855,23 @@
             <h3 id="inputSettingsModalTitle">Input Settings</h3>
             <button class="modal-close" onclick="closeInputSettingsModal()">✕</button>
         </div>
-        <div class="modal-body" style="padding:14px;">
+        <div class="modal-tabs" id="inputSettingsTabs"></div>
+        <div class="modal-body" id="inputSettingsBody" style="padding:0;">
+            <div class="empty-msg" style="padding:14px;">Loading...</div>
+        </div>
+        <div class="modal-body" id="inputSettingsJsonBody" style="padding:14px;display:none;">
             <label class="field-label" for="inputSettingsJson">Variables JSON</label>
             <textarea class="field-textarea" id="inputSettingsJson" spellcheck="false" style="min-height:320px;"></textarea>
+        </div>
+        <div style="padding:0 14px 8px;">
             <div class="nodes-error" id="inputSettingsError"></div>
             <div style="margin-top:8px;color:var(--muted);font-size:9px;">Empty values are ignored by ZennoPoster and do not clear variables.</div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-update" onclick="closeInputSettingsModal()">Cancel</button>
-            <button class="btn btn-start" id="inputSettingsSaveBtn" onclick="saveInputSettings()">💾 Apply</button>
+            <button class="btn btn-update" id="inputSettingsViewBtn" onclick="toggleInputSettingsView()" title="Switch between the rendered form and raw JSON">{ } JSON</button>
+            <button class="btn btn-update" id="inputSettingsPayloadBtn" onclick="copyInputSettingsPayload()" style="border-color:#58a6ff;color:#58a6ff;" title="Copy settings as scheduler payload">&#128203; Copy Payload</button>
+            <button class="btn btn-start" id="inputSettingsSaveBtn" onclick="saveInputSettings()">&#128190; Apply</button>
         </div>
     </div>
 </div>
@@ -1729,18 +1737,27 @@
     document.getElementById('inputSettingsModal').addEventListener('click', function(e) { if (e.target === this) closeInputSettingsModal(); });
 
     // ── INPUT SETTINGS MODAL ──
+    // Два вида одних и тех же значений: отрисованная форма по InputSettings XML
+    // и сырой JSON. Сохранение в обоих случаях идёт одним путём — команда
+    // set_input_settings с исходным xml_b64 и собранными значениями.
     let inputSettingsTaskId = null;
     let inputSettingsXmlB64 = '';
+    let inputSettingsFields = [];
+    let inputSettingsValues = {};
+    let inputSettingsJsonView = false;
 
     async function openInputSettingsModal(taskId, taskName) {
         const task = allTasks.find(t => t.Id === taskId) || {};
         inputSettingsTaskId = taskId;
         inputSettingsXmlB64 = '';
+        inputSettingsFields = [];
+        inputSettingsValues = {};
         document.getElementById('inputSettingsModalTitle').textContent = `Input Settings: ${taskName}`;
+        document.getElementById('inputSettingsTabs').innerHTML = '';
+        document.getElementById('inputSettingsBody').innerHTML = '<div class="empty-msg" style="padding:14px;">Loading...</div>';
         document.getElementById('inputSettingsJson').value = '';
-        document.getElementById('inputSettingsJson').disabled = true;
-        document.getElementById('inputSettingsSaveBtn').disabled = true;
-        document.getElementById('inputSettingsError').textContent = 'Loading...';
+        setInputSettingsEnabled(false);
+        document.getElementById('inputSettingsError').textContent = '';
         document.getElementById('inputSettingsModal').classList.add('open');
 
         try {
@@ -1752,20 +1769,194 @@
 
             const settings = ZpSettings.decodeInputSettings(data);
             inputSettingsXmlB64 = settings.xmlB64;
+            inputSettingsValues = settings.values;
             document.getElementById('inputSettingsJson').value = JSON.stringify(settings.values, null, 2);
-            document.getElementById('inputSettingsJson').disabled = false;
-            document.getElementById('inputSettingsSaveBtn').disabled = false;
-            document.getElementById('inputSettingsError').textContent = '';
+
+            // Разбор XML не должен мешать правке значений: не вышло — остаётся JSON.
+            try {
+                inputSettingsFields = ZpSettings.parseFields(settings.xmlB64, settings.values);
+            } catch (parseError) {
+                inputSettingsFields = [];
+                document.getElementById('inputSettingsError').textContent = parseError.message || String(parseError);
+            }
+
+            inputSettingsJsonView = inputSettingsFields.length === 0 || PageState.load().inputSettingsJsonView === true;
+            renderInputSettingsView();
+            setInputSettingsEnabled(true);
         } catch (e) {
-            if (inputSettingsTaskId === taskId)
+            if (inputSettingsTaskId === taskId) {
+                document.getElementById('inputSettingsBody').innerHTML = '';
                 document.getElementById('inputSettingsError').textContent = e.message || String(e);
+            }
         }
+    }
+
+    function setInputSettingsEnabled(enabled) {
+        document.getElementById('inputSettingsJson').disabled = !enabled;
+        document.getElementById('inputSettingsSaveBtn').disabled = !enabled;
+        document.getElementById('inputSettingsPayloadBtn').disabled = !enabled;
+        document.getElementById('inputSettingsViewBtn').disabled = !enabled;
     }
 
     function closeInputSettingsModal() {
         document.getElementById('inputSettingsModal').classList.remove('open');
         inputSettingsTaskId = null;
         inputSettingsXmlB64 = '';
+        inputSettingsFields = [];
+        inputSettingsValues = {};
+    }
+
+    // ── переключение Form / JSON ──
+    function toggleInputSettingsView() {
+        if (!inputSettingsJsonView && inputSettingsFields.length === 0) return;
+
+        // Значения переносятся из текущего вида, чтобы правки не терялись.
+        let values;
+        try { values = collectInputSettingsValues(); }
+        catch (e) { document.getElementById('inputSettingsError').textContent = e.message || String(e); return; }
+
+        inputSettingsJsonView = !inputSettingsJsonView;
+        document.getElementById('inputSettingsError').textContent = '';
+
+        if (inputSettingsJsonView) {
+            document.getElementById('inputSettingsJson').value = JSON.stringify(values, null, 2);
+        } else {
+            inputSettingsFields = inputSettingsFields.map(field => field.key && Object.prototype.hasOwnProperty.call(values, field.key)
+                ? { ...field, value: values[field.key] }
+                : field);
+        }
+        PageState.save({ inputSettingsJsonView: inputSettingsJsonView });
+        renderInputSettingsView();
+    }
+
+    function renderInputSettingsView() {
+        const jsonView = inputSettingsJsonView;
+        document.getElementById('inputSettingsTabs').style.display = jsonView ? 'none' : '';
+        document.getElementById('inputSettingsBody').style.display = jsonView ? 'none' : '';
+        document.getElementById('inputSettingsJsonBody').style.display = jsonView ? '' : 'none';
+        document.getElementById('inputSettingsViewBtn').textContent = jsonView ? '☰ Form' : '{ } JSON';
+        if (!jsonView) renderInputSettingsFields(inputSettingsFields);
+    }
+
+    // ── отрисовка формы ──
+    // Tab начинает новую вкладку, Comment — разделитель внутри неё.
+    function renderInputSettingsFields(fields) {
+        const tabsEl = document.getElementById('inputSettingsTabs');
+        const body = document.getElementById('inputSettingsBody');
+
+        if (!fields.length) {
+            tabsEl.innerHTML = '';
+            body.innerHTML = '<div class="empty-msg" style="padding:14px;">No input settings in this task</div>';
+            return;
+        }
+
+        // Пустые вкладки не показываем: XML обычно открывается элементом Tab,
+        // и безусловный первый «Global» дал бы пустую вкладку.
+        const tabs = [];
+        let current = { name: 'Global', fields: [] };
+        for (const field of fields) {
+            if (field.type === 'Tab') {
+                if (current.fields.length > 0) tabs.push(current);
+                current = { name: field.label.replace(/[{}]/g, '').trim() || field.key || 'Tab', fields: [] };
+            } else {
+                current.fields.push(field);
+            }
+        }
+        if (current.fields.length > 0 || tabs.length === 0) tabs.push(current);
+
+        tabsEl.innerHTML = tabs.map((tab, index) =>
+            `<button class="modal-tab${index === 0 ? ' active' : ''}" onclick="switchInputSettingsTab(${index})">${escHtml(tab.name)}</button>`).join('');
+        body.innerHTML = tabs.map((tab, index) =>
+            `<div class="tab-pane${index === 0 ? ' active' : ''}">${inputSettingsFieldsHtml(tab.fields)}</div>`).join('');
+    }
+
+    function switchInputSettingsTab(index) {
+        document.querySelectorAll('#inputSettingsTabs .modal-tab').forEach((el, i) => el.classList.toggle('active', i === index));
+        document.querySelectorAll('#inputSettingsBody .tab-pane').forEach((el, i) => el.classList.toggle('active', i === index));
+    }
+
+    function inputSettingsFieldsHtml(fields) {
+        let html = '';
+        for (const field of fields) {
+            if (field.type === 'Comment') {
+                const text = field.label.replace(/[▪◆►•]+/g, '').replace(/\s+/g, ' ').trim();
+                if (text.length > 2) html += `<div class="section-divider">${escHtml(text.slice(0, 100))}</div>`;
+                continue;
+            }
+            if (!field.key) {
+                if (field.type === 'Label' && field.label.trim())
+                    html += `<div class="section-divider">${escHtml(field.label.trim().slice(0, 100))}</div>`;
+                continue;
+            }
+
+            const key = escHtml(field.key);
+            const value = field.value || '';
+            const label = `<span class="field-label">${escHtml(ZpSettings.cleanLabel(field))}<span class="field-key">${key}</span></span>`;
+            const options = ZpSettings.fieldOptions(field.label);
+            const help = field.help ? ` title="${escHtml(field.help)}"` : '';
+
+            if (field.type === 'Boolean') {
+                const checked = value === 'True' || value === 'true' ? ' checked' : '';
+                html += `<div class="field-group"${help}>${label}<div class="field-bool">`
+                     + `<input type="checkbox" id="is_${key}" data-key="${key}"${checked}>`
+                     + `<label for="is_${key}" style="color:var(--muted);font-size:10px;">${escHtml(value || 'False')}</label></div></div>`;
+            } else if ((field.type === 'DropDown' || field.type === 'Select') && options) {
+                const optionsHtml = options.map(o =>
+                    `<option value="${escHtml(o)}"${o === value ? ' selected' : ''}>${escHtml(o)}</option>`).join('');
+                html += `<div class="field-group"${help}>${label}<select class="field-select" data-key="${key}">${optionsHtml}</select></div>`;
+            } else if (field.type === 'DropDownMultiSelect' && options) {
+                const selected = String(value).split(',').map(s => s.trim());
+                const boxes = options.map(o =>
+                    `<label><input type="checkbox" data-multi="${key}" value="${escHtml(o)}"${selected.includes(o) ? ' checked' : ''}><span>${escHtml(o)}</span></label>`).join('');
+                html += `<div class="field-group"${help}>${label}<div class="field-multiselect">${boxes}</div></div>`;
+            } else if (field.type === 'Number') {
+                html += `<div class="field-group"${help}>${label}<input class="field-input" type="number" data-key="${key}" value="${escHtml(value)}"></div>`;
+            } else if (value.length > 60) {
+                html += `<div class="field-group"${help}>${label}<textarea class="field-textarea" data-key="${key}">${escHtml(value)}</textarea></div>`;
+            } else {
+                const type = field.type === 'Password' ? 'password' : 'text';
+                html += `<div class="field-group"${help}>${label}<input class="field-input" type="${type}" data-key="${key}" value="${escHtml(value)}"></div>`;
+            }
+        }
+        return html || '<div class="empty-msg" style="padding:14px 0">No fields in this tab</div>';
+    }
+
+    // ── сбор значений из активного вида ──
+    function collectInputSettingsValues() {
+        if (inputSettingsJsonView) {
+            const parsed = JSON.parse(document.getElementById('inputSettingsJson').value);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+                throw new Error('Input settings must be a flat JSON object');
+            return parsed;
+        }
+
+        // Начинаем с полного набора с ноды, поверх кладём то, что нарисовано:
+        // ключи Tab, Comment и Label полей не имеют и иначе бы пропали.
+        const values = { ...inputSettingsValues };
+        const multi = {};
+        document.querySelectorAll('#inputSettingsBody [data-key]').forEach(el => {
+            values[el.dataset.key] = el.type === 'checkbox' ? (el.checked ? 'True' : 'False') : el.value;
+        });
+        document.querySelectorAll('#inputSettingsBody [data-multi]').forEach(el => {
+            const key = el.dataset.multi;
+            if (!multi[key]) multi[key] = [];
+            if (el.checked) multi[key].push(el.value);
+        });
+        for (const key in multi) values[key] = multi[key].join(', ');
+        return values;
+    }
+
+    async function copyInputSettingsPayload() {
+        const button = document.getElementById('inputSettingsPayloadBtn');
+        try {
+            const payload = ZpSettings.buildSchedulerPayload(inputSettingsFields, collectInputSettingsValues());
+            await navigator.clipboard.writeText(payload);
+            const original = button.textContent;
+            button.textContent = '✓ Copied';
+            setTimeout(() => { button.textContent = original; }, 1500);
+        } catch (e) {
+            document.getElementById('inputSettingsError').textContent = e.message || String(e);
+        }
     }
 
     async function saveInputSettings() {
@@ -1778,7 +1969,7 @@
         try {
             const payload = ZpSettings.buildInputPayload(
                 inputSettingsXmlB64,
-                document.getElementById('inputSettingsJson').value
+                JSON.stringify(collectInputSettingsValues())
             );
             await postCommand(inputSettingsTaskId, 'set_input_settings', payload);
             closeInputSettingsModal();
