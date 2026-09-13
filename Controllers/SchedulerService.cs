@@ -728,6 +728,29 @@ public sealed partial class SchedulerService : IDisposable
                     : JsonSerializer.Deserialize<Dictionary<string, string>>(
                         Encoding.UTF8.GetString(Convert.FromBase64String(args))) ?? record;
 
+                // Значения payload — это InputSettings задачи, и в ZennoPoster они
+                // ложатся в переменные проекта до старта. Без этого шаблон работал
+                // на своих значениях по умолчанию: в настройках стояла страна GH,
+                // а прокси собирался с той, что зашита в сам шаблон.
+                //
+                // Кладём только то, что пришло из args: при пустом args payload
+                // подменяется строкой задачи из БД, и её колонки (name, executor,
+                // script_path) переменными проекта быть не должны.
+                //
+                // SeedVariables в XmlPlayer заполняет лишь пустые переменные,
+                // поэтому заданное здесь шаблон не перетрёт.
+                if (!string.IsNullOrWhiteSpace(args))
+                {
+                    var applied = 0;
+                    foreach (var (key, value) in payload)
+                    {
+                        if (key.StartsWith("__") || key == "condition") continue;
+                        project.Variables[key].Value = value ?? "";
+                        applied++;
+                    }
+                    if (applied > 0) rp.AddLine($"[xml] из payload в переменные: {applied}");
+                }
+
                 var rawProxy = payload.GetValueOrDefault("proxy", "");
                 if (string.IsNullOrWhiteSpace(rawProxy))
                     rawProxy = tpl.Variables.GetValueOrDefault("proxy", "");
