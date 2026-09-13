@@ -313,7 +313,7 @@
         catch (e) { toast('Stop failed: ' + e.message, 'err'); btn.disabled = false; }
     }
     async function killInstance(pid, profileId, btn) {
-        if (!await Dialog.confirm(`Force kill PID ${pid}?\nZB API не используется — прямой Process.Kill.`)) return;
+        if (!await Dialog.confirm(`Force kill PID ${pid}?\nThe ZB API is not used — a direct Process.Kill.`)) return;
         btn.disabled = true;
         try {
             const res = await serverKill(pid);

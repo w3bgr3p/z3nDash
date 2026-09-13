@@ -280,7 +280,7 @@ function renderList() {
                 ? '<span class="row-dot ' + (disabled ? 'disabled' : 'enabled')
                   + '" title="' + (disabled ? 'Enable' : 'Disable')
                   + '" onclick="event.stopPropagation();toggleEnabled(\'' + s.id + '\',\'' + s.enabled + '\')"></span>'
-                : '<span class="row-dot ondemand" title="Без расписания"></span>')
+                : '<span class="row-dot ondemand" title="No schedule"></span>')
             + '<div class="row-info">'
             + '<div class="row-name">' + escHtml(showGrp ? shortName : (s.name || '(unnamed)')) + '</div>'
             + '<div class="row-sub">' + escHtml(trigger) + (lastRun ? ' · ' + lastRun : '') + '</div>'
@@ -324,14 +324,14 @@ function _lastOutputLine(s) {
 
 function renderGlobalStats() {
     var NAV_PAGES = [
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.scheduler : ''), title: 'z3nDash',      desc: 'Запуск .py, .js, .exe, .bat по cron, или интервалам (you are here)', url: '/tasker.html', color: '#e3b341' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.zp7       : ''), title: 'ZP7',        desc: 'Управление ZP7',                                                      url: '/?page=zp7',      color: '#58a6ff' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.logs       : ''), title: 'Logs',       desc: 'Логи приложения с фильтрацией по уровню, машине, проекту, аккаунту.', url: '/?page=logs',     color: '#3fb950' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.http       : ''), title: 'HTTP',       desc: 'Перехваченные HTTP-запросы и ответы из ZP-задач. Replay запросов.',   url: '/?page=http',     color: '#d29922' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.json       : ''), title: 'JSON',       desc: 'Интерактивный JSON-tree с определением auth/captcha и replay.',       url: '/json',           color: '#4e9eff' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.clips      : ''), title: 'Clips',      desc: 'Copy-paste шаблоны, организованные в дерево.',                       url: '/?page=clips',    color: '#f0883e' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.scheduler : ''), title: 'z3nDash',      desc: 'Runs .py, .js, .exe, .bat on cron or intervals (you are here)', url: '/tasker.html', color: '#e3b341' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.zp7       : ''), title: 'ZP7',        desc: 'ZennoPoster node and task control',                                                      url: '/?page=zp7',      color: '#58a6ff' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.logs       : ''), title: 'allLogs',    desc: 'Log history from every ZP7 node, filtered by level, machine, project and thread.', url: '/?page=zp7#allLogs',     color: '#3fb950' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.http       : ''), title: 'Traffic',    desc: 'HTTP traffic from the nodes and z3nDash, with details and replay.',   url: '/?page=zp7#traffic',     color: '#d29922' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.json       : ''), title: 'JSON',       desc: 'Interactive JSON tree with auth/captcha detection and replay.',       url: '/json',           color: '#4e9eff' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.clips      : ''), title: 'Clips',      desc: 'Copy-paste snippets organised into a tree.',                       url: '/?page=clips',    color: '#f0883e' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.text       : ''), title: 'Text Tools', desc: 'URL encode/decode, C# escaper, Base64, JSON escape.',                 url: '/text.html',      color: '#a371f7' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.config     : ''), title: 'Config',     desc: 'Статус сервера, редактор конфигурации, управление хранилищем логов.', url: '/?page=config',   color: '#f78166' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.config     : ''), title: 'Config',     desc: 'Server status, configuration editor, log storage management.', url: '/?page=config',   color: '#f78166' },
     ];
     document.getElementById('detailHeader').style.display  = 'none';
     document.getElementById('hResizer').style.display      = 'none';
@@ -954,13 +954,13 @@ function renderSettings(s) {
         + '<div class="form-label">Threads</div>'
         + '<div style="display:flex;gap:6px;align-items:center;">'
         +   '<input class="form-input" id="f_max_threads" type="number" min="1" max="256" style="width:70px" value="' + (s.max_threads || '1') + '" oninput="onThreadsChanged()">'
-        +   '<span style="color:var(--text2);font-size:10px;">сколько инстансов задачи держать одновременно</span>'
+        +   '<span style="color:var(--text2);font-size:10px;">how many instances of the task may run at once</span>'
         + '</div>'
         + '<div class="form-label">When full</div>'
         + '<select class="form-input" id="f_on_overlap" onchange="onOverlapChanged()">'
-        + '<option value="skip"         ' + (s.on_overlap === 'skip'         ? 'selected' : '') + '>Skip — пропустить заход</option>'
-        + '<option value="parallel"     ' + (s.on_overlap === 'parallel'     ? 'selected' : '') + '>Queue — копить очередь</option>'
-        + '<option value="kill_restart" ' + (s.on_overlap === 'kill_restart' ? 'selected' : '') + '>Kill &amp; restart — снести и перезапустить</option>'
+        + '<option value="skip"         ' + (s.on_overlap === 'skip'         ? 'selected' : '') + '>Skip — drop the extra run</option>'
+        + '<option value="parallel"     ' + (s.on_overlap === 'parallel'     ? 'selected' : '') + '>Queue — hold extra runs in a queue</option>'
+        + '<option value="kill_restart" ' + (s.on_overlap === 'kill_restart' ? 'selected' : '') + '>Kill &amp; restart — stop the running ones and start over</option>'
         + '</select>'
         + '<div class="form-label"></div>'
         + '<div id="f_threads_hint" style="color:var(--text2);font-size:10px;"></div>'
@@ -991,8 +991,8 @@ function scriptFieldHtml(s, spec) {
     if (spec.pick === 'none') return '<div style="display:flex;gap:4px;">' + input + '</div>';
 
     var btn = spec.pick === 'folder'
-        ? '<button type="button" class="btn sm" onclick="pickPath(&#39;folder&#39;)" title="Выбрать каталог">📁</button>'
-        : '<button type="button" class="btn sm" onclick="pickPath(&#39;file&#39;)" title="Выбрать файл">📄</button>';
+        ? '<button type="button" class="btn sm" onclick="pickPath(&#39;folder&#39;)" title="Pick a folder">📁</button>'
+        : '<button type="button" class="btn sm" onclick="pickPath(&#39;file&#39;)" title="Pick a file">📄</button>';
     return '<div style="display:flex;gap:4px;">' + input + btn + '</div>';
 }
 
@@ -1002,7 +1002,7 @@ function venvRowHtml(s, id) {
     return '<div class="form-label">Use venv</div>'
         + '<div style="display:flex;gap:6px;align-items:center;">'
         + '<input type="checkbox" id="f_use_venv"' + (s.use_venv === 'true' ? ' checked' : '') + '>'
-        + '<span style="color:var(--text2);font-size:10px;">каталог venv рядом со скриптом, интерпретатор системный</span>'
+        + '<span style="color:var(--text2);font-size:10px;">the venv folder sits next to the script, the interpreter is the system one</span>'
         + '<button class="btn sm" onclick="ensureVenv(\'' + escHtml(id) + '\')" style="padding:3px 8px;">Create now</button>'
         + '</div>';
 }
@@ -1032,15 +1032,15 @@ function _formSnapshot() {
 }
 
 async function ensureVenv(id) {
-    if (!id) { Dialog.info('Сохраните задачу, потом создавайте venv.'); return; }
+    if (!id) { Dialog.info('Save the task first, then create the venv.'); return; }
     var res  = await fetch('/tasker/ensure-venv', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ id: id }),
     });
     var data = await res.json();
-    if (data.ok) Dialog.info('venv готов:\n\n' + data.interpreter);
-    else         Dialog.error((data.log || []).join('\n') || data.error || 'venv не создан');
+    if (data.ok) Dialog.info('venv ready:\n\n' + data.interpreter);
+    else         Dialog.error((data.log || []).join('\n') || data.error || 'venv was not created');
 }
 
 // ── Browser (xml) ─────────────────────────────────────────────────────────────
@@ -1098,53 +1098,53 @@ function browserSectionHtml(s) {
     var b = browserFromSaved(s);
 
     return '<div class="form-section">Browser</div>'
-        + '<div class="form-label">Источник</div>'
+        + '<div class="form-label">Source</div>'
         + '<select class="form-input" id="b_mode" onchange="browserSyncRows()">'
-        + [['patchright','Patchright (свой браузер)'],
+        + [['patchright','Patchright (own browser)'],
            ['zennobrowser','ZennoBrowser'],
            ['shardx','ShardX'],
-           ['cdp','Внешний по CDP'],
-           ['api','Внешний через API антика']]
+           ['cdp','External over CDP'],
+           ['api','External via anti-detect API']]
             .map(function(o) { return '<option value="' + o[0] + '"' + (b.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
         + '</select>'
 
-        + '<div class="form-label" id="b_profile_label">Профиль</div>'
+        + '<div class="form-label" id="b_profile_label">Profile</div>'
         + '<div id="b_profile_wrap" style="display:flex;gap:6px;align-items:center;">'
-        +   '<input class="form-input" id="b_profile" value="' + escHtml(b.profile) + '" placeholder="id профиля" style="flex:1">'
-        +   '<span style="color:var(--text2);font-size:10px;white-space:nowrap">payload перекрывает</span>'
+        +   '<input class="form-input" id="b_profile" value="' + escHtml(b.profile) + '" placeholder="profile id" style="flex:1">'
+        +   '<span style="color:var(--text2);font-size:10px;white-space:nowrap">payload overrides this</span>'
         + '</div>'
 
-        + '<div class="form-label" id="b_cdp_label">CDP-эндпоинт</div>'
+        + '<div class="form-label" id="b_cdp_label">CDP endpoint</div>'
         + '<input class="form-input" id="b_cdp" value="' + escHtml(b.cdp) + '" placeholder="ws://127.0.0.1:9222/devtools/browser/...">'
 
-        + '<div class="form-label" id="b_preset_label">Пресет</div>'
+        + '<div class="form-label" id="b_preset_label">Preset</div>'
         + '<div id="b_preset_wrap">'
         +   '<select class="form-input" id="b_preset" onchange="applyBrowserPreset()">'
-        +   '<option value="">— вручную —</option>'
+        +   '<option value="">— manual —</option>'
         +   Object.keys(BROWSER_PRESETS).map(function(k) {
                 return '<option value="' + k + '">' + BROWSER_PRESETS[k].title + '</option>';
             }).join('')
         +   '</select>'
         + '</div>'
 
-        + '<div class="form-label" id="b_method_label">Метод старта</div>'
+        + '<div class="form-label" id="b_method_label">Start method</div>'
         + '<select class="form-input" id="b_method" onchange="browserSyncRows()">'
         + ['GET','POST'].map(function(m) { return '<option' + (b.api.method === m ? ' selected' : '') + '>' + m + '</option>'; }).join('')
         + '</select>'
 
-        + '<div class="form-label" id="b_url_label">URL старта</div>'
+        + '<div class="form-label" id="b_url_label">Start URL</div>'
         + '<input class="form-input" id="b_url" value="' + escHtml(b.api.url) + '" placeholder="http://.../start?user_id={profile}">'
 
-        + '<div class="form-label" id="b_body_label">Тело запроса</div>'
-        + '<input class="form-input" id="b_body" value="' + escHtml(b.api.body) + '" placeholder="JSON для POST, можно с {profile}">'
+        + '<div class="form-label" id="b_body_label">Request body</div>'
+        + '<input class="form-input" id="b_body" value="' + escHtml(b.api.body) + '" placeholder="JSON for POST, {profile} is substituted">'
 
-        + '<div class="form-label" id="b_ws_label">Шаблон эндпоинта</div>'
+        + '<div class="form-label" id="b_ws_label">Endpoint template</div>'
         + '<input class="form-input" id="b_ws" value="' + escHtml(b.api.ws) + '" placeholder="{data.ws.puppeteer}">'
 
-        + '<div class="form-label" id="b_stop_label">URL закрытия</div>'
+        + '<div class="form-label" id="b_stop_label">Close URL</div>'
         + '<input class="form-input" id="b_stop" value="' + escHtml(b.api.stopUrl) + '" placeholder="http://.../stop?user_id={profile}">'
 
-        + '<div class="form-label" id="b_close_label">Закрывать после прогона</div>'
+        + '<div class="form-label" id="b_close_label">Close after the run</div>'
         + '<div id="b_close_wrap"><input type="checkbox" id="b_close"' + (b.close ? ' checked' : '') + '></div>';
 }
 
@@ -1265,7 +1265,7 @@ function renderScheduleBody(s, mode) {
     if (!box) return;
 
     if (mode === 'off') {
-        box.innerHTML = '<div class="empty-state" style="padding:18px 4px;">Расписания нет — задача запускается только кнопкой Run.</div>'
+        box.innerHTML = '<div class="empty-state" style="padding:18px 4px;">No schedule — the task runs only from the Run button.</div>'
                       + scheduleActionsHtml(s, false);
         return;
     }
@@ -1308,67 +1308,67 @@ function zpFormHtml(s) {
     var z = _zp;
     return '<div class="form-grid">'
         // 1. Как выполнять
-        + '<div class="form-section">Как выполнять</div>'
-        + '<div class="form-label">Периодичность</div>'
+        + '<div class="form-section">How to run</div>'
+        + '<div class="form-label">Frequency</div>'
         + '<select class="form-input" id="z_how" onchange="zpSyncRows()">'
-        + [['once','Один раз'],['daily','Каждый день'],['weekly','Каждую неделю'],['monthly','Каждый месяц']]
+        + [['once','Once'],['daily','Every day'],['weekly','Every week'],['monthly','Every month']]
             .map(function(o) { return '<option value="' + o[0] + '"' + (z.how === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
         + '</select>'
-        + '<div class="form-label" id="z_weekdays_label">Дни недели</div>'
+        + '<div class="form-label" id="z_weekdays_label">Weekdays</div>'
         + '<div id="z_weekdays_wrap"><div style="display:flex;gap:4px;flex-wrap:wrap" id="z_weekdays">'
         + WEEKDAY_NAMES.map(function(d, i) {
             return '<div class="wd-btn' + (z.weekdays.indexOf(i) >= 0 ? ' wd-on' : '') + '" data-bit="' + i + '" onclick="this.classList.toggle(\'wd-on\')">' + d + '</div>';
           }).join('')
         + '</div></div>'
-        + '<div class="form-label" id="z_monthdays_label">Числа месяца</div>'
+        + '<div class="form-label" id="z_monthdays_label">Days of month</div>'
         + '<input class="form-input" id="z_monthdays" value="' + escHtml(z.monthdays) + '" placeholder="1-5, 10, 20">'
 
         // 2. Начать
-        + '<div class="form-section">Начать</div>'
-        + '<div class="form-label">Начало</div>'
+        + '<div class="form-section">Start</div>'
+        + '<div class="form-label">Begins</div>'
         + '<select class="form-input" id="z_start_mode" onchange="zpSyncRows()">'
-        + '<option value="now"' + (z.start.mode === 'now' ? ' selected' : '') + '>Сразу</option>'
-        + '<option value="date"' + (z.start.mode === 'date' ? ' selected' : '') + '>По дате</option>'
+        + '<option value="now"' + (z.start.mode === 'now' ? ' selected' : '') + '>Right away</option>'
+        + '<option value="date"' + (z.start.mode === 'date' ? ' selected' : '') + '>On a date</option>'
         + '</select>'
-        + '<div class="form-label" id="z_start_at_label">Дата и время</div>'
+        + '<div class="form-label" id="z_start_at_label">Date and time</div>'
         + '<input class="form-input" id="z_start_at" type="datetime-local" value="' + escHtml(z.start.at || '') + '">'
 
         // 3. Сколько делать
-        + '<div class="form-section">Сколько делать</div>'
-        + '<div class="form-label">Попыток за раз</div>'
+        + '<div class="form-section">How much to do</div>'
+        + '<div class="form-label">Attempts per run</div>'
         + rangeInputsHtml('z_attempts', z.attempts.min, z.attempts.max)
-        + '<div class="form-label">Сбрасывать успехи</div>'
+        + '<div class="form-label">Reset successes</div>'
         + '<div><input type="checkbox" id="z_reset_success"' + (z.attempts.resetSuccess ? ' checked' : '') + '></div>'
 
         // 4. Когда повторять
-        + '<div class="form-section" id="z_windows_section">Когда повторять</div>'
-        + '<div class="form-label" id="z_windows_label">Интервалы</div>'
+        + '<div class="form-section" id="z_windows_section">When to repeat</div>'
+        + '<div class="form-label" id="z_windows_label">Time windows</div>'
         + '<div id="z_windows_wrap">'
         +   '<div id="z_windows"></div>'
-        +   '<button class="btn sm" onclick="zpAddWindow()" style="margin-top:4px;">+ Добавить интервал</button>'
-        +   '<div style="color:var(--text2);font-size:10px;margin-top:3px;">пусто — круглосуточно</div>'
+        +   '<button class="btn sm" onclick="zpAddWindow()" style="margin-top:4px;">+ Add a window</button>'
+        +   '<div style="color:var(--text2);font-size:10px;margin-top:3px;">empty — around the clock</div>'
         + '</div>'
 
         // 5. Как повторять
-        + '<div class="form-section" id="z_repeat_section">Как повторять</div>'
-        + '<div class="form-label" id="z_repeat_label">Режим</div>'
+        + '<div class="form-section" id="z_repeat_section">How to repeat</div>'
+        + '<div class="form-label" id="z_repeat_label">Mode</div>'
         + '<select class="form-input" id="z_repeat_mode" onchange="zpSyncRows()">'
-        + [['back_to_back','Подряд'],['pause','Подряд с паузой'],['regular','Регулярно'],['spread','Распределить по интервалу']]
+        + [['back_to_back','Back to back'],['pause','Back to back with a pause'],['regular','At a fixed rate'],['spread','Spread over the window']]
             .map(function(o) { return '<option value="' + o[0] + '"' + (z.repeat.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
         + '</select>'
-        + '<div class="form-label" id="z_repeat_min_label">Минут</div>'
+        + '<div class="form-label" id="z_repeat_min_label">Minutes</div>'
         + rangeInputsHtml('z_repeat', z.repeat.min, z.repeat.max)
 
         // 6. Завершить
-        + '<div class="form-section" id="z_end_section">Завершить</div>'
-        + '<div class="form-label" id="z_end_label">Условие</div>'
+        + '<div class="form-section" id="z_end_section">Finish</div>'
+        + '<div class="form-label" id="z_end_label">Condition</div>'
         + '<select class="form-input" id="z_end_mode" onchange="zpSyncRows()">'
-        + [['never','Без конца'],['date','По дате'],['count','После N повторений']]
+        + [['never','Never'],['date','On a date'],['count','After N repeats']]
             .map(function(o) { return '<option value="' + o[0] + '"' + (z.end.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
         + '</select>'
-        + '<div class="form-label" id="z_end_at_label">Дата и время</div>'
+        + '<div class="form-label" id="z_end_at_label">Date and time</div>'
         + '<input class="form-input" id="z_end_at" type="datetime-local" value="' + escHtml(z.end.at || '') + '">'
-        + '<div class="form-label" id="z_end_count_label">Повторений</div>'
+        + '<div class="form-label" id="z_end_count_label">Repeats</div>'
         + rangeInputsHtml('z_end_count', z.end.min, z.end.max)
         + '</div>';
 }
@@ -1377,7 +1377,7 @@ function zpFormHtml(s) {
 function rangeInputsHtml(prefix, min, max) {
     return '<div id="' + prefix + '_wrap" style="display:flex;gap:4px;align-items:center;">'
         + '<input class="form-input" id="' + prefix + '_min" type="number" min="1" value="' + (min || 1) + '" style="width:70px">'
-        + '<span style="color:var(--text2);font-size:10px;">до</span>'
+        + '<span style="color:var(--text2);font-size:10px;">to</span>'
         + '<input class="form-input" id="' + prefix + '_max" type="number" min="1" value="' + (max || min || 1) + '" style="width:70px">'
         + '</div>';
 }
@@ -1465,7 +1465,7 @@ async function previewSchedule() {
     var mode = _val('f_schedule_mode', 'off');
     if (!box || mode === 'off') return;
 
-    box.textContent = 'считаю...';
+    box.textContent = 'calculating...';
     var body = mode === 'cron'
         ? { mode: 'cron', cron: _val('f_cron', '') }
         : { mode: 'zp',   schedule_json: JSON.stringify(collectZp()) };
@@ -1482,10 +1482,10 @@ async function previewSchedule() {
             return;
         }
         if (!data.times || data.times.length === 0) {
-            box.innerHTML = '<span style="color:var(--red,#f85149)">Ближайших запусков нет — проверьте настройки</span>';
+            box.innerHTML = '<span style="color:var(--red,#f85149)">No upcoming runs — check the settings</span>';
             return;
         }
-        box.innerHTML = 'Ближайшие запуски (UTC):<br>' + data.times.map(escHtml).join('<br>');
+        box.innerHTML = 'Upcoming runs (UTC):<br>' + data.times.map(escHtml).join('<br>');
     } catch (e) {
         box.textContent = e.message;
     }
@@ -1539,7 +1539,7 @@ function _noteRun(run) {
         var chip = document.createElement('button');
         chip.className   = 'run-chip';
         chip.textContent = run.slice(0, 4);
-        chip.title       = 'Только нить ' + run;
+        chip.title       = 'Only thread ' + run;
         chip.setAttribute('data-run', run);
         chip.style.setProperty('--ll-h', LogLine.hue(run));
         chip.onclick = function () { toggleRunFilter(run); };
@@ -1978,14 +1978,14 @@ function onThreadsChanged() {
     if (!hint || !tEl || !oEl) return;
 
     var n    = parseInt(tEl.value, 10) || 1;
-    var full = { skip:         'лишние заходы расписания пропускаются',
-                 parallel:     'лишние заходы копятся в очереди и стартуют по мере освобождения',
-                 kill_restart: 'работающие инстансы сносятся и запускаются заново' }[oEl.value] || '';
+    var full = { skip:         'extra scheduled runs are dropped',
+                 parallel:     'extra runs queue up and start as threads free up',
+                 kill_restart: 'running instances are stopped and started again' }[oEl.value] || '';
 
     hint.textContent = n > 1
-        ? 'Планировщик доливает до ' + n + ' нитей, старты разносятся на 1–5 с. '
-          + 'Когда все заняты — ' + full + '.'
-        : 'Одна нить. Пока она занята — ' + full + '.';
+        ? 'The scheduler tops up to ' + n + ' threads, starts are spread over 1-5 s. '
+          + 'When all of them are busy — ' + full + '.'
+        : 'A single thread. While it is busy — ' + full + '.';
 }
 
 function onOverlapChanged() { onThreadsChanged(); }
@@ -2299,8 +2299,8 @@ function pickPath(mode) {
     fetch(url)
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (!d.ok)   { alert('Не удалось открыть диалог: ' + (d.error || '')); return; }
+            if (!d.ok)   { alert('Could not open the dialog: ' + (d.error || '')); return; }
             if (d.path && field.isConnected) { field.value = d.path; markTaskDirty(); }
         })
-        .catch(function(e) { alert('Не удалось открыть диалог: ' + e); });
+        .catch(function(e) { alert('Could not open the dialog: ' + e); });
 }

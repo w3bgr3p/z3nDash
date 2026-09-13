@@ -591,7 +591,7 @@
                 console.log('📊 metadata:', metadata);
 
                 if (!metadata) {
-                    console.error("reportMetadata не найден!");
+                    console.error("reportMetadata not found!");
                     return;
                 }
 
@@ -602,7 +602,7 @@
                 const projectsData = [];
 
                 if (metadata.projects) {
-                    console.log(`🔍 Ищем ${metadata.projects.length} проектов...`);
+                    console.log(`🔍 Looking up ${metadata.projects.length} projects...`);
 
                     // Создаём маппинг project_* переменных (регистронезависимый)
                     const projectVars = {};
@@ -623,7 +623,7 @@
                             projectData = window[actualKey];
                             console.log(`   ✅ ${projectName} -> window.${actualKey}`);
                         } else {
-                            console.warn(`   ❌ ${projectName} не найден (искали ${searchKey})`);
+                            console.warn(`   ❌ ${projectName} not found (searched for ${searchKey})`);
                         }
 
                         if (projectData) {
@@ -632,7 +632,7 @@
                             projectsData.push(projectData);
                         }
                     });
-                    console.log(`✅ Найдено проектов: ${projectsData.length} из ${metadata.projects.length}`);
+                    console.log(`✅ Projects found: ${projectsData.length} of ${metadata.projects.length}`);
                 }
 
                 this.renderReport(socialData, projectsData, metadata);
@@ -645,10 +645,10 @@
                 if (loading) loading.style.display = 'none';
 
             } catch (e) {
-                console.error("❌ Ошибка загрузки данных:", e);
+                console.error("❌ Failed to load data:", e);
                 const loading = document.getElementById('loading');
                 if (loading) {
-                    loading.innerHTML = `<div style="color: #f85149;">❌ Ошибка: ${e.message}<br><small>Проверь консоль (F12)</small></div>`;
+                    loading.innerHTML = `<div style="color: #f85149;">❌ Error: ${e.message}<br><small>Check the console (F12)</small></div>`;
                 }
             }
         }
@@ -660,14 +660,14 @@
                 return;
             }
 
-            console.log('🖥️ Начинаем рендеринг процессов...');
+            console.log('🖥️ Rendering processes...');
 
             // Ищем все переменные processData_*
             const processDataKeys = Object.keys(window).filter(k => k.startsWith('processData_'));
-            console.log('🔍 Найдено переменных processData_*:', processDataKeys);
+            console.log('🔍 processData_* variables found:', processDataKeys);
 
             if (processDataKeys.length === 0) {
-                console.warn('⚠️ Нет данных о процессах (переменные processData_* не найдены)');
+                console.warn('⚠️ No process data (no processData_* variables found)');
                 container.innerHTML = '';
                 return;
             }
@@ -675,10 +675,10 @@
             let html = '';
             processDataKeys.forEach(key => {
                 const data = window[key];
-                console.log(`   📦 Обрабатываем ${key}:`, data);
+                console.log(`   📦 Processing ${key}:`, data);
 
                 if (!data || !data.processes) {
-                    console.warn(`   ⚠️ ${key} не содержит processes`);
+                    console.warn(`   ⚠️ ${key} has no processes`);
                     return;
                 }
 
@@ -707,7 +707,7 @@
                 </div>`;
             });
 
-            console.log('✅ Рендеринг процессов завершен, блоков:', processDataKeys.length);
+            console.log('✅ Processes rendered, blocks:', processDataKeys.length);
             container.innerHTML = html;
         }
 
@@ -734,7 +734,7 @@
 
         renderSocialSection(socialData) {
             if (!socialData || !socialData.accounts) {
-                console.warn("socialData отсутствует");
+                console.warn("socialData is missing");
                 return;
             }
 
@@ -853,13 +853,13 @@
             // СНАЧАЛА сортируем ВСЕ проекты
             const sortBy = new URLSearchParams(window.location.search).get('sort') || 'lastActivity';
             projects = this.sortProjects(projects, sortBy);
-            console.log(`📊 Проекты отсортированы по: ${sortBy}`);
+            console.log(`📊 Projects sorted by: ${sortBy}`);
 
             // ПОТОМ разделяем уже отсортированные проекты
             const activeProjects = projects.filter(p => Object.keys(p.accounts).length > 0);
             const idleProjects = projects.filter(p => Object.keys(p.accounts).length === 0);
 
-            console.log(`📊 Активных проектов: ${activeProjects.length}, Idle: ${idleProjects.length}`);
+            console.log(`📊 Active projects: ${activeProjects.length}, idle: ${idleProjects.length}`);
 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -1166,12 +1166,12 @@
                 : '';
 
             if (!commandLine || !commandLine.trim()) {
-                console.warn('⚠️ Нет commandLine для копирования');
+                console.warn('⚠️ No commandLine to copy');
                 return;
             }
 
             navigator.clipboard.writeText(commandLine).then(() => {
-                console.log('✅ Скопировано в буфер:', commandLine.substring(0, 50) + '...');
+                console.log('✅ Copied to clipboard:', commandLine.substring(0, 50) + '...');
 
                 // Показываем уведомление
                 const notification = document.createElement('div');
@@ -1196,7 +1196,7 @@
                     setTimeout(() => notification.remove(), 300);
                 }, 2000);
             }).catch(err => {
-                console.error('❌ Ошибка копирования:', err);
+                console.error('❌ Copy failed:', err);
             });
         }
 
@@ -1209,7 +1209,7 @@
                 ? window.processCommandLines[processId]
                 : '';
 
-            console.log('🖱️ Показываем тултип процесса:', processName, 'commandLine:', commandLine.substring(0, 100) + '...');
+            console.log('🖱️ Showing process tooltip:', processName, 'commandLine:', commandLine.substring(0, 100) + '...');
 
             // Показываем тултип даже если commandLine пустой
             const content = commandLine && commandLine.trim()

@@ -239,21 +239,21 @@
         <div class="tool-header">
             <span class="tool-icon">⚙</span>
             <span class="tool-title">C# String Escaper</span>
-            <span class="tool-desc">Любая строка → C# string literal (экранирует \, ", \n, \r, \t и др.)</span>
+            <span class="tool-desc">Any string → C# string literal (escapes \, ", \n, \r, \t and the rest)</span>
         </div>
         <div class="tool-body">
             <div class="converter-row">
                 <div class="converter-col">
-                    <div class="col-label">Исходная строка</div>
-                    <textarea id="cs_raw" placeholder='Вставь любой текст, путь или JSON...' oninput="csEscape()"></textarea>
+                    <div class="col-label">Source string</div>
+                    <textarea id="cs_raw" placeholder='Paste any text, path or JSON...' oninput="csEscape()"></textarea>
                 </div>
                 <div class="arrow-col">
                     <button class="arrow-btn" onclick="csEscape()" title="Escape →">→</button>
                     <button class="arrow-btn" onclick="csUnescape()" title="← Unescape">←</button>
                 </div>
                 <div class="converter-col">
-                    <div class="col-label">C# literal (готово к вставке)</div>
-                    <textarea id="cs_escaped" placeholder='"Вставь любой текст, путь или JSON..."' oninput="csUnescape()"></textarea>
+                    <div class="col-label">C# literal (ready to paste)</div>
+                    <textarea id="cs_escaped" placeholder='"Paste any text, path or JSON..."' oninput="csUnescape()"></textarea>
                 </div>
             </div>
             <div class="action-row">
@@ -264,9 +264,9 @@
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer">
                     <input type="checkbox" id="cs_interpolated" onchange="csEscape()" style="cursor:pointer">
-                    interpolated ($"...") — можно {var}
+                    interpolated ($"...") — {var} allowed
                 </label>
-                <input type="text" id="cs_vars" placeholder="vars: name, id, token — оставить как {name}; пусто = авто {identifier}" oninput="csEscape()" style="max-width:420px;font-size:10px;padding:3px 7px">
+                <input type="text" id="cs_vars" placeholder="vars: name, id, token — keep as {name}; empty = auto {identifier}" oninput="csEscape()" style="max-width:420px;font-size:10px;padding:3px 7px">
                 <button class="copy-btn" id="cs_copy" onclick="copyField('cs_escaped','cs_copy')">Copy</button>
             </div>
         </div>
@@ -343,7 +343,7 @@
         <div class="tool-header">
             <span class="tool-icon">{}</span>
             <span class="tool-title">JSON String Escape</span>
-            <span class="tool-desc">Строка → JSON-safe значение (для вставки внутрь JSON)</span>
+            <span class="tool-desc">String → JSON-safe value (to paste inside JSON)</span>
         </div>
         <div class="tool-body">
             <div class="converter-row">
@@ -511,7 +511,7 @@
                 document.getElementById('cs_verbatim').checked = false;
                 return;
             }
-            document.getElementById('cs_raw').value = '[Ожидается C# string literal]';
+            document.getElementById('cs_raw').value = '[Expecting a C# string literal]';
         } catch(e) {
             document.getElementById('cs_raw').value = '[Parse error]';
         }

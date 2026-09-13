@@ -65,7 +65,7 @@ svg#edges{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;tr
   <div id="top">
     <div style="display:flex;flex-direction:column;gap:8px">
       <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-        📂 выбери XML файл или перетащи сюда
+        📂 pick an XML file or drop it here
       </div>
       <input type="file" id="file-input" accept=".xml,.zp,.txt">
       <div style="display:flex;gap:6px;align-items:center">
@@ -74,10 +74,10 @@ svg#edges{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;tr
       </div>
     </div>
     <div style="font-size:11px;color:#888;line-height:1.7">
-      <b>Формат файла:</b> XML из ZennoPoster<br>
-      (сохрани вывод <code>ExtractXml()</code> в .xml)<br>
+      <b>File format:</b> XML from ZennoPoster<br>
+      (save the output of <code>ExtractXml()</code> as .xml)<br>
       <br>
-      <b>Управление:</b> тащи фон · колесо = зум · клик на ноду = детали
+      <b>Controls:</b> drag the background · wheel to zoom · click a node for details
     </div>
   </div>
 
@@ -86,7 +86,7 @@ svg#edges{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;tr
     <button class="btn" onclick="zoomOut()">－</button>
     <button class="btn" onclick="resetView()">reset</button>
     <button class="btn active" id="btn-layout" onclick="toggleLayout()">↕ vertical</button>
-    <input id="search" type="text" placeholder="поиск по label / ID…" oninput="filterNodes(this.value)">
+    <input id="search" type="text" placeholder="search by label / ID…" oninput="filterNodes(this.value)">
     <div class="legend">
       <div class="ld"><div class="ldot" style="background:#eaf7f1;border-color:#2da870"></div>start/good</div>
       <div class="ld"><div class="ldot" style="background:#fdecea;border-color:#d94f4f"></div>bad end</div>
@@ -107,8 +107,8 @@ svg#edges{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;tr
     </div>
     <div id="mini"></div>
     <div id="empty">
-      <span>выбери XML файл выше</span>
-      <span style="font-size:11px">сохрани вывод ExtractXml() / LoadFromBytesArray() в .xml</span>
+      <span>pick an XML file above</span>
+      <span style="font-size:11px">save the output of ExtractXml() / LoadFromBytesArray() as .xml</span>
     </div>
   </div>
 </div>
@@ -136,10 +136,10 @@ dz.addEventListener('drop', e=>{
 });
 
 function readFile(file){
-  setStatus('читаю файл…','info');
+  setStatus('reading the file…','info');
   const reader = new FileReader();
   reader.onload = e => processXml(e.target.result, file.name);
-  reader.onerror = () => setStatus('ошибка чтения файла','err');
+  reader.onerror = () => setStatus('could not read the file','err');
   reader.readAsText(file, 'UTF-8');
 }
 
@@ -164,12 +164,12 @@ function processXml(raw, filename){
     } else {
       buildFromDoc(doc);
     }
-    setStatus('✓ '+filename+' · '+stepList.length+' шагов · '+edges.length+' рёбер','ok');
+    setStatus('✓ '+filename+' · '+stepList.length+' steps · '+edges.length+' edges','ok');
     document.getElementById('empty').style.display='none';
     render();
     resetView();
   }catch(e){
-    setStatus('ошибка: '+e.message,'err');
+    setStatus('error: '+e.message,'err');
     console.error(e);
   }
 }
@@ -216,7 +216,7 @@ function buildFromDoc(doc){
   });
 
   stepList = Object.values(steps);
-  if(!stepList.length) throw new Error('Step элементы не найдены');
+  if(!stepList.length) throw new Error('No Step elements found');
 
   const startEl = doc.querySelector('Start');
   const goodEl  = doc.querySelector('GoodEnd');
