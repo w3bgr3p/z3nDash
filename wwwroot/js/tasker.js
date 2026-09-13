@@ -2208,7 +2208,12 @@ function renderFieldHtml(f) {
             + '<button class="btn sm" onclick="document.getElementById(\'' + fid + '_picker\').click()" style="flex-shrink:0;white-space:nowrap">Browse</button>'
             + '</div>';
     } else if (f.type === 'select') {
-        var opts = (f.options||'').split(',').map(function(o){return o.trim();}).filter(Boolean);
+        // Пустой вариант из списка не выбрасываем: в шаблонах он значащий.
+        // simroute.bolt.lgn на пустом proxy_iso подставляет location, и без
+        // пустого пункта выбрать этот путь в интерфейсе нечем.
+        var opts = (f.options||'').trim()
+            ? f.options.split(',').map(function(o){return o.trim();})
+            : [];
         inputHtml = '<select class="values-input" data-vkey="' + escHtml(f.key) + '" onchange="pmValuesSet(\'' + escHtml(f.key) + '\',this.value)">'
             + opts.map(function(o){return '<option value="'+escHtml(o)+'"'+(o===val?' selected':'')+'>'+escHtml(o)+'</option>';}).join('') + '</select>';
     } else if (f.type === 'multiselect') {

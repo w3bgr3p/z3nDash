@@ -85,7 +85,7 @@ public sealed partial class SchedulerService : IDisposable
 
     private void RestoreRunningProcesses(Db db)
     {
-        var columns = db.GetTableColumns(Table);
+        var columns = RowColumns(db);
         if (columns.Count == 0) return;
 
         var rows = db.GetLines(string.Join(",", columns), Table, where: "\"status\" = 'running' AND \"enabled\" = 'true'");
@@ -117,7 +117,7 @@ public sealed partial class SchedulerService : IDisposable
     {
         if (!_dbService.TryGetDb(out var db) || db == null) return;
 
-        var columns = db.GetTableColumns(Table);
+        var columns = RowColumns(db);
         if (columns.Count == 0) return;
 
         var rows = db.GetLines(string.Join(",", columns), Table, where: "\"enabled\" = 'true'");
@@ -203,7 +203,7 @@ public sealed partial class SchedulerService : IDisposable
     /// </summary>
     public void EvaluateNow(string id, Db db)
     {
-        var cols = db.GetTableColumns(Table);
+        var cols = RowColumns(db);
         if (cols.Count == 0) return;
 
         var rows = db.GetLines(string.Join(",", cols), Table, where: $"\"id\" = '{id}'");
@@ -282,7 +282,7 @@ public sealed partial class SchedulerService : IDisposable
 
     private void DrainQueueForCore(Db db, string scheduleId)
     {
-        var schedCols = db.GetTableColumns(Table);
+        var schedCols = RowColumns(db);
         if (schedCols.Count == 0) return;
 
         var schedRows = db.GetLines(string.Join(",", schedCols), Table, where: $"\"id\" = '{scheduleId}'");
@@ -323,7 +323,7 @@ public sealed partial class SchedulerService : IDisposable
     {
         DrainQueueFor(db, scheduleId);
 
-        var schedCols = db.GetTableColumns(Table);
+        var schedCols = RowColumns(db);
         if (schedCols.Count == 0) return;
 
         var schedRows = db.GetLines(string.Join(",", schedCols), Table, where: $"\"id\" = '{scheduleId}'");
@@ -1115,6 +1115,16 @@ public sealed partial class SchedulerService : IDisposable
             _         => (ResolvePython(scriptPath, useVenv), $"\"{scriptPath}\" {args}".Trim()),
         };
     }
+
+    /// <summary>
+    /// Колонки строки расписания для чтения через GetLines. last_output исключён
+    /// намеренно: GetLines склеивает колонки разделителем '¦', а вывод шаблона
+    /// содержит его как есть — DbGetLine печатает результат тем же разделителем.
+    /// Одна такая строка в last_output сдвигала все колонки вправо, и запуск
+    /// падал на разборе payload_values, не оставляя следа в выводе задачи.
+    /// </summary>
+    public static List<string> RowColumns(Db db)
+        => db.GetTableColumns(Table).Where(c => c != "last_output").ToList();
 
     private static Dictionary<string, string> ParseRow(string row, List<string> columns)
     {

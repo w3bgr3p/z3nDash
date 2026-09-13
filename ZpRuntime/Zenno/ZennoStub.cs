@@ -234,18 +234,25 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
     internal sealed class Variable : IVariable
     {
         private readonly ConcurrentDictionary<string, string> _store;
+        private readonly ConcurrentDictionary<string, byte>?  _assigned;
         private readonly string _key;
 
-        public Variable(ConcurrentDictionary<string, string> store, string key)
+        public Variable(ConcurrentDictionary<string, string> store, string key,
+                        ConcurrentDictionary<string, byte>? assigned = null)
         {
-            _store = store;
-            _key   = key;
+            _store    = store;
+            _assigned = assigned;
+            _key      = key;
         }
 
         public string Value
         {
             get => _store.GetOrAdd(_key, "");
-            set => _store[_key] = value ?? "";
+            set
+            {
+                _store[_key] = value ?? "";
+                _assigned?.TryAdd(_key, 0);
+            }
         }
     }
 
@@ -254,14 +261,26 @@ namespace ZennoLab.InterfacesLibrary.ProjectModel.Collections
         private readonly ConcurrentDictionary<string, string> _store
             = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        // Присваивание отмечаем отдельно от значения: геттер Value заводит
+        // переменную через GetOrAdd, поэтому наличие ключа в _store ещё не
+        // значит, что её кто-то задавал — её могли просто прочитать.
+        private readonly ConcurrentDictionary<string, byte> _assigned
+            = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+
         public IVariable this[string name]
-            => new Variable(_store, name);
+            => new Variable(_store, name, _assigned);
 
         public string Get(string name)
             => _store.GetOrAdd(name, "");
 
         public void Set(string name, string value)
-            => _store[name] = value ?? "";
+        {
+            _store[name] = value ?? "";
+            _assigned.TryAdd(name, 0);
+        }
+
+        /// <summary>Переменную задавали снаружи — пустая строка тоже значение.</summary>
+        public bool IsAssigned(string name) => _assigned.ContainsKey(name);
     }
 
     internal sealed class GlobalVariableList : IGlobalVariables

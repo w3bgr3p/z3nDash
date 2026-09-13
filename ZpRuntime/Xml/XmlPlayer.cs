@@ -122,7 +122,11 @@ public sealed class XmlPlayer
 
         var exec = new BranchExecutor(_project, _instance, code, _log);
 
-        _log($"[xml] {tpl.Name}: старт с {tpl.Start}");
+        // Имя файла, а не атрибут Name из XML: там у половины шаблонов лежит
+        // «Template.xml» от мастера создания, и по такой строке в логе не понять,
+        // какой из них прогоняли.
+        var title = string.IsNullOrWhiteSpace(_project.Name) ? tpl.Name : _project.Name;
+        _log($"[xml] {title}: старт с {tpl.Start}");
 
         var result = Walk(tpl, exec, entry, ct);
 
@@ -145,9 +149,19 @@ public sealed class XmlPlayer
         // ZP заводит объявленные переменные до старта. Без этого первое же
         // обращение к необъявленной переменной в ветке даёт пустоту там, где
         // шаблон рассчитывает на значение по умолчанию из настроек проекта.
+        // Заданное вызывающим (InputSettings задачи) не трогаем даже когда там
+        // пустая строка: в ZP пустое поле настроек — это выбор, а не «не задано».
+        // simroute.bolt.lgn на пустом proxy_iso подставляет location; со значением
+        // по умолчанию из XML («id») эта ветка не срабатывала вовсе.
+        var assigned = _project.Variables as
+            ZennoLab.InterfacesLibrary.ProjectModel.Collections.VariableList;
+
         foreach (var (name, value) in tpl.Variables)
+        {
+            if (assigned?.IsAssigned(name) == true) continue;
             if (string.IsNullOrEmpty(_project.Variables[name].Value))
                 _project.Variables[name].Value = value;
+        }
     }
 
     private PlayResult Walk(XmlTemplate tpl, BranchExecutor exec,

@@ -198,8 +198,10 @@ public sealed class SchedulerHandler : IScriptHandler
         var id = json.Value.TryGetProperty("id", out var eid) ? eid.GetString() ?? "" : "";
         if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
 
-        // Получить запись и прогнать через LaunchAsync минуя триггер
-        var cols = db.GetTableColumns(Table);
+        // Получить запись и прогнать через LaunchAsync минуя триггер.
+        // Колонки — через RowColumns: last_output читать нельзя, вывод шаблона
+        // содержит разделитель колонок и сдвигает всю строку.
+        var cols = SchedulerService.RowColumns(db);
         var rows = db.GetLines(string.Join(",", cols), Table, where: $"\"id\" = '{id}'");
         if (rows.Count == 0) { ctx.Response.StatusCode = 404; return; }
 
