@@ -76,8 +76,14 @@ public sealed class ProxyRelay : IDisposable
     {
         public static readonly Upstream Direct = new("direct", "", 0, "", "");
         public bool HasAuth => User.Length > 0;
+
+        // Логин печатаем целиком: у резидентных прокси в нём закодированы страна
+        // и сессия, и без него отказ вида «REP 0x05» разобрать нельзя — проверено
+        // на arealproxy, где та же учётка с другим суффиксом ведёт себя иначе.
+        // Пароль не печатаем никогда.
         public override string ToString()
-            => Kind == "direct" ? "напрямую" : $"{Kind} {Host}:{Port}{(HasAuth ? " с логином" : "")}";
+            => Kind == "direct" ? "напрямую"
+             : $"{Kind} {Host}:{Port}" + (HasAuth ? $" логин {User}" : " без логина");
     }
 
     /// <summary>Адрес для браузера: HTTP-прокси на локальной петле.</summary>
@@ -316,6 +322,21 @@ public sealed class ProxyRelay : IDisposable
         return reply.Length > 1 ? reply[1] : (byte)0xFF;
     }
 
+    /// <summary>Расшифровка кода ответа SOCKS5 по RFC 1928 — чтобы в логе был не только байт.</summary>
+    private static string SocksReply(byte code) => code switch
+    {
+        0x00 => "успех",
+        0x01 => "общий отказ сервера",
+        0x02 => "запрещено правилами",
+        0x03 => "сеть недоступна",
+        0x04 => "хост недоступен",
+        0x05 => "соединение отклонено",
+        0x06 => "TTL истёк",
+        0x07 => "команда не поддерживается",
+        0x08 => "тип адреса не поддерживается",
+        _    => "код вне RFC 1928",
+    };
+
     /// <summary>Первая строка ответа — в лог не нужен весь заголовок.</summary>
     private static string FirstLine(string text)
     {
@@ -349,7 +370,8 @@ public sealed class ProxyRelay : IDisposable
             var code = await ConnectThroughSocksAsync(up, host, port);
             if (code == 0x00) return true;
 
-            Log?.Invoke($"прокси отказал в CONNECT {host}:{port}, код 0x{code:X2} (наверху {cfg})");
+            Log?.Invoke($"прокси отказал в CONNECT {host}:{port}, код 0x{code:X2} — {SocksReply(code)} "
+                      + $"(наверху {cfg})");
             if (isConnect) await WriteAsciiAsync(down, "HTTP/1.1 502 Bad Gateway" + "\r\n\r\n");
             return false;
         }
