@@ -715,7 +715,14 @@ public sealed partial class SchedulerService : IDisposable
             BrowserProvider.ApplyGlobalConfig(brConfig, Config.BrowsersApi);
             try
             {
-                var project = new StubProject { Name = name, OnLog = rp.AddLine };
+                var project = new StubProject
+                {
+                    // Имя проекта — файл шаблона, как в ZennoPoster: шаблоны
+                    // разбирают его на части (Name.Split('.')[1] — сервис), а
+                    // Constantes.ProjectName ищет по нему файл в каталоге.
+                    Name = Path.GetFileName(scriptPath),
+                    OnLog = rp.AddLine,
+                };
                 project.Variables["dbSource"].Value = db.Source;
 
                 var tpl = z3nDash.Xml.XmlTemplate.Load(scriptPath);

@@ -53,9 +53,15 @@ public sealed class XmlPlayer
     }
 
     public PlayResult Play(string templatePath, CancellationToken ct = default)
-        => Play(XmlTemplate.Load(templatePath),
-                System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(templatePath))!,
-                ct);
+    {
+        // Имя — файл шаблона: по нему Constantes.ProjectName ищет проект в каталоге.
+        if (_project is StubProject stub && string.IsNullOrWhiteSpace(stub.Name))
+            stub.Name = System.IO.Path.GetFileName(templatePath);
+
+        return Play(XmlTemplate.Load(templatePath),
+                    System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(templatePath))!,
+                    ct);
+    }
 
     public PlayResult Play(XmlTemplate tpl, string templateDir, CancellationToken ct = default)
     {
@@ -77,7 +83,15 @@ public sealed class XmlPlayer
         if (_project is StubProject stub)
         {
             stub.Path = templateDir;
-            if (!string.IsNullOrWhiteSpace(tpl.Name)) stub.Name = tpl.Name;
+
+            // Имя проекта задаёт вызывающий — именем файла шаблона, как в ZP.
+            // Раньше здесь оно перетиралось атрибутом Name из самого XML, а там
+            // у сохранённых из ProjectMaker шаблонов остаётся «Template.xml».
+            // Шаблоны на это имя опираются: simroute.bolt.lgn берёт из него
+            // название сервиса через Name.Split('.')[1], и вместо «bolt»
+            // получалось «xml» — выборка из базы уходила пустой.
+            if (string.IsNullOrWhiteSpace(stub.Name) && !string.IsNullOrWhiteSpace(tpl.Name))
+                stub.Name = tpl.Name;
         }
 
         SeedVariables(tpl);
