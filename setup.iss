@@ -20,8 +20,8 @@ Compression=lzma2
 SolidCompression=yes
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\z3nDash.exe
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 
 
 [Files]
