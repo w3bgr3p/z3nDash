@@ -1,4 +1,4 @@
-// Срез z3n7/Accounts/InstanceManager.cs — пока только ProxySet.
+﻿// Срез z3n7/Accounts/InstanceManager.cs — пока только ProxySet.
 //
 // Эталонный файл на 602 строки: сам InstanceManager, Disposer, RunBrowser,
 // Finish, ReportError/ReportSuccess. Всё это про жизненный цикл инстанса ZP,
@@ -69,6 +69,84 @@ namespace z3n7
                 return true;
             }
             throw new Exception($"proxy check failed: proxyString=[{proxyString}]");
+        }
+
+        // ── SaveProfile ───────────────────────────────────────────────────────
+        // Перенесено из z3n7/Accounts/InstanceManager.cs. Зовёт ветка шаблона
+        // simroute.bolt.lgn: project.SaveProfile(instance).
+        //
+        // Экспорт отпечатка профиля в JSON: простые свойства IProfile и Instance
+        // собираются рефлексией, к ним добавляются настройки WebGL и куки.
+        //
+        // Отступление от эталона одно: там instance.WebGLPreferences.Save(), у нас
+        // это свойство — строка, поэтому берётся как есть. Остальное дословно.
+        public static void SaveProfile(this IZennoPosterProjectModel project, Instance instance)
+        {
+            var profileData = new System.Collections.Generic.Dictionary<string, object>();
+            foreach (var prop in typeof(ZennoLab.InterfacesLibrary.ProjectModel.Collections.IProfile).GetProperties())
+            {
+                if (!prop.CanRead || prop.GetMethod?.IsPublic != true) continue;
+                var t = prop.PropertyType;
+                bool isSimple = t.IsPrimitive || t == typeof(string) || t == typeof(decimal) || t == typeof(DateTime) || t.IsEnum;
+                if (isSimple)
+                {
+                    try
+                    {
+                        var val = prop.GetValue(project.Profile, null);
+                        if (val != null) profileData[prop.Name] = val;
+                    }
+                    catch { }
+                }
+            }
+
+            var instanceData = new System.Collections.Generic.Dictionary<string, object>();
+            foreach (var prop in typeof(Instance).GetProperties())
+            {
+                if (!prop.CanRead || prop.GetMethod?.IsPublic != true) continue;
+                var t = prop.PropertyType;
+                bool isSimple = t.IsPrimitive || t == typeof(string) || t == typeof(decimal) || t == typeof(DateTime) || t.IsEnum;
+                if (isSimple)
+                {
+                    try
+                    {
+                        var val = prop.GetValue(instance, null);
+                        if (val != null) instanceData[prop.Name] = val;
+                    }
+                    catch { }
+                }
+            }
+
+            string webglData = "";
+            try { webglData = instance.WebGLPreferences; } catch { }
+
+            string cookiesBase64 = "";
+            try
+            {
+                cookiesBase64 = Convert.ToBase64String(
+                    System.Text.Encoding.UTF8.GetBytes(instance.GetCookie() ?? ""));
+            }
+            catch { }
+
+            var exportBundle = new System.Collections.Generic.Dictionary<string, object>
+            {
+                { "timestamp", DateTime.UtcNow.ToString("o") },
+                { "profile", profileData },
+                { "instance", instanceData },
+                { "_preferences", webglData },
+                { "cookies", cookiesBase64 }
+            };
+
+            string profilesDir = System.IO.Path.Combine(project.Directory, "profiles");
+            System.IO.Directory.CreateDirectory(profilesDir);
+
+            string fileName = $"zenno_profile_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 6)}.json";
+            string fullPath = System.IO.Path.Combine(profilesDir, fileName);
+
+            string jsonOutput = Newtonsoft.Json.JsonConvert.SerializeObject(
+                exportBundle, Newtonsoft.Json.Formatting.Indented);
+            System.IO.File.WriteAllText(fullPath, jsonOutput, System.Text.Encoding.UTF8);
+
+            project.SendInfoToLog($"[Fingerprint] Профиль успешно сохранен: {fullPath}");
         }
     }
 }
