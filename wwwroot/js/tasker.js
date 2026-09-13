@@ -1071,7 +1071,7 @@ var BROWSER_PRESETS = {
 
 function browserDefaults() {
     return {
-        mode: 'patchright', profile: '', cdp: '', close: true,
+        mode: 'patchright', profile: '', cdp: '', close: true, headless: true,
         api: { method: 'GET', url: '', body: '', ws: '', stopMethod: 'GET', stopUrl: '' }
     };
 }
@@ -1086,6 +1086,7 @@ function browserFromSaved(s) {
             profile: p.profile || '',
             cdp:     p.cdp     || '',
             close:   p.close !== false,
+            headless: p.headless !== false,
             api:     Object.assign(d.api, p.api || {})
         };
     } catch (e) { return d; }
@@ -1145,7 +1146,13 @@ function browserSectionHtml(s) {
         + '<input class="form-input" id="b_stop" value="' + escHtml(b.api.stopUrl) + '" placeholder="http://.../stop?user_id={profile}">'
 
         + '<div class="form-label" id="b_close_label">Close after the run</div>'
-        + '<div id="b_close_wrap"><input type="checkbox" id="b_close"' + (b.close ? ' checked' : '') + '></div>';
+        + '<div id="b_close_wrap"><input type="checkbox" id="b_close"' + (b.close ? ' checked' : '') + '></div>'
+
+        + '<div class="form-label" id="b_headless_label">Headless</div>'
+        + '<div id="b_headless_wrap">'
+        +   '<input type="checkbox" id="b_headless"' + (b.headless ? ' checked' : '') + '>'
+        +   '<span style="color:var(--text2);font-size:10px;margin-left:6px">off shows the browser window - for watching where a template stops</span>'
+        + '</div>';
 }
 
 /// Поля зависят от источника: у Patchright их нет вовсе, у CDP только эндпоинт.
@@ -1163,6 +1170,7 @@ function browserSyncRows() {
     _row('b_ws_label',      'b_ws',           api);
     _row('b_stop_label',    'b_stop',         api);
     _row('b_close_label',   'b_close_wrap',   api || shardx);
+    _row('b_headless_label', 'b_headless_wrap', mode === 'patchright');
 }
 
 function applyBrowserPreset() {
@@ -1182,6 +1190,7 @@ function collectBrowser() {
         profile: _val('b_profile', ''),
         cdp:     (_val('b_cdp', '') || '').trim(),
         close:   !!(document.getElementById('b_close') || { checked: true }).checked,
+        headless: !!(document.getElementById('b_headless') || { checked: true }).checked,
         api: {
             method:     _val('b_method', 'GET'),
             url:        (_val('b_url', '') || '').trim(),

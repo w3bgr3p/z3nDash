@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 
 namespace z3nDash;
@@ -23,6 +23,13 @@ public sealed class BrowserConfig
 
     public bool CloseAfterRun = true;
 
+    /// <summary>
+    /// Окно браузера. По умолчанию его нет: в прогоне оно не нужно, а мешает.
+    /// Включается на время разбора — посмотреть, на чём встал шаблон.
+    /// Касается только режима patchright: в остальных браузер поднимаем не мы.
+    /// </summary>
+    public bool Headless = true;
+
     public static BrowserConfig Parse(string json)
     {
         var cfg = new BrowserConfig();
@@ -37,6 +44,8 @@ public sealed class BrowserConfig
         cfg.Cdp     = Str(root, "cdp", "");
         if (root.TryGetProperty("close", out var cl) && cl.ValueKind == JsonValueKind.False)
             cfg.CloseAfterRun = false;
+        if (root.TryGetProperty("headless", out var hl) && hl.ValueKind == JsonValueKind.False)
+            cfg.Headless = false;
 
         if (!root.TryGetProperty("api", out var api) || api.ValueKind != JsonValueKind.Object)
             return cfg;

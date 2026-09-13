@@ -823,10 +823,10 @@ public sealed partial class SchedulerService : IDisposable
                     var safe = string.Concat((name + "-" + slot).Select(
                         c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
                     var profileDir = Path.Combine(Path.GetTempPath(), "z3nDash-xml", "profile-" + safe);
-                    rp.AddLine($"[br] Patchright, профиль {profileDir}"
+                    rp.AddLine($"[br] Patchright{(brConfig.Headless ? " (без окна)" : " (с окном)")}, профиль {profileDir}"
                                + (proxy.Length > 0 ? $", прокси {proxy}" : ", без прокси"));
                     session = await z3nDash.Browser.BrowserSession.LaunchAsync(
-                        profileDir, headless: false, proxy: proxy.Length > 0 ? proxy : null,
+                        profileDir, headless: brConfig.Headless, proxy: proxy.Length > 0 ? proxy : null,
                         log: rp.AddLine);
                 }
 
