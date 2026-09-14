@@ -34,7 +34,7 @@ public sealed class SchedulerHandler : IScriptHandler
         "payload_schema", "payload_values",
         "runs_total", "runs_success", "schedule_tag", "last_run_id",
         "use_venv", "schedule_mode", "schedule_json", "sched_runs", "sched_started_at",
-        "browser_json"
+        "browser_json", "timeout_seconds"
     };
 
     public SchedulerHandler(DbConnectionService dbService, SchedulerService scheduler, string wwwrootPath)
@@ -108,7 +108,6 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/tasker/config-file" && method == "GET") { await GetConfigFile(context, db); return true; }
             if (path == "/tasker/config-file" && method == "POST") { await SaveConfigFile(context); return true; }
             if (path == "/tasker/ensure-venv" && method == "POST") { await EnsureVenv(context, db); return true; }
-            if (path == "/tasker/internal-tasks" && method == "GET") { await InternalTasks(context); return true; }
             if (path == "/tasker/schedule-preview" && method == "POST") { await SchedulePreview(context); return true; }
             if (path == "/tasker/install/stream" && method == "GET") { await InstallStream(context, db); return true; }
             if (path == "/tasker/open-terminal" && method == "GET") { await OpenTerminal(context, db); return true; }
@@ -864,12 +863,6 @@ public sealed class SchedulerHandler : IScriptHandler
                                 .ToList();
         await HttpHelpers.WriteJson(ctx.Response, new { ok = true, errors = Array.Empty<string>(), times = preview });
     }
-
-    // ── Internal tasks ─────────────────────────────────────────────────────────
-
-    /// <summary>Список зарегистрированных internal-задач для выпадашки в Settings.</summary>
-    private async Task InternalTasks(HttpListenerContext ctx)
-        => await HttpHelpers.WriteJson(ctx.Response, new { tasks = _scheduler.InternalTaskNames });
 
     // ── Open terminal ──────────────────────────────────────────────────────────
 

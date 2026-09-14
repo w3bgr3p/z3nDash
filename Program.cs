@@ -39,7 +39,7 @@ try
 
     var schedulerService = new SchedulerService(dbConnectionService, _log);
     schedulerService.ApiBaseUrl = $"http://localhost:{dashboardService.Port}";
-    InternalTasks.Register(schedulerService, dbConnectionService, logsConfig);
+    InternalTasks.Load();
 
 
     var watchdogService = new MemoryWatchdogService(_log);

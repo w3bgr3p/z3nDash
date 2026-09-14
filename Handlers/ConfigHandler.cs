@@ -25,7 +25,8 @@ internal sealed class ConfigHandler
 
     public bool Matches(string path, string method) =>
         (method == "GET"  && path is "/config" or "/config/status" or "/config/storage" or "/config/ui" or "/config/ai-models") ||
-        (method == "POST" && path is "/config" or "/config/jvars" or "/config/ai-validate" or "/clear-all-logs" or "/config/ui");
+        (method == "POST" && path is "/config" or "/config/jvars" or "/config/ai-validate" or "/clear-all-logs" or "/config/ui"
+                                  or "/config/client-bundle" or "/config/update-templates");
 
     public async Task Handle(HttpListenerContext ctx)
     {
@@ -40,6 +41,9 @@ internal sealed class ConfigHandler
         if (method == "GET"  && path == "/config/storage")       { await GetStorage(ctx.Response);   return; }
         if (method == "GET"  && path == "/config/ai-models")     { await GetAiModels(ctx.Response);  return; }
         if (method == "POST" && path == "/clear-all-logs")       { await ClearAllLogs(ctx.Response); return; }
+
+        if (method == "POST" && path == "/config/client-bundle")    { using var r = new StreamReader(ctx.Request.InputStream); await ClientBundle(ctx.Response, await r.ReadToEndAsync()); return; }
+        if (method == "POST" && path == "/config/update-templates") { using var r = new StreamReader(ctx.Request.InputStream); await UpdateTemplates(ctx.Response, await r.ReadToEndAsync()); return; }
 
         if (method == "GET"  && path == "/config/ui") { await GetUiState(ctx.Response);  return; }
         if (method == "POST" && path == "/config/ui") { using var r = new StreamReader(ctx.Request.InputStream); await SaveUiState(ctx.Response, await r.ReadToEndAsync()); return; }
@@ -188,6 +192,59 @@ internal sealed class ConfigHandler
     }
 
     // Принимает Base64(JSON{pin, jVarsPath})
+    // ── Разовые служебные операции ────────────────────────────────────────────
+    // Раньше они висели экзекутором "internal" в планировщике. Расписание им не
+    // нужно: обе выполняются руками и по одному разу.
+
+    /// <summary>Бандл для воркера: jvars.dat под его HWID и safu.key.</summary>
+    private static async Task ClientBundle(HttpListenerResponse response, string body)
+    {
+        var lines = new List<string>();
+        try
+        {
+            var payload = JsonSerializer.Deserialize<Dictionary<string, string>>(body)
+                          ?? new Dictionary<string, string>();
+            var result = InternalTasks.GenerateClientBundle(payload, lines.Add);
+            await HttpHelpers.WriteJson(response, new { ok = true, result, log = lines });
+        }
+        catch (Exception ex)
+        {
+            response.StatusCode = 400;
+            await HttpHelpers.WriteJson(response, new { error = ex.Message, log = lines });
+        }
+    }
+
+    /// <summary>
+    /// Снять с текущей БД templates/db_template.json и api_template.json.
+    /// Утилита разработки: результат коммитится в исходники и уезжает клиенту
+    /// обновлением, поэтому каталог приходит в теле запроса — {"outDir":"..."};
+    /// без него пишем в templates рядом с исполняемым файлом.
+    /// </summary>
+    private async Task UpdateTemplates(HttpListenerResponse response, string body)
+    {
+        var lines = new List<string>();
+        try
+        {
+            if (!_dbService.TryGetDb(out var db) || db == null)
+                throw new Exception("DB not connected");
+
+            var outDir = "";
+            if (!string.IsNullOrWhiteSpace(body))
+                outDir = JsonSerializer.Deserialize<Dictionary<string, string>>(body)?
+                             .GetValueOrDefault("outDir", "") ?? "";
+            if (string.IsNullOrWhiteSpace(outDir))
+                outDir = Path.Combine(AppContext.BaseDirectory, "templates");
+
+            var result = InternalTasks.UpdateTemplates(db, outDir, lines.Add);
+            await HttpHelpers.WriteJson(response, new { ok = true, result, outDir, log = lines });
+        }
+        catch (Exception ex)
+        {
+            response.StatusCode = 500;
+            await HttpHelpers.WriteJson(response, new { error = ex.Message, log = lines });
+        }
+    }
+
     private static async Task SaveJVars(HttpListenerResponse response, string body)
     {
         try

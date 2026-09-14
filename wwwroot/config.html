@@ -627,6 +627,50 @@
                 ⚠ Restart required for port / path changes to take effect
             </p>
             </section>
+
+            <section class="card config-card">
+            <div class="card-hdr"><h2>Maintenance</h2></div>
+            <p style="font-size:10px; color:var(--text-dim); margin:0 0 10px;">
+                One-off operations. They used to sit in Tasker as <code>internal</code> tasks; they need no schedule.
+            </p>
+
+            <div style="font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Client bundle</div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Client name</label>
+                    <input id="mtClientName" type="text" placeholder="worker01">
+                </div>
+                <div class="field">
+                    <label>Client HWID</label>
+                    <input id="mtClientHwid" type="text" placeholder="HWID of the worker machine">
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Output folder (optional)</label>
+                    <input id="mtClientOut" type="text" placeholder="default: clients\&lt;name&gt; next to the exe">
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn primary" id="mtBundleBtn" onclick="mtClientBundle()">&#128230; Build bundle</button>
+            </div>
+
+            <div style="font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin:14px 0 6px;">Update templates</div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Output folder (optional)</label>
+                    <input id="mtTplOut" type="text" placeholder="default: templates next to the exe">
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn" id="mtTplBtn" onclick="mtUpdateTemplates()">&#128451; Write db_template &amp; api_template</button>
+            </div>
+            <p style="font-size:10px; color:var(--text-dim); margin-top:-6px;">
+                Dev utility: the result is committed to the sources and reaches clients with an update, so point it at the repo.
+            </p>
+
+            <pre id="mtLog" style="display:none; margin-top:10px; padding:8px; max-height:200px; overflow:auto; background:var(--bg,#0d1117); border:1px solid var(--border); border-radius:6px; font-size:10px; white-space:pre-wrap;"></pre>
+            </section>
         </div>
     </div>
 
@@ -1043,6 +1087,58 @@
             btn.disabled = false;
             btn.textContent = '🔐 Set PIN & Path';
         }
+    }
+
+    // ── Maintenance: разовые операции ─────────────────────
+    // Обе раньше жили экзекутором "internal" в планировщике. Расписание
+    // им не нужно: выполняются руками. Вывод показываем целиком:
+    // обе пишут файлы, и нужно видеть, куда именно они легли.
+
+    function mtShowLog(lines) {
+        const el = document.getElementById('mtLog');
+        el.style.display = 'block';
+        el.textContent = (lines || []).join(String.fromCharCode(10));
+    }
+
+    async function mtPost(url, body, btn, busyText, doneText) {
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = busyText;
+        try {
+            const r = await fetch(url, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(body)
+            });
+            const d = await r.json().catch(() => ({}));
+            mtShowLog(d.log && d.log.length ? d.log : [d.result || d.error || '']);
+            if (r.ok && d.ok) toast(doneText + (d.result ? ': ' + d.result : ''), 'ok');
+            else              toast('Failed: ' + (d.error || r.status), 'err');
+        } catch (e) {
+            mtShowLog([e.message]);
+            toast('Error: ' + e.message, 'err');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = label;
+        }
+    }
+
+    function mtClientBundle() {
+        const name = document.getElementById('mtClientName').value.trim();
+        const hwid = document.getElementById('mtClientHwid').value.trim();
+        if (!name) { toast('Client name is required', 'err'); return; }
+        if (!hwid) { toast('Client HWID is required', 'err'); return; }
+        mtPost('/config/client-bundle', {
+            clientName:   name,
+            clientHwid:   hwid,
+            outputFolder: document.getElementById('mtClientOut').value.trim()
+        }, document.getElementById('mtBundleBtn'), 'building...', 'bundle ready');
+    }
+
+    function mtUpdateTemplates() {
+        mtPost('/config/update-templates',
+               { outDir: document.getElementById('mtTplOut').value.trim() },
+               document.getElementById('mtTplBtn'), 'writing...', 'templates written');
     }
 
     // ── Memory Watchdog ───────────────────────────────────────────────

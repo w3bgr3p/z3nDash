@@ -115,7 +115,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initResizer();
     initHResizer();
     restoreLayout();
-    loadInternalTasks();
     document.getElementById('detailBody').addEventListener('input', markTaskDirty);
     document.getElementById('detailBody').addEventListener('change', markTaskDirty);
     document.getElementById('detailBody').addEventListener('click', function(e) {
@@ -462,6 +461,7 @@ function renderDetailActions(s) {
         + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🔧 </button>'
         + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📥 </button>'
         + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📤 </button>'
+        + '<button class="btn sm" title="Clear payload" onclick="clearPayload(\'' + id + '\',\'' + escHtml(s.name || '') + '\')" style="border-color:#f85149;color:#f85149;">🗑 </button>'
         + '</div>'
         + '<div class="action-group">'
         
@@ -472,7 +472,7 @@ function renderDetailActions(s) {
         + '<div class="action-group">'
         + (s.script_path ? '<button class="btn sm" onclick="openAiForTask(\'' + escHtml(s.id) + '\')" style="border-color:var(--accent);color:var(--accent);">⟡ AI</button>' : '')
         + (s.script_path ? '<button class="btn sm" onclick="openInTerminal(\'' + escHtml(s.id) + '\')" style="border-color:#a371f7;color:#a371f7;">⌨ Terminal</button>' : '')
-        + (s.executor === 'csx-internal' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Build csx</button>' : '')
+        + (s.executor === 'csx' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Build csx</button>' : '')
         + '</div>';
 
     // async: добавить кнопки config/install если нужно
@@ -803,6 +803,7 @@ function renderExecution(s) {
         + infoRow('Period',     trigger)
         + infoRow('Threads',    s.max_threads || '1')
         + infoRow('When full',  OVERLAP_LABELS[s.on_overlap] || s.on_overlap || '—')
+        + infoRow('Max runtime', (parseInt(s.timeout_seconds || '0', 10) || 0) > 0 ? s.timeout_seconds + 's' : 'no limit')
         + '</div>'
         + (isRunning && isMulti
             ? '<div class="detail-section" id="instancesCard"><div class="info-card-title">Active instances</div><div id="instancesList">—</div></div>'
@@ -876,6 +877,7 @@ function newSchedule() {
     renderList();
     var s = { id:'', name:'', executor:'python', script_path:'', args:'',
               enabled:'false', cron:'', on_overlap:'skip', max_threads:'1',
+              timeout_seconds:'0',
               use_venv:'false', schedule_mode:'off', schedule_json:'' };
     taskDraft = Object.assign({}, s);
     document.getElementById('detailHeader').style.display = '';
@@ -895,12 +897,11 @@ function newSchedule() {
 // ── Executor capabilities ─────────────────────────────────────────────────────
 //
 // Форма Settings зависит от экзекутора: у части задач путь — это файл, у части
-// папка, у internal вообще имя зарегистрированной задачи. Аргументы прячутся
-// там, где ими управляет не пользователь: у npm их пишет выпадашка скриптов,
-// у internal и csx-internal в args лежит base64-payload.
+// папка. Аргументы прячутся там, где ими управляет не пользователь: у npm их
+// пишет выпадашка скриптов проекта.
 
 var EXECUTORS = ['python','node','ts-node','npm','exe','cmd','bat','bash','ps1',
-                 'csx','csx-internal','xml','internal'];
+                 'csx','xml'];
 
 var EXECUTOR_SPEC = {
     'python':       { label: 'Script (.py)',      pick: 'file'   },
@@ -913,22 +914,11 @@ var EXECUTOR_SPEC = {
     'bash':         { label: 'Script (.sh)',      pick: 'file'   },
     'ps1':          { label: 'Script (.ps1)',     pick: 'file'   },
     'csx':          { label: 'Script (.csx)',     pick: 'file'   },
-    'csx-internal': { label: 'Script (.csx)',     pick: 'file',   noArgs: true },
     'xml':          { label: 'Template (.xml)',   pick: 'file'   },
-    'internal':     { label: 'Task',              pick: 'task',   noArgs: true },
 };
 
 function execSpec(executor) {
     return EXECUTOR_SPEC[executor] || EXECUTOR_SPEC['python'];
-}
-
-var _internalTaskNames = [];
-
-function loadInternalTasks() {
-    fetch('/tasker/internal-tasks')
-        .then(function(r) { return r.json(); })
-        .then(function(d) { _internalTaskNames = d.tasks || []; })
-        .catch(function() {});
 }
 
 function renderSettings(s) {
@@ -941,7 +931,9 @@ function renderSettings(s) {
         + '<input class="form-input" id="f_name" value="' + escHtml(s.name) + '">'
         + '<div class="form-label">Executor</div>'
         + '<select class="form-input" id="f_executor" onchange="onExecutorChange()">'
-        + EXECUTORS.map(function(e) {
+        // Экзекутор удалённой задачи оставляем в списке: иначе select молча
+        // выберет первый пункт и первое же сохранение подменит его на python.
+        + (EXECUTORS.indexOf(s.executor) < 0 && s.executor ? [s.executor] : []).concat(EXECUTORS).map(function(e) {
             return '<option ' + (s.executor === e ? 'selected' : '') + '>' + e + '</option>';
         }).join('') + '</select>'
         + '<div class="form-label" id="f_script_label">' + spec.label + '</div>'
@@ -964,6 +956,12 @@ function renderSettings(s) {
         + '</select>'
         + '<div class="form-label"></div>'
         + '<div id="f_threads_hint" style="color:var(--text2);font-size:10px;"></div>'
+        + '<div class="form-section">Limits</div>'
+        + '<div class="form-label">Max runtime</div>'
+        + '<div style="display:flex;gap:6px;align-items:center;">'
+        +   '<input class="form-input" id="f_timeout_seconds" type="number" min="0" max="604800" style="width:90px" value="' + (s.timeout_seconds || '0') + '">'
+        +   '<span style="color:var(--text2);font-size:10px;">seconds before a run is aborted; 0 — no limit</span>'
+        + '</div>'
         + '<div class="form-actions"><button class="btn primary" onclick="saveSchedule(\'' + escHtml(id) + '\')">Save</button></div>'
         + '</div>';
 
@@ -971,21 +969,8 @@ function renderSettings(s) {
     onThreadsChanged();
 }
 
-/// Поле пути: файл с пикером, папка с пикером каталога, команда без пикера,
-/// либо выпадашка зарегистрированных internal-задач.
+/// Поле пути: файл с пикером, папка с пикером каталога либо команда без пикера.
 function scriptFieldHtml(s, spec) {
-    if (spec.pick === 'task') {
-        var names = _internalTaskNames.slice();
-        if (s.script_path && names.indexOf(s.script_path) < 0) names.unshift(s.script_path);
-        if (names.length === 0)
-            return '<input class="form-input" id="f_script_path" value="' + escHtml(s.script_path) + '" placeholder="no internal tasks registered">';
-        return '<select class="form-input" id="f_script_path">'
-             + names.map(function(n) {
-                 return '<option ' + (s.script_path === n ? 'selected' : '') + '>' + escHtml(n) + '</option>';
-               }).join('')
-             + '</select>';
-    }
-
     var input = '<input class="form-input" id="f_script_path" style="flex:1;" value="' + escHtml(s.script_path) + '" placeholder="'
               + (spec.pick === 'none' ? 'command to run' : '/path/to/script or folder') + '">';
     if (spec.pick === 'none') return '<div style="display:flex;gap:4px;">' + input + '</div>';
@@ -1025,6 +1010,7 @@ function _formSnapshot() {
     snap.args        = (document.getElementById('f_args')        || {}).value || '';
     snap.on_overlap  = (document.getElementById('f_on_overlap')  || {}).value || 'skip';
     snap.max_threads = (document.getElementById('f_max_threads') || {}).value || '1';
+    snap.timeout_seconds = (document.getElementById('f_timeout_seconds') || {}).value || '0';
     var venv = document.getElementById('f_use_venv');
     if (venv) snap.use_venv = venv.checked ? 'true' : 'false';
     if (document.getElementById('b_mode')) snap.browser_json = JSON.stringify(collectBrowser());
@@ -1768,9 +1754,12 @@ function collectScheduleFields(prev) {
         payload.script_path = document.getElementById('f_script_path').value.trim();
         payload.on_overlap  = document.getElementById('f_on_overlap').value;
         payload.max_threads = maxThreadsEl ? maxThreadsEl.value : '1';
+        var timeoutEl = document.getElementById('f_timeout_seconds');
+        payload.timeout_seconds = timeoutEl ? (parseInt(timeoutEl.value, 10) > 0 ? String(parseInt(timeoutEl.value, 10)) : '0')
+                                            : (prev.timeout_seconds || '0');
         payload.use_venv    = venvEl ? (venvEl.checked ? 'true' : 'false') : (prev.use_venv || 'false');
 
-        // У npm, internal и csx-internal поля Arguments нет: там args служебный.
+        // У npm поля Arguments нет: их пишет выпадашка скриптов проекта.
         var argsEl = document.getElementById('f_args');
         if (argsEl && argsEl.style.display !== 'none') payload.args = argsEl.value.trim();
 
@@ -1793,7 +1782,7 @@ async function saveSchedule(existingId) {
     captureTaskDraft();
     var prev = schedules.find(function(x) { return x.id === selectedId; }) || {};
     var payload = { id: existingId || undefined };
-    ['name', 'executor', 'script_path', 'args', 'on_overlap', 'max_threads',
+    ['name', 'executor', 'script_path', 'args', 'on_overlap', 'max_threads', 'timeout_seconds',
      'use_venv', 'browser_json', 'schedule_mode', 'cron', 'schedule_json', 'enabled'].forEach(function(key) {
         if (taskDraft && taskDraft[key] !== undefined) payload[key] = taskDraft[key];
     });
@@ -1828,6 +1817,7 @@ async function duplicateSchedule(id) {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ name:newName, executor:s.executor, script_path:s.script_path, args:s.args,
             enabled:'false', cron:s.cron, on_overlap:s.on_overlap, max_threads:s.max_threads,
+            timeout_seconds:s.timeout_seconds,
             use_venv:s.use_venv, schedule_mode:s.schedule_mode, schedule_json:s.schedule_json })
     });
     var data = await res.json();
@@ -1864,6 +1854,20 @@ async function exportPayload(id) {
         var data = await res.json();
         await navigator.clipboard.writeText(JSON.stringify({ schema:data.schema, values:data.values }, null, 2));
         Dialog.alert('Payload JSON copied to clipboard.', 'Exported');
+    } catch(e) { Dialog.error(e.message); }
+}
+
+async function clearPayload(id, name) {
+    // payload_values ровно пустая — единственное состояние, при котором планировщик
+    // не перезапишет args базой-64. "{}" его не останавливает — скрипту
+    // всё равно приедет позиционный аргумент e30=.
+    if (!(await Dialog.confirm('Delete payload schema and values of "' + (name||id) + '"? Script will stop receiving the base64 argument.', '🗑 Clear payload', true))) return;
+    try {
+        var res  = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id, schema:'', values:''}) });
+        var data = await res.json();
+        if (!data.ok) { Dialog.error(data.error || 'Clear failed'); return; }
+        await loadList();
+        if (selectedId === id) selectRow(id);
     } catch(e) { Dialog.error(e.message); }
 }
 
@@ -2126,7 +2130,7 @@ async function confirmImportPayload() {
     if (!raw) return;
     var parsed;
     try { parsed = JSON.parse(raw); } catch(e) { alert('Invalid JSON: ' + e.message); return; }
-    if (!parsed.schema || !parsed.values) { alert('Missing schema or values fields'); return; }
+    if (typeof parsed.schema !== 'string' || typeof parsed.values !== 'string') { alert('Missing schema or values fields'); return; }
     try {
         var res = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:_importPayloadId, schema:parsed.schema, values:parsed.values}) });
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -2301,7 +2305,7 @@ function pickPath(mode) {
     var exec  = (document.getElementById('f_executor') || {}).value || '';
 
     var extByExec = {
-        'xml': 'xml', 'csx': 'csx', 'csx-internal': 'csx',
+        'xml': 'xml', 'csx': 'csx',
         'python': 'py', 'node': 'js', 'ts-node': 'js', 'ps1': 'ps1',
         'exe': 'exe', 'cmd': 'cmd', 'bat': 'cmd', 'bash': 'sh'
     };

@@ -59,6 +59,7 @@
                 { "deferred_until",   "TEXT DEFAULT ''" },
                 { "defer_reason",     "TEXT DEFAULT ''" },
                 { "schedule_paused",  "TEXT DEFAULT 'false'" },
+                { "timeout_seconds",  "TEXT DEFAULT '0'" },
             }
         };
 

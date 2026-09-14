@@ -1,4 +1,5 @@
 ﻿// InternalTasks.GenerateClientBundle.cs
+// Разовая операция выдачи бандла воркеру: вызывается из POST /config/client-bundle.
 // Payload: { "clientHwid": "...", "clientName": "worker01", "outputFolder": "C:\bundles" }
 // outputFolder опционален, fallback: AppContext.BaseDirectory/clients/clientName
 
@@ -9,13 +10,9 @@ namespace z3nDash;
 
 public static partial class InternalTasks
 {
-    private static readonly bool _generateClientBundleRegistered = RegisterSelf(
-        (scheduler, dbService, logsConfig) => RegisterGenerateClientBundle(scheduler, dbService, logsConfig)
-    );
-
-    private static void RegisterGenerateClientBundle(SchedulerService scheduler, DbConnectionService dbService, LogsConfig logsConfig)
+    public static string GenerateClientBundle(Dictionary<string, string> payload, Action<string>? sink = null)
     {
-        scheduler.RegisterTask("GenerateClientBundle", async (payload, ct, log) =>
+        var log = sink ?? (_ => { });
         {
             var clientHwid   = payload.GetValueOrDefault("clientHwid", "").Trim();
             var clientName   = payload.GetValueOrDefault("clientName", "").Trim();
@@ -64,6 +61,6 @@ public static partial class InternalTasks
             log($"[GenerateClientBundle] safu.key  → {safuKeyOutPath}");
 
             return $"bundle ready: {outDir}";
-        });
+        }
     }
 }

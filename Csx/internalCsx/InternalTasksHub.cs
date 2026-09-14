@@ -18,21 +18,15 @@ public static partial class InternalTasks
 
 public static partial class InternalTasks
 {
-    private static readonly bool _updateTemplatesRegistered = RegisterSelf(
-        (scheduler, dbService, logsConfig) => RegisterUpdateTemplates(scheduler, dbService, logsConfig)
-    );
-
-    private static void RegisterUpdateTemplates(SchedulerService scheduler, DbConnectionService dbService, LogsConfig logsConfig)
+    /// <summary>
+    /// Утилита разработки: снимает с текущей БД структуру таблиц и содержимое _api
+    /// в каталог templates. Каталог передаётся явно — результат едет клиенту
+    /// обновлением, а не генерируется у него. Вызов: POST /config/update-templates.
+    /// </summary>
+    public static string UpdateTemplates(Db db, string outDir, Action<string>? sink = null)
     {
-        scheduler.RegisterTask("UpdateTemplates", async (payload, ct, log) =>
+        var log = sink ?? (_ => { });
         {
-            if (!dbService.TryGetDb(out var db) || db == null)
-                throw new Exception("DB not connected");
-
-            
-            
-            //string outDir = Path.Combine(AppContext.BaseDirectory, "templates");
-            string outDir = Path.Combine("W:\\code_hard\\.net\\z3nDash", "templates");
             Directory.CreateDirectory(outDir);
 
             // ── db_template.json ─────────────────────────────────────────────
@@ -105,6 +99,6 @@ public static partial class InternalTasks
             log($"[UpdateTemplates] api_template.json → {resultTemplate.Count} entries → {apiTemplatePath}");
 
             return $"db_template: {tables.Count} tables, api_template: {resultTemplate.Count} entries";
-        });
+        }
     }
 }

@@ -28,13 +28,6 @@ public sealed partial class SchedulerService : IDisposable
     /// <summary>Границы паузы между стартами соседних нитей одной пачки.</summary>
     private const int StaggerMinMs = 1000;
     private const int StaggerMaxMs = 5000;
-    private readonly ConcurrentDictionary<string, Func<Dictionary<string, string>, CancellationToken, Action<string>, Task<string>>> _internalTasks = new();
-    public void RegisterTask(string name, Func<Dictionary<string, string>, CancellationToken, Action<string>, Task<string>> handler)
-        => _internalTasks[name] = handler;
-
-    /// <summary>Имена зарегистрированных internal-задач — для выпадашки в Settings.</summary>
-    public IReadOnlyList<string> InternalTaskNames => _internalTasks.Keys.OrderBy(k => k).ToList();
-
     private static string Table => DbSchema.Schedules.Name;
     private static string QueueTable => DbSchema.ScheduleQueue.Name;
 
@@ -437,10 +430,26 @@ public sealed partial class SchedulerService : IDisposable
         var executor   = record.GetValueOrDefault("executor", "python");
         var scriptPath = record.GetValueOrDefault("script_path", "");
         var args       = record.GetValueOrDefault("args", "");
+        var timeoutSec = ReadTimeoutSeconds(record);
 
         _log?.Info($"[{name}] executor='{executor}' (len={executor.Length}) scriptPath='{scriptPath}'");
 
-        if (executor != "internal" && executor != "cmd" && executor != "npm" && !File.Exists(scriptPath))
+        // Экзекуторы, которых больше нет. Без явной проверки такая строка ушла бы
+        // в ветку по умолчанию и пыталась запустить имя задачи как python-скрипт.
+        if (executor is "internal" or "csx-internal")
+        {
+            var gone = executor == "internal"
+                ? $"[ERR] экзекутор internal удалён; {scriptPath} вызывается через POST /config/client-bundle или /config/update-templates"
+                : "[ERR] экзекутор csx-internal удалён; используйте xml или внешний csx";
+            _log?.Error(gone);
+            SseHub.BroadcastOutput(JsonSerializer.Serialize(new { line = gone, level = "ERROR" }), id);
+            db.Upd(
+                $"last_output = '{gone.Replace("'", "''")}', last_exit = '1', last_run = '{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}', status = 'error'",
+                Table, where: $"\"id\" = '{id}'");
+            return;
+        }
+
+        if (executor != "cmd" && executor != "npm" && !File.Exists(scriptPath))
         {
             var errMsg = $"[ERR] no script file found at {scriptPath}";
             _log.Error(errMsg);
@@ -503,190 +512,6 @@ public sealed partial class SchedulerService : IDisposable
                 level = line.StartsWith("[ERR]") ? "ERROR" : "INFO",
             }), id);
 
-        if (executor == "internal")
-        {
-            if (!_internalTasks.TryGetValue(scriptPath, out var handler))
-            {
-                _log?.Error($"[{name}] internal task not found: {scriptPath}");
-                UpdateStatus(db, id, "error", firedAt, "-1", $"task not registered: {scriptPath}", runId);
-                return;
-            }
-
-            UpdateStatus(db, id, "running", firedAt, "", "", runId);
-            var cts = new CancellationTokenSource();
-
-            var rp  = new RunningProcess(null, firedAt, cts, broadcast);
-            _running[instanceKey] = rp;
-            threadSlot?.Dispose();
-
-            Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"[LIVE] internal task started id={id} name={name} run={runId} key={instanceKey}");
-            Console.ResetColor();
-
-            try
-            {
-                var payload = string.IsNullOrWhiteSpace(args)
-                    ? record
-                    : JsonSerializer.Deserialize<Dictionary<string, string>>(
-                        Encoding.UTF8.GetString(Convert.FromBase64String(args))) ?? record;
-
-                payload["__taskName"]    = name;
-                payload["__runId"]       = runId;
-                payload["__scheduleTag"] = scheduleTag;
-
-                var output = await handler(payload, cts.Token, rp.AddLine);
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
-                rp.Result = output ?? "";
-                RunLogger(scheduleTag, runId)?.Info($"[{name}] done run={runId}");
-                _running.TryRemove(instanceKey, out _);
-                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
-                FinishQueueEntry(db, queueUuid, "done", runId);
-            }
-            catch (Exception ex)
-            {
-                rp.AddLine("[ERR] " + ex.Message);
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
-                var runLog = RunLogger(scheduleTag, runId);
-                runLog?.Error($"[{name}] internal task failed: {ex.Message}");
-                rp.Result = ex.Message;
-                _running.TryRemove(instanceKey, out _);
-                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
-                FinishQueueEntry(db, queueUuid, "error", runId);
-            }
-            finally
-            {
-                cts.Dispose();
-                TopUp(db, id);
-            }
-
-            return;
-        }
-
-        if (executor == "csx-internal")
-        {
-            if (!File.Exists(scriptPath))
-            {
-                _log?.Error($"[{name}] csx script not found: {scriptPath}");
-                UpdateStatus(db, id, "error", firedAt, "-1", $"script not found: {scriptPath}", runId);
-                return;
-            }
-
-            UpdateStatus(db, id, "running", firedAt, "", "", runId);
-            var cts = new CancellationTokenSource();
-            var rp  = new RunningProcess(null, firedAt, cts, broadcast);
-            _running[instanceKey] = rp;
-            threadSlot?.Dispose();
-
-            Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"[LIVE] csx task started id={id} name={name} run={runId} script={Path.GetFileName(scriptPath)}");
-            Console.ResetColor();
-
-            InternalTasks.TaskContext? ctx = null;
-            ZB? zb                        = null;
-            Microsoft.Playwright.IPlaywright? pw = null;
-            var released    = false;
-            var zbId        = "";
-            var keepBrowser = false;
-
-            try
-            {
-                var payload = string.IsNullOrWhiteSpace(args)
-                    ? record
-                    : JsonSerializer.Deserialize<Dictionary<string, string>>(
-                        Encoding.UTF8.GetString(Convert.FromBase64String(args))) ?? record;
-
-                payload["__taskName"]    = name;
-                payload["__runId"]       = runId;
-                payload["__scheduleTag"] = scheduleTag;
-
-                var accountTable = payload.GetValueOrDefault("accountTable",
-                    "__" + name.Split('.')[0]);
-
-                ctx = await InternalTasks.PrepareTaskContext(this, _dbService, Config.LogsConfig, payload, accountTable, rp.AddLine);
-
-                if (ctx == null)
-                {
-                    rp.AddLine("no account available");
-                    _running.TryRemove(instanceKey, out _);
-                    UpdateStatus(db, id, "idle", DateTime.UtcNow, "0", "no account available", runId);
-                    FinishQueueEntry(db, queueUuid, "done", runId);
-                    return;
-                }
-
-                var needsBrowser = payload.GetValueOrDefault("browser", "false") == "true";
-                keepBrowser      = payload.GetValueOrDefault("browser_keep", "false") == "true";
-                zbId = ctx.Project.Variables["zb_id"].Value;
-                zb = needsBrowser && !string.IsNullOrWhiteSpace(zbId)
-                    ? new ZB(Config.BrowsersApi.ZennoBrowser.Token, Config.BrowsersApi.ZennoBrowser.Host)
-                    : null;
-
-                z3nDash.Browser.PlaywrightInstance? instance = null;
-
-                if (zb != null)
-                {
-                    var wsEndpoint = await zb.RunProfile(zbId);
-                    if (!string.IsNullOrWhiteSpace(wsEndpoint))
-                    {
-                        pw          = await Microsoft.Playwright.Playwright.CreateAsync();
-                        var browser = await pw.Chromium.ConnectOverCDPAsync(wsEndpoint);
-                        var context = browser.Contexts[0];
-                        var page    = context.Pages.FirstOrDefault()
-                                      ?? await context.NewPageAsync();
-                        instance    = new z3nDash.Browser.PlaywrightInstance(page);
-                        // чтобы ZennoPoster.HTTP.Request мог уйти с сессией браузера
-                        ZennoLab.CommandCenter.ZennoPoster.AttachBrowser(instance);
-                    }
-                }
-
-
-                var globals = new CsxGlobals
-                {
-                    project  = ctx.Project,
-                    instance = instance!,
-                    log      = ctx.Logger,
-                };
-
-                await CsxExecutor.RunAsync<CsxGlobals>(scriptPath, globals, cts.Token);
-
-                ctx.Release("idle");
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
-                rp.Result = "ok";
-                RunLogger(scheduleTag, runId)?.Info($"[{name}] csx done run={runId}");
-                _running.TryRemove(instanceKey, out _);
-                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
-                FinishQueueEntry(db, queueUuid, "done", runId);
-                released = true;
-            }
-            catch (Exception ex)
-            {
-                var scriptFrames = ex.StackTrace?
-                    .Split(" at ", StringSplitOptions.RemoveEmptyEntries)
-                    .Where(f => f.Contains("Submission#0") || f.Contains("InternalTasks") || f.Contains("SchedulerService"))
-                    .Select(f => "at " + f.Trim());
-
-                rp.AddLine("[ERR] " + ex.Message);
-                rp.AddLine("[ERR] " + ex.StackTrace);  
-                foreach (var frame in scriptFrames ?? Enumerable.Empty<string>())
-                    rp.AddLine("[ERR] " + frame);
-
-                SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
-                RunLogger(scheduleTag, runId)?.Error($"[{name}] csx failed: {ex.Message}");
-                rp.Result = ex.Message;
-                _running.TryRemove(instanceKey, out _);
-                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
-                FinishQueueEntry(db, queueUuid, "error", runId);
-            }
-            finally
-            {
-                try { if (zb != null && !keepBrowser) await zb.ProfileDown(zbId); } catch { }
-                try { if (!keepBrowser) pw?.Dispose(); } catch { }
-                if (!released) try { ctx?.Release("fail"); } catch { }
-                cts.Dispose();
-                TopUp(db, id);
-            }
-
-            return;
-        }
         if (executor == "xml")
         {
             // Проигрывание шаблона ZennoPoster: граф из XML исполняет
@@ -704,6 +529,12 @@ public sealed partial class SchedulerService : IDisposable
             _running[instanceKey] = rp;
             threadSlot?.Dispose();
 
+            using var limit = new RunTimeout(timeoutSec, () =>
+            {
+                rp.AddLine($"[ERR] лимит времени {timeoutSec}s исчерпан — прогон обрывается");
+                rp.Kill();
+            });
+
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.WriteLine($"[LIVE] xml started id={id} name={name} run={runId} template={Path.GetFileName(scriptPath)}");
             Console.ResetColor();
@@ -711,6 +542,11 @@ public sealed partial class SchedulerService : IDisposable
             z3nDash.Browser.BrowserSession? session = null;
             // Профиль антика, который мы обязаны закрыть за собой; null — не наш.
             string? externalProfile = null;
+            // Аккаунт — эксклюзивный ресурс: ссылка живёт снаружи try, иначе
+            // освободить его на исключении или на снятии по таймауту нечем.
+            Dictionary<string, string>? account = null;
+            var accountTable  = "";
+            var accountStatus = "fail";
             var brConfig = BrowserConfig.Parse(record.GetValueOrDefault("browser_json", ""));
             BrowserProvider.ApplyGlobalConfig(brConfig, Config.BrowsersApi);
             try
@@ -756,6 +592,52 @@ public sealed partial class SchedulerService : IDisposable
                         applied++;
                     }
                     if (applied > 0) rp.AddLine($"[xml] из payload в переменные: {applied}");
+                }
+
+                // Аккаунт берём только когда шаблон действительно с ним работает:
+                // лок эксклюзивный, а по аккаунтам ходит меньшая часть шаблонов.
+                // Явно заданный acc0 — это выбор руками, резервировать нечего.
+                accountTable = payload.GetValueOrDefault("accountTable", "__" + name.Split('.')[0]);
+                var wantsAccount = string.IsNullOrWhiteSpace(payload.GetValueOrDefault("acc0", ""))
+                                   && (TemplateUsesAccount(tpl, scriptPath)
+                                       || payload.ContainsKey("accountTable")
+                                       || payload.ContainsKey("condition"));
+
+                if (wantsAccount)
+                {
+                    // Нет таблицы — это ошибка настройки, а не «аккаунты кончились».
+                    // ReserveAccount на оба случая отдаёт null, и без этой проверки
+                    // неверно настроенная задача молча отчитывалась бы успехом.
+                    if (db.GetTableColumns(accountTable).Count == 0)
+                    {
+                        rp.AddLine($"[ERR] таблица аккаунтов {accountTable} не найдена");
+                        SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
+                        _running.TryRemove(instanceKey, out _);
+                        UpdateStatus(db, id, "error", DateTime.UtcNow, "-1", rp.Snapshot(), runId);
+                        FinishQueueEntry(db, queueUuid, "error", runId);
+                        return;
+                    }
+
+                    var condition = payload.GetValueOrDefault("condition", "1=1")
+                        .Replace("NOW", $"'{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fffZ}'");
+
+                    account = await ReserveAccount(db, accountTable, condition, RunLogger(scheduleTag, runId));
+
+                    if (account == null)
+                    {
+                        rp.AddLine($"[xml] свободных аккаунтов нет: таблица {accountTable}, условие [{condition}]");
+                        SseHub.BroadcastOutput(JsonSerializer.Serialize(new { done = true, run = runId }), id);
+                        _running.TryRemove(instanceKey, out _);
+                        // Пустой код возврата — счётчики не трогаются: прогона не было,
+                        // и записывать его успехом значит портить статистику.
+                        UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle",
+                                     DateTime.UtcNow, "", rp.Snapshot(), runId);
+                        FinishQueueEntry(db, queueUuid, "done", runId);
+                        return;
+                    }
+
+                    SeedAccount(db, project, payload, account);
+                    rp.AddLine($"[xml] аккаунт {account.GetValueOrDefault("id", "")} из {accountTable}");
                 }
 
                 var rawProxy = payload.GetValueOrDefault("proxy", "");
@@ -854,6 +736,7 @@ public sealed partial class SchedulerService : IDisposable
                 }
 
                 rp.Result = "ok";
+                accountStatus = "idle";
                 RunLogger(scheduleTag, runId)?.Info($"[{name}] xml done run={runId}, веток {res.BranchesRun}");
                 _running.TryRemove(instanceKey, out _);
                 UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, "0", rp.Snapshot(), runId);
@@ -871,6 +754,14 @@ public sealed partial class SchedulerService : IDisposable
             }
             finally
             {
+                // Ресурс освобождаем первым и так, чтобы его освобождение не
+                // могло уронить уже полученный результат прогона.
+                if (account != null)
+                {
+                    try { ReleaseAccount(db, accountTable, account, accountStatus, RunLogger(scheduleTag, runId)); }
+                    catch (Exception ex) { rp.AddLine($"[warn] аккаунт не освобождён: {ex.Message}"); }
+                    account = null;
+                }
                 if (session is not null) await session.DisposeAsync();
                 // Профиль антика закрываем только если сами его открывали:
                 // при прогоне по аккаунтам иначе накопятся десятки открытых окон.
@@ -916,6 +807,12 @@ public sealed partial class SchedulerService : IDisposable
         Console.WriteLine($"[LIVE] process task starting id={id} name={name} run={runId} key={instanceKey} exe={fileName}");
         Console.ResetColor();
 
+        using var guard = new RunTimeout(timeoutSec, () =>
+        {
+            rp2.AddLine($"[ERR] лимит времени {timeoutSec}s исчерпан — процесс снимается");
+            rp2.Kill();
+        });
+
         try
         {
             process.Start();
@@ -933,8 +830,21 @@ public sealed partial class SchedulerService : IDisposable
             string output = rp2.Snapshot();
             _log?.Info($"[{name}] exit {process.ExitCode} run={runId}");
             _running.TryRemove(instanceKey, out _);
-            UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, process.ExitCode.ToString(), output, runId);
-            FinishQueueEntry(db, queueUuid, "done", runId);
+
+            // Снятый по лимиту процесс — это провал прогона, а не его исход:
+            // код возврата у убитого дерева случайный и мог бы совпасть с нулём.
+            if (guard.Fired)
+            {
+                _log?.Warn($"[{name}] timeout {timeoutSec}s run={runId}");
+                RunLogger(scheduleTag, runId)?.Error($"[{name}] timeout {timeoutSec}s run={runId}");
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "error", DateTime.UtcNow, "-1", output, runId);
+                FinishQueueEntry(db, queueUuid, "error", runId);
+            }
+            else
+            {
+                UpdateStatus(db, id, CountActiveInstances(id) > 0 ? "running" : "idle", DateTime.UtcNow, process.ExitCode.ToString(), output, runId);
+                FinishQueueEntry(db, queueUuid, "done", runId);
+            }
         }
         catch (Exception ex)
         {
@@ -1360,6 +1270,124 @@ public sealed partial class SchedulerService : IDisposable
         _timer.Dispose();
         foreach (var rp in _running.Values)
             rp.Kill();
+    }
+
+    // ── Аккаунт под прогон шаблона ────────────────────────────────────────────
+
+    /// <summary>
+    /// Шаблон работает по аккаунту: переменная acc0 объявлена в блоке Variables
+    /// и упомянута где-то ещё — в шаге или в собственном коде.
+    ///
+    /// Одного объявления мало. В шаблоны ZennoPoster переменные переезжают из
+    /// проекта-донора пачкой, и часть из них не читает никто. Проверено на
+    /// xml_example/simroute_test.xml: acc0 там объявлена, а во всём файле
+    /// встречается ровно один раз — в самом объявлении.
+    /// </summary>
+    private static bool TemplateUsesAccount(z3nDash.Xml.XmlTemplate tpl, string templatePath)
+    {
+        if (!tpl.Variables.ContainsKey("acc0")) return false;
+
+        string text;
+        try { text = File.ReadAllText(templatePath); } catch { return false; }
+
+        // Блок объявлений вырезаем: имя переменной есть в нём всегда.
+        var start = text.IndexOf("<Variables", StringComparison.Ordinal);
+        var end   = text.IndexOf("</Variables>", StringComparison.Ordinal);
+        if (start >= 0 && end > start)
+            text = text.Remove(start, end - start + "</Variables>".Length);
+
+        return MentionsName(text, "acc0");
+    }
+
+    /// <summary>Имя целиком, а не куском длинного слова: acc0 — это не acc01.</summary>
+    private static bool MentionsName(string text, string name)
+    {
+        for (var i = text.IndexOf(name, StringComparison.Ordinal); i >= 0;
+                 i = text.IndexOf(name, i + 1, StringComparison.Ordinal))
+        {
+            var before = i == 0 ? ' ' : text[i - 1];
+            var after  = i + name.Length >= text.Length ? ' ' : text[i + name.Length];
+            if (!char.IsLetterOrDigit(before) && before != '_' &&
+                !char.IsLetterOrDigit(after)  && after  != '_')
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Данные аккаунта — в переменные проекта и в payload запуска: колонки самого
+    /// аккаунта, acc0, строки из instance и folder_profile. payload заполняется
+    /// тоже, потому что именно из него ветка xml берёт прокси и профиль браузера,
+    /// а у аккаунта они свои — и должны перекрыть значения из настроек задачи.
+    /// </summary>
+    private static void SeedAccount(Db db, StubProject project,
+                                    Dictionary<string, string> payload,
+                                    Dictionary<string, string> account)
+    {
+        var accId = account.GetValueOrDefault("id", "");
+
+        void Put(string key, string value, bool toPayload = true)
+        {
+            if (string.IsNullOrEmpty(key) || key.StartsWith("__")) return;
+            project.Variables[key].Value = value ?? "";
+            // id аккаунта в payload не кладём: там это идентификатор задачи.
+            if (toPayload && key != "id") payload[key] = value ?? "";
+        }
+
+        foreach (var (key, value) in account) Put(key, value);
+
+        var instanceCols = db.GetTableColumns(DbSchema.Instance.Name);
+        if (instanceCols.Count > 0)
+            foreach (var (key, value) in db.GetColumns(string.Join(",", instanceCols),
+                         DbSchema.Instance.Name, where: $"\"id\" = '{accId}'"))
+                Put(key, value);
+
+        var profileCols = db.GetTableColumns("folder_profile");
+        if (profileCols.Count > 0)
+        {
+            var profile = db.GetColumns(string.Join(",", profileCols), "folder_profile",
+                                        where: $"\"id\" = '{accId}'");
+            foreach (var (key, value) in profile) Put(key, value);
+            if (profile.TryGetValue("UserAgent", out var ua) && !string.IsNullOrEmpty(ua))
+                project.Profile.UserAgent = ua;
+        }
+
+        Put("acc0", accId);
+    }
+
+    // ── Ограничение времени прогона ───────────────────────────────────────────
+
+    /// <summary>
+    /// Лимит времени одного прогона в секундах. 0 или мусор — лимита нет.
+    /// </summary>
+    private static int ReadTimeoutSeconds(Dictionary<string, string> record)
+        => int.TryParse(record.GetValueOrDefault("timeout_seconds", "0"), out var v) && v > 0 ? v : 0;
+
+    /// <summary>
+    /// Сторож времени прогона. По истечении лимита один раз вызывает обрыв.
+    /// Внешний процесс при этом убивается деревом — это остановка по факту;
+    /// внутренние задачи (internal, csx, xml) получают отмену токена, а она
+    /// кооперативная: код, который токен не смотрит, ею не прервётся.
+    /// </summary>
+    private sealed class RunTimeout : IDisposable
+    {
+        private readonly System.Threading.Timer? _timer;
+        private int _fired;
+
+        public RunTimeout(int seconds, Action onTimeout)
+        {
+            if (seconds <= 0) return;
+            _timer = new System.Threading.Timer(_ =>
+            {
+                if (Interlocked.Exchange(ref _fired, 1) != 0) return;
+                try { onTimeout(); } catch { }
+            }, null, TimeSpan.FromSeconds(seconds), Timeout.InfiniteTimeSpan);
+        }
+
+        /// <summary>Лимит уже сработал — прогон оборван сторожем, а не собой.</summary>
+        public bool Fired => Volatile.Read(ref _fired) == 1;
+
+        public void Dispose() => _timer?.Dispose();
     }
 
     // ── RunningProcess ────────────────────────────────────────────────────────

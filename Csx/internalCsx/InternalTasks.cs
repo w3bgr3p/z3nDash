@@ -7,9 +7,6 @@ namespace z3nDash;
 
 public static partial class InternalTasks
 {
-    private static List<Action<SchedulerService, DbConnectionService, LogsConfig>> _registrations;
-
-    
     private static string _jVarsPath =>
         !string.IsNullOrWhiteSpace(Config.SecurityConfig.JVarsPath)
             ? Config.SecurityConfig.JVarsPath
@@ -31,17 +28,4 @@ public static partial class InternalTasks
         Console.WriteLine($"[InternalTasks.Load] loaded {_jVars[..20]}...");
     }
 
-    private static bool RegisterSelf(Action<SchedulerService, DbConnectionService, LogsConfig> reg)
-    {
-        _registrations ??= new();
-        _registrations.Add(reg);
-        return true;
-    }
-
-    public static void Register(SchedulerService scheduler, DbConnectionService dbService, LogsConfig logsConfig)
-    {
-        Load();
-        foreach (var reg in _registrations ?? Enumerable.Empty<Action<SchedulerService, DbConnectionService, LogsConfig>>())
-            reg(scheduler, dbService, logsConfig);
-    }
 }
