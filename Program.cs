@@ -16,6 +16,14 @@
 
 using z3nDash;
 using System.Diagnostics;
+using System.Text;
+
+// Логи содержат кириллицу и «ёлочки» из ZpRuntime. Без явной кодировки
+// Console пишет в кодовой странице, доставшейся от родительского терминала,
+// и всё непредставимое в ней подменяется на «?». Ставим UTF-8 до первой
+// строки вывода. В try: у перенаправленного stdout консоли может не быть.
+try { Console.OutputEncoding = new UTF8Encoding(false); } catch { }
+try { Console.InputEncoding  = new UTF8Encoding(false); } catch { }
 
 try
 {
