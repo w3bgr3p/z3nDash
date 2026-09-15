@@ -1098,7 +1098,7 @@
             </div>
             <label class="field-label" for="triesValue">Value</label>
             <div class="tries-row">
-                <input class="field-input" id="triesValue" type="number" min="0" step="1" value="1">
+                <input class="field-input" id="triesValue" type="number" step="1" value="1">
                 <button class="btn btn-start" id="triesApplyBtn" onclick="applyTriesExact()">Apply</button>
             </div>
             <label class="field-label" style="margin-top:12px;">Add to the value above</label>
@@ -2190,8 +2190,10 @@
         const btn = document.getElementById('triesApplyBtn');
         const raw = document.getElementById('triesValue').value.trim();
         const value = parseInt(raw, 10);
-        if (raw === '' || isNaN(value) || value < 0) {
-            error.textContent = 'Enter a whole number, zero or greater';
+        // Знак не ограничиваем: узел передаёт payload в ZennoPoster.SetTries
+        // как есть, а у задач с бесконечным выполнением стоит -1.
+        if (raw === '' || isNaN(value)) {
+            error.textContent = 'Enter a whole number';
             return;
         }
 
