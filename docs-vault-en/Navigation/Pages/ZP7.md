@@ -4,11 +4,22 @@ ZP7 shows task state taken directly from the registered ZP node services.
 
 ## Data source
 
-z3nDash stores only the node addresses, in the `zp_nodes` table. Task state is requested from each node:
+z3nDash stores only the node addresses and their tokens, in the `zp_nodes` table. Task state is requested from each node:
 
 ```text
 GET http://HOST:PORT/state
+Authorization: Bearer <token>
 ```
+
+The token comes from the node registration line (see [[02. Adding a ZennoPoster worker on the LAN]])
+and is attached on the z3nDash side: it never reaches the browser. A node that
+answers `401` is marked **Unauthorized** in the list — paste the registration line
+again.
+
+The node list in the **NODES** window comes from `GET /zp/nodes` with a probe:
+alongside availability it carries the node's `z3n7` and ZennoPoster versions, taken
+from `GET /version`. The same data is served on its own by
+`GET /zp/version?machine=...`.
 
 The page gets the addresses through `GET /zp/nodes?probe=false`, then polls each node
 independently through `GET /zp/state?machine=...` every 3 seconds. Tasks appear as the
@@ -35,18 +46,20 @@ Commands go straight to the selected node:
 POST http://HOST:PORT/command
 ```
 
-Actions offered by the interface:
+The action bar is icons only; each label lives in the tooltip:
 
-- start;
-- stop;
-- interrupt;
-- apply/update settings;
-- add/set tries;
-- set threads;
-- clear done;
-- clear fails;
-- execution settings;
-- scheduler settings.
+| Icon | Action | Command |
+|---|---|---|
+| green ▶ | start | `start` |
+| yellow ❚❚ | pause (the task stops but is not interrupted) | `stop` |
+| red ✕ | interrupt | `interrupt` |
+| node with two branches | Input Settings | `set_input_settings` |
+| ± | tries: a modal with a Set/Add toggle, a value field and +1 / +10 / +100 (they edit the field; Apply sends the command) | `set_tries`, `add_tries` |
+| Clear ✓ / ✗ | clear done / clear fails | `clear_success`, `clear_fails` |
+| terminal | Execution Settings | `set_execution_settings` |
+| clock | Scheduler Settings | `set_scheduler_settings` |
+
+Apply/update settings and set threads come from the Limits panel.
 
 ## Panels
 

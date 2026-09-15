@@ -4,11 +4,20 @@ ZP7 показывает состояние задач, полученное н�
 
 ## Источник данных
 
-z3nDash хранит только адреса узлов в таблице `zp_nodes`. Состояние задач запрашивается у каждого узла:
+z3nDash хранит только адреса узлов и их токены в таблице `zp_nodes`. Состояние задач запрашивается у каждого узла:
 
 ```text
 GET http://HOST:PORT/state
+Authorization: Bearer <token>
 ```
+
+Токен берётся из строки регистрации узла (см. [[02. Добавление ZennoPoster воркера в локальной сети]])
+и подставляется на стороне z3nDash: в браузер он не попадает. Узел, ответивший
+`401`, помечен в списке **Unauthorized** — строку регистрации надо вставить заново.
+
+Список узлов в окне **NODES** приходит через `GET /zp/nodes` с пробой: вместе
+с доступностью узла там его версии `z3n7` и ZennoPoster, снятые с `GET /version`.
+Отдельно те же данные отдаёт `GET /zp/version?machine=...`.
 
 Страница получает адреса через `GET /zp/nodes?probe=false`, затем независимо
 опрашивает каждый узел через `GET /zp/state?machine=...` каждые 3 секунды.
@@ -35,18 +44,20 @@ GET http://HOST:PORT/state
 POST http://HOST:PORT/command
 ```
 
-Поддерживаемые действия интерфейса:
+Панель действий состоит из иконок, подпись каждой — в тултипе:
 
-- start;
-- stop;
-- interrupt;
-- apply/update settings;
-- add/set tries;
-- set threads;
-- clear done;
-- clear fails;
-- execution settings;
-- scheduler settings.
+| Иконка | Действие | Команда |
+|---|---|---|
+| ▶ зелёная | запуск | `start` |
+| ❚❚ жёлтая | пауза (задача останавливается, но не прерывается) | `stop` |
+| ✕ красная | прерывание | `interrupt` |
+| узел с двумя ветками | Input Settings | `set_input_settings` |
+| ± | попытки: модалка с тумблером Set/Add, полем значения и кнопками +1 / +10 / +100 (они правят поле, команду шлёт Apply) | `set_tries`, `add_tries` |
+| Clear ✓ / ✗ | сбросить успешные / сбросить неудачные | `clear_success`, `clear_fails` |
+| терминал | Execution Settings | `set_execution_settings` |
+| часы | Scheduler Settings | `set_scheduler_settings` |
+
+Ещё есть apply/update settings и set threads из панели Limits.
 
 ## Панели
 

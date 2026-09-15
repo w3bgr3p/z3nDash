@@ -7,10 +7,27 @@ public sealed record ZpNodeRegistration(
     string Host,
     string External,
     int Port,
+    string Token,
     string Firewall,
     string PortRule);
 
-public sealed record ZpNodeRow(string Machine, string Host, int Port, string UpdatedAt);
+public sealed record ZpNodeRow(string Machine, string Host, int Port, string Token, string UpdatedAt);
+
+/// <summary>Версии, которые узел отдаёт на GET /version. Пустая строка — узел значение не прочитал.</summary>
+public sealed record ZpNodeVersion(string Z3n7, string ZennoPoster, string Framework);
+
+/// <summary>Чем ответил узел на пробу: это наблюдение, а не вывод о причине.</summary>
+public enum ZpNodeProbe
+{
+    /// <summary>Соединение не установилось либо ответ не 2xx и не 401.</summary>
+    Unreachable,
+
+    /// <summary>Узел ответил 401: токена нет либо он не тот.</summary>
+    Unauthorized,
+
+    /// <summary>Узел ответил успешно.</summary>
+    Ok,
+}
 
 public sealed class ZpNodeStore
 {
@@ -21,7 +38,7 @@ public sealed class ZpNodeStore
 
     public static bool TryParse(string raw, out ZpNodeRegistration node, out string error)
     {
-        node = new ZpNodeRegistration("", "", "", 0, "", "");
+        node = new ZpNodeRegistration("", "", "", 0, "", "", "");
         error = "";
 
         var json = raw.Trim();
@@ -35,6 +52,7 @@ public sealed class ZpNodeStore
             var machine = ReadString(root, "machine");
             var host = ReadString(root, "host");
             var external = ReadString(root, "external");
+            var token = ReadString(root, "token");
             var firewall = ReadString(root, "firewall");
             var portRule = ReadString(root, "portRule");
             if (string.IsNullOrEmpty(portRule)
@@ -59,6 +77,7 @@ public sealed class ZpNodeStore
                 host.Trim(),
                 external.Trim(),
                 port,
+                token.Trim(),
                 firewall.Trim(),
                 portRule.Trim());
             return true;
@@ -73,7 +92,7 @@ public sealed class ZpNodeStore
     public IReadOnlyList<ZpNodeRow> GetAll()
     {
         var rows = _db.GetLines(
-            "machine,host,port,updated_at",
+            "machine,host,port,token,updated_at",
             DbSchema.ZpNodes.Name,
             where: "1=1");
 
@@ -89,13 +108,15 @@ public sealed class ZpNodeStore
     {
         var machine = Escape(node.Machine);
         var host = Escape(node.Host);
+        var token = Escape(node.Token);
         var updatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
         _db.Query(
-            $"INSERT INTO \"{DbSchema.ZpNodes.Name}\" (\"machine\", \"host\", \"port\", \"updated_at\") " +
-            $"VALUES ('{machine}', '{host}', '{node.Port}', '{updatedAt}') " +
+            $"INSERT INTO \"{DbSchema.ZpNodes.Name}\" (\"machine\", \"host\", \"port\", \"token\", \"updated_at\") " +
+            $"VALUES ('{machine}', '{host}', '{node.Port}', '{token}', '{updatedAt}') " +
             "ON CONFLICT (\"machine\") DO UPDATE SET " +
-            "\"host\" = excluded.\"host\", \"port\" = excluded.\"port\", \"updated_at\" = excluded.\"updated_at\"",
+            "\"host\" = excluded.\"host\", \"port\" = excluded.\"port\", " +
+            "\"token\" = excluded.\"token\", \"updated_at\" = excluded.\"updated_at\"",
             thrw: true);
     }
 
@@ -105,10 +126,10 @@ public sealed class ZpNodeStore
     private static ZpNodeRow? ParseRow(string raw)
     {
         var parts = raw.Split(ColumnSeparator);
-        if (parts.Length < 4 || string.IsNullOrWhiteSpace(parts[0]) || !int.TryParse(parts[2], out var port))
+        if (parts.Length < 5 || string.IsNullOrWhiteSpace(parts[0]) || !int.TryParse(parts[2], out var port))
             return null;
 
-        return new ZpNodeRow(parts[0], parts[1], port, parts[3]);
+        return new ZpNodeRow(parts[0], parts[1], port, parts[3], parts[4]);
     }
 
     private static string ReadString(JsonElement root, string name)
@@ -134,10 +155,15 @@ public sealed class ZpNodeStore
 
 public static class ZpNodeAddressResolver
 {
-    public static async Task<string?> ResolveAsync(
+    /// <summary>
+    /// Первый адрес, с которого узел ответил успешно. Если ни один не ответил,
+    /// но хотя бы один вернул 401 — отдаём Unauthorized: адрес рабочий, дело
+    /// в токене, и сообщение об этом читается иначе, чем «узел недоступен».
+    /// </summary>
+    public static async Task<(string? Host, ZpNodeProbe Result)> ResolveAsync(
         ZpNodeRegistration node,
         string localMachine,
-        Func<string, int, Task<bool>> probe)
+        Func<string, int, string, Task<ZpNodeProbe>> probe)
     {
         var candidates = new List<string>();
         if (string.Equals(node.Machine, localMachine, StringComparison.OrdinalIgnoreCase))
@@ -145,11 +171,15 @@ public static class ZpNodeAddressResolver
         if (!string.IsNullOrWhiteSpace(node.Host)) candidates.Add(node.Host);
         if (!string.IsNullOrWhiteSpace(node.External)) candidates.Add(node.External);
 
+        var seen = ZpNodeProbe.Unreachable;
+
         foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             try
             {
-                if (await probe(candidate, node.Port)) return candidate;
+                var result = await probe(candidate, node.Port, node.Token);
+                if (result == ZpNodeProbe.Ok) return (candidate, ZpNodeProbe.Ok);
+                if (result == ZpNodeProbe.Unauthorized) seen = ZpNodeProbe.Unauthorized;
             }
             catch
             {
@@ -157,7 +187,7 @@ public static class ZpNodeAddressResolver
             }
         }
 
-        return null;
+        return (null, seen);
     }
 }
 
@@ -167,15 +197,15 @@ public sealed class ZpNodeRegistrar
 
     public ZpNodeRegistrar(ZpNodeStore store) => _store = store;
 
-    public async Task<string?> RegisterAsync(
+    public async Task<(string? Host, ZpNodeProbe Result)> RegisterAsync(
         ZpNodeRegistration node,
         string localMachine,
-        Func<string, int, Task<bool>> probe)
+        Func<string, int, string, Task<ZpNodeProbe>> probe)
     {
-        var reachableHost = await ZpNodeAddressResolver.ResolveAsync(node, localMachine, probe);
-        if (reachableHost == null) return null;
+        var (reachableHost, result) = await ZpNodeAddressResolver.ResolveAsync(node, localMachine, probe);
+        if (reachableHost == null) return (null, result);
 
         _store.Upsert(node with { Host = reachableHost });
-        return reachableHost;
+        return (reachableHost, result);
     }
 }

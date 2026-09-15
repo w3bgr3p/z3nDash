@@ -252,7 +252,106 @@
         .detail-name { font-size: 15px; color: var(--text-hi); font-weight: 600; margin-bottom: 3px; }
         .detail-path { font-size: 9px; color: var(--muted); margin-bottom: 10px; word-break: break-all; }
 
-        .detail-actions { display: flex; gap: 7px; margin-bottom: 12px; flex-wrap: wrap; }
+        .detail-actions { display: flex; gap: 7px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+
+        /* Иконочная панель действий: подпись только в tooltip, иначе строка
+           кнопок занимает больше места, чем сама карточка задачи.
+
+           Цвета через !important: тема hyper перекрывает .btn-update цветом
+           --text2 с !important, и без этого иконки уходили в серый #888. */
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 30px;
+            padding: 0;
+            font-size: 19px;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--text-hi) !important;
+        }
+        .btn-icon svg { width: 23px; height: 23px; display: block; }
+        /* Фон задаётся явно: у этих кнопок нет .btn-update, а без правила фона
+           браузер рисует кнопку светлой. */
+        /* Иконочные кнопки не носят .btn-update: тема перекрывает его через
+           [data-theme=...] .btn-update, что специфичнее любого класса здесь,
+           и жёлтый с фиолетовым до кнопок не доезжали. */
+        .btn-pause, .btn-danger, .btn-ok, .btn-fail, .btn-neutral, .btn-exec, .btn-sched { background: var(--bg2); }
+        .btn-neutral { border-color: var(--border); }
+        .btn-pause  { border-color: var(--yellow) !important; color: var(--yellow) !important; }
+        .btn-danger { border-color: var(--red) !important;    color: var(--red) !important; }
+        .btn-ok     { color: var(--green) !important; }
+        .btn-fail   { color: var(--red) !important; }
+        .btn-exec   { border-color: var(--yellow) !important; color: var(--yellow) !important; }
+        .btn-sched  { border-color: var(--purple) !important; color: var(--purple) !important; }
+        .action-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text2);
+            margin-left: 4px;
+        }
+        .tries-row { display: flex; gap: 6px; align-items: center; }
+        .tries-row .field-select { width: 84px; }
+        .tries-row .field-input { flex: 1; }
+        .tries-quick { display: flex; gap: 6px; }
+        .tries-quick .btn { flex: 1; }
+        .tries-current { font-size: 10px; color: var(--text2); margin-bottom: 10px; }
+        .tries-current b { color: var(--text-hi); }
+
+        /* Ползунок вместо галки. Во включённом положении --red, а не --red-bg:
+           в теме hyper --red-bg это #550000, и включённый ползунок сливался
+           с фоном — читался как поломанный, а не как включённый. */
+        .switch { position: relative; display: inline-block; width: 38px; height: 20px; flex: none; vertical-align: middle; }
+        /* Инпут накрывает весь переключатель, а не висит нулевой точкой у края.
+           Иначе при клике браузер прокручивает ячейку .kv .v (overflow:hidden)
+           к сфокусированному инпуту: ползунок срезало слева, справа вылезало
+           многоточие. Проверено кликом: scrollLeft уезжал на 11px.
+           !important нужен потому, что .kv .v input[type=checkbox] специфичнее. */
+        .switch input {
+            position: absolute;
+            inset: 0;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .switch .slider {
+            position: absolute;
+            inset: 0;
+            background: var(--bg3, var(--muted));
+            border: 1px solid var(--muted2);
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .switch .slider::before {
+            content: '';
+            position: absolute;
+            left: 3px;
+            top: 3px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-hi);
+            transition: transform 0.15s;
+        }
+        .switch input:checked + .slider { background: var(--red); border-color: var(--red); }
+        .switch input:checked + .slider::before { transform: translateX(18px); }
+        .switch input:focus-visible + .slider { outline: 1px solid var(--accent); outline-offset: 1px; }
+        /* Set/Add: положения равнозначны, поэтому цвет не меняется —
+           ориентир только в том, где стоит кружок. */
+        .switch.switch-plain input:checked + .slider { background: var(--bg3, var(--muted)); border-color: var(--muted2); }
+        /* .v.v-switch, а не .v-switch: у .kv .v та же специфичность, и оно
+           объявлено ниже по файлу — иначе overflow:hidden снова выигрывает
+           и режет ползунок справа. flex:none — чтобы ячейку не ужимало
+           уже самого ползунка. */
+        .kv .v.v-switch { overflow: visible; text-overflow: clip; flex: none; }
+        .toggle2 { display: inline-flex; align-items: center; gap: 7px; }
+        .toggle2 .t2-label { font-size: 10px; color: var(--muted2); cursor: pointer; user-select: none; }
+        .toggle2 .t2-label.on { color: var(--text-hi); font-weight: 600; }
 
         .btn {
             padding: 4px 12px;
@@ -284,11 +383,58 @@
             letter-spacing: 0.5px;
             color: var(--accent);
             margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .mini-btn {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: inherit;
+            padding: 1px 8px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            color: var(--text2);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .mini-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+        .mini-btn:disabled { opacity: 0.5; cursor: default; }
+
+        .inline-input {
+            width: 72px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text-hi);
+            border-radius: 3px;
+            padding: 0 5px;
+            font-size: 10px;
+            font-family: inherit;
+            text-align: right;
+            outline: none;
+        }
+        .inline-input:focus { border-color: var(--accent); }
+        .kv .v input[type=checkbox] { width: 12px; height: 12px; cursor: pointer; vertical-align: middle; }
+
+        .detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; }
+        .detail-cols > div { min-width: 0; }
+        /* single-column sections: keep label and value together instead of spanning the whole panel */
+        .detail-section > .kv { max-width: 320px; }
+        .detail-section .sub {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text2);
+            margin-bottom: 4px;
+            padding-bottom: 2px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .kv { display: flex; justify-content: space-between; margin-bottom: 2px; }
-        .kv .k { color: var(--text2); font-size: 10px; }
-        .kv .v { color: var(--text-hi); font-size: 10px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+        .kv { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+        .kv .k { color: var(--text2); font-size: 10px; white-space: nowrap; }
+        .kv .v { color: var(--text-hi); font-size: 10px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 
         .tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
         .tag {
@@ -393,6 +539,27 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
+        /* rarely used fields: kept, but folded away by default */
+        .adv-section { margin-top: 12px; }
+        .adv-section > summary {
+            cursor: pointer;
+            list-style: none;
+            padding: 4px 9px;
+            background: var(--bg2);
+            border-left: 3px solid var(--muted);
+            border-radius: 0 4px 4px 0;
+            font-size: 9px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            user-select: none;
+        }
+        .adv-section > summary::-webkit-details-marker { display: none; }
+        .adv-section > summary::before { content: '▸'; margin-right: 6px; display: inline-block; }
+        .adv-section[open] > summary::before { transform: rotate(90deg); }
+        .adv-section > summary:hover { color: var(--text-hi); }
+        .adv-body { padding-top: 6px; }
         .modal-tabs {
             display: flex;
             gap: 2px;
@@ -434,6 +601,7 @@
         }
         .node-machine { color: var(--text-hi); font-weight: 600; overflow-wrap: anywhere; }
         .node-address { color: var(--text2); overflow-wrap: anywhere; }
+        .node-version { font-size: 9px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
         .node-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
         .node-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; }
         .node-status.online { color: var(--green); }
@@ -839,7 +1007,7 @@
             <label class="field-label" for="nodeJson">Node registration JSON</label>
             <div class="nodes-entry">
                 <textarea class="field-textarea" id="nodeJson" spellcheck="false"
-                    placeholder='{"machine":"NS341956","host":"5.196.90.154","external":"5.196.90.154","port":22222,"firewall":"on","portRule":"no"}'></textarea>
+                    placeholder='{"machine":"NS341956","host":"5.196.90.154","external":"5.196.90.154","port":22222,"token":"&lt;token&gt;","firewall":"on","portRule":"no"}'></textarea>
                 <button class="btn btn-start" id="nodeSaveBtn" onclick="saveNode()">Add / Update</button>
             </div>
             <div class="nodes-error" id="nodesError"></div>
@@ -907,6 +1075,42 @@
         <div class="modal-footer">
             <button class="btn btn-update" onclick="closeSchedulerModal()">Cancel</button>
             <button class="btn btn-start" onclick="saveSchedulerSettings()">💾 Apply</button>
+        </div>
+    </div>
+</div>
+
+<!-- Tries Modal -->
+<div class="modal-overlay" id="triesModal">
+    <div class="modal" style="width:340px;">
+        <div class="modal-header">
+            <h3 id="triesModalTitle">Tries</h3>
+            <button class="modal-close" onclick="closeTriesModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:14px;">
+            <div class="tries-current" id="triesCurrent"></div>
+            <div class="toggle2" style="margin-bottom:10px;">
+                <span class="t2-label on" id="triesModeSet" onclick="setTriesMode(false)">Set</span>
+                <label class="switch switch-plain" title="Set / Add">
+                    <input type="checkbox" id="triesMode" onchange="renderTriesMode()">
+                    <span class="slider"></span>
+                </label>
+                <span class="t2-label" id="triesModeAdd" onclick="setTriesMode(true)">Add</span>
+            </div>
+            <label class="field-label" for="triesValue">Value</label>
+            <div class="tries-row">
+                <input class="field-input" id="triesValue" type="number" min="0" step="1" value="1">
+                <button class="btn btn-start" id="triesApplyBtn" onclick="applyTriesExact()">Apply</button>
+            </div>
+            <label class="field-label" style="margin-top:12px;">Add to the value above</label>
+            <div class="tries-quick">
+                <button class="btn btn-update" onclick="bumpTriesValue(1)">+1</button>
+                <button class="btn btn-update" onclick="bumpTriesValue(10)">+10</button>
+                <button class="btn btn-update" onclick="bumpTriesValue(100)">+100</button>
+            </div>
+            <div class="nodes-error" id="triesError" style="margin-top:10px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-update" onclick="closeTriesModal()">Close</button>
         </div>
     </div>
 </div>
@@ -1021,8 +1225,11 @@
                         ${escHtml(node.machine)}
                         <div style="font-size:9px;color:var(--muted);font-weight:400;margin-top:2px;">${escHtml(node.updated_at || '')}</div>
                     </div>
-                    <div class="node-address">${escHtml(node.host)}:${escHtml(node.port)}</div>
-                    <span class="node-status ${node.available ? 'online' : 'offline'}">${node.available ? 'Available' : 'Unavailable'}</span>
+                    <div class="node-address">
+                        ${escHtml(node.host)}:${escHtml(node.port)}
+                        <div class="node-version">${escHtml(nodeVersionLabel(node))}</div>
+                    </div>
+                    <span class="node-status ${node.available ? 'online' : 'offline'}">${nodeStatusLabel(node)}</span>
                     <button class="btn btn-stop node-delete" data-machine="${escHtml(node.machine)}">Delete</button>
                 </div>`).join('');
 
@@ -1033,6 +1240,23 @@
             list.innerHTML = '<div class="nodes-empty">Failed to load nodes</div>';
             error.textContent = e.message || String(e);
         }
+    }
+
+    // Токен узла хранится на сервере и в список не отдаётся: наружу приходит
+    // только итог пробы. 'unauthorized' значит, что узел ответил 401, —
+    // строку регистрации надо вставить заново.
+    // Версии приходят с узла по GET /version. Пусто — либо узел не ответил,
+    // либо на нём сборка z3n7 без этого роута; узел при этом рабочий.
+    function nodeVersionLabel(node) {
+        const parts = [];
+        if (node.z3n7) parts.push(`z3n7 ${node.z3n7}`);
+        if (node.zennoposter) parts.push(`ZP ${node.zennoposter}`);
+        return parts.join(' · ');
+    }
+
+    function nodeStatusLabel(node) {
+        if (node.available) return 'Available';
+        return node.status === 'unauthorized' ? 'Unauthorized' : 'Unavailable';
     }
 
     async function saveNode() {
@@ -1149,12 +1373,18 @@
         updateHeaderStats();
         updateTagFilterBar();
         applyFilters();
+        if (!selectedTaskId) return;
+        const task = allTasks.find(t => t.Id === selectedTaskId);
         // A saved selection may belong to a node that has not answered yet.
-        if (selectedTaskId && !_currentTaskId) {
-            const task = allTasks.find(t => t.Id === selectedTaskId);
-            if (task) renderDetail(task);
-            else if ([...taskNodes.values()].every(node => node.loaded)) selectedTaskId = null;
+        if (!task) {
+            if (_currentTaskId !== selectedTaskId
+                && [...taskNodes.values()].every(node => node.loaded)) selectedTaskId = null;
+            return;
         }
+        // Full render only when the panel is not already on this task:
+        // it restarts the log polling and drops the thread filter.
+        if (_currentTaskId !== selectedTaskId) renderDetail(task);
+        else refreshDetailGrid(task);
     }
 
     function updateHeaderStats() {
@@ -1658,68 +1888,220 @@
         makeRowResizer('hResizerTop', detail, logsArea, 'pm_h_detail', 'pm_h_logs');
     }
 
+    // Поля, которые вообще может править форма (модалка + плашка Limits).
+    // Это НЕ список того, что уходит на ноду, — см. buildExecPayload.
+    const EXEC_KEYS = ['LimitOfThreads','Priority','Timeout','PerformBadEndOnInterrupt',
+                       'MaxNumOfSuccessStop','MaxNumOfFailStop','Proxy','GroupLabels'];
+
+    // Сколько полей ZennoPoster требует в XML, чтобы вообще применить вызов.
+    // Проверено на ноде 22222, задача Simroute.bolt.reg.ua, 2026-09-14.
+    const EXEC_MIN_FIELDS = 15;
+
+    // Транзитные поля берём из свежего чтения: кэш опроса отстаёт до 3 секунд,
+    // а в payload уходит весь блок целиком, включая счётчики.
+    async function freshTask(task) {
+        try {
+            const r = await fetch(`${SERVER}/zp/state?machine=${encodeURIComponent(task.machine || '')}`,
+                                  { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+            const data = await r.json();
+            if (!r.ok || !Array.isArray(data.tasks)) return task;
+            return data.tasks.find(x => x.Id === task.Id) || task;
+        } catch (e) {
+            console.warn('freshTask failed, using cached task:', e);
+            return task;
+        }
+    }
+
+    // Отправляем блок ExecutionSettings ЦЕЛИКОМ — все поля, что отдала нода,
+    // включая Id и счётчики, — подменив только то, что правил человек.
+    //
+    // Проверено живьём (нода 22222, задача Simroute.bolt.reg.ua):
+    //   * полный блок применяется 10 раз из 10, набор из 12 полей — 0 из 10;
+    //     нода в обоих случаях отвечает {"ok":true}, то есть молчаливый отказ
+    //     от ZennoPoster.SetExecutionSettings, а не ошибка транспорта;
+    //   * поля, которых в payload нет, ZennoPoster затирает своими дефолтами,
+    //     а не сохраняет: Id блока перегенерировался, MaxAllowOfThreads 0 -> 999,
+    //     PerformBadEndOnInterrupt True -> False;
+    //   * порядок полей на результат не влияет (свой, порядок ноды, перемешанный).
+    // Поэтому урезать payload нельзя ни ради красоты, ни ради "это же не настройка".
+    function buildExecPayload(task, overrides) {
+        const PREFIX = 'ExecutionSettings_';
+        const payload = {};
+        Object.keys(task).forEach(k => {
+            if (!k.startsWith(PREFIX)) return;
+            const name = k.slice(PREFIX.length);
+            payload[name] = (name in overrides) ? overrides[name] : String(task[k] ?? '');
+        });
+        if (Object.keys(payload).length < EXEC_MIN_FIELDS)
+            throw new Error(`ExecutionSettings block is incomplete (${Object.keys(payload).length} fields) `
+                          + `- ZennoPoster would silently ignore the write`);
+        Object.keys(overrides).forEach(k => { if (!(k in payload)) payload[k] = overrides[k]; });
+        return payload;
+    }
+
+    // The Limits panel is edited in place - opening the modal for this is the thing we removed.
+    function limField(label, key, val, taskId) {
+        return `<div class="kv">
+                        <span class="k">${label}</span>
+                        <span class="v"><input class="inline-input" id="lim_${key}" value="${escHtml(val || '')}"
+                            onkeydown="if (event.key === 'Enter') applyLimits('${taskId}')"></span>
+                    </div>`;
+    }
+
+    async function applyLimits(taskId) {
+        const task = allTasks.find(x => x.Id === taskId);
+        if (!task) return;
+        const btn = document.getElementById('limitsApply');
+        const overrides = {};
+        ['LimitOfThreads','Timeout','MaxNumOfSuccessStop','MaxNumOfFailStop'].forEach(k => {
+            const el = document.getElementById('lim_' + k);
+            if (el) overrides[k] = el.value.trim();
+        });
+        const cb = document.getElementById('lim_PerformBadEndOnInterrupt');
+        if (cb) overrides.PerformBadEndOnInterrupt = cb.checked ? 'True' : 'False';
+
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving'; }
+        try {
+            // Нода исполняет команду синхронно до ответа (ZpServer.ServeCommand ->
+            // ExecAction -> ZennoPoster.SetExecutionSettings), а /state каждый раз
+            // читает ZennoPoster.TasksList заново. Значит после ok сразу перечитываем
+            // состояние узла и показываем то, что там теперь лежит, а не свой ввод.
+            const base = await freshTask(task);
+            await postCommand(taskId, 'set_execution_settings', JSON.stringify(buildExecPayload(base, overrides)));
+            _limitsForceRefresh = true;
+            if (btn) { btn.disabled = false; btn.textContent = 'Apply'; }
+            const node = taskNodes.get(task.machine);
+            if (node) refreshNodeTasks(node);
+        } catch (e) {
+            console.error('applyLimits failed:', e);
+            if (btn) { btn.textContent = 'Failed'; btn.disabled = false; setTimeout(() => { btn.textContent = 'Apply'; }, 2000); }
+        }
+    }
+
+    // Иконки панели действий. Подписи ушли в title: десять текстовых кнопок
+    // занимали две строки над карточкой задачи.
+    const ACTION_ICONS = {
+        play:   `<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M5 3.4l7.2 4.6L5 12.6z"/></svg>`,
+        pause:  `<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="3.8" y="2.8" width="3.4" height="10.4" rx="1"/><rect x="8.8" y="2.8" width="3.4" height="10.4" rx="1"/></svg>`,
+        clock:  `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.4V8l2.6 1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+        cross:  `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>`,
+        check:  `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.4l3.4 3.4 6.2-7"/></svg>`,
+        // Терминал: рамка окна и приглашение ">_". Цветное эмодзи 🖥 рядом
+        // с монохромными иконками выбивалось из ряда.
+        term:   `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="1" y="2.2" width="14" height="11.6" rx="1.2"/><path d="M4 6l2.6 2.4L4 10.8M8.4 11h3.6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+        // Приближение к иконке Input settings в ZennoPoster: узел и две ветки.
+        inputs: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="8" cy="3" r="2"/><circle cx="3.4" cy="13" r="2"/><circle cx="12.6" cy="13" r="2"/><path d="M8 5v2.4M3.4 11V7.4h9.2V11" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    };
+
+    function renderDetailActions(t) {
+        const name = escHtml(t.Name);
+        return `
+                <button class="btn btn-start btn-icon" title="Start" aria-label="Start" onclick="sendCommand('${t.Id}','start')">${ACTION_ICONS.play}</button>
+                <button class="btn btn-pause btn-icon" title="Pause (stop)" aria-label="Pause" onclick="sendCommand('${t.Id}','stop')">${ACTION_ICONS.pause}</button>
+                <button class="btn btn-danger btn-icon" title="Interrupt" aria-label="Interrupt" onclick="sendCommand('${t.Id}','interrupt')">${ACTION_ICONS.cross}</button>
+                <button class="btn btn-icon btn-neutral" title="Input settings" aria-label="Input settings" onclick="openInputSettingsModal('${t.Id}','${name}')">${ACTION_ICONS.inputs}</button>
+                <button class="btn btn-icon btn-neutral" title="Tries" aria-label="Tries" onclick="openTriesModal('${t.Id}','${name}')">&plusmn;</button>
+                <span class="action-label">Clear</span>
+                <button class="btn btn-ok btn-icon" title="Clear done" aria-label="Clear done" onclick="sendCommand('${t.Id}','clear_success')">${ACTION_ICONS.check}</button>
+                <button class="btn btn-fail btn-icon" title="Clear fails" aria-label="Clear fails" onclick="sendCommand('${t.Id}','clear_fails')">${ACTION_ICONS.cross}</button>
+                <button class="btn btn-icon btn-exec" title="Execution settings" aria-label="Execution settings" onclick="openExecModal('${t.Id}','${name}')">${ACTION_ICONS.term}</button>
+                <button class="btn btn-icon btn-sched" title="Scheduler settings" aria-label="Scheduler settings" onclick="openSchedulerModal('${t.Id}','${name}')">${ACTION_ICONS.clock}</button>
+        `;
+    }
+
+    // Панели детали живут отдельно от renderDetail: их можно перерисовать
+    // по свежим данным, не трогая showLogsArea (он сбрасывает опрос логов).
+    function renderDetailGrid(t) {
+        const status = t.ExecutionSettings_Status || '';
+        const stClass = status ? `st-${status}` : 'st-empty';
+        const isWork = t.ExecutionSettings_IsWork === 'True';
+        const done = t.ExecutionSettings_DoneSuccessfully || '0';
+        const doneAll = t.ExecutionSettings_DoneAll || '0';
+        const nextRun = t.Scheduler7Settings_NextScheduleTime || t.SchedulerSettings_NextScheduleDate || '';
+        const lastRun = t.Scheduler7Settings_LastScheduleTime || t.SchedulerSettings_LastScheduleDate || '';
+        return `
+                <div class="detail-section">
+                    <h4>State</h4>
+                    <div class="detail-cols">
+                        <div>
+                            <div class="sub">Execution</div>
+                            <div class="kv"><span class="k">Status</span><span class="v"><span class="task-status ${stClass}">${status || '—'}</span></span></div>
+                            <div class="kv"><span class="k">Is Working</span><span class="v" style="color:${isWork ? '#3fb950' : '#8b949e'}">${isWork ? 'Yes' : 'No'}</span></div>
+                            <div class="kv"><span class="k">Done</span><span class="v" style="color:#3fb950">${done}</span></div>
+                            <div class="kv"><span class="k">Total</span><span class="v">${doneAll}</span></div>
+                            <div class="kv"><span class="k">Tries</span><span class="v">${t.ExecutionSettings_NumberOfTries || '—'}</span></div>
+                            <div class="kv"><span class="k">Priority</span><span class="v">${t.ExecutionSettings_Priority || '—'}</span></div>
+                        </div>
+                        <div>
+                            <div class="sub">Scheduler</div>
+                            <div class="kv"><span class="k">Active</span><span class="v">${t.Scheduler7Settings_IsActive || '—'}</span></div>
+                            <div class="kv"><span class="k">Next Run</span><span class="v" title="${escHtml(nextRun)}">${escHtml(nextRun) || '—'}</span></div>
+                            <div class="kv"><span class="k">Last Run</span><span class="v" title="${escHtml(lastRun)}">${escHtml(lastRun) || '—'}</span></div>
+                            <div class="kv"><span class="k">Period</span><span class="v">${t.Scheduler7Settings_ExecutePeriod || '—'}</span></div>
+                            <div class="kv"><span class="k">Repeat</span><span class="v">${t.Scheduler7Settings_RepeatType || '—'}</span></div>
+                            <div class="kv"><span class="k">Running</span><span class="v" style="color:${t.Scheduler7Settings_IsTaskRunning==='True'?'#3fb950':'#8b949e'}">${t.Scheduler7Settings_IsTaskRunning || '—'}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h4>Limits &amp; Stop Conditions
+                        <button class="mini-btn" id="limitsApply" onclick="applyLimits('${t.Id}')">Apply</button>
+                    </h4>
+                    ${limField('Limit of Threads', 'LimitOfThreads', t.ExecutionSettings_LimitOfThreads, t.Id)}
+                    ${limField('Timeout (s)', 'Timeout', t.ExecutionSettings_Timeout, t.Id)}
+                    <div class="kv">
+                        <span class="k">BadEnd on Interrupt</span>
+                        <span class="v v-switch"><label class="switch" title="BadEnd on Interrupt"><input type="checkbox" id="lim_PerformBadEndOnInterrupt" ${t.ExecutionSettings_PerformBadEndOnInterrupt === 'True' ? 'checked' : ''}><span class="slider"></span></label></span>
+                    </div>
+                    ${limField('Max Success Stop', 'MaxNumOfSuccessStop', t.ExecutionSettings_MaxNumOfSuccessStop, t.Id)}
+                    ${limField('Max Fail Stop', 'MaxNumOfFailStop', t.ExecutionSettings_MaxNumOfFailStop, t.Id)}
+                </div>
+        `;
+    }
+
     function renderDetail(t) {
         hideHeatmapPane();
         document.getElementById('detailTaskId').textContent = `#${t.Id}`;
         showLogsArea(t);
 
-        const status = t.ExecutionSettings_Status || '';
-        const stClass = status ? `st-${status}` : 'st-empty';
-        const isWork = t.ExecutionSettings_IsWork === 'True';
-        const tags = getTags(t);
-        const threads = t.ExecutionSettings_LimitOfThreads || '1';
-        const done = t.ExecutionSettings_DoneSuccessfully || '0';
-        const doneAll = t.ExecutionSettings_DoneAll || '0';
-        const nextRun = t.Scheduler7Settings_NextScheduleTime || t.SchedulerSettings_NextScheduleDate || '';
-        const lastRun = t.Scheduler7Settings_LastScheduleTime || t.SchedulerSettings_LastScheduleDate || '';
-
         document.getElementById('detailBody').innerHTML = `
             <div class="detail-name">${escHtml(t.Name)}</div>
             <div class="detail-path">${escHtml(t.Project_ProjectFileLocation || '')}</div>
 
-            <div class="detail-actions">
-                <button class="btn btn-start" onclick="sendCommand('${t.Id}','start')">▶ Start</button>
-                <button class="btn btn-stop" onclick="sendCommand('${t.Id}','stop')">■ Stop</button>
-                <button class="btn btn-stop" onclick="sendCommand('${t.Id}','interrupt')" style="background:#7c2d12;border-color:#c2410c;">⚡ Interrupt</button>
-                <button class="btn btn-update" onclick="openInputSettingsModal('${t.Id}','${escHtml(t.Name)}')">⚙ Input Settings</button>
-                <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','add_tries')">+ Tries</button>
-                <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','set_tries')">= Tries</button>
-                <button class="btn btn-update" onclick="sendCommandWithPayload('${t.Id}','set_threads')">⚙ Threads</button>
-                <button class="btn btn-update" onclick="sendCommand('${t.Id}','clear_success')" style="color:#3fb950;">✓ Clear Done</button>
-                <button class="btn btn-update" onclick="sendCommand('${t.Id}','clear_fails')" style="color:#f85149;">✗ Clear Fails</button>
-                <button class="btn btn-update" onclick="openExecModal('${t.Id}','${escHtml(t.Name)}')" style="border-color:#d29922;color:#d29922;">⚙ Execution</button>
-                <button class="btn btn-update" onclick="openSchedulerModal('${t.Id}','${escHtml(t.Name)}')" style="border-color:#a371f7;color:#a371f7;">🕐 Scheduler</button>
-            </div>
+            <div class="detail-actions">${renderDetailActions(t)}</div>
 
-            <div class="detail-grid">
-                <div class="detail-section">
-                    <h4>Execution</h4>
-                    <div class="kv"><span class="k">Status</span><span class="v"><span class="task-status ${stClass}">${status || '—'}</span></span></div>
-                    <div class="kv"><span class="k">Is Working</span><span class="v" style="color:${isWork ? '#3fb950' : '#8b949e'}">${isWork ? 'Yes' : 'No'}</span></div>
-                    <div class="kv"><span class="k">Threads</span><span class="v">${threads}</span></div>
-                    <div class="kv"><span class="k">Done</span><span class="v" style="color:#3fb950">${done}</span></div>
-                    <div class="kv"><span class="k">Total</span><span class="v">${doneAll}</span></div>
-                    <div class="kv"><span class="k">Priority</span><span class="v">${t.ExecutionSettings_Priority || '—'}</span></div>
-                </div>
-
-                <div class="detail-section">
-                    <h4>Scheduler</h4>
-                    <div class="kv"><span class="k">Active</span><span class="v">${t.Scheduler7Settings_IsActive || '—'}</span></div>
-                    <div class="kv"><span class="k">Next Run</span><span class="v">${escHtml(nextRun) || '—'}</span></div>
-                    <div class="kv"><span class="k">Last Run</span><span class="v">${escHtml(lastRun) || '—'}</span></div>
-                    <div class="kv"><span class="k">Period</span><span class="v">${t.Scheduler7Settings_ExecutePeriod || '—'}</span></div>
-                    <div class="kv"><span class="k">Repeat</span><span class="v">${t.Scheduler7Settings_RepeatType || '—'}</span></div>
-                    <div class="kv"><span class="k">Running</span><span class="v" style="color:${t.Scheduler7Settings_IsTaskRunning==='True'?'#3fb950':'#8b949e'}">${t.Scheduler7Settings_IsTaskRunning || '—'}</span></div>
-                </div>
-
-                <div class="detail-section" style="grid-column:1/-1;">
-                    <h4>Tags (GroupLabels)</h4>
-                    <div class="tags">
-                        ${tags.length ? tags.map(g => `<span class="tag" style="cursor:pointer;" onclick="toggleTagFilter('${escHtml(g)}')" title="Filter by this tag">${escHtml(g)}</span>`).join('') : '<span style="color:#484f58">—</span>'}
-                    </div>
-                </div>
-            </div>
+            <div class="detail-grid">${renderDetailGrid(t)}</div>
         `;
+    }
+
+    // Есть ли в панели Limits правки, которые ещё не отправлены.
+    function limitsDirty(t) {
+        for (const k of ['LimitOfThreads','Timeout','MaxNumOfSuccessStop','MaxNumOfFailStop']) {
+            const el = document.getElementById('lim_' + k);
+            if (el && el.value.trim() !== (t['ExecutionSettings_' + k] || '')) return true;
+        }
+        const cb = document.getElementById('lim_PerformBadEndOnInterrupt');
+        if (cb && (cb.checked ? 'True' : 'False') !== (t.ExecutionSettings_PerformBadEndOnInterrupt || 'False')) return true;
+        return false;
+    }
+
+    // Взведён после Apply: первая же порция данных от ноды должна попасть в панель,
+    // даже если она разойдётся с тем, что набрано в полях. Иначе неприменённая
+    // настройка выглядела бы применённой.
+    let _limitsForceRefresh = false;
+
+    // Перерисовка только панелей — по опросу.
+    // Пропускаем, если поле в фокусе, если Apply ещё не отпустил кнопку или если
+    // в панели лежат неотправленные правки: иначе затрём ввод.
+    function refreshDetailGrid(t) {
+        const grid = document.querySelector('#detailBody .detail-grid');
+        if (!grid) return;
+        if (grid.contains(document.activeElement)) return;
+        if (document.getElementById('limitsApply')?.disabled) return;
+        if (!_limitsForceRefresh && limitsDirty(t)) return;
+        _limitsForceRefresh = false;
+        grid.innerHTML = renderDetailGrid(t);
     }
 
     async function postCommand(taskId, action, payload = '') {
@@ -1741,21 +2123,100 @@
         } catch (e) { console.error('Send command failed:', e); }
     }
 
-    async function sendCommandWithPayload(taskId, action) {
-        const labels = {
-            'add_tries': 'Add tries (number):',
-            'set_tries': 'Set tries to (number):',
-            'set_threads': 'Set max threads to (number):'
-        };
-        const val = await _dialog.prompt(labels[action] || 'Value:', action.replace(/_/g,' '));
-        if (val === null || val === '') return;
-        if (isNaN(parseInt(val))) { await _dialog.error('Please enter a valid number.', 'Invalid input'); return; }
-        await sendCommand(taskId, action, val.trim());
+    // ── TRIES MODAL ──
+    // Раньше это были две кнопки с prompt-ом. Теперь одна: тумблер Set/Add,
+    // поле значения и кнопки быстрой прибавки К ПОЛЮ — команда уходит только
+    // по Apply, чтобы промах по +100 не менял задачу.
+    let triesTaskId = null;
+    let triesCurrentTimer = null;
+
+    function openTriesModal(taskId, taskName) {
+        triesTaskId = taskId;
+        document.getElementById('triesModalTitle').textContent = `Tries — ${taskName || ''}`;
+        document.getElementById('triesError').textContent = '';
+        document.getElementById('triesValue').value = '1';
+        document.getElementById('triesMode').checked = false;
+        renderTriesMode();
+        renderTriesCurrent();
+        document.getElementById('triesModal').classList.add('open');
+        setTimeout(() => document.getElementById('triesValue')?.focus(), 50);
+        // Счётчик приходит из /state, а его опрашивает список задач:
+        // пока модалка открыта, просто перечитываем уже полученные данные.
+        clearInterval(triesCurrentTimer);
+        triesCurrentTimer = setInterval(renderTriesCurrent, 2000);
+    }
+
+    function closeTriesModal() {
+        document.getElementById('triesModal').classList.remove('open');
+        clearInterval(triesCurrentTimer);
+        triesCurrentTimer = null;
+        triesTaskId = null;
+    }
+
+    function renderTriesCurrent() {
+        const task = allTasks.find(t => t.Id === triesTaskId) || {};
+        document.getElementById('triesCurrent').innerHTML =
+            `Current: <b>${escHtml(task.ExecutionSettings_NumberOfTries || '—')}</b>`;
+    }
+
+    function setTriesMode(isAdd) {
+        document.getElementById('triesMode').checked = isAdd;
+        renderTriesMode();
+    }
+
+    function renderTriesMode() {
+        const isAdd = document.getElementById('triesMode').checked;
+        document.getElementById('triesModeSet').classList.toggle('on', !isAdd);
+        document.getElementById('triesModeAdd').classList.toggle('on', isAdd);
+        document.getElementById('triesApplyBtn').title = isAdd
+            ? 'Add this number to the current tries'
+            : 'Set tries to this number';
+    }
+
+    // Кнопки +1/+10/+100 только правят поле: применяет Apply.
+    function bumpTriesValue(delta) {
+        const input = document.getElementById('triesValue');
+        const current = parseInt(input.value, 10);
+        input.value = String((isNaN(current) ? 0 : current) + delta);
+        document.getElementById('triesError').textContent = '';
+        input.focus();
+    }
+
+    // Узел отвечает на команду, но счётчик в карточке берётся из /state,
+    // поэтому после отправки просим ноду перечитать состояние.
+    async function applyTriesExact() {
+        if (!triesTaskId) return;
+        const error = document.getElementById('triesError');
+        const btn = document.getElementById('triesApplyBtn');
+        const raw = document.getElementById('triesValue').value.trim();
+        const value = parseInt(raw, 10);
+        if (raw === '' || isNaN(value) || value < 0) {
+            error.textContent = 'Enter a whole number, zero or greater';
+            return;
+        }
+
+        const action = document.getElementById('triesMode').checked ? 'add_tries' : 'set_tries';
+        error.textContent = '';
+        btn.disabled = true;
+        const task = allTasks.find(t => t.Id === triesTaskId) || {};
+        try {
+            await postCommand(triesTaskId, action, String(value));
+            const node = taskNodes.get(task.machine);
+            if (node) await refreshNodeTasks(node);
+            renderTriesCurrent();
+            btn.textContent = 'Applied';
+            setTimeout(() => { btn.textContent = 'Apply'; }, 1500);
+        } catch (e) {
+            error.textContent = e.message || String(e);
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     document.getElementById('execModal').addEventListener('click', function(e) { if (e.target === this) closeExecModal(); });
     document.getElementById('schedulerModal').addEventListener('click', function(e) { if (e.target === this) closeSchedulerModal(); });
     document.getElementById('inputSettingsModal').addEventListener('click', function(e) { if (e.target === this) closeInputSettingsModal(); });
+    document.getElementById('triesModal').addEventListener('click', function(e) { if (e.target === this) closeTriesModal(); });
 
     // ── INPUT SETTINGS MODAL ──
     // Два вида одних и тех же значений: отрисованная форма по InputSettings XML
@@ -2026,32 +2487,55 @@
                     ${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}
                 </select>
             </div>`;
+        const fbool = (label, key, val) => `
+            <div class="field-group">
+                <span class="field-label">${label}<span class="field-key">${key}</span></span>
+                <label class="field-bool" style="cursor:pointer;display:flex;align-items:center;gap:8px;">
+                    <span class="switch">
+                        <input type="checkbox" id="exec_${key}" ${val === 'True' ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </span>
+                    <span style="font-size:11px;color:var(--text2);">Perform bad end when the task is interrupted</span>
+                </label>
+            </div>`;
         return `
-            <div class="section-divider">Threads & Priority</div>
+            <div class="section-divider">Threads & Stop Conditions</div>
             ${f('Limit of Threads', 'LimitOfThreads', t.ExecutionSettings_LimitOfThreads)}
-            ${f('Priority', 'Priority', t.ExecutionSettings_Priority)}
-            <div class="section-divider">Counters</div>
-            ${f('Done Successfully', 'DoneSuccessfully', t.ExecutionSettings_DoneSuccessfully)}
-            ${f('Done All', 'DoneAll', t.ExecutionSettings_DoneAll)}
-            ${f('Number of Tries', 'NumberOfTries', t.ExecutionSettings_NumberOfTries)}
-            <div class="section-divider">Stop Conditions</div>
             ${f('Timeout (seconds)', 'Timeout', t.ExecutionSettings_Timeout)}
-            ${fsel('BadEnd on Interrupt', 'PerformBadEndOnInterrupt', t.ExecutionSettings_PerformBadEndOnInterrupt, ['True','False'])}
-            ${f('Max Success Stop', 'MaxNumOfSuccessStop', t.ExecutionSettings_MaxNumOfSuccessStop)}
-            ${f('Max Fail Stop', 'MaxNumOfFailStop', t.ExecutionSettings_MaxNumOfFailStop)}
-            <div class="section-divider">Other</div>
-            ${fsel('Status', 'Status', t.ExecutionSettings_Status, ['Newbie','Stop','Schedule','Perform','Complete','Fail'])}
-            ${fsel('Proxy', 'Proxy', t.ExecutionSettings_Proxy, ['DoNotUseProxy','IfPossible','UseProxyWithoutRemove','UseProxy'])}
-            ${f('Group Labels', 'GroupLabels', t.ExecutionSettings_GroupLabels)}
+            ${fbool('BadEnd on Interrupt', 'PerformBadEndOnInterrupt', t.ExecutionSettings_PerformBadEndOnInterrupt)}
+            <details class="adv-section">
+                <summary>More settings</summary>
+                <div class="adv-body">
+                    ${f('Priority', 'Priority', t.ExecutionSettings_Priority)}
+                    ${f('Max Success Stop', 'MaxNumOfSuccessStop', t.ExecutionSettings_MaxNumOfSuccessStop)}
+                    ${f('Max Fail Stop', 'MaxNumOfFailStop', t.ExecutionSettings_MaxNumOfFailStop)}
+                    ${fsel('Proxy', 'Proxy', t.ExecutionSettings_Proxy, ['DoNotUseProxy','IfPossible','UseProxyWithoutRemove','UseProxy'])}
+                    ${f('Group Labels', 'GroupLabels', t.ExecutionSettings_GroupLabels)}
+                </div>
+            </details>
         `;
     }
 
     async function saveExecSettings() {
         if (!execTaskId) return;
-        const keys = ['LimitOfThreads','Priority','DoneSuccessfully','DoneAll','NumberOfTries','Timeout','PerformBadEndOnInterrupt','MaxNumOfSuccessStop','MaxNumOfFailStop','Status','Proxy','GroupLabels'];
-        const payload = {};
-        keys.forEach(k => { const el = document.getElementById('exec_' + k); if (el) payload[k] = el.value; });
-        await sendCommand(execTaskId, 'set_execution_settings', JSON.stringify(payload));
+        const task = allTasks.find(x => x.Id === execTaskId) || {};
+        const overrides = {};
+        EXEC_KEYS.forEach(k => {
+            const el = document.getElementById('exec_' + k);
+            if (!el) return;
+            overrides[k] = el.type === 'checkbox' ? (el.checked ? 'True' : 'False') : el.value;
+        });
+        try {
+            const base = await freshTask(task);
+            await postCommand(execTaskId, 'set_execution_settings', JSON.stringify(buildExecPayload(base, overrides)));
+        } catch (e) {
+            console.error('saveExecSettings failed:', e);
+            await _dialog.error(e.message || String(e), 'Execution settings not saved');
+            return;
+        }
+        // Модалка правит те же поля, что и панель: без этого панель осталась бы
+        // со старыми значениями и считалась бы "грязной", то есть замерла бы навсегда.
+        _limitsForceRefresh = true;
         closeExecModal();
     }
 

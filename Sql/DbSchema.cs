@@ -20,6 +20,7 @@
                 { "machine",    "TEXT PRIMARY KEY" },
                 { "host",       "TEXT DEFAULT ''"  },
                 { "port",       "TEXT DEFAULT ''"  },
+                { "token",      "TEXT DEFAULT ''"  },
                 { "updated_at", "TEXT DEFAULT ''"  },
             }
         };

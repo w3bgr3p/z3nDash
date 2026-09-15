@@ -10,6 +10,7 @@ namespace z3nDash;
 /// Роуты:
 ///   GET  /zp/nodes       — список зарегистрированных node-сервисов
 ///   GET  /zp/traffic     — HTTP-трафик с ноды (хвост trafficLog.jsonl)
+///   GET  /zp/version     — версии z3n7, ZennoPoster и рантайма на node
 ///   GET  /zp/state       — состояние конкретного node
 ///   GET  /zp/state/all   — агрегированное состояние всех node
 ///   GET  /zp/task/settings — input settings конкретной задачи
@@ -56,6 +57,7 @@ public class ZpOrchestratorHandler : IScriptHandler
             if (path == "/zp/log"            && method == "GET")    { await GetLog(context, db);          return true; }
             if (path == "/zp/traffic"        && method == "GET")    { await GetTraffic(context, db);      return true; }
             if (path == "/zp/task/settings"  && method == "GET")    { await GetTaskSettings(context, db); return true; }
+            if (path == "/zp/version"        && method == "GET")    { await GetVersion(context, db);      return true; }
             if (path == "/zp/state"  && method == "GET")  { await GetState(context, db);  return true; }
             if (path == "/zp/state/all" && method == "GET") { await GetStateAll(context, db); return true; }
         }
@@ -72,12 +74,30 @@ public class ZpOrchestratorHandler : IScriptHandler
     private static readonly TimeSpan NodeStateTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan NodeTrafficTimeout = TimeSpan.FromSeconds(20);
 
-    private async Task<string?> GetNodeUrl(Db db, string machine)
-    {
-        var node = new ZpNodeStore(db).GetAll()
+    private static ZpNodeRow? GetNode(Db db, string machine)
+        => new ZpNodeStore(db).GetAll()
             .FirstOrDefault(item => item.Machine.Equals(machine, StringComparison.OrdinalIgnoreCase));
-        return node == null ? null : $"http://{node.Host}:{node.Port}";
+
+    private static string NodeUrl(ZpNodeRow node) => $"http://{node.Host}:{node.Port}";
+
+    /// <summary>
+    /// Запрос к узлу с токеном в заголовке. Пустой токен заголовок не ставит:
+    /// узел ответит 401, и это честнее, чем послать «Bearer » без значения.
+    /// </summary>
+    private static HttpRequestMessage NodeRequest(HttpMethod method, string url, string token)
+    {
+        var request = new HttpRequestMessage(method, url);
+        if (!string.IsNullOrEmpty(token))
+            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
+        return request;
     }
+
+    /// <summary>
+    /// Текст на 401 от узла: это наблюдение («узел ответил 401») плюс действие,
+    /// которое его снимает. Причину — сменился токен, не тот узел — не гадаем.
+    /// </summary>
+    private static string UnauthorizedHint(string machine)
+        => $"Node {machine} answered 401 unauthorized — re-add the node string printed by ZennoPoster";
 
     // ── Handlers ──────────────────────────────────────────────────────────────
     // GET /zp/nodes
@@ -95,13 +115,22 @@ public class ZpOrchestratorHandler : IScriptHandler
             }));
             return;
         }
-        var probes = store.GetAll().Select(async node => new
+        var probes = store.GetAll().Select(async node =>
         {
-            machine = node.Machine,
-            host = node.Host,
-            port = node.Port,
-            updated_at = node.UpdatedAt,
-            available = await ProbeNode(node),
+            var probe = await ProbeNode(node);
+            var version = probe == ZpNodeProbe.Ok ? await FetchVersion(node) : null;
+            return new
+            {
+                machine = node.Machine,
+                host = node.Host,
+                port = node.Port,
+                updated_at = node.UpdatedAt,
+                status = probe.ToString().ToLowerInvariant(),
+                available = probe == ZpNodeProbe.Ok,
+                z3n7 = version?.Z3n7 ?? "",
+                zennoposter = version?.ZennoPoster ?? "",
+                framework = version?.Framework ?? "",
+            };
         });
 
         var result = await Task.WhenAll(probes);
@@ -117,13 +146,15 @@ public class ZpOrchestratorHandler : IScriptHandler
             return;
         }
 
-        var reachableHost = await new ZpNodeRegistrar(new ZpNodeStore(db)).RegisterAsync(
+        var (reachableHost, probe) = await new ZpNodeRegistrar(new ZpNodeStore(db)).RegisterAsync(
             node,
             Environment.MachineName,
             ProbeAddress);
         if (reachableHost == null)
         {
-            await WriteError(ctx.Response, 502, "node unreachable on loopback, local and external addresses");
+            await WriteError(ctx.Response, 502, probe == ZpNodeProbe.Unauthorized
+                ? "node answered 401 unauthorized — the token in this string does not match the one the node expects"
+                : "node unreachable on loopback, local and external addresses");
             return;
         }
 
@@ -143,20 +174,99 @@ public class ZpOrchestratorHandler : IScriptHandler
         await WriteJson(ctx.Response, new { ok = true });
     }
 
-    private static async Task<bool> ProbeNode(ZpNodeRow node)
-        => await ProbeAddress(node.Host, node.Port);
+    private static async Task<ZpNodeProbe> ProbeNode(ZpNodeRow node)
+        => await ProbeAddress(node.Host, node.Port, node.Token);
 
-    private static async Task<bool> ProbeAddress(string host, int port)
+    private static async Task<ZpNodeProbe> ProbeAddress(string host, int port, string token)
     {
         using var timeout = new CancellationTokenSource(NodeProbeTimeout);
         try
         {
-            using var response = await _http.GetAsync($"http://{host}:{port}/state", timeout.Token);
-            return response.IsSuccessStatusCode;
+            using var request = NodeRequest(HttpMethod.Get, $"http://{host}:{port}/state", token);
+            using var response = await _http.SendAsync(request, timeout.Token);
+            if (response.IsSuccessStatusCode) return ZpNodeProbe.Ok;
+            return response.StatusCode == HttpStatusCode.Unauthorized
+                ? ZpNodeProbe.Unauthorized
+                : ZpNodeProbe.Unreachable;
         }
         catch
         {
-            return false;
+            return ZpNodeProbe.Unreachable;
+        }
+    }
+
+    /// <summary>
+    /// Версии с узла. Пустой результат — не «узел мёртв»: сборка z3n7 без роута
+    /// /version отвечает 404, и это ровно тот случай, когда версию показать
+    /// нечем, а всё остальное на узле работает.
+    /// </summary>
+    private static async Task<ZpNodeVersion?> FetchVersion(ZpNodeRow node)
+    {
+        using var timeout = new CancellationTokenSource(NodeProbeTimeout);
+        try
+        {
+            using var request = NodeRequest(HttpMethod.Get, $"{NodeUrl(node)}/version", node.Token);
+            using var response = await _http.SendAsync(request, timeout.Token);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            var info = JsonSerializer.Deserialize<JsonElement>(body);
+            if (info.ValueKind != JsonValueKind.Object) return null;
+
+            return new ZpNodeVersion(
+                ReadVersionField(info, "z3n7"),
+                ReadVersionField(info, "zennoposter"),
+                ReadVersionField(info, "framework"));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string ReadVersionField(JsonElement info, string name)
+        => info.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? ""
+            : "";
+
+    // GET /zp/version?machine=PC
+    private async Task GetVersion(HttpListenerContext ctx, Db db)
+    {
+        var machine = ctx.Request.QueryString["machine"]?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(machine))
+        {
+            await WriteError(ctx.Response, 400, "machine required");
+            return;
+        }
+
+        var node = GetNode(db, machine);
+        if (node == null)
+        {
+            await WriteError(ctx.Response, 404, $"Node not found: {machine}");
+            return;
+        }
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var request = NodeRequest(HttpMethod.Get, $"{NodeUrl(node)}/version", node.Token);
+            using var response = await _http.SendAsync(request, timeout.Token);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await WriteError(ctx.Response, 401, UnauthorizedHint(machine));
+                return;
+            }
+            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            ctx.Response.StatusCode = (int)response.StatusCode;
+            await WriteRaw(ctx.Response, body);
+        }
+        catch (OperationCanceledException)
+        {
+            await WriteError(ctx.Response, 504, "Node version request timed out");
+        }
+        catch (Exception ex)
+        {
+            await WriteError(ctx.Response, 502, $"Node unreachable: {ex.Message}");
         }
     }
 
@@ -178,8 +288,8 @@ public class ZpOrchestratorHandler : IScriptHandler
             return;
         }
 
-        var nodeUrl = await GetNodeUrl(db, machine);
-        if (nodeUrl == null)
+        var node = GetNode(db, machine);
+        if (node == null)
         {
             await WriteError(ctx.Response, 404, $"Node not found: {machine}");
             return;
@@ -188,7 +298,13 @@ public class ZpOrchestratorHandler : IScriptHandler
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         try
         {
-            using var response = await _http.GetAsync(nodeUrl + logRequest.BuildPath(), timeout.Token);
+            using var request = NodeRequest(HttpMethod.Get, NodeUrl(node) + logRequest.BuildPath(), node.Token);
+            using var response = await _http.SendAsync(request, timeout.Token);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await WriteError(ctx.Response, 401, UnauthorizedHint(machine));
+                return;
+            }
             var body = await response.Content.ReadAsStringAsync(timeout.Token);
             ctx.Response.StatusCode = (int)response.StatusCode;
             await WriteRaw(ctx.Response, body);
@@ -225,8 +341,8 @@ public class ZpOrchestratorHandler : IScriptHandler
             return;
         }
 
-        var nodeUrl = await GetNodeUrl(db, machine);
-        if (nodeUrl == null)
+        var node = GetNode(db, machine);
+        if (node == null)
         {
             await WriteError(ctx.Response, 404, $"Node not found: {machine}");
             return;
@@ -235,7 +351,13 @@ public class ZpOrchestratorHandler : IScriptHandler
         using var timeout = new CancellationTokenSource(NodeTrafficTimeout);
         try
         {
-            using var response = await _http.GetAsync(nodeUrl + trafficRequest.BuildPath(), timeout.Token);
+            using var request = NodeRequest(HttpMethod.Get, NodeUrl(node) + trafficRequest.BuildPath(), node.Token);
+            using var response = await _http.SendAsync(request, timeout.Token);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await WriteError(ctx.Response, 401, UnauthorizedHint(machine));
+                return;
+            }
             var body = await response.Content.ReadAsStringAsync(timeout.Token);
             ctx.Response.StatusCode = (int)response.StatusCode;
             await WriteRaw(ctx.Response, body);
@@ -266,8 +388,8 @@ public class ZpOrchestratorHandler : IScriptHandler
             return;
         }
 
-        var nodeUrl = await GetNodeUrl(db, machine);
-        if (nodeUrl == null)
+        var node = GetNode(db, machine);
+        if (node == null)
         {
             await WriteError(ctx.Response, 404, $"Node not found: {machine}");
             return;
@@ -276,7 +398,13 @@ public class ZpOrchestratorHandler : IScriptHandler
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         try
         {
-            using var response = await _http.GetAsync(nodeUrl + settingsRequest.BuildPath(), timeout.Token);
+            using var request = NodeRequest(HttpMethod.Get, NodeUrl(node) + settingsRequest.BuildPath(), node.Token);
+            using var response = await _http.SendAsync(request, timeout.Token);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await WriteError(ctx.Response, 401, UnauthorizedHint(machine));
+                return;
+            }
             var body = await response.Content.ReadAsStringAsync(timeout.Token);
             ctx.Response.StatusCode = (int)response.StatusCode;
             await WriteRaw(ctx.Response, body);
@@ -303,15 +431,21 @@ public class ZpOrchestratorHandler : IScriptHandler
 
         if (string.IsNullOrEmpty(machine)) { await WriteError(ctx.Response, 400, "machine required"); return; }
 
-        var url = await GetNodeUrl(db, machine);
-        if (url == null) { await WriteError(ctx.Response, 404, $"Node not found: {machine}"); return; }
+        var node = GetNode(db, machine);
+        if (node == null) { await WriteError(ctx.Response, 404, $"Node not found: {machine}"); return; }
 
         var body = JsonSerializer.Serialize(new { action, task_id = taskId, payload });
-        var content = new System.Net.Http.StringContent(body, Encoding.UTF8, "application/json");
 
         try
         {
-            var resp = await _http.PostAsync($"{url}/command", content);
+            using var request = NodeRequest(HttpMethod.Post, $"{NodeUrl(node)}/command", node.Token);
+            request.Content = new System.Net.Http.StringContent(body, Encoding.UTF8, "application/json");
+            using var resp = await _http.SendAsync(request);
+            if (resp.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await WriteError(ctx.Response, 401, UnauthorizedHint(machine));
+                return;
+            }
             var text = await resp.Content.ReadAsStringAsync();
             ctx.Response.StatusCode = (int)resp.StatusCode;
             await WriteRaw(ctx.Response, text);
@@ -327,14 +461,20 @@ public class ZpOrchestratorHandler : IScriptHandler
         var machine = ctx.Request.QueryString["machine"] ?? "";
         if (string.IsNullOrEmpty(machine)) { await WriteError(ctx.Response, 400, "machine required"); return; }
 
-        var url = await GetNodeUrl(db, machine);
-        if (url == null) { await WriteError(ctx.Response, 404, $"Node not found: {machine}"); return; }
+        var node = GetNode(db, machine);
+        if (node == null) { await WriteError(ctx.Response, 404, $"Node not found: {machine}"); return; }
 
         string raw;
         try
         {
             using var timeout = new CancellationTokenSource(NodeStateTimeout);
-            using var resp = await _http.GetAsync($"{url}/state", timeout.Token);
+            using var request = NodeRequest(HttpMethod.Get, $"{NodeUrl(node)}/state", node.Token);
+            using var resp = await _http.SendAsync(request, timeout.Token);
+            if (resp.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await WriteError(ctx.Response, 401, UnauthorizedHint(machine));
+                return;
+            }
             resp.EnsureSuccessStatusCode();
             raw = await resp.Content.ReadAsStringAsync(timeout.Token);
         }
@@ -386,25 +526,21 @@ public class ZpOrchestratorHandler : IScriptHandler
 
     private async Task GetStateAll(HttpListenerContext ctx, Db db)
     {
-        var rows = db.GetLines("machine,host,port", DbSchema.ZpNodes.Name, where: "1=1");
-
-        var nodes = rows
-            .Select(r => r.Split('¦'))
-            .Where(p => p.Length >= 3 && !string.IsNullOrEmpty(p[0]))
-            .Select(p => (machine: p[0], url: $"http://{p[1]}:{p[2]}"))
-            .ToList();
+        var nodes = new ZpNodeStore(db).GetAll();
 
         var fetches = nodes.Select(async node =>
         {
             try
             {
-                var resp = await _http.GetAsync($"{node.url}/state");
-                var raw  = await resp.Content.ReadAsStringAsync();
-                return (node.machine, raw, ok: true);
+                using var request = NodeRequest(HttpMethod.Get, $"{NodeUrl(node)}/state", node.Token);
+                using var resp = await _http.SendAsync(request);
+                if (!resp.IsSuccessStatusCode) return (machine: node.Machine, raw: "", ok: false);
+                var raw = await resp.Content.ReadAsStringAsync();
+                return (machine: node.Machine, raw, ok: true);
             }
             catch
             {
-                return (node.machine, raw: "", ok: false);
+                return (machine: node.Machine, raw: "", ok: false);
             }
         });
 
