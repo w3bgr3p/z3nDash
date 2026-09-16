@@ -76,6 +76,9 @@
                 { "priority",    "TEXT DEFAULT '10'" },
                 { "run_id",      "TEXT DEFAULT ''" },
                 { "args_b64",    "TEXT DEFAULT ''" },
+                // Откуда прилетел элемент. Расписанный разбирается только у
+                // включённой задачи, ручной — у любой: кнопку нажал человек.
+                { "origin",      "TEXT DEFAULT 'schedule'" },
             }
         };
 

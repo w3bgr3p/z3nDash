@@ -11,7 +11,7 @@ namespace z3nDash;
 ///   GET  /tasker/list     — список расписаний из БД
 ///   POST /tasker/save     — создать / обновить запись
 ///   POST /tasker/delete   — удалить по id
-///   POST /tasker/run      — запустить вручную немедленно
+///   POST /tasker/run      — поставить в очередь count прогонов (по умолчанию 1)
 ///   POST /tasker/stop     — Kill процесса по id
 ///   GET  /tasker/output   — last_output из БД по ?id=
 ///   GET  /tasker/pick     — системный диалог выбора файла или каталога
@@ -197,6 +197,14 @@ public sealed class SchedulerHandler : IScriptHandler
         var id = json.Value.TryGetProperty("id", out var eid) ? eid.GetString() ?? "" : "";
         if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
 
+        if (!TryReadCount(json.Value, out var count))
+        {
+            ctx.Response.StatusCode = 400;
+            await HttpHelpers.WriteJson(ctx.Response,
+                new { error = $"count must be an integer between 1 and {SchedulerService.MaxManualBurst}" });
+            return;
+        }
+
         // Получить запись и прогнать через LaunchAsync минуя триггер.
         // Колонки — через RowColumns: last_output читать нельзя, вывод шаблона
         // содержит разделитель колонок и сдвигает всю строку.
@@ -204,9 +212,35 @@ public sealed class SchedulerHandler : IScriptHandler
         var rows = db.GetLines(string.Join(",", cols), Table, where: $"\"id\" = '{id}'");
         if (rows.Count == 0) { ctx.Response.StatusCode = 404; return; }
 
-        // Форсировать запуск через FireNow
-        _scheduler.FireNow(id, ParseRow(rows[0], cols), db);
-        await HttpHelpers.WriteJson(ctx.Response, new { ok = true, id });
+        var queued = _scheduler.EnqueueManual(id, ParseRow(rows[0], cols), db, count);
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true, id, queued });
+    }
+
+    /// <summary>
+    /// Сколько прогонов заказано. Поле необязательное: без него — один прогон.
+    /// Число принимается и как JSON-число, и как строка — поле ввода в браузере
+    /// отдаёт строку.
+    /// </summary>
+    private static bool TryReadCount(JsonElement json, out int count)
+    {
+        count = 1;
+        if (!json.TryGetProperty("count", out var el)) return true;
+
+        switch (el.ValueKind)
+        {
+            case JsonValueKind.Null or JsonValueKind.Undefined:
+                return true;
+            case JsonValueKind.Number when el.TryGetInt32(out var n):
+                count = n;
+                break;
+            case JsonValueKind.String when int.TryParse(el.GetString(), out var s):
+                count = s;
+                break;
+            default:
+                return false;
+        }
+
+        return count >= 1 && count <= SchedulerService.MaxManualBurst;
     }
 
     private async Task Stop(HttpListenerContext ctx)

@@ -31,6 +31,15 @@ public sealed partial class SchedulerService : IDisposable
     private static string Table => DbSchema.Schedules.Name;
     private static string QueueTable => DbSchema.ScheduleQueue.Name;
 
+    /// <summary>Элемент очереди, поставленный расписанием.</summary>
+    private const string OriginSchedule = "schedule";
+
+    /// <summary>Элемент очереди, поставленный человеком через кнопку Run.</summary>
+    private const string OriginManual = "manual";
+
+    /// <summary>Потолок на размер одного залпа. Защищает от опечатки в поле ввода.</summary>
+    public const int MaxManualBurst = 10000;
+
     public SchedulerService(DbConnectionService dbService, Logger? log = null)
     {
         _dbService = dbService;
@@ -48,6 +57,7 @@ public sealed partial class SchedulerService : IDisposable
         db.PrepareTable(DbSchema.Schedules.Columns, Table);
         db.PrepareTable(DbSchema.ScheduleQueue.Columns, QueueTable);
         RepairShiftedScheduleColumns(db);
+        RestoreQueue(db);
         RestoreRunningProcesses(db);
         _timer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(1));
     }
@@ -74,6 +84,21 @@ public sealed partial class SchedulerService : IDisposable
 
         if (repaired != "0")
             _log?.Info($"[SchedulerService] Repaired {repaired} shifted schedule rows");
+    }
+
+    /// <summary>
+    /// Элементы очереди, помеченные running, пережили падение приложения:
+    /// процессов, которые их выполняли, на старте нет по определению.
+    /// Без этого сброса залп, прерванный перезапуском, терял бы свой хвост.
+    /// </summary>
+    private void RestoreQueue(Db db)
+    {
+        // Отработанные записи очереди больше никем не читаются и растут без предела.
+        db.Query($"DELETE FROM \"{QueueTable}\" WHERE \"status\" NOT IN ('pending', 'running')");
+
+        var revived = db.Query($"UPDATE \"{QueueTable}\" SET \"status\" = 'pending', \"run_id\" = '' WHERE \"status\" = 'running'");
+        if (revived != "0" && !string.IsNullOrWhiteSpace(revived))
+            _log?.Info($"[SchedulerService] Вернул в очередь {revived} прерванных элементов");
     }
 
     private void RestoreRunningProcesses(Db db)
@@ -233,7 +258,8 @@ public sealed partial class SchedulerService : IDisposable
             kv.Value.Kill();
     }
 
-    private void EnqueueItem(Db db, string scheduleId, Dictionary<string, string> record, int priority)
+    private void EnqueueItem(Db db, string scheduleId, Dictionary<string, string> record, int priority,
+                             string origin = OriginSchedule)
     {
         db.InsertDic(new Dictionary<string, string>
         {
@@ -244,6 +270,7 @@ public sealed partial class SchedulerService : IDisposable
             { "priority",    priority.ToString() },
             { "run_id",      "" },
             { "args_b64",    record.GetValueOrDefault("args", "") },
+            { "origin",      origin },
         }, QueueTable);
     }
 
@@ -263,17 +290,33 @@ public sealed partial class SchedulerService : IDisposable
             DrainQueueFor(db, scheduleId);
     }
 
-    /// <summary>Разобрать очередь одной задачи ровно до заполнения её нитей.</summary>
+    /// <summary>
+    /// Разобрать очередь одной задачи ровно до заполнения её нитей.
+    ///
+    /// Гейт поэлементный, а не на всю задачу: расписанный элемент разбирается
+    /// только у включённой задачи, ручной — у любой. Иначе залп «выполнить N раз»
+    /// на задаче без расписания (а там enabled всегда false) не разобрался бы
+    /// никогда. Пауза и отсрочка держат и то и другое: это единственный способ
+    /// остановить уже заказанный залп, не вычищая очередь.
+    /// </summary>
     private void DrainQueueFor(Db db, string scheduleId)
     {
         lock (_controlGate)
         {
-            if (!AutomaticLaunchAllowed(db, scheduleId)) return;
-            DrainQueueForCore(db, scheduleId);
+            bool allowScheduled;
+            try
+            {
+                var control = ReadControlRecord(db, scheduleId);
+                if (IsHeld(control, DateTime.UtcNow)) return;
+                allowScheduled = control.GetValueOrDefault("enabled") == "true";
+            }
+            catch (KeyNotFoundException) { return; }
+
+            DrainQueueForCore(db, scheduleId, allowScheduled);
         }
     }
 
-    private void DrainQueueForCore(Db db, string scheduleId)
+    private void DrainQueueForCore(Db db, string scheduleId, bool allowScheduled)
     {
         var schedCols = RowColumns(db);
         if (schedCols.Count == 0) return;
@@ -288,10 +331,13 @@ public sealed partial class SchedulerService : IDisposable
         if (qCols.Count == 0) return;
         var colsSql = string.Join(", ", qCols.Select(c => $"\"{c}\""));
 
+        // Выключенная задача видит в очереди только свои ручные элементы.
+        var originFilter = allowScheduled ? "" : $" AND \"origin\" = '{OriginManual}'";
+
         var stagger = TimeSpan.Zero;
         while (CountActiveInstances(scheduleId) < maxThreads)
         {
-            var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"status\" = 'pending' AND \"schedule_id\" = '{scheduleId}' ORDER BY \"priority\" ASC, \"queued_at\" ASC LIMIT 1");
+            var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"status\" = 'pending' AND \"schedule_id\" = '{scheduleId}'{originFilter} ORDER BY \"priority\" ASC, \"queued_at\" ASC LIMIT 1");
             if (string.IsNullOrWhiteSpace(raw)) return;
 
             var qRecord = ParseRow(raw.Split('·')[0], qCols);
@@ -303,7 +349,11 @@ public sealed partial class SchedulerService : IDisposable
 
             var own = new Dictionary<string, string>(record);
             if (!string.IsNullOrWhiteSpace(argsB64)) own["args"] = argsB64;
-            StartInstance(db, own, DateTime.UtcNow, qUuid, delay: stagger);
+
+            // Ручной элемент стартует как ручной запуск: повторный гейт после паузы
+            // разноса иначе вернул бы его в pending у выключенной задачи навсегда.
+            var manual = qRecord.GetValueOrDefault("origin", OriginSchedule) == OriginManual;
+            StartInstance(db, own, DateTime.UtcNow, qUuid, delay: stagger, automatic: !manual);
             stagger += NextStaggerGap();
         }
     }
@@ -1081,6 +1131,11 @@ public sealed partial class SchedulerService : IDisposable
     /// Снимок живого вывода как готовые SSE-события: строка, время и id нити.
     /// Догруженная при переподписке история раскрашивается так же, как поток.
     /// </summary>
+    /// <summary>
+    /// Строки уже идущих прогонов для новой подписки. Помечены replay: подписчик
+    /// не должен принимать восстановленный лог за признак живого прогона —
+    /// строки могли быть написаны часы назад.
+    /// </summary>
     public List<string> GetLiveEvents(string id)
     {
         return _running
@@ -1089,10 +1144,11 @@ public sealed partial class SchedulerService : IDisposable
             .OrderBy(e => e.At)
             .Select(e => JsonSerializer.Serialize(new
             {
-                line  = e.Text,
-                run   = e.Run,
-                ts    = e.At.ToString("o"),
-                level = e.Text.StartsWith("[ERR]") ? "ERROR" : "INFO",
+                line   = e.Text,
+                run    = e.Run,
+                ts     = e.At.ToString("o"),
+                level  = e.Text.StartsWith("[ERR]") ? "ERROR" : "INFO",
+                replay = true,
             }))
             .ToList();
     }
@@ -1126,7 +1182,10 @@ public sealed partial class SchedulerService : IDisposable
         var qCols = db.GetTableColumns(QueueTable);
         if (qCols.Count == 0) return new();
         var colsSql = string.Join(", ", qCols.Select(c => $"\"{c}\""));
-        var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"schedule_id\" = '{scheduleId}' ORDER BY \"priority\" ASC, \"queued_at\" ASC");
+        // Только незавершённые: отработанные записи очередь копит навсегда, а этот
+        // список UI опрашивает раз в две секунды. Залп на 50 прогонов за день
+        // превратил бы опрос в выгрузку тысяч мёртвых строк.
+        var raw = db.Query($"SELECT {colsSql} FROM \"{QueueTable}\" WHERE \"schedule_id\" = '{scheduleId}' AND \"status\" IN ('pending', 'running') ORDER BY \"priority\" ASC, \"queued_at\" ASC");
         if (string.IsNullOrWhiteSpace(raw)) return new();
         return raw.Split('·').Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => ParseRow(r, qCols)).ToList();
     }
@@ -1233,36 +1292,29 @@ public sealed partial class SchedulerService : IDisposable
     }
 
     /// <summary>
-    /// Ручной запуск. Наливает все свободные нити задачи: если в настройках стоит
-    /// пять потоков, кнопка Run поднимает пять инстансов, а не один.
+    /// Залп «выполнить N раз»: кладёт в очередь count прогонов и сразу начинает
+    /// их разбирать. Скорость определяет только max_threads.
+    ///
+    /// on_overlap здесь не спрашивается намеренно. Он отвечает на вопрос «что
+    /// делать, когда расписание сработало, а предыдущий прогон ещё идёт»;
+    /// «выполнить 50 раз» — не пересечение, а прямая команда, и молча выбросить
+    /// её хвост при on_overlap='skip' значило бы соврать о числе прогонов.
+    ///
+    /// Возвращает, сколько элементов поставлено в очередь.
     /// </summary>
-    public void FireNow(string id, Dictionary<string, string> record, Db db)
+    public int EnqueueManual(string id, Dictionary<string, string> record, Db db, int count)
     {
-        var overlap    = record.GetValueOrDefault("on_overlap", "skip");
-        var maxThreads = ReadThreads(record);
-        var active     = CountActiveInstances(id);
+        if (count < 1) return 0;
+        count = Math.Min(count, MaxManualBurst);
 
-        if (overlap == "kill_restart" && active > 0)
-        {
-            KillAllInstances(id);
-            RemoveInstancesFromRunning(id);
-            active = 0;
-        }
+        for (var i = 0; i < count; i++)
+            EnqueueItem(db, id, record, priority: 0, origin: OriginManual);
 
-        var free = Math.Max(0, maxThreads - active);
-        if (free == 0)
-        {
-            // Свободных нитей нет: очередь копит только режим parallel.
-            if (overlap == "parallel") EnqueueItem(db, id, record, priority: 0);
-            return;
-        }
+        if (count > 1)
+            _log?.Info($"[{record.GetValueOrDefault("name", id)}] залп: {count} прогонов в очередь, нитей {ReadThreads(record)}");
 
-        var stagger = TimeSpan.Zero;
-        for (var i = 0; i < free; i++)
-        {
-            StartInstance(db, record, DateTime.UtcNow, delay: stagger, automatic: false);
-            stagger += NextStaggerGap();
-        }
+        DrainQueueFor(db, id);
+        return count;
     }
 
     public void Dispose()

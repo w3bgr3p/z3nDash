@@ -6,6 +6,10 @@ var _PS = {
     load: function()    { return (typeof PageState !== 'undefined') ? PageState.load() : {}; },
 };
 
+// Потолок одного залпа по кнопке Run. Тот же, что у SchedulerService.MaxManualBurst:
+// сервер всё равно проверит, здесь — чтобы поле не давало ввести заведомо отказное.
+var MAX_BURST = 10000;
+
 var schedules  = [];
 var selectedId = null;
 var activeTab  = 'execution';
@@ -27,6 +31,8 @@ function markTaskDirty() {
 
 var _httpPoll  = null;
 var _sseOutput = null;
+var _livePoll  = null;   // опрос живых инстансов задачи: он и решает, гореть ли LIVE
+var _liveId    = '';     // задача, за которой сейчас следит _livePoll
 
 var curProject = '';
 var curTaskId  = '';
@@ -73,6 +79,7 @@ function closeSse() {
 
 function closeSseOutput() {
     if (_sseOutput) { _sseOutput.close(); _sseOutput = null; }
+    stopLiveWatch();
 }
 
 function startSse() {
@@ -448,6 +455,8 @@ function renderDetailActions(s) {
 
     document.getElementById('detailActions').innerHTML =
         '<div class="action-group">'
+        + '<input type="number" class="form-input" id="runCount" value="1" min="1" max="' + MAX_BURST + '"'
+        +   ' title="How many runs to queue. They start as threads free up." style="width:54px;text-align:center;padding:2px 4px">'
         + '<button class="btn primary sm" onclick="runNow(\'' + id + '\')">' + runLabel + '</button>'
         + (scheduled ? '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled || 'true') + '\')">' + pauseLabel + '</button>' : '')
         + (scheduleHeld(s) ? '<button class="btn sm" title="Clear script pause and deferral" onclick="resumeSchedule(\'' + id + '\')">Resume schedule</button>' : '')
@@ -598,10 +607,10 @@ function runInstall(s, btn) {
     btn.textContent = '⏳ installing...';
     switchTab('output');
 
-    var box   = _getOutputBox();
-    var badge = _getLiveBadge();
-    if (box)   { box.innerHTML = ''; }
-    if (badge) { badge.style.display = 'inline-block'; }
+    var box = _getOutputBox();
+    if (box) { box.innerHTML = ''; }
+    stopLiveWatch();
+    _setLive(true);
 
     var src = new EventSource('/tasker/install/stream?id=' + encodeURIComponent(s.id));
 
@@ -617,16 +626,14 @@ function runInstall(s, btn) {
 
     src.addEventListener('done', function() {
         src.close();
-        var badge = _getLiveBadge();
-        if (badge) badge.style.display = 'none';
+        startLiveWatch(selectedId);
         btn.disabled    = false;
         btn.textContent = _isJs(s.executor) ? '📦 npm install' : '📦 pip install';
     });
 
     src.onerror = function() {
         src.close();
-        var badge = _getLiveBadge();
-        if (badge) badge.style.display = 'none';
+        startLiveWatch(selectedId);
         btn.disabled    = false;
         btn.textContent = '❌ failed';
         setTimeout(function() {
@@ -755,9 +762,11 @@ function setActiveTab(tab) {
 // ── Execution tab ─────────────────────────────────────────────────────────────
 
 var _procStatsPoll = null;
+var _queuePoll     = null;
 
 function stopProcStatsPoll() {
     if (_procStatsPoll) { clearInterval(_procStatsPoll); _procStatsPoll = null; }
+    if (_queuePoll)     { clearInterval(_queuePoll);     _queuePoll     = null; }
 }
 
 function renderExecution(s) {
@@ -807,9 +816,12 @@ function renderExecution(s) {
         + '</div>'
         + (isRunning && isMulti
             ? '<div class="detail-section" id="instancesCard"><div class="info-card-title">Active instances</div><div id="instancesList">—</div></div>'
-            + '<div class="detail-section" id="queueCard"><div class="info-card-title">Queue (pending)</div><div id="queueList">—</div>'
-            + '<button class="btn sm" style="margin-top:4px" onclick="clearQueue(\'' + escHtml(s.id) + '\')">Clear queue</button></div>'
             : '')
+        // Очередь скрыта, пока в ней пусто, и раскрывается опросом. Прежнее условие
+        // (isRunning && isMulti) прятало её у однопоточной задачи — а залп «N раз»
+        // при max_threads=1 живёт целиком в очереди и был бы не виден вовсе.
+        + '<div class="detail-section" id="queueCard" style="display:none"><div class="info-card-title">Queue (pending)</div><div id="queueList">—</div>'
+        + '<button class="btn sm" style="margin-top:4px" onclick="clearQueue(\'' + escHtml(s.id) + '\')">Clear queue</button></div>'
         + '</div>';
 
     if (isRunning) {
@@ -845,15 +857,6 @@ function renderExecution(s) {
                             + '</div>';
                     }).join('');
                 }).catch(function() {});
-
-            fetch('/tasker/queue?id=' + encodeURIComponent(id))
-                .then(function(r) { return r.json(); })
-                .then(function(list) {
-                    var el = document.getElementById('queueList');
-                    if (!el) return;
-                    var pending = (list || []).filter(function(q) { return q.status === 'pending'; });
-                    el.textContent = pending.length ? pending.length + ' pending' : '(empty)';
-                }).catch(function() {});
         }
 
         if (!isMulti) pollStats();
@@ -863,6 +866,34 @@ function renderExecution(s) {
             if (isMulti)  pollInstances();
         }, 2000);
     }
+
+    startQueuePoll(s.id);
+}
+
+/// Очередь опрашивается независимо от того, идёт ли прогон: залп «N раз» на
+/// однопоточной задаче виден только здесь, а в паузе между прогонами статус
+/// задачи успевает стать idle — по нему очередь пряталась бы и появлялась.
+function startQueuePoll(id) {
+    function poll() {
+        fetch('/tasker/queue?id=' + encodeURIComponent(id))
+            .then(function(r) { return r.json(); })
+            .then(function(list) {
+                var card = document.getElementById('queueCard');
+                var el   = document.getElementById('queueList');
+                if (!card || !el) { if (_queuePoll) { clearInterval(_queuePoll); _queuePoll = null; } return; }
+
+                var pending = (list || []).filter(function(q) { return q.status === 'pending'; });
+                card.style.display = pending.length ? '' : 'none';
+                if (!pending.length) return;
+
+                var manual = pending.filter(function(q) { return q.origin === 'manual'; }).length;
+                el.textContent = manual === pending.length ? pending.length + ' pending (Run)'
+                               : manual === 0              ? pending.length + ' pending'
+                               : pending.length + ' pending, ' + manual + ' of them from Run';
+            }).catch(function() {});
+    }
+    poll();
+    _queuePoll = setInterval(poll, 2000);
 }
 
 function infoRow(key, val) {
@@ -1505,6 +1536,44 @@ function renderOutputLines(text) {
 function _getOutputBox()  { return document.getElementById('outputBox'); }
 function _getLiveBadge()  { return document.getElementById('liveBadgeBottom'); }
 
+// ── Бейдж LIVE ────────────────────────────────────────────────────────────────
+// Бейдж утверждает «прогон идёт прямо сейчас», поэтому источник для него один —
+// список живых инстансов задачи. Событие в канале вывода таким источником быть
+// не может: при подписке сервер повторяет накопленный лог, и строка, написанная
+// час назад, зажигала бейдж на задаче, которая давно не работает.
+
+function _setLive(on) {
+    var badge = _getLiveBadge();
+    if (badge) badge.style.display = on ? 'inline-block' : 'none';
+}
+
+function stopLiveWatch() {
+    if (_livePoll) { clearInterval(_livePoll); _livePoll = null; }
+    _liveId = '';
+}
+
+function startLiveWatch(id) {
+    stopLiveWatch();
+    if (!id || id === '__new__') { _setLive(false); return; }
+    _liveId = id;
+    _setLive(false);
+    checkLive();
+    _livePoll = setInterval(checkLive, 3000);
+}
+
+// Ответ пришёл после переключения задачи — он уже не про ту, что на экране.
+function checkLive() {
+    var id = _liveId;
+    if (!id) return;
+    fetch('/tasker/instances?id=' + encodeURIComponent(id))
+        .then(function(r) { return r.json(); })
+        .then(function(list) {
+            if (_liveId !== id) return;
+            _setLive(!!(list && list.length));
+        })
+        .catch(function() {});
+}
+
 // ── Нити и фильтры вывода ─────────────────────────────────────────────────────
 // Пять параллельных нитей пишут в одно окно, поэтому у каждой свой цвет,
 // бейдж с началом runId и чип в шапке для изоляции.
@@ -1613,16 +1682,16 @@ function reloadOutput() {
 function startSseOutput(id) {
     if (_sseOutput) { _sseOutput.close(); _sseOutput = null; }
     _resetRuns();
+    startLiveWatch(id);
 
     _sseOutput = new EventSource('/tasker/output/stream?id=' + encodeURIComponent(id));
 
     _sseOutput.addEventListener('output', function(e) {
         try {
-            var d     = JSON.parse(e.data);
-            var box   = _getOutputBox();
-            var badge = _getLiveBadge();
+            var d   = JSON.parse(e.data);
+            var box = _getOutputBox();
             if (!box) return;
-            if (d.done)  { if (badge) badge.style.display = 'none'; return; }
+            if (d.done)  { _setLive(false); return; }
             if (d.clear) { box.innerHTML = ''; _resetRuns(); }
             var empty = box.querySelector('.out-line.empty');
             if (empty) empty.remove();
@@ -1647,19 +1716,19 @@ function startSseOutput(id) {
                 _appendLine(box, d);
             }
             if (atBottom) box.scrollTop = box.scrollHeight;
-            if (badge) badge.style.display = 'inline-block';
+            // Живая строка — повод не ждать очередного тика опроса.
+            if (!d.replay) checkLive();
         } catch(err) {}
     });
 
     _sseOutput.addEventListener('done', function() {
-        var badge = _getLiveBadge();
-        if (badge) badge.style.display = 'none';
+        _setLive(false);
         _sseOutput.close(); _sseOutput = null;
     });
 
+    // Оборвалась подписка, а не прогон: гасить бейдж здесь нельзя, опрос сам
+    // увидит, работает задача или нет.
     _sseOutput.onerror = function() {
-        var badge = _getLiveBadge();
-        if (badge) badge.style.display = 'none';
         _sseOutput.close(); _sseOutput = null;
     };
 }
@@ -1680,6 +1749,7 @@ async function clearOutputBottom() {
 function clearOutputPoll() {
     if (outputPoll)  { clearTimeout(outputPoll); outputPoll = null; }
     if (_sseOutput)  { _sseOutput.close(); _sseOutput = null; }
+    stopLiveWatch();
 }
 
 // ── Log / HTTP panels ─────────────────────────────────────────────────────────
@@ -1901,8 +1971,26 @@ async function resumeSchedule(id) {
     await loadList();
 }
 
+/// Сколько прогонов заказано полем рядом с кнопкой Run. Поля может не быть:
+/// карточка задачи перерисовывается, и вызов способен пережить её замену.
+function _runCount() {
+    var el = document.getElementById('runCount');
+    var n  = parseInt((el && el.value) || '1', 10);
+    if (!isFinite(n) || n < 1) return 1;
+    return Math.min(n, MAX_BURST);
+}
+
 async function runNow(id) {
-    await fetch('/tasker/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+    var res = await fetch('/tasker/run', {
+        method:  'POST',
+        headers: {'Content-Type':'application/json'},
+        body:    JSON.stringify({id: id, count: _runCount()})
+    });
+    if (!res.ok) {
+        var err = await res.json().catch(function() { return {}; });
+        Dialog.error(err.error || ('Run failed: HTTP ' + res.status));
+        return;
+    }
     await loadList();
     startSseOutput(id);
 }
@@ -1919,11 +2007,28 @@ async function buildCsx(id) {
     finally { setTimeout(function() { btn.disabled = false; btn.textContent = '🔨 Check'; btn.style.borderColor = '#a371f7'; btn.style.color = '#a371f7'; }, 3000); }
 }
 
+/// Сколько прогонов ждёт очереди. Остановка всех инстансов без этого выглядела бы
+/// как остановка задачи, а через две секунды очередь подняла бы следующий.
+async function _pendingCount(id) {
+    try {
+        var list = await (await fetch('/tasker/queue?id=' + encodeURIComponent(id))).json();
+        return (list || []).filter(function(q) { return q.status === 'pending'; }).length;
+    } catch (e) { return 0; }
+}
+
+async function _offerQueueDrop(id) {
+    var pending = await _pendingCount(id);
+    if (!pending) return;
+    if (await Dialog.confirm(pending + ' more run(s) are queued and will start as threads free up.\nDrop them too?', '■ Interrupt', true))
+        await fetch('/tasker/clear-queue', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+}
+
 async function stopNow(id) {
     var res       = await fetch('/tasker/instances?id=' + encodeURIComponent(id));
     var instances = await res.json().catch(function() { return []; }) || [];
     if (instances.length === 0) {
         await fetch('/tasker/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+        await _offerQueueDrop(id);
     } else if (instances.length === 1) {
         if (!(await Dialog.confirm('Kill running instance?', '■ Interrupt', true))) return;
         await fetch('/tasker/kill-instance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id, runId:instances[0].runId}) });
@@ -1933,6 +2038,8 @@ async function stopNow(id) {
         var url = chosen === '__all__' ? '/tasker/stop' : '/tasker/kill-instance';
         var body = chosen === '__all__' ? {id:id} : {id:id, runId:chosen};
         await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        // Убийство одного инстанса очередь не трогает: человек снял именно его.
+        if (chosen === '__all__') await _offerQueueDrop(id);
     }
     await loadList();
 }
@@ -1940,7 +2047,7 @@ async function stopNow(id) {
 async function restartNow(id) {
     await fetch('/tasker/stop', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
     await new Promise(function(r) { setTimeout(r, 800); });
-    await fetch('/tasker/run', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
+    await fetch('/tasker/run', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id, count: _runCount()}) });
     await loadList();
     startSseOutput(id);
 }
