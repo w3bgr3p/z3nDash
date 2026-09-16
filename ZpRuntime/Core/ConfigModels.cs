@@ -65,6 +65,15 @@ public class WatchdogConfig
     public int    IntervalSec { get; set; } = 15;
 }
 
+public class ClipboardConfig
+{
+    // Преобразование селектора ZennoPoster в буфере обмена по Alt+G / Alt+C / Alt+S.
+    public bool   Enabled     { get; set; } = false;
+    // Хоткеи регистрируются, только пока окно этого процесса активно.
+    // Пустая строка = гейт выключен, хоткеи держатся постоянно.
+    public string ProcessName { get; set; } = "ProjectMaker";
+}
+
 public class CrxItem
 {
     public string Id { get; set; } = string.Empty;

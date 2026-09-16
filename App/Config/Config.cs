@@ -16,6 +16,7 @@ public class Config
     public static SecurityConfig SecurityConfig { get; private set; } = new();
     public static AiConfig       AiConfig       { get; private set; } = new();
     public static WatchdogConfig WatchdogConfig { get; private set; } = new();
+    public static ClipboardConfig ClipboardConfig { get; private set; } = new();
 
 
     public static Dictionary<string, CrxItem> Crx { get; private set; } = new();
@@ -42,6 +43,7 @@ public class Config
         SecurityConfig = config.GetSection("SecurityConfig").Get<SecurityConfig>() ?? new();
         AiConfig       = config.GetSection("AiConfig").Get<AiConfig>()             ?? new();
         WatchdogConfig = config.GetSection("WatchdogConfig").Get<WatchdogConfig>() ?? new();
+        ClipboardConfig = config.GetSection("ClipboardConfig").Get<ClipboardConfig>() ?? new();
 
 
         Crx = config.GetSection("Crx").Get<Dictionary<string, CrxItem>>() ?? new();
