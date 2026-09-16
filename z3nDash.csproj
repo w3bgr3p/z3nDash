@@ -103,8 +103,12 @@
         </None>
         <!-- Секреты нужны при отладке рядом с bin, но в publish им нельзя:
              иначе строка подключения с паролем уедет в портабл-архив. -->
+        <!-- PreserveNewest, а не Always: приложение пишет в этот файл во время работы (страница Config,
+             /watchdog/config, /clipconv/config). Проверено на отдельном стенде: при Always следующая
+             сборка затирает сохранённые настройки исходным файлом из корня проекта, при PreserveNewest
+             более свежая копия в bin уцелеет. -->
         <None Update="appsettings.secrets.json">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <CopyToPublishDirectory>Never</CopyToPublishDirectory>
         </None>
         <None Update="icon.ico">
