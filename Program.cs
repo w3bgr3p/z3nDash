@@ -25,6 +25,30 @@ using System.Text;
 try { Console.OutputEncoding = new UTF8Encoding(false); } catch { }
 try { Console.InputEncoding  = new UTF8Encoding(false); } catch { }
 
+// Аналог -SelfTest из clipboard-heget.ps1: проверка преобразования без буфера,
+// без хоткеев и без запуска сервера. Результат дублируется в файл: у WinExe
+// stdout не всегда доходит до вызывающей консоли.
+if (args.Contains("--clipconv-selftest"))
+{
+    var selfTestLines = new List<string>();
+    int selfTestFailed = 0;
+    foreach (var c in HeSelectorConverter.SelfTest())
+    {
+        selfTestLines.Add($"{(c.Passed ? "PASS" : "FAIL")}  {c.Name}");
+        if (!c.Passed)
+        {
+            selfTestFailed++;
+            selfTestLines.Add($"  expected: {c.Expected}");
+            selfTestLines.Add($"  actual:   {c.Actual}");
+        }
+    }
+    selfTestLines.Add(selfTestFailed == 0 ? "Self-test passed" : $"Self-test FAILED: {selfTestFailed}");
+
+    foreach (var l in selfTestLines) Console.WriteLine(l);
+    try { File.WriteAllLines(Path.Combine(AppContext.BaseDirectory, "clipconv-selftest.log"), selfTestLines); } catch { }
+    return selfTestFailed == 0 ? 0 : 1;
+}
+
 try
 {
     
@@ -51,6 +75,7 @@ try
 
 
     var watchdogService = new MemoryWatchdogService(_log);
+    var clipboardService = new ClipboardConverterService(_log);
 
     dashboardService.RegisterHandler(new ZpOrchestratorHandler(dbConnectionService));
     dashboardService.RegisterHandler(new SchedulerHandler(dbConnectionService, schedulerService, dashboardService.WwwrootPath));
@@ -58,6 +83,7 @@ try
     dashboardService.RegisterHandler(new ImportHandler(dbConnectionService));
     dashboardService.RegisterHandler(new CliplatesHandler(dbConnectionService));
     dashboardService.RegisterHandler(new MemoryWatchdogHandler(watchdogService));
+    dashboardService.RegisterHandler(new ClipboardConverterHandler(clipboardService));
 
     dashboardService.Start();
     schedulerService.Init();
@@ -89,6 +115,7 @@ try
     await exitTcs.Task;
     schedulerService.Dispose();
     watchdogService.Dispose();
+    clipboardService.Dispose();
 }
 catch (Exception ex)
 {
@@ -106,6 +133,10 @@ catch (Exception ex)
     Console.Error.WriteLine($"Details: {crashLog}");
 #endif
 }
+
+// Ключ --clipconv-selftest возвращает код явно, поэтому точка входа стала int-возвращающей:
+// компилятор требует возврат на всех путях (CS0161). Ноль — прежнее поведение.
+return 0;
 
 #if !WINDOWS
 static void OpenBrowser(string url)

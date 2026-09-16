@@ -474,6 +474,53 @@
         </div>
     </div>
 
+    <!-- ── CLIPBOARD CONVERTER ── -->
+    <div class="card" id="ccCard">
+        <div class="card-hdr">
+            <span class="icon">📋</span>
+            <h2>Clipboard Converter</h2>
+            <span class="badge" id="ccBadge">—</span>
+        </div>
+
+        <div class="status-grid" style="margin-bottom:14px;">
+            <div class="stat-item"><span class="stat-label">State</span><span class="stat-value" id="ccState"><span class="pill warn">—</span></span></div>
+            <div class="stat-item"><span class="stat-label">Hotkeys</span><span class="stat-value" id="ccActive">—</span></div>
+            <div class="stat-item"><span class="stat-label">Foreground now</span><span class="stat-value mono" id="ccFg">—</span></div>
+            <div class="stat-item"><span class="stat-label">Alt+G</span><span class="stat-value mono" id="ccK0" style="font-size:10px">—</span></div>
+            <div class="stat-item"><span class="stat-label">Alt+C</span><span class="stat-value mono" id="ccK1" style="font-size:10px">—</span></div>
+            <div class="stat-item"><span class="stat-label">Alt+S</span><span class="stat-value mono" id="ccK2" style="font-size:10px">—</span></div>
+            <div class="stat-item"><span class="stat-label">Converted</span><span class="stat-value mono" id="ccConverted">—</span></div>
+            <div class="stat-item"><span class="stat-label">No match</span><span class="stat-value mono" id="ccMissed">—</span></div>
+            <div class="stat-item"><span class="stat-label">Errors</span><span class="stat-value mono" id="ccErrors">—</span></div>
+            <div class="stat-item"><span class="stat-label">Last</span><span class="stat-value mono" id="ccLast" style="font-size:10px">—</span></div>
+            <div class="stat-item"><span class="stat-label">Last error</span><span class="stat-value mono" id="ccLastErr" style="font-size:10px">—</span></div>
+        </div>
+
+        <div class="field-group" id="ccFields">
+            <div class="field-row">
+                <div class="field">
+                    <label>Enabled</label>
+                    <select id="ccEnabled">
+                        <option value="false">Off</option>
+                        <option value="true">On</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Process Name · empty = everywhere</label>
+                    <input id="ccProcessName" type="text" placeholder="ProjectMaker">
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn primary" onclick="saveClipConv()">💾 Save Clipboard Converter</button>
+                <button class="btn" onclick="clipConvSelfTest()">🧪 Self-test</button>
+            </div>
+            <p style="font-size:10px; color:var(--text-dim); text-align:right; margin-top:-6px;">
+                Copy a FindElementByAttribute line, press Alt+G / Alt+C / Alt+S, paste.
+                Hotkeys are only held while the named process is in the foreground.
+            </p>
+        </div>
+    </div>
+
     <!-- ── CONFIG EDITOR ── -->
     <div class="config-cards">
         <div class="card-hdr">
@@ -1205,11 +1252,103 @@
         }
     }
 
+    // ── Clipboard Converter ───────────────────────────────────────────
+    function renderClipConv(d) {
+        if (!d.supported) {
+            document.getElementById('ccBadge').textContent = 'Windows only';
+            document.getElementById('ccState').innerHTML = '<span class="pill warn">N/A</span>';
+            document.getElementById('ccFields').style.display = 'none';
+            return;
+        }
+
+        document.getElementById('ccState').innerHTML = d.enabled
+            ? '<span class="pill ok">ON</span>'
+            : '<span class="pill err">OFF</span>';
+
+        document.getElementById('ccActive').innerHTML = d.active
+            ? '<span class="pill ok">active</span>'
+            : '<span class="pill warn">idle</span>';
+
+        document.getElementById('ccBadge').textContent =
+            !d.enabled ? 'off' : (d.active ? 'listening' : 'waiting for ' + (d.processName || 'focus'));
+
+        setText('ccFg', d.foreground || '—');
+
+        (d.hotkeys || []).forEach((k, i) => {
+            const el = document.getElementById('ccK' + i);
+            if (!el) return;
+            el.textContent = k.registered ? 'ok' : (k.error || '—');
+        });
+
+        setText('ccConverted', d.converted);
+        setText('ccMissed',    d.missed);
+        setText('ccErrors',    d.errors);
+        setText('ccLast',      d.lastResult || '—');
+        setText('ccLastErr',   d.lastError  || '—');
+    }
+
+    async function loadClipConvStatus() {
+        try {
+            const r = await fetch('/clipconv/status');
+            if (!r.ok) return;
+            renderClipConv(await r.json());
+        } catch (e) { /* silent */ }
+    }
+
+    async function loadClipConv() {
+        try {
+            const r = await fetch('/clipconv/status');
+            if (!r.ok) return;
+            const d = await r.json();
+            document.getElementById('ccEnabled').value = d.enabled ? 'true' : 'false';
+            setVal('ccProcessName', d.processName ?? 'ProjectMaker');
+            renderClipConv(d);
+        } catch (e) { /* silent */ }
+    }
+
+    async function saveClipConv() {
+        const payload = {
+            enabled:     document.getElementById('ccEnabled').value === 'true',
+            processName: document.getElementById('ccProcessName').value.trim(),
+        };
+        try {
+            const r = await fetch('/clipconv/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const d = await r.json();
+            if (d.ok) {
+                toast('✓ Clipboard converter saved', 'ok');
+                if (d.status) renderClipConv(d.status);
+            } else {
+                toast('Save failed: ' + (d.error ?? 'unknown'), 'err');
+            }
+        } catch (e) {
+            toast('Error: ' + e.message, 'err');
+        }
+    }
+
+    async function clipConvSelfTest() {
+        try {
+            const r = await fetch('/clipconv/selftest');
+            const d = await r.json();
+            if (d.ok) {
+                toast('✓ Self-test passed (' + d.cases.length + ' cases)', 'ok');
+            } else {
+                const bad = d.cases.filter(c => !c.passed).map(c => c.name).join(', ');
+                toast('Self-test FAILED: ' + bad, 'err');
+            }
+        } catch (e) {
+            toast('Error: ' + e.message, 'err');
+        }
+    }
+
     // ── Init ──────────────────────────────────────────────────────────
     (async () => {
-        await Promise.all([loadStatus(), loadStorage(), loadConfig(), loadWatchdog()]);
+        await Promise.all([loadStatus(), loadStorage(), loadConfig(), loadWatchdog(), loadClipConv()]);
         jvEnsureSeed();
-        setInterval(loadWatchdogStatus, 5000);
+        setInterval(() => { loadWatchdogStatus(); loadClipConvStatus(); }, 5000);
     })();
 
     // ── IMPORT ────────────────────────────────────────────────────────
