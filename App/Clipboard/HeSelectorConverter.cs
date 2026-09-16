@@ -29,7 +29,7 @@ public static class HeSelectorConverter
         string selector = "(" + match.Groups["args"].Value + ")";
         return action switch
         {
-            HeAction.Get   => "var msg = HeGet(" + selector + ");",
+            HeAction.Get   => "var msg = instance.HeGet(" + selector + ");",
             HeAction.Click => "instance.HeClick(" + selector + ");",
             HeAction.Set   => "instance.HeSet(" + selector + ", \"value\");",
             _              => null,
@@ -42,6 +42,9 @@ public static class HeSelectorConverter
         "HtmlElement he = instance.ActiveTab.FindElementByAttribute(\"div\", \"data-ttid\", \"modal-msg\", \"regexp\", 0);\r\n"
         + "if (he.IsVoid) return -1;";
 
+    private const string EscapedSample =
+        "HtmlElement he = instance.ActiveTab.FindElementByAttribute(\"modern-notification\", \"innertext\", \"The\\\\ password\\\\ !@#\\\\$%\\\\^&\\\\*\\\\(\\\\)-_\\\\+=\", \"regexp\", 0);";
+
     public static IReadOnlyList<SelfTestCase> SelfTest()
     {
         var cases = new List<SelfTestCase>();
@@ -49,9 +52,11 @@ public static class HeSelectorConverter
         void Check(string name, string? expected, string? actual) =>
             cases.Add(new SelfTestCase(name, expected == actual, expected ?? "<null>", actual ?? "<null>"));
 
-        Check("Get",   "var msg = HeGet((\"div\", \"data-ttid\", \"modal-msg\", \"regexp\", 0));",          Convert(Sample, HeAction.Get));
+        Check("Get",   "var msg = instance.HeGet((\"div\", \"data-ttid\", \"modal-msg\", \"regexp\", 0));",          Convert(Sample, HeAction.Get));
         Check("Click", "instance.HeClick((\"div\", \"data-ttid\", \"modal-msg\", \"regexp\", 0));",          Convert(Sample, HeAction.Click));
         Check("Set",   "instance.HeSet((\"div\", \"data-ttid\", \"modal-msg\", \"regexp\", 0), \"value\");", Convert(Sample, HeAction.Set));
+
+        Check("Escaped literal", "var msg = instance.HeGet((\"modern-notification\", \"innertext\", \"The\\\\ password\\\\ !@#\\\\$%\\\\^&\\\\*\\\\(\\\\)-_\\\\+=\", \"regexp\", 0));", Convert(EscapedSample, HeAction.Get));
 
         Check("Unrelated text / Get",   null, Convert("ordinary clipboard text", HeAction.Get));
         Check("Unrelated text / Click", null, Convert("ordinary clipboard text", HeAction.Click));
