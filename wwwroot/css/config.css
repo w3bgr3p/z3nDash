@@ -39,9 +39,9 @@
 
         .layout {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: 200px minmax(0, 1fr);
             gap: 14px;
-            align-items: stretch;
+            align-items: start;
         }
         @media (max-width: 900px) {
             body { padding: 22px 14px 36px; }
@@ -239,13 +239,6 @@
             margin-left: auto;
             margin-right: auto;
         }
-        .config-cards,
-        .config-cards > .field-group {
-            display: contents;
-        }
-        .config-cards > .card-hdr {
-            display: none;
-        }
         .config-card > .section-label {
             display: none;
         }
@@ -350,3 +343,61 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+
+        /* ── Rail ── */
+        .cfg-rail {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            position: sticky;
+            top: 32px;
+            align-self: start;
+        }
+        .cfg-rail-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            text-align: left;
+            padding: 7px 10px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-dim);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .cfg-rail-item:hover { background: var(--surface2, #21262d); color: var(--text); }
+        .cfg-rail-item.active {
+            background: #0c2340;
+            border-color: #1f6feb;
+            color: #58a6ff;
+        }
+        .cfg-rail-item .icon { font-size: 13px; line-height: 1; flex: none; }
+        .cfg-rail-item .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cfg-rail-sep { height: 1px; background: var(--border); margin: 6px 8px; }
+
+        /* ── Pane ── */
+        .cfg-pane { min-width: 0; }
+        .cfg-sec {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .cfg-sec[hidden] { display: none; }
+
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+            .cfg-rail {
+                position: static;
+                flex-direction: row;
+                overflow-x: auto;
+                gap: 4px;
+                padding-bottom: 4px;
+            }
+            .cfg-rail-item { width: auto; flex: none; }
+            .cfg-rail-item .label { overflow: visible; }
+            .cfg-rail-sep { display: none; }
+        }
