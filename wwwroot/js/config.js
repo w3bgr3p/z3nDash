@@ -42,7 +42,6 @@
             if (d.startedAt) {
                 _startTime = new Date(d.startedAt).getTime();
                 tickUptime();
-                setInterval(tickUptime, 1000);
             }
 
             setText('sPort', d.dashboardPort ?? '—');
@@ -585,11 +584,93 @@
         }
     }
 
+    // ── Sections ──────────────────────────────────────────
+    let _uptimeTimer   = null;
+    let _servicesTimer = null;
+    let _storageLoaded = false;
+
+    function enterOverview() {
+        loadStatus();
+        if (!_storageLoaded) { _storageLoaded = true; loadStorage(); }
+        if (_uptimeTimer === null) _uptimeTimer = setInterval(tickUptime, 1000);
+    }
+    function leaveOverview() {
+        if (_uptimeTimer !== null) { clearInterval(_uptimeTimer); _uptimeTimer = null; }
+    }
+    function enterServices() {
+        loadWatchdogStatus();
+        loadClipConvStatus();
+        if (_servicesTimer === null)
+            _servicesTimer = setInterval(() => { loadWatchdogStatus(); loadClipConvStatus(); }, 5000);
+    }
+    function leaveServices() {
+        if (_servicesTimer !== null) { clearInterval(_servicesTimer); _servicesTimer = null; }
+    }
+
+    const SECTIONS = [
+        { id: 'overview', icon: '🟢', title: 'Обзор',                enter: enterOverview, leave: leaveOverview },
+        { id: 'db',       icon: '🗄', title: 'База данных' },
+        { id: 'server',   icon: '⚙',      title: 'Сервер и логи' },
+        { id: 'browsers', icon: '🌐', title: 'Браузеры API' },
+        { id: 'ai',       icon: '✨',      title: 'ИИ · OmniRoute' },
+        { id: 'services', icon: '🛡', title: 'Службы',              enter: enterServices, leave: leaveServices },
+        { id: 'security', icon: '🔐', title: 'Безопасность · jVars' },
+        { id: 'maint',    icon: '🧰', title: 'Обслуживание' },
+    ];
+
+    const SEPARATORS_AFTER = ['overview', 'ai', 'services'];
+
+    let _curSec = null;
+
+    function buildRail() {
+        const rail = document.getElementById('cfgRail');
+        rail.textContent = '';
+        SECTIONS.forEach(sec => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'cfg-rail-item';
+            b.dataset.sec = sec.id;
+            b.innerHTML = '<span class="icon"></span><span class="label"></span>';
+            b.querySelector('.icon').textContent  = sec.icon;
+            b.querySelector('.label').textContent = sec.title;
+            b.addEventListener('click', () => showSection(sec.id));
+            rail.appendChild(b);
+            if (SEPARATORS_AFTER.includes(sec.id)) {
+                const hr = document.createElement('div');
+                hr.className = 'cfg-rail-sep';
+                rail.appendChild(hr);
+            }
+        });
+    }
+
+    function showSection(id) {
+        if (!SECTIONS.some(s => s.id === id)) id = SECTIONS[0].id;
+        if (id === _curSec) return;
+
+        const prev = SECTIONS.find(s => s.id === _curSec);
+        if (prev && prev.leave) prev.leave();
+
+        document.querySelectorAll('.cfg-sec').forEach(el => {
+            el.hidden = el.dataset.sec !== id;
+        });
+        document.querySelectorAll('.cfg-rail-item').forEach(el => {
+            el.classList.toggle('active', el.dataset.sec === id);
+        });
+
+        _curSec = id;
+        PageState.save({ sec: id });
+
+        const cur = SECTIONS.find(s => s.id === id);
+        if (cur && cur.enter) cur.enter();
+    }
+
+
     // ── Init ──────────────────────────────────────────────────────────
     (async () => {
-        await Promise.all([loadStatus(), loadStorage(), loadConfig(), loadWatchdog(), loadClipConv()]);
+        buildRail();
+        await Promise.all([loadConfig(), loadWatchdog(), loadClipConv()]);
         jvEnsureSeed();
-        setInterval(() => { loadWatchdogStatus(); loadClipConvStatus(); }, 5000);
+        showSection((PageState.load() || {}).sec || SECTIONS[0].id);
     })();
 
     // ── IMPORT ────────────────────────────────────────────────────────
