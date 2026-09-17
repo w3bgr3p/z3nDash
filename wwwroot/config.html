@@ -25,7 +25,11 @@
 
 <div class="layout" id="layout">
 
-    <!-- ── STATUS ── -->
+    <nav class="cfg-rail" id="cfgRail"></nav>
+
+    <div class="cfg-pane" id="cfgPane">
+
+        <section class="cfg-sec" data-sec="overview">
     <div class="card">
         <div class="card-hdr">
             <span class="icon">🟢</span>
@@ -46,7 +50,6 @@
         </div>
     </div>
 
-    <!-- ── LOG STORAGE ── -->
     <div class="card">
         <div class="card-hdr">
             <span class="icon">💾</span>
@@ -70,8 +73,132 @@
             <button class="btn danger" id="clearAllBtn" onclick="clearLogs('all')">☠ Clear ALL Logs</button>
         </div>
     </div>
+        </section>
 
-    <!-- ── MEMORY WATCHDOG ── -->
+        <section class="cfg-sec" data-sec="db" hidden>
+            <section class="card config-card">
+            <div class="card-hdr">
+                <h2>Database</h2>
+                <span class="badge">appsettings.secrets.json</span>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>DB Type</label>
+                    <select id="cfgDbType">
+                        <option value="sqlite">SQLite</option>
+                        <option value="postgres">PostgreSQL</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>SQLite Path</label>
+                    <input id="cfgSqlitePath" type="text" placeholder="path/to/db.sqlite">
+                </div>
+            </div>
+            <div class="field-row" id="pgFields">
+                <div class="field" style="grid-column:1 / -1;">
+                    <label>PostgreSQL Connection String</label>
+                    <div class="input-actions">
+                        <input id="cfgPgConnectionString" type="password"
+                               placeholder="Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=secret;">
+                        <button class="btn" id="btnTogglePgConnectionString" type="button"
+                                onclick="togglePgConnectionStringVisibility()">Show</button>
+                        <button class="btn" id="btnCopyPgConnectionString" type="button"
+                                onclick="copyPgConnectionString()">Copy</button>
+                    </div>
+                </div>
+            </div>
+
+            </section>
+        </section>
+
+        <section class="cfg-sec" data-sec="server" hidden>
+            <section class="card config-card">
+            <div class="card-hdr"><h2>Logs &amp; Server</h2></div>
+            <div class="field-row-3">
+                <div class="field">
+                    <label>Dashboard Port</label>
+                    <input id="cfgDashboardPort" type="text" placeholder="33333">
+                </div>
+                <div class="field">
+                </div>
+            </div>
+            <div class="field-row-3">
+                <div class="field">
+                    <label>Logs Folder</label>
+                    <input id="cfgLogsFolder" type="text" placeholder="./logs">
+                </div>
+                <div class="field">
+                    <label>Temp Folder</label>
+                    <input id="cfgTempFolder" type="text" placeholder="./temp">
+                </div>
+                <div class="field">
+                    <label>Reports Folder</label>
+                    <input id="cfgReportsFolder" type="text" placeholder="./reports">
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Max File Size (MB)</label>
+                    <input id="cfgMaxFileSizeMb" type="number" placeholder="50">
+                </div>
+            </div>
+
+            <p style="font-size:10px; color:var(--text-dim); text-align:right; margin-top:4px;">
+                ⚠ Restart required for port / path changes to take effect
+            </p>
+            </section>
+        </section>
+
+        <section class="cfg-sec" data-sec="browsers" hidden>
+            <section class="card config-card">
+            <div class="card-hdr"><h2>Browsers API</h2></div>
+            <div class="browser-api-row">
+                <div class="browser-api-name">ZennoBrowser</div>
+                <div class="field">
+                    <label>Host</label>
+                    <input id="cfgZennoBrowserHost" type="text" placeholder="http://localhost:8160">
+                </div>
+                <div class="field">
+                    <label>API Key</label>
+                    <input id="cfgZennoBrowserToken" type="password" autocomplete="off" placeholder="••••••••">
+                </div>
+            </div>
+            <div class="browser-api-row">
+                <div class="browser-api-name">ShardX</div>
+                <div class="field">
+                    <label>Host</label>
+                    <input id="cfgShardXHost" type="text" placeholder="http://127.0.0.1:40325">
+                </div>
+                <div class="field">
+                    <label>Bearer Token</label>
+                    <input id="cfgShardXToken" type="password" autocomplete="off" placeholder="••••••••">
+                </div>
+            </div>
+
+            </section>
+        </section>
+
+        <section class="cfg-sec" data-sec="ai" hidden>
+            <section class="card config-card">
+            <div class="card-hdr">
+                <h2>OmniRoute</h2>
+                <span class="badge">AI</span>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>OmniRoute Host</label>
+                    <input id="cfgOmniRouteHost" type="text" placeholder="http://localhost:20128">
+                </div>
+            </div>
+            <div class="btn-row" style="margin-top:6px; align-items:center; gap:10px;">
+                <button class="btn primary" onclick="saveAiConfig()">✓ Validate &amp; Save AI</button>
+                <span id="aiProviderStatus" style="font-size:11px; color:var(--text-dim);"></span>
+            </div>
+
+            </section>
+        </section>
+
+        <section class="cfg-sec" data-sec="services" hidden>
     <div class="card">
         <div class="card-hdr">
             <span class="icon">🛡</span>
@@ -121,7 +248,6 @@
         </div>
     </div>
 
-    <!-- ── CLIPBOARD CONVERTER ── -->
     <div class="card" id="ccCard">
         <div class="card-hdr">
             <span class="icon">📋</span>
@@ -167,129 +293,9 @@
             </p>
         </div>
     </div>
+        </section>
 
-    <!-- ── CONFIG EDITOR ── -->
-    <div class="config-cards">
-        <div class="card-hdr">
-            <span class="icon">📝</span>
-            <h2>Edit Configuration</h2>
-            <span class="badge">appsettings.secrets.json</span>
-            <button class="btn" onclick="openImport()" style="margin-left:8px; padding:3px 10px; font-size:10px;">⬆ Fill DB</button>
-        </div>
-
-        <div class="field-group" id="configForm">
-            <section class="card config-card">
-            <div class="card-hdr">
-                <h2>Database</h2>
-                <span class="badge">appsettings.secrets.json</span>
-            </div>
-            <div class="field-row">
-                <div class="field">
-                    <label>DB Type</label>
-                    <select id="cfgDbType">
-                        <option value="sqlite">SQLite</option>
-                        <option value="postgres">PostgreSQL</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label>SQLite Path</label>
-                    <input id="cfgSqlitePath" type="text" placeholder="path/to/db.sqlite">
-                </div>
-            </div>
-            <div class="field-row" id="pgFields">
-                <div class="field" style="grid-column:1 / -1;">
-                    <label>PostgreSQL Connection String</label>
-                    <div class="input-actions">
-                        <input id="cfgPgConnectionString" type="password"
-                               placeholder="Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=secret;">
-                        <button class="btn" id="btnTogglePgConnectionString" type="button"
-                                onclick="togglePgConnectionStringVisibility()">Show</button>
-                        <button class="btn" id="btnCopyPgConnectionString" type="button"
-                                onclick="copyPgConnectionString()">Copy</button>
-                    </div>
-                </div>
-            </div>
-
-            </section>
-
-            <section class="card config-card">
-            <div class="card-hdr"><h2>Logs &amp; Server</h2></div>
-            <div class="field-row-3">
-                <div class="field">
-                    <label>Dashboard Port</label>
-                    <input id="cfgDashboardPort" type="text" placeholder="33333">
-                </div>
-                <div class="field">
-                </div>
-            </div>
-            <div class="field-row-3">
-                <div class="field">
-                    <label>Logs Folder</label>
-                    <input id="cfgLogsFolder" type="text" placeholder="./logs">
-                </div>
-                <div class="field">
-                    <label>Temp Folder</label>
-                    <input id="cfgTempFolder" type="text" placeholder="./temp">
-                </div>
-                <div class="field">
-                    <label>Reports Folder</label>
-                    <input id="cfgReportsFolder" type="text" placeholder="./reports">
-                </div>
-            </div>
-            <div class="field-row">
-                <div class="field">
-                    <label>Max File Size (MB)</label>
-                    <input id="cfgMaxFileSizeMb" type="number" placeholder="50">
-                </div>
-            </div>
-
-            </section>
-
-            <section class="card config-card">
-            <div class="card-hdr"><h2>Browsers API</h2></div>
-            <div class="browser-api-row">
-                <div class="browser-api-name">ZennoBrowser</div>
-                <div class="field">
-                    <label>Host</label>
-                    <input id="cfgZennoBrowserHost" type="text" placeholder="http://localhost:8160">
-                </div>
-                <div class="field">
-                    <label>API Key</label>
-                    <input id="cfgZennoBrowserToken" type="password" autocomplete="off" placeholder="••••••••">
-                </div>
-            </div>
-            <div class="browser-api-row">
-                <div class="browser-api-name">ShardX</div>
-                <div class="field">
-                    <label>Host</label>
-                    <input id="cfgShardXHost" type="text" placeholder="http://127.0.0.1:40325">
-                </div>
-                <div class="field">
-                    <label>Bearer Token</label>
-                    <input id="cfgShardXToken" type="password" autocomplete="off" placeholder="••••••••">
-                </div>
-            </div>
-
-            </section>
-
-            <section class="card config-card">
-            <div class="card-hdr">
-                <h2>OmniRoute</h2>
-                <span class="badge">AI</span>
-            </div>
-            <div class="field-row">
-                <div class="field">
-                    <label>OmniRoute Host</label>
-                    <input id="cfgOmniRouteHost" type="text" placeholder="http://localhost:20128">
-                </div>
-            </div>
-            <div class="btn-row" style="margin-top:6px; align-items:center; gap:10px;">
-                <button class="btn primary" onclick="saveAiConfig()">✓ Validate &amp; Save AI</button>
-                <span id="aiProviderStatus" style="font-size:11px; color:var(--text-dim);"></span>
-            </div>
-
-            </section>
-
+        <section class="cfg-sec" data-sec="security" hidden>
             <section class="card config-card">
             <div class="card-hdr"><h2>Security · jVars</h2></div>
             <div class="field-row">
@@ -317,11 +323,10 @@
             <p style="font-size:10px; color:var(--text-dim); text-align:right; margin-top:4px;">
                 The PIN is never returned when the config loads. The path is stored in appsettings.
             </p>
-            <p style="font-size:10px; color:var(--text-dim); text-align:right; margin-top:4px;">
-                ⚠ Restart required for port / path changes to take effect
-            </p>
             </section>
+        </section>
 
+        <section class="cfg-sec" data-sec="maint" hidden>
             <section class="card config-card">
             <div class="card-hdr"><h2>Maintenance</h2></div>
             <p style="font-size:10px; color:var(--text-dim); margin:0 0 10px;">
@@ -365,7 +370,8 @@
 
             <pre id="mtLog" style="display:none; margin-top:10px; padding:8px; max-height:200px; overflow:auto; background:var(--bg,#0d1117); border:1px solid var(--border); border-radius:6px; font-size:10px; white-space:pre-wrap;"></pre>
             </section>
-        </div>
+        </section>
+
     </div>
 
 </div>
