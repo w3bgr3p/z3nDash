@@ -608,14 +608,14 @@
     }
 
     const SECTIONS = [
-        { id: 'overview', icon: '🟢', title: 'Обзор',                enter: enterOverview, leave: leaveOverview },
-        { id: 'db',       icon: '🗄', title: 'База данных' },
-        { id: 'server',   icon: '⚙',      title: 'Сервер и логи' },
-        { id: 'browsers', icon: '🌐', title: 'Браузеры API' },
-        { id: 'ai',       icon: '✨',      title: 'ИИ · OmniRoute' },
-        { id: 'services', icon: '🛡', title: 'Службы',              enter: enterServices, leave: leaveServices },
-        { id: 'security', icon: '🔐', title: 'Безопасность · jVars' },
-        { id: 'maint',    icon: '🧰', title: 'Обслуживание' },
+        { id: 'overview', icon: '🟢', title: 'Overview',            enter: enterOverview, leave: leaveOverview },
+        { id: 'db',       icon: '🗄', title: 'Database' },
+        { id: 'server',   icon: '⚙',      title: 'Logs & Server' },
+        { id: 'browsers', icon: '🌐', title: 'Browsers API' },
+        { id: 'ai',       icon: '✨',      title: 'OmniRoute' },
+        { id: 'services', icon: '🛡', title: 'Services',            enter: enterServices, leave: leaveServices },
+        { id: 'security', icon: '🔐', title: 'Security · jVars' },
+        { id: 'maint',    icon: '🧰', title: 'Maintenance' },
     ];
 
     const SEPARATORS_AFTER = ['overview', 'ai', 'services'];
