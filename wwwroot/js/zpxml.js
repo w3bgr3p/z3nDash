@@ -166,9 +166,29 @@ function showDetail(step, bi) {
             (step.label.trim() ? ' · ' + escHtml(step.label.trim()) : '') + '</dd>' +
         (step.x !== null ? '<dt>canvas</dt><dd>' + step.x + ', ' + step.y + '</dd>' : '') +
         '<dt>reached</dt><dd>' + (step.reachable === false ? 'no — dead code' : 'yes') + '</dd>' +
-        (b.disabled ? '<dt>state</dt><dd>disabled — not executed</dd>' : '') +
-        (b.optional ? '<dt>state</dt><dd>optional — errors do not fail the route</dd>' : '') +
-        (b.outputVariable ? '<dt>output</dt><dd>' + escHtml(b.outputVariable) + '</dd>' : '');
+        (b.outputVariable ? '<dt>output</dt><dd>' + escHtml(b.outputVariable) + '</dd>' : '') +
+        '<dt>caption</dt><dd>' +
+            (editing ? '<input class="cap-edit" spellcheck="false">' : escHtml(b.userText) || '—') +
+        '</dd>' +
+        '<dt>state</dt><dd>' + (editing
+            ? '<label class="flag-box"><input type="checkbox" class="flag-edit" data-flag="disabled">disabled</label>' +
+              '<label class="flag-box"><input type="checkbox" class="flag-edit" data-flag="optional">optional</label>'
+            : [b.disabled ? 'disabled — not executed' : '',
+               b.optional ? 'optional — errors do not fail the route' : ''
+              ].filter(Boolean).join('; ') || 'normal') + '</dd>';
+
+    const cap = document.getElementById('d-meta').querySelector('.cap-edit');
+    if (cap) {
+        cap.value = b.userText;
+        bindEdit(cap, b.userText, v => ZpDoc.setBranchText(b.id, v), 'caption');
+    }
+    document.getElementById('d-meta').querySelectorAll('.flag-edit').forEach(cb => {
+        cb.checked = cb.dataset.flag === 'disabled' ? b.disabled : b.optional;
+        cb.addEventListener('change', () => {
+            if (ZpDoc.setBranchFlag(b.id, cb.dataset.flag, cb.checked))
+                refresh(cb.dataset.flag + (cb.checked ? ' on' : ' off'));
+        });
+    });
 
     const db = document.getElementById('d-branches');
     db.innerHTML = '';
@@ -177,8 +197,15 @@ function showDetail(step, bi) {
         const code = document.createElement('div');
         code.className = 'bi';
         code.innerHTML = '<div class="bi-head">code</div>' +
-                         '<div class="bi-code full">' + escHtml(b.code.trim()) + '</div>';
+            (editing
+                ? '<textarea class="bi-code full edit" spellcheck="false"></textarea>'
+                : '<div class="bi-code full">' + escHtml(b.code) + '</div>');
         db.appendChild(code);
+        const ta = code.querySelector('textarea');
+        if (ta) {
+            ta.value = b.code;
+            bindEdit(ta, b.code, v => ZpDoc.setCode(b.id, v), 'code', { multiline: true });
+        }
     }
 
     // Параметры действия: для HTMLElement это и есть главное — по какому
@@ -188,10 +215,18 @@ function showDetail(step, bi) {
         pr.className = 'bi';
         pr.innerHTML = '<div class="bi-head">parameters</div>' +
             '<div class="dl params">' +
-            b.params.map(p =>
-                '<dt>' + escHtml(p.path) + '</dt><dd>' + escHtml(cut(p.value, 300)) + '</dd>').join('') +
+            b.params.map((p, i) => '<dt>' + escHtml(p.path) + '</dt><dd>' +
+                (editing
+                    ? '<input class="pedit" data-i="' + i + '" spellcheck="false">'
+                    : escHtml(cut(p.value, 300))) +
+                '</dd>').join('') +
             '</div>';
         db.appendChild(pr);
+        pr.querySelectorAll('.pedit').forEach(inp => {
+            const par = b.params[+inp.dataset.i];
+            inp.value = par.value;
+            bindEdit(inp, par.value, v => ZpDoc.setParam(b.id, par.path, v), par.path);
+        });
     }
 
     const links = document.createElement('div');
@@ -207,13 +242,23 @@ function showDetail(step, bi) {
         ? '<div class="bi-link err">→ err: ' + escHtml(errTarget) + '</div>'
         : '<div class="bi-link err dim">→ err: ' +
           (b.optional ? 'skipped, branch is optional' : 'route fails') + '</div>';
-    b.cases.forEach(c => {
+    b.cases.forEach((c, ci) => {
         const t = targetText(c.val);
+        const slot = c.isDefault ? 'default' : 'case:' + c.number;
         html += '<div class="bi-link case' + (t ? '' : ' dim') + '">→ ' +
-                (c.isDefault ? 'Default' : c.number + ': "' + escHtml(c.key) + '"') + ': ' +
-                escHtml(t || 'no arrow') + '</div>';
+                (c.isDefault
+                    ? 'Default'
+                    : c.number + ': ' + (editing
+                        ? '<input class="key-edit" data-slot="' + slot + '" data-ci="' + ci + '" spellcheck="false">'
+                        : '"' + escHtml(c.key) + '"')) +
+                ': ' + escHtml(t || 'no arrow') + '</div>';
     });
     links.innerHTML = html;
+    links.querySelectorAll('.key-edit').forEach(inp => {
+        const c = b.cases[+inp.dataset.ci];
+        inp.value = c.key;
+        bindEdit(inp, c.key, v => ZpDoc.setCaseKey(b.id, inp.dataset.slot, v), 'case key');
+    });
     db.appendChild(links);
 
     // The other actions of the same block, one line each, so the step is still
@@ -227,6 +272,39 @@ function showDetail(step, bi) {
     sib.querySelectorAll('.sib').forEach(el =>
         el.addEventListener('click', () => selectBranch(step.id, +el.dataset.i)));
     db.appendChild(sib);
+}
+
+/// Правка применяется по уходу фокуса и по Enter, Esc возвращает прежнее
+/// значение. Один снимок в историю на завершённую правку, а не на символ —
+/// иначе Ctrl+Z пришлось бы жать по букве.
+function bindEdit(input, original, apply, label, opts) {
+    opts = opts || {};
+    let cancelled = false;
+
+    // Применяем сами, а не через blur(): программный blur не везде порождает
+    // событие, и правка по Enter тихо терялась. После применения original
+    // сдвигается, поэтому пришедший следом blur ничего не делает повторно.
+    const commit = () => {
+        if (cancelled) { cancelled = false; return; }
+        const value = input.value;
+        if (value === original) return;
+        original = value;
+        if (apply(value)) refresh('edited ' + label);
+    };
+
+    input.addEventListener('keydown', e => {
+        e.stopPropagation();                       // Delete и Ctrl+Z — полю, не холсту
+        if (e.key === 'Escape') {
+            cancelled = true;
+            input.value = original;
+            input.blur();
+        } else if (e.key === 'Enter' && !(opts.multiline && !e.ctrlKey)) {
+            e.preventDefault();
+            commit();
+            input.blur();
+        }
+    });
+    input.addEventListener('blur', commit);
 }
 
 function cut(v, max) {

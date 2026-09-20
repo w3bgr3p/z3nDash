@@ -262,6 +262,35 @@ body.editing .crow:hover > .drag-port { display:block; }
 .dl.params dt { font-size:10px; color:var(--text3); word-break:break-all; }
 .dl.params dd { font-size:10px; white-space:pre-wrap; word-break:break-word; }
 
+/* Поля правки в панели. Выглядят как текст, пока их не тронули: панель прежде
+   всего читают, и десяток рамок превратил бы её в форму. */
+.pedit, .cap-edit, .key-edit {
+    width:100%; box-sizing:border-box;
+    background:transparent; color:var(--text);
+    border:1px solid transparent; border-radius:3px;
+    font-family:var(--mono, monospace); font-size:10px;
+    padding:1px 3px; outline:none;
+}
+.pedit:hover, .cap-edit:hover, .key-edit:hover { border-color:var(--border); }
+.pedit:focus, .cap-edit:focus, .key-edit:focus {
+    border-color:var(--accent); background:var(--bg2);
+}
+.key-edit { width:auto; min-width:70px; max-width:160px; color:var(--accent); }
+.cap-edit { font-size:11px; }
+
+textarea.bi-code.edit {
+    width:100%; box-sizing:border-box; min-height:160px; resize:vertical;
+    border:1px solid var(--border); outline:none;
+}
+textarea.bi-code.edit:focus { border-color:var(--accent); }
+
+.flag-box {
+    display:inline-flex; align-items:center; gap:3px;
+    margin-right:8px; font-size:10px; color:var(--text2); cursor:pointer;
+    font-family:var(--font);
+}
+.flag-box input { margin:0; cursor:pointer; }
+
 .bi        { border:1px solid var(--border); border-radius:var(--radius, 6px); padding:7px 9px; margin-bottom:7px; }
 .bi-head   { font-size:10px; color:var(--text2); margin-bottom:3px; font-weight:500; }
 .bi-utext  { font-size:11px; font-weight:600; color:var(--text-hi); margin-bottom:4px; }

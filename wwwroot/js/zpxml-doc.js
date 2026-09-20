@@ -183,6 +183,93 @@ const ZpDoc = {
         return true;
     },
 
+    // ── Правка содержимого ветки ─────────────────────────────────────────
+
+    /// Узел параметра по пути из flattenParams: 'Finder.Tag' или
+    /// 'Finder.SearchCondition@AttrValue'. Возвращает узел и имя атрибута,
+    /// если путь указывает на атрибут.
+    paramNode(branchId, path) {
+        const el = this.branchEl(branchId);
+        if (!el) return null;
+        let node = el.querySelector('Parameters');
+        if (!node) return null;
+
+        const at = path.split('@');
+        const segs = at[0].split('.');
+        for (const seg of segs) {
+            node = [...node.children].find(c => c.tagName === seg);
+            if (!node) return null;
+        }
+        return { node, attr: at.length > 1 ? at[1] : null };
+    },
+
+    setParam(branchId, path, value) {
+        const loc = this.paramNode(branchId, path);
+        if (!loc) return false;
+        const current = loc.attr ? loc.node.getAttribute(loc.attr) : loc.node.textContent;
+        if (current === value) return false;      // пустая правка истории не стоит
+
+        this.snapshot();
+        if (loc.attr) loc.node.setAttribute(loc.attr, value);
+        else loc.node.textContent = value;
+        return true;
+    },
+
+    /// Код ветки OwnCode. Лежит в Parameters/Code.
+    setCode(branchId, code) {
+        const el = this.branchEl(branchId);
+        const node = el && el.querySelector('Parameters > Code');
+        if (!node || node.textContent === code) return false;
+        this.snapshot();
+        node.textContent = code;
+        return true;
+    },
+
+    /// Подпись ветки — та, что видна на строке блока.
+    setBranchText(branchId, text) {
+        const el = this.branchEl(branchId);
+        if (!el || (el.getAttribute('UserText') || '') === text) return false;
+        this.snapshot();
+        el.setAttribute('UserText', text);
+        return true;
+    },
+
+    /// Флаги ветки. ZennoPoster пишет их не всегда; отсутствие значит «нет».
+    setBranchFlag(branchId, flag, on) {
+        const attr = flag === 'disabled' ? 'IsDisable' : 'IsNotNecessarily';
+        const el = this.branchEl(branchId);
+        if (!el) return false;
+        const current = /^true$/i.test(el.getAttribute(attr) || '');
+        if (current === on) return false;
+        this.snapshot();
+        el.setAttribute(attr, on ? 'True' : 'False');
+        return true;
+    },
+
+    /// Ключ варианта Switch: то, с чем сравнивается переменная. Лежит внутри
+    /// экранированной разметки <Pair>, рядом с адресом перехода — правим
+    /// только <Key>, адрес не трогаем.
+    setCaseKey(branchId, slot, key) {
+        const el = this.branchEl(branchId);
+        const results = el && el.querySelector('Results');
+        if (!results) return false;
+
+        const tag = slot === 'default' ? 'Default' : 'Case' + slot.split(':')[1];
+        const node = results.querySelector(tag);
+        if (!node) return false;
+
+        const txt = node.textContent || '';
+        const escaped = key.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const next = txt.includes('<Key>')
+            ? txt.replace(/<Key>[^<]*<\/Key>/, '<Key>' + escaped + '</Key>')
+            : '<Pair><Key>' + escaped + '</Key><Value></Value></Pair>';
+        if (next === txt) return false;
+
+        this.snapshot();
+        node.textContent = next;
+        return true;
+    },
+
     /// Записать переход ветки. slot: 'ok' | 'err' | 'case:N' | 'default',
     /// где N — номер из имени тега <CaseN>, а не позиция в файле.
     /// target вида stepId|branchId, либо null — стереть переход.
