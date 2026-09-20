@@ -18,58 +18,47 @@ dz.addEventListener('drop', e => {
     if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
 });
 
-function readFile(file) {
-    setStatus('reading the file…', 'info');
-    const reader = new FileReader();
-    reader.onload  = e => processXml(decodeBytes(e.target.result), file.name);
-    reader.onerror = () => setStatus('could not read the file', 'err');
-    // Read bytes, not text: ZennoPoster saves templates as UTF-16 LE, and
-    // decoding those as UTF-8 yields garbage that fails at the first character.
-    reader.readAsArrayBuffer(file);
-}
-
-/// Decode by byte order mark, falling back to UTF-8 when there is none.
-function decodeBytes(buffer) {
-    const b = new Uint8Array(buffer);
-    let enc = 'utf-8', skip = 0;
-    if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) { enc = 'utf-16le'; skip = 2; }
-    else if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) { enc = 'utf-16be'; skip = 2; }
-    else if (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) { skip = 3; }
+/// Открыть шаблон из байтов. Вынесено отдельно от readFile, чтобы файл можно
+/// было подать и не через выбор в диалоге.
+function openBuffer(buffer, fileName) {
     try {
-        return new TextDecoder(enc).decode(b.subarray(skip));
-    } catch (e) {
-        // utf-16be is not decodable everywhere; utf-8 at least fails loudly.
-        return new TextDecoder('utf-8').decode(b.subarray(skip));
-    }
-}
-
-function processXml(raw, filename) {
-    try {
-        // Drop the XML declaration — DOMParser chokes on some encodings there.
-        raw = raw.replace(/^﻿/, '').replace(/^\s*<\?xml[^?]*\?>\s*/, '');
-
-        const parser = new DOMParser();
-        const doc  = parser.parseFromString(raw, 'text/xml');
-        const perr = doc.querySelector('parsererror');
-        if (perr) {
-            // Second try: the file may be a fragment without a single root.
-            const doc2  = parser.parseFromString('<root>' + raw + '</root>', 'text/xml');
-            const perr2 = doc2.querySelector('parsererror');
-            if (perr2) throw new Error(perr.textContent.replace(/\s+/g, ' ').substring(0, 180));
-            buildFromDoc(doc2);
-        } else {
-            buildFromDoc(doc);
-        }
-        setStatus('✓ ' + filename + ' · ' + stepList.length + ' steps · ' + edges.length + ' edges', 'ok');
+        const doc = ZpDoc.open(buffer, fileName);
+        buildFromDoc(doc);
+        setStatus('✓ ' + fileName + ' · ' + stepList.length + ' steps · ' + edges.length + ' edges', 'ok');
         document.getElementById('empty').style.display = 'none';
         layoutMode = hasCanvasCoords() ? 'canvas' : 'vertical';
         document.getElementById('btn-layout').textContent = LAYOUTS[layoutMode];
         render();
         resetView();
-    } catch (e) {
-        setStatus('error: ' + e.message, 'err');
-        console.error(e);
+    } catch (err) {
+        setStatus('error: ' + err.message, 'err');
+        console.error(err);
     }
+}
+
+function readFile(file) {
+    setStatus('reading the file…', 'info');
+    const reader = new FileReader();
+    reader.onload  = e => openBuffer(e.target.result, file.name);
+    reader.onerror = () => setStatus('could not read the file', 'err');
+    reader.readAsArrayBuffer(file);
+}
+
+/// Отдать шаблон файлом. Кодировка и объявление — исходные: UTF-8 ProjectMaker
+/// не открывает.
+function saveFile() {
+    if (!ZpDoc.doc) { setStatus('nothing to save', 'err'); return; }
+    const blob = new Blob([ZpDoc.bytes()], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = ZpDoc.fileName || 'template.xml';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    ZpDoc.dirty = false;
+    setStatus('saved ' + a.download, 'ok');
 }
 
 function setStatus(msg, type) {
@@ -79,7 +68,8 @@ function setStatus(msg, type) {
 }
 
 function clearAll() {
-    steps = {}; edges = []; stepList = [];
+    steps = {}; edges = []; stepList = []; terminals = [];
+    ZpDoc.doc = null; ZpDoc.dirty = false; ZpDoc.undoStack = []; ZpDoc.redoStack = [];
     document.getElementById('canvas').innerHTML = '';
     document.getElementById('edges').innerHTML  = '';
     document.getElementById('empty').style.display = 'flex';
@@ -264,3 +254,4 @@ document.getElementById('btn-reset'  ).addEventListener('click', resetView);
 document.getElementById('btn-layout' ).addEventListener('click', toggleLayout);
 document.getElementById('btn-detail-close').addEventListener('click', closeDetail);
 document.getElementById('search').addEventListener('input', function () { filterNodes(this.value); });
+document.getElementById('btn-save').addEventListener('click', saveFile);
