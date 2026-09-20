@@ -80,6 +80,7 @@ try
     dashboardService.RegisterHandler(new ZpOrchestratorHandler(dbConnectionService));
     dashboardService.RegisterHandler(new SchedulerHandler(dbConnectionService, schedulerService, dashboardService.WwwrootPath));
     dashboardService.RegisterHandler(new TaskControlHandler(schedulerService));
+    dashboardService.RegisterHandler(new ZpDebugHandler());
     dashboardService.RegisterHandler(new ImportHandler(dbConnectionService));
     dashboardService.RegisterHandler(new CliplatesHandler(dbConnectionService));
     dashboardService.RegisterHandler(new MemoryWatchdogHandler(watchdogService));
