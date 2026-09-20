@@ -162,8 +162,8 @@ function showDetail(step, bi) {
         '<dt>action</dt><dd>' + escHtml(b.type + ' / ' + b.action) + '</dd>' +
         '<dt>branch</dt><dd>#' + bi + ' of ' + step.branches.length + '</dd>' +
         '<dt>branch id</dt><dd>' + escHtml(b.id) + '</dd>' +
-        '<dt>step</dt><dd>' + escHtml(stepLabel(step)) + '</dd>' +
-        '<dt>step id</dt><dd>' + escHtml(step.id) + '</dd>' +
+        '<dt>step id</dt><dd>' + escHtml(step.id) +
+            (step.label.trim() ? ' · ' + escHtml(step.label.trim()) : '') + '</dd>' +
         (step.x !== null ? '<dt>canvas</dt><dd>' + step.x + ', ' + step.y + '</dd>' : '') +
         '<dt>reached</dt><dd>' + (step.reachable === false ? 'no — dead code' : 'yes') + '</dd>' +
         (b.disabled ? '<dt>state</dt><dd>disabled — not executed</dd>' : '') +
@@ -179,6 +179,19 @@ function showDetail(step, bi) {
         code.innerHTML = '<div class="bi-head">code</div>' +
                          '<div class="bi-code full">' + escHtml(b.code.trim()) + '</div>';
         db.appendChild(code);
+    }
+
+    // Параметры действия: для HTMLElement это и есть главное — по какому
+    // элементу кликать и сколько его ждать.
+    if (b.params && b.params.length) {
+        const pr = document.createElement('div');
+        pr.className = 'bi';
+        pr.innerHTML = '<div class="bi-head">parameters</div>' +
+            '<div class="dl params">' +
+            b.params.map(p =>
+                '<dt>' + escHtml(p.path) + '</dt><dd>' + escHtml(cut(p.value, 300)) + '</dd>').join('') +
+            '</div>';
+        db.appendChild(pr);
     }
 
     const links = document.createElement('div');
@@ -214,6 +227,11 @@ function showDetail(step, bi) {
     sib.querySelectorAll('.sib').forEach(el =>
         el.addEventListener('click', () => selectBranch(step.id, +el.dataset.i)));
     db.appendChild(sib);
+}
+
+function cut(v, max) {
+    const t = String(v == null ? '' : v);
+    return t.length <= max ? t : t.substring(0, max) + '…';
 }
 
 function escHtml(s) {

@@ -124,7 +124,7 @@ body.editing .row            { cursor:grab; }
 }
 /* Row tint follows the action type, the way the ProjectMaker canvas colours it. */
 .row.t-own     { background:color-mix(in srgb, var(--red)    14%, var(--bg1)); }
-.row.t-html    { background:color-mix(in srgb, var(--purple) 14%, var(--bg1)); }
+.row.t-html    { background:color-mix(in srgb, var(--cyan)   14%, var(--bg1)); }
 .row.t-web     { background:color-mix(in srgb, var(--accent) 14%, var(--bg1)); }
 .row.t-logic   { background:color-mix(in srgb, var(--yellow) 14%, var(--bg1)); }
 .row.t-profile { background:color-mix(in srgb, var(--green)  14%, var(--bg1)); }
@@ -142,7 +142,7 @@ body.editing .row            { cursor:grab; }
     background:var(--red); color:#fff;
 }
 .mark.own     { background:var(--red); }
-.mark.html    { background:var(--purple); }
+.mark.html    { background:var(--cyan); color:#000; }
 .mark.web     { background:var(--accent); }
 .mark.logic   { background:var(--yellow); color:#000; }
 .mark.profile { background:var(--green);  color:#000; }
@@ -255,6 +255,12 @@ body.editing .crow:hover > .drag-port { display:block; }
 .dl    { display:grid; grid-template-columns:72px 1fr; gap:3px 8px; margin-bottom:10px; }
 .dl dt { color:var(--text2); font-size:11px; }
 .dl dd { color:var(--text); font-size:11px; word-break:break-all; font-family:var(--mono, monospace); }
+
+/* Параметры действия: путей много и они длинные, поэтому колонка шире и
+   значения переносятся по словам, а не рвутся посимвольно. */
+.dl.params    { grid-template-columns:minmax(80px, 40%) 1fr; gap:2px 8px; margin-bottom:0; }
+.dl.params dt { font-size:10px; color:var(--text3); word-break:break-all; }
+.dl.params dd { font-size:10px; white-space:pre-wrap; word-break:break-word; }
 
 .bi        { border:1px solid var(--border); border-radius:var(--radius, 6px); padding:7px 9px; margin-bottom:7px; }
 .bi-head   { font-size:10px; color:var(--text2); margin-bottom:3px; font-weight:500; }

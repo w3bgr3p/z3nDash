@@ -66,6 +66,7 @@ function buildFromDoc(doc) {
                 // names depending on the action, so look for the macro instead
                 // of betting on one field. Empty when nothing looks like one.
                 switchVar: findMacro(b.querySelector('Parameters')),
+                params:    flattenParams(b.querySelector('Parameters')),
                 outputVariable: res?.querySelector('OutputVariable')?.textContent || '',
                 onSuccess, onError, cases
             });
@@ -124,21 +125,47 @@ function markReachable() {
     stepList.forEach(s => s.reachable = seen.has(s.id));
 }
 
-/// The canvas label. In real templates Step@UserText is empty — ZennoPoster
-/// puts the caption on the branch (XmlTemplate.Branch.Title), so fall back to
-/// the first branch that has one.
+/// Имя блока. В реальных шаблонах Step@UserText пуст, и своего имени у блока
+/// нет. Подставлять сюда подпись одной из его веток нельзя: тогда блок из
+/// тринадцати действий назывался бы по восьмому из них, и это читалось бы как
+/// факт. Без имени показываем короткий идентификатор.
 function stepLabel(s) {
-    if (s.label.trim()) return s.label.trim();
-    const named = s.branches.find(b => b.userText.trim());
-    if (named) return named.userText.trim();
-    const first = s.branches[0];
-    return first ? (first.type + ' / ' + first.action) : '(empty step)';
+    return s.label.trim() || ('step ' + s.id.substring(0, 8));
 }
 
 /// <Pair><Key>…</Key><Value>stepId|branchId</Value></Pair>, stored escaped
 /// inside the node's text. An empty Value is legal: it is an option with no
 /// arrow drawn on the canvas.
 /// First {-Something-} macro inside the node, used as the switch caption.
+/// Плоский список параметров ветки: путь и значение, как они лежат в файле.
+/// Разбирать по типам действия не берёмся — у каждого Type/Action свой набор
+/// полей, и выдуманная схема врала бы на первом незнакомом действии. Поэтому
+/// показываем всё, что есть, включая атрибуты: у HTMLElement условие поиска
+/// элемента хранится именно в них.
+function flattenParams(el, prefix, out, depth) {
+    out = out || [];
+    prefix = prefix || '';
+    depth = depth || 0;
+    if (!el || depth > 6) return out;
+
+    Array.from(el.children).forEach(node => {
+        const name = prefix + node.tagName;
+
+        Array.from(node.attributes || []).forEach(a => {
+            if ((a.value || '').trim()) out.push({ path: name + '@' + a.name, value: a.value });
+        });
+
+        const kids = Array.from(node.children);
+        if (kids.length) { flattenParams(node, name + '.', out, depth + 1); return; }
+
+        // Код ветки показывается отдельным блоком, дублировать не нужно.
+        if (node.tagName === 'Code') return;
+        const text = (node.textContent || '').trim();
+        if (text) out.push({ path: name, value: text });
+    });
+    return out;
+}
+
 function findMacro(params) {
     if (!params) return '';
     const m = (params.textContent || '').match(/\{-[^}]{1,60}-\}/);
