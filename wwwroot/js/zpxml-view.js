@@ -253,6 +253,12 @@ function renderNodes() {
         div.dataset.step = s.id;
         // Два уровня выделения разведены местом на экране: подложка — блок,
         // строка — ветка. Case-строки принадлежат ветке над ними.
+        div.addEventListener('mousedown', e => {
+            if (!editing) return;
+            if (e.target.closest('.row, .vrow, .crow')) return;   // строка — не блок
+            e.preventDefault(); e.stopPropagation();
+            beginStepDrag(s, div, e);
+        });
         div.addEventListener('click', e => {
             e.stopPropagation();
             const row = e.target.closest('.row, .vrow, .crow');

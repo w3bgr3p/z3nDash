@@ -335,3 +335,39 @@ function toggleEdit() {
 }
 
 document.getElementById('btn-edit').addEventListener('click', toggleEdit);
+
+// ── Dragging a block ─────────────────────────────────────────────────────────
+
+/// Перетаскивание блока за подложку. Документ во время движения не трогается:
+/// двигается только элемент на экране, мутация происходит один раз, на
+/// отпускании — иначе история забьётся промежуточными состояниями.
+function beginStepDrag(step, div, ev) {
+    const startX = ev.clientX, startY = ev.clientY;
+    const from = positions[step.id];
+    let dx = 0, dy = 0, moved = false;
+    div.classList.add('dragging');
+
+    const onMove = e => {
+        dx = (e.clientX - startX) / scale;
+        dy = (e.clientY - startY) / scale;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
+        div.style.left = (from.x + dx) + 'px';
+        div.style.top  = (from.y + dy) + 'px';
+    };
+
+    const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        div.classList.remove('dragging');
+        if (!moved) { render(); return; }
+        // Сдвиг применяем к исходным x/y из файла: раскладка отсчитывается от
+        // левого верхнего угла холста, а координаты в файле — от своего начала.
+        if (ZpDoc.moveStep(step.id, step.x + dx, step.y + dy)) {
+            setStatus('moved "' + stepLabel(step) + '"', 'ok');
+            refresh();
+        }
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+}

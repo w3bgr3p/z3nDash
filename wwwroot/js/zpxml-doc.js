@@ -61,6 +61,29 @@ const ZpDoc = {
         return new TextEncoder().encode(text);
     },
 
+    // ── Поиск элементов ──────────────────────────────────────────────────
+
+    stepEl(stepId) {
+        return [...this.doc.querySelectorAll('Step')].find(s => s.getAttribute('ID') === stepId) || null;
+    },
+
+    branchEl(branchId) {
+        return [...this.doc.querySelectorAll('Branch')].find(b => b.getAttribute('ID') === branchId) || null;
+    },
+
+    // ── Операции ─────────────────────────────────────────────────────────
+
+    moveStep(stepId, x, y) {
+        const el = this.stepEl(stepId);
+        if (!el) return false;
+        this.snapshot();
+        el.setAttribute('x', String(Math.round(x)));
+        el.setAttribute('y', String(Math.round(y)));
+        return true;
+    },
+
+    // ── История ──────────────────────────────────────────────────────────
+
     undoStack: [],
     redoStack: [],
     maxHistory: 50,
