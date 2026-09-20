@@ -104,6 +104,13 @@ public sealed class Branch
     public bool IsOptional { get; init; }
 
     /// <summary>
+    /// Точка останова, расставленная в ProjectMaker. Плеер её не исполняет —
+    /// это признак для отладчика. Атрибута может не быть вовсе: отсутствие
+    /// значит «точки нет».
+    /// </summary>
+    public bool HasBreakPoint { get; init; }
+
+    /// <summary>
     /// Действие выключено в редакторе — на холсте это серый кубик. ZP такую
     /// ветку не исполняет вовсе: она сразу «успешна» и маршрут идёт дальше.
     /// Выключают обычно именно то, что на текущем сайте не работает, поэтому
@@ -234,6 +241,8 @@ public sealed class XmlTemplate
                     Title      = b.Attribute("UserText")?.Value ?? "",
                     IsOptional = string.Equals(b.Attribute("IsNotNecessarily")?.Value,
                                                "True", StringComparison.OrdinalIgnoreCase),
+                    HasBreakPoint = string.Equals(b.Attribute("HasBreakPoint")?.Value,
+                                                  "True", StringComparison.OrdinalIgnoreCase),
                     // Атрибута может не быть вовсе: ZP пишет его не всегда, а
                     // отсутствие значит «включено».
                     IsDisabled = string.Equals(b.Attribute("IsDisable")?.Value,
