@@ -1,0 +1,86 @@
+/* zb.css — вынесено из ZB.html */
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: var(--sp-20) var(--sp-20) var(--sp-80); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--fs-12); background: var(--bg); color: var(--text); }
+
+.page-header { display: flex; align-items: center; gap: var(--sp-12); margin-bottom: var(--sp-18); }
+.page-header h1 { font-size: var(--fs-16); font-weight: var(--fw-bold); color: var(--text-hi); margin: 0; letter-spacing: 0.04em; }
+.page-header .subtitle { font-size: var(--fs-11); color: var(--text-dim); }
+
+.status-bar { display: flex; align-items: center; gap: var(--sp-10); margin-bottom: var(--sp-20); padding: var(--sp-8) var(--sp-14); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-11); }
+.status-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.2s; }
+.status-bar .dot.ok  { background: var(--green); }
+.status-bar .dot.err { background: var(--red); }
+.status-bar .sep { color: var(--border); }
+
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-10); margin-bottom: var(--sp-20); }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-12) var(--sp-14); }
+.stat-card .stat-label { font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: var(--sp-4); }
+.stat-card .stat-value { font-size: var(--fs-22); font-weight: var(--fw-bold); color: var(--text-hi); line-height: var(--lh-tight); }
+.stat-card .stat-sub   { font-size: var(--fs-10); color: var(--text-dim); margin-top: var(--sp-2); }
+.stat-card.running .stat-value { color: var(--green); }
+.stat-card.warn    .stat-value { color: var(--yellow); }
+
+.tabs { display: flex; gap: var(--sp-2); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-16); }
+.tab-btn { padding: var(--sp-6) var(--sp-14); font-family: inherit; font-size: var(--fs-11); font-weight: var(--fw-semi); color: var(--text-dim); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -var(--sp-1); transition: color 0.1s; }
+.tab-btn:hover  { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.section-header  { display: flex; align-items: center; gap: var(--sp-10); margin-bottom: var(--sp-10); }
+.section-title   { font-size: var(--fs-11); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); }
+.section-count   { font-size: var(--fs-10); color: var(--text-dim); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-1) var(--sp-6); }
+.section-actions { margin-left: auto; display: flex; gap: var(--sp-6); }
+
+.tbl-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+thead th { background: var(--surface); font-size: var(--fs-10); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); padding: var(--sp-6) var(--sp-10); text-align: left; border-bottom: 1px solid var(--border); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface2); }
+td { padding: var(--sp-6) var(--sp-10); font-size: var(--fs-11); color: var(--text); vertical-align: middle; }
+td.mono       { font-family: 'JetBrains Mono', monospace; font-size: var(--fs-10); color: var(--text-dim); }
+td.name-cell  { color: var(--text-hi); font-weight: var(--fw-semi); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td.token-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-10); color: var(--text-dim); }
+
+.tag { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-4); font-size: var(--fs-9); color: var(--text-dim); margin: var(--sp-1) var(--sp-2) var(--sp-1) 0; }
+
+.badge { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-10); font-weight: var(--fw-semi); padding: var(--sp-2) var(--sp-6); border-radius: var(--radius-lg); }
+.badge.running { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 30%, transparent); }
+.badge.stopped { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+.badge.unknown { background: color-mix(in srgb, var(--yellow) 10%, transparent); color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 30%, transparent); }
+
+.btn { padding: var(--sp-2) var(--sp-10); border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: var(--fs-10); font-family: inherit; cursor: pointer; background: var(--surface); color: var(--text); transition: background 0.1s; white-space: nowrap; }
+.btn:hover    { background: var(--surface2); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn.green  { background: color-mix(in srgb, var(--green-bg) 15%, transparent); border-color: color-mix(in srgb, var(--green-bg) 50%, transparent); color: var(--green); }
+.btn.green:hover { background: color-mix(in srgb, var(--green-bg) 25%, transparent); }
+.btn.red    { background: color-mix(in srgb, var(--red) 12%, transparent); border-color: color-mix(in srgb, var(--red) 40%, transparent); color: var(--red); }
+.btn.red:hover   { background: color-mix(in srgb, var(--red) 22%, transparent); }
+.btn.orange { background: color-mix(in srgb, var(--yellow) 12%, transparent); border-color: color-mix(in srgb, var(--yellow) 40%, transparent); color: var(--yellow); }
+.btn.orange:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent); }
+.btn.sm { padding: var(--sp-2) var(--sp-6); font-size: var(--fs-9); }
+.btn-row { display: flex; gap: var(--sp-4); }
+
+.filter-row { display: flex; gap: var(--sp-8); margin-bottom: var(--sp-10); align-items: center; }
+.filter-row input, .filter-row select { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: var(--fs-11); padding: var(--sp-4) var(--sp-8); outline: none; }
+.filter-row input { width: 220px; }
+.filter-row input:focus, .filter-row select:focus { border-color: var(--accent); }
+
+.empty   { text-align: center; padding: var(--sp-32); color: var(--text-dim); font-size: var(--fs-11); }
+.loading { text-align: center; padding: var(--sp-20); color: var(--text-dim); font-size: var(--fs-11); }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: var(--sp-6); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.uptime { font-size: var(--fs-10); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sort-asc::after  { content: ' ↑'; color: var(--accent); }
+th.sort-desc::after { content: ' ↓'; color: var(--accent); }
+
+#toast { position: fixed; bottom: 90px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-8) var(--sp-14); font-size: var(--fs-11); color: var(--text); box-shadow: 0 4px 16px rgba(0,0,0,0.4); z-index: 9000; opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
+#toast.show { opacity: 1; transform: translateY(0); }
+#toast.ok  { border-color: color-mix(in srgb, var(--green) 50%, transparent); color: var(--green); }
+#toast.err { border-color: color-mix(in srgb, var(--red) 40%, transparent); color: var(--red); }
