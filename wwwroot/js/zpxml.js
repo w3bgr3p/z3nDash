@@ -496,3 +496,66 @@ document.addEventListener('keydown', e => {
     closeDetail();
     refresh(note);
 });
+
+// ── Dragging an edge ─────────────────────────────────────────────────────────
+
+/// Протянуть переход от порта к строке. Отпускание где угодно, кроме строки —
+/// включая подложку блока и пустой холст — стирает переход: это единственный
+/// способ убрать стрелку мышью.
+function beginEdgeDrag(stepId, branchIndex, slot, ev) {
+    const branch = steps[stepId].branches[branchIndex];
+    const svg = document.getElementById('edges');
+    const ns  = 'http://www.w3.org/2000/svg';
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('class', 'edge pending');
+    svg.appendChild(path);
+
+    const caseIndex = slot.startsWith('case:') || slot === 'default'
+        ? branch.cases.findIndex(c => (c.isDefault ? 'default' : 'case:' + c.number) === slot)
+        : null;
+    const from = anchor({ stepId, branchIndex, caseIndex: caseIndex < 0 ? null : caseIndex }, 'right');
+    let hovered = null;
+
+    const highlight = el => {
+        if (hovered === el) return;
+        if (hovered) hovered.classList.remove('drop-ok');
+        hovered = el;
+        if (hovered) hovered.classList.add('drop-ok');
+    };
+
+    const rowUnder = (x, y) => {
+        const el = document.elementFromPoint(x, y);
+        return el && el.closest ? el.closest('.row') : null;
+    };
+
+    const onMove = e => {
+        const pt = canvasPoint(e.clientX, e.clientY);
+        path.setAttribute('d', 'M' + from.x + ',' + from.y + ' L' + pt.x + ',' + pt.y);
+        highlight(rowUnder(e.clientX, e.clientY));
+    };
+
+    const onUp = e => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        path.remove();
+        highlight(null);
+
+        const row = rowUnder(e.clientX, e.clientY);
+        const block = row && row.closest('.block');
+        let target = null, targetLabel = 'cleared';
+        if (row && block) {
+            const toStep = steps[block.dataset.step];
+            const toBranch = toStep && toStep.branches[+row.dataset.b];
+            if (toBranch) {
+                target = toStep.id + '|' + toBranch.id;
+                targetLabel = stepLabel(toStep) + ' #' + row.dataset.b;
+            }
+        }
+
+        if (ZpDoc.setTransition(branch.id, slot, target))
+            refresh(slot + ' → ' + targetLabel);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+}

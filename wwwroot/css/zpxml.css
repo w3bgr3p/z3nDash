@@ -161,6 +161,26 @@ body.editing .row            { cursor:grab; }
 .port.pl { margin-left:-3px; }
 .port.pr { margin-right:-3px; }
 
+/* Порты протяжки: появляются только в режиме правки и только у строки под
+   курсором, иначе блок превращается в россыпь точек. */
+.row, .crow { position:relative; }
+.drag-port {
+    display:none;
+    position:absolute; right:-5px;
+    width:8px; height:8px; border-radius:50%;
+    border:1px solid var(--bg);
+    cursor:crosshair; z-index:26;
+}
+.drag-port.ok   { background:var(--green); top:3px; }
+.drag-port.err  { background:var(--red);   bottom:3px; }
+.drag-port.case { background:var(--accent); top:4px; }
+
+body.editing .row:hover  > .drag-port,
+body.editing .crow:hover > .drag-port { display:block; }
+
+#edges .edge.pending { stroke:var(--accent); stroke-dasharray:4 3; stroke-opacity:1; }
+.row.drop-ok { outline:2px solid var(--accent); outline-offset:-2px; }
+
 /* Switch rows: the tested value, then one row per case. */
 .vrow {
     display:flex; align-items:center;

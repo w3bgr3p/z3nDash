@@ -234,6 +234,8 @@ function renderNodes() {
                       '<span class="mark ' + typeClass(b.type) + '">' + branchMark(b) + '</span>' +
                       '<span class="rlabel">' + escHtml(branchRowLabel(b)) + '</span>' +
                       (() => { const p = portHtml(s.id, bi, undefined, ''); return p.right; })() +
+                      '<span class="drag-port ok"  data-slot="ok"></span>' +
+                      '<span class="drag-port err" data-slot="err"></span>' +
                     '</div>';
             if (b.cases.length) {
                 html += '<div class="vrow" style="height:' + VAR_H + 'px" data-b="' + bi + '">' +
@@ -247,6 +249,8 @@ function renderNodes() {
                                 (c.isDefault ? 'Default' : escHtml(c.number + ': ' + (c.key || 'undefined'))) +
                               '</span>' +
                               cp.right +
+                              '<span class="drag-port case" data-slot="' +
+                                (c.isDefault ? 'default' : 'case:' + c.number) + '"></span>' +
                             '</div>';
                 });
             }
@@ -269,6 +273,15 @@ function renderNodes() {
                 if (e.target.closest('.drag-port')) return;
                 e.preventDefault(); e.stopPropagation();
                 beginBranchDrag(s, bi, e);
+            });
+        });
+        // Порты есть и у case-строк; номер ветки-владельца берётся из data-b.
+        div.querySelectorAll('.drag-port').forEach(port => {
+            port.addEventListener('mousedown', e => {
+                if (!editing) return;
+                e.preventDefault(); e.stopPropagation();
+                const row = port.closest('[data-b]');
+                beginEdgeDrag(s.id, +row.dataset.b, port.dataset.slot, e);
             });
         });
         div.addEventListener('click', e => {

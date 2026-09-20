@@ -152,6 +152,43 @@ const ZpDoc = {
         return true;
     },
 
+    /// Записать переход ветки. slot: 'ok' | 'err' | 'case:N' | 'default',
+    /// где N — номер из имени тега <CaseN>, а не позиция в файле.
+    /// target вида stepId|branchId, либо null — стереть переход.
+    /// Case и Default хранят адрес внутри экранированной разметки <Pair>,
+    /// поэтому там правится только <Value>, а ключ остаётся как был.
+    setTransition(branchId, slot, target) {
+        const el = this.branchEl(branchId);
+        if (!el) return false;
+        let results = el.querySelector('Results');
+        if (!results) {
+            results = this.doc.createElement('Results');
+            el.appendChild(results);
+        }
+
+        const value = target || '';
+
+        if (slot === 'ok' || slot === 'err') {
+            const tag = slot === 'ok' ? 'OnSuccess' : 'OnError';
+            this.snapshot();
+            let node = results.querySelector(tag);
+            if (!node) { node = this.doc.createElement(tag); results.appendChild(node); }
+            node.textContent = value;
+            return true;
+        }
+
+        const tag = slot === 'default' ? 'Default' : 'Case' + slot.split(':')[1];
+        const node = results.querySelector(tag);
+        if (!node) return false;          // варианта с таким номером в файле нет
+
+        this.snapshot();
+        const txt = node.textContent || '';
+        node.textContent = txt.includes('<Value>')
+            ? txt.replace(/<Value>[^<]*<\/Value>/, '<Value>' + value + '</Value>')
+            : '<Pair><Key></Key><Value>' + value + '</Value></Pair>';
+        return true;
+    },
+
     /// Удалить ветку. Входящие переходы переводятся на следующую ветку того же
     /// блока — так маршрут сохраняет смысл. Если удаляемая была последней,
     /// переходы очищаются: по правилам рантайма пустой переход у последней
