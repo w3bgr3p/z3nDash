@@ -130,7 +130,17 @@
     /* Матовый синий (тон BMW, H=208), пришёл на смену фиолетовому */
     /* Бирюза: статус Schedule. Разведена с --steel по тону (177 против 208). */
     /* Золото: денежные суммы в treasury. */
+    /* Индиго и розовый: категории бейджей безопасности в json. */
+    --indigo:             #8f8fff;
+    --indigo-tint:        #0e0e2f;
+    --indigo-tint-border: #16164b;
+    --pink:             #ff8fce;
+    --pink-tint:        #2f0e21;
+    --pink-tint-border: #4b1634;
+
     --gold:              #ffd700;
+    --gold-tint:         #2f2a0e;
+    --gold-tint-border:  #4b4316;
 
     --cyan:             #66d6d1;
     --cyan-tint:        #0e3432;
@@ -221,7 +231,17 @@
     /* Матовый синий (тон BMW, H=208), пришёл на смену фиолетовому */
     /* Бирюза: статус Schedule. Разведена с --steel по тону (177 против 208). */
     /* Золото: денежные суммы в treasury. */
+    /* Индиго и розовый: категории бейджей безопасности в json. */
+    --indigo:             #3030a6;
+    --indigo-tint:        #dedef7;
+    --indigo-tint-border: #a5a5e9;
+    --pink:             #a63073;
+    --pink-tint:        #f7deec;
+    --pink-tint-border: #e9a5cb;
+
     --gold:              #8a6a00;
+    --gold-tint:         #f7f3de;
+    --gold-tint-border:  #e9dea5;
 
     --cyan:             #197671;
     --cyan-tint:        #daf6f4;
@@ -312,7 +332,17 @@
     /* Матовый синий (тон BMW, H=208), пришёл на смену фиолетовому */
     /* Бирюза: статус Schedule. Разведена с --steel по тону (177 против 208). */
     /* Золото: денежные суммы в treasury. */
+    /* Индиго и розовый: категории бейджей безопасности в json. */
+    --indigo:             #7070ff;
+    --indigo-tint:        #08082b;
+    --indigo-tint-border: #0d0d4a;
+    --pink:             #ff70c1;
+    --pink-tint:        #2b081c;
+    --pink-tint-border: #4a0d2f;
+
     --gold:              #ffd700;
+    --gold-tint:         #2b2608;
+    --gold-tint-border:  #4a410d;
 
     --cyan:             #0affef;
     --cyan-tint:        #082b2a;
