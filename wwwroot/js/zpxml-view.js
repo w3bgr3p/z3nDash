@@ -6,7 +6,8 @@ const LAYOUTS = { canvas: '▦ canvas', vertical: '↕ vertical', horizontal: '�
 let positions = {};
 
 // rather than to the block. Switch branches add a row per case below their own.
-const NW = 132;      // block width
+const NW = 132;      // block width, without the backing plate
+const PAD = 4;       // backing plate: the margin you grab the whole block by
 const ROW_H = 26;    // one branch row
 const VAR_H = 16;    // the switch variable line above its cases
 const CASE_H = 17;   // one switch case row
@@ -38,7 +39,7 @@ function blockRows(step) {
 }
 
 function stepHeight(step) {
-    if (step._h === undefined) step._h = blockRows(step).height;
+    if (step._h === undefined) step._h = blockRows(step).height + PAD * 2;
     return step._h;
 }
 
@@ -59,7 +60,7 @@ function anchor(ref, side) {
         : rows.find(r => r.kind === 'branch' && r.branchIndex === ref.branchIndex);
     const top = row ? row.y : 0;
     const h   = row ? row.h : ROW_H;
-    return { x: p.x + (side === 'right' ? NW : 0), y: p.y + top + h / 2, side };
+    return { x: p.x + (side === 'right' ? NW + PAD * 2 : 0), y: p.y + PAD + top + h / 2, side };
 }
 
 /// Pick the shortest sensible route instead of always leaving right and
@@ -139,9 +140,9 @@ function layoutDag() {
         let along = 24;
         ids.forEach(id => {
             pos[id] = vertical ? { x: along, y: cursor } : { x: cursor, y: along };
-            along += vertical ? NW + GX : stepHeight(steps[id]) + GY;
+            along += vertical ? NW + PAD * 2 + GX : stepHeight(steps[id]) + GY;
         });
-        cursor += (vertical ? tallest : NW) + GY;
+        cursor += (vertical ? tallest : NW + PAD * 2) + GY;
     });
     placeTerminals(pos);
     return pos;
@@ -216,10 +217,11 @@ function renderNodes() {
                         (s.id === goodEndId ? ' good'  : '') +
                         (s.id === badEndId  ? ' bad'   : '') +
                         (s.reachable === false ? ' unreachable' : '') +
-                        (selected && selected.stepId === s.id ? ' selected' : '');
+                        (selected && selected.stepId === s.id && selected.branchIndex !== null ? ' selected' : '') +
+                        (selected && selected.stepId === s.id && selected.branchIndex === null ? ' block-selected' : '');
         div.style.left  = p.x + 'px';
         div.style.top   = p.y + 'px';
-        div.style.width = NW + 'px';
+        div.style.width = (NW + PAD * 2) + 'px';
 
         let html = '';
         s.branches.forEach((b, bi) => {
@@ -248,13 +250,15 @@ function renderNodes() {
             }
         });
         div.innerHTML = html;
-        // Clicking picks the row under the pointer. Case rows belong to the
-        // branch above them, so they select that branch.
+        div.dataset.step = s.id;
+        // Два уровня выделения разведены местом на экране: подложка — блок,
+        // строка — ветка. Case-строки принадлежат ветке над ними.
         div.addEventListener('click', e => {
             e.stopPropagation();
             const row = e.target.closest('.row, .vrow, .crow');
-            let bi = row && row.dataset.b !== undefined ? +row.dataset.b : null;
-            if (bi === null && row) {
+            if (!row) { selectStep(s.id); return; }
+            let bi = row.dataset.b !== undefined ? +row.dataset.b : null;
+            if (bi === null) {
                 const rows = [...div.children];
                 for (let i = rows.indexOf(row); i >= 0; i--)
                     if (rows[i].dataset.b !== undefined) { bi = +rows[i].dataset.b; break; }
@@ -295,7 +299,7 @@ function renderEdges() {
     const svg = document.getElementById('edges');
     let mx = 200, my = 200;
     Object.entries(positions).forEach(([id, p]) => {
-        const w = steps[id] ? NW : TERM_R * 2;
+        const w = steps[id] ? NW + PAD * 2 : TERM_R * 2;
         const h = steps[id] ? stepHeight(steps[id]) : TERM_R * 2;
         mx = Math.max(mx, p.x + w + 80);
         my = Math.max(my, p.y + h + 80);
@@ -363,7 +367,7 @@ function resetView() {
 
     const box = Object.entries(positions).map(([id, p]) => ({
         x: p.x, y: p.y,
-        w: steps[id] ? NW : TERM_R * 2,
+        w: steps[id] ? NW + PAD * 2 : TERM_R * 2,
         h: steps[id] ? stepHeight(steps[id]) : TERM_R * 2
     }));
     const minX = Math.min(...box.map(b => b.x)), maxX = Math.max(...box.map(b => b.x + b.w));

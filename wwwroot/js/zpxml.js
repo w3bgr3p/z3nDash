@@ -94,6 +94,30 @@ function clearAll() {
 
 // ── Detail panel ─────────────────────────────────────────────────────────────
 
+/// Выделение блока целиком: панель показывает сводку по шагу.
+function selectStep(stepId) {
+    selected = { stepId, branchIndex: null };
+    renderNodes();
+    showStepDetail(steps[stepId]);
+}
+
+function showStepDetail(step) {
+    document.getElementById('detail').classList.add('open');
+    document.getElementById('d-label').textContent = stepLabel(step);
+    document.getElementById('d-meta').innerHTML =
+        '<dt>step id</dt><dd>' + escHtml(step.id) + '</dd>' +
+        '<dt>branches</dt><dd>' + step.branches.length + '</dd>' +
+        (step.x !== null ? '<dt>canvas</dt><dd>' + step.x + ', ' + step.y + '</dd>' : '') +
+        '<dt>reached</dt><dd>' + (step.reachable === false ? 'no — dead code' : 'yes') + '</dd>';
+    const db = document.getElementById('d-branches');
+    db.innerHTML = '<div class="bi"><div class="bi-head">step branches</div>' +
+        step.branches.map((o, i) =>
+            '<div class="sib' + (o.disabled ? ' off' : '') + '" data-i="' + i + '">#' + i +
+            ' · ' + escHtml(branchRowLabel(o)) + '</div>').join('') + '</div>';
+    db.querySelectorAll('.sib').forEach(el =>
+        el.addEventListener('click', () => selectBranch(step.id, +el.dataset.i)));
+}
+
 /// Selection is one branch row, not the whole block: a step on the canvas
 /// stacks many actions, and showing all of them at once buries the one that was
 /// clicked.
@@ -297,3 +321,17 @@ window.addEventListener('beforeunload', e => {
     e.preventDefault();
     e.returnValue = '';
 });
+
+// ── Edit mode ────────────────────────────────────────────────────────────────
+
+let editing = false;
+
+function toggleEdit() {
+    editing = !editing;
+    document.body.classList.toggle('editing', editing);
+    document.getElementById('btn-edit').classList.toggle('active', editing);
+    setStatus(editing ? 'edit mode on' : 'edit mode off', 'info');
+    updateDirtyMark();
+}
+
+document.getElementById('btn-edit').addEventListener('click', toggleEdit);

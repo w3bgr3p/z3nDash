@@ -1,0 +1,274 @@
+/* zpxml.css — ZennoPoster XML flow viewer */
+
+#app { display:flex; flex-direction:column; height:100vh; }
+
+/* ── Top bar ────────────────────────────────────────────────────────────── */
+#top {
+    padding:10px 14px;
+    background:var(--bg1);
+    border-bottom:1px solid var(--border);
+    display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;
+}
+#top-left  { display:flex; flex-direction:column; gap:8px; }
+#top-row   { display:flex; gap:6px; align-items:center; }
+#top-hint  { font-size:11px; color:var(--text2); line-height:1.7; }
+
+#file-input { display:none; }
+#drop-zone {
+    border:2px dashed var(--border);
+    border-radius:var(--radius-lg, 10px);
+    padding:10px 18px;
+    font-size:12px; color:var(--text2);
+    cursor:pointer; white-space:nowrap;
+    background:var(--bg2);
+}
+#drop-zone:hover, #drop-zone.over {
+    border-color:var(--accent); color:var(--accent);
+    background:var(--blue-tint);
+}
+#status { font-size:11px; color:var(--text2); align-self:center; max-width:400px; }
+#status.ok  { color:var(--green); }
+#status.err { color:var(--red); }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+#toolbar {
+    display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+    padding:7px 14px;
+    background:var(--bg1);
+    border-bottom:1px solid var(--border);
+}
+#zpxml .btn {
+    font-size:12px; padding:5px 12px;
+    border-radius:var(--radius, 6px);
+    border:1px solid var(--border);
+    background:var(--bg2); color:var(--text);
+    cursor:pointer;
+}
+#zpxml .btn:hover { background:var(--bg3); border-color:var(--border2); }
+#zpxml .btn.active {
+    background:var(--blue-tint); color:var(--accent); border-color:var(--blue-border);
+}
+#search {
+    font-size:12px; padding:4px 9px;
+    border-radius:var(--radius, 6px);
+    border:1px solid var(--border);
+    background:var(--bg2); color:var(--text);
+    width:180px; outline:none;
+}
+#search:focus { border-color:var(--accent); }
+
+.legend { display:flex; gap:10px; align-items:center; font-size:11px; color:var(--text2); margin-left:6px; flex-wrap:wrap; }
+.ld    { display:flex; align-items:center; gap:4px; }
+.ldot  { width:10px; height:10px; border-radius:50%; border:1.5px solid; flex-shrink:0; }
+.lline { width:20px; height:2px; border-radius:1px; opacity:.8; }
+.ldot.good { background:color-mix(in srgb, var(--green) 16%, var(--bg1)); border-color:var(--green); }
+.ldot.bad  { background:color-mix(in srgb, var(--red)   16%, var(--bg1)); border-color:var(--red); }
+.lline.ok   { background:var(--green); }
+.lline.err  { background:var(--red); }
+.lline.case { background:var(--accent); }
+
+/* ── Canvas ─────────────────────────────────────────────────────────────── */
+#canvas-wrap { flex:1; position:relative; overflow:hidden; background:var(--bg); cursor:grab; }
+#canvas-wrap.grabbing { cursor:grabbing; }
+#canvas { position:absolute; transform-origin:0 0; }
+svg#edges { position:absolute; top:0; left:0; pointer-events:none; overflow:visible; transform-origin:0 0; }
+
+#edges .edge      { fill:none; stroke-width:1.5; stroke-opacity:.55; }
+#edges .edge-ok   { stroke:var(--green); }
+#edges .edge-err  { stroke:var(--red); }
+#edges .edge-case { stroke:var(--accent); }
+#edges .elabel      { font-size:9px; font-family:var(--mono, monospace); opacity:.9; }
+#edges .elabel-err  { fill:var(--red); }
+#edges .elabel-case { fill:var(--accent); }
+#edges #a-ok   path { fill:var(--green);  opacity:.8; }
+#edges #a-err  path { fill:var(--red);    opacity:.8; }
+#edges #a-case path { fill:var(--accent); opacity:.8; }
+
+/* ── Blocks: a step is a stack of its branch rows ───────────────────────── */
+.block {
+    position:absolute;
+    border:1px solid var(--border);
+    border-radius:4px;
+    /* Подложка: поле по периметру, за которое берут весь блок — как в ProjectMaker. */
+    background:var(--bg3);
+    padding:4px;
+    overflow:hidden;
+    cursor:pointer; user-select:none;
+}
+.block.block-selected { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+
+body.editing .block          { cursor:grab; }
+body.editing .block.dragging { cursor:grabbing; opacity:.75; z-index:30; }
+body.editing .row            { cursor:grab; }
+
+/* Линия вставки при перетаскивании ветки. */
+.drop-line {
+    position:absolute; height:2px;
+    background:var(--accent); border-radius:1px; pointer-events:none; z-index:35;
+}
+.block:hover        { border-color:var(--text3); z-index:10; }
+/* The block Start points into, and the two end handlers. */
+.block.entry { border-color:var(--green);  box-shadow:0 0 0 1px var(--green); }
+.block.good  { border-color:var(--green); }
+.block.bad   { border-color:var(--red); }
+.block.selected     { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); z-index:20; }
+.block.unreachable  { opacity:.42; border-style:dashed; }
+.block.unreachable:hover { opacity:1; }
+
+.row {
+    display:flex; align-items:center; gap:5px;
+    padding:0 5px;
+    border-bottom:1px solid var(--border);
+    background:var(--bg2);
+}
+/* Row tint follows the action type, the way the ProjectMaker canvas colours it. */
+.row.t-own     { background:color-mix(in srgb, var(--red)    14%, var(--bg1)); }
+.row.t-html    { background:color-mix(in srgb, var(--purple) 14%, var(--bg1)); }
+.row.t-web     { background:color-mix(in srgb, var(--accent) 14%, var(--bg1)); }
+.row.t-logic   { background:color-mix(in srgb, var(--yellow) 14%, var(--bg1)); }
+.row.t-profile { background:color-mix(in srgb, var(--green)  14%, var(--bg1)); }
+.row.t-other   { background:var(--bg2); }
+.row:last-child { border-bottom:none; }
+.row.off { opacity:.45; }
+.row.opt { box-shadow:inset 2px 0 0 var(--yellow); }
+.row.on  { outline:1px solid var(--accent); outline-offset:-1px; }
+
+.mark {
+    flex-shrink:0; width:16px; height:16px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:3px;
+    font-family:var(--mono, monospace); font-size:8px; font-weight:700;
+    background:var(--red); color:#fff;
+}
+.mark.own     { background:var(--red); }
+.mark.html    { background:var(--purple); }
+.mark.web     { background:var(--accent); }
+.mark.logic   { background:var(--yellow); color:#000; }
+.mark.profile { background:var(--green);  color:#000; }
+.mark.other   { background:var(--muted2); }
+
+.rlabel {
+    flex:1; min-width:0;
+    font-size:9px; color:var(--text-hi);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.port {
+    flex-shrink:0; width:5px; height:5px; border-radius:50%;
+    background:var(--red-lo);
+}
+.port.case { background:var(--accent); }
+/* A row can have a port on either edge — whichever side its arrow leaves from. */
+.port.pl { margin-left:-3px; }
+.port.pr { margin-right:-3px; }
+
+/* Switch rows: the tested value, then one row per case. */
+.vrow {
+    display:flex; align-items:center;
+    padding:0 5px;
+    font-size:8px; color:var(--green-hi);
+    background:var(--bg1);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.crow {
+    display:flex; align-items:center; gap:4px;
+    padding:0 5px;
+    background:var(--bg1);
+    border-top:1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.clabel {
+    flex:1; min-width:0;
+    font-size:8px; color:var(--text2);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── Start / Good End / Bad End ─────────────────────────────────────────── */
+.term {
+    position:absolute;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; line-height:1.15;
+    font-size:9px; font-weight:600; color:#fff;
+    user-select:none;
+}
+.term-start { background:var(--accent); }
+.term-good  { background:var(--green); }
+.term-bad   { background:var(--red); }
+
+/* ── Detail panel ───────────────────────────────────────────────────────── */
+#detail {
+    position:absolute; right:0; top:0; bottom:0;
+    width:var(--detail-w, 290px);
+    min-width:200px; max-width:80vw;
+    background:var(--bg1);
+    border-left:1px solid var(--border);
+    padding:12px; overflow-y:auto; font-size:12px;
+    display:none; z-index:40;
+    box-shadow:-2px 0 8px rgba(0,0,0,.25);
+}
+#detail.open { display:block; }
+
+/* Drag handle on the panel's inner edge. */
+#detail-resizer {
+    position:absolute; left:0; top:0; bottom:0; width:6px;
+    margin-left:-3px; cursor:col-resize; z-index:41;
+}
+#detail-resizer:hover, #detail-resizer.dragging { background:var(--accent); opacity:.5; }
+
+/* One line per sibling branch of the selected step. */
+.sib {
+    font-size:10px; color:var(--text2);
+    padding:2px 4px; border-radius:3px; cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.sib:hover { background:var(--bg2); color:var(--text); }
+.sib.on    { background:var(--blue-tint); color:var(--accent); font-weight:600; }
+.sib.off   { opacity:.5; }
+
+.bi-code.full { max-height:none; }
+#btn-detail-close { float:right; cursor:pointer; color:var(--text3); font-size:16px; border:none; background:none; padding:0; }
+#btn-detail-close:hover { color:var(--text-hi); }
+#detail h3 { font-size:13px; font-weight:600; margin:0 0 8px; color:var(--text-hi); padding-right:20px; }
+
+.dl    { display:grid; grid-template-columns:72px 1fr; gap:3px 8px; margin-bottom:10px; }
+.dl dt { color:var(--text2); font-size:11px; }
+.dl dd { color:var(--text); font-size:11px; word-break:break-all; font-family:var(--mono, monospace); }
+
+.bi        { border:1px solid var(--border); border-radius:var(--radius, 6px); padding:7px 9px; margin-bottom:7px; }
+.bi-head   { font-size:10px; color:var(--text2); margin-bottom:3px; font-weight:500; }
+.bi-utext  { font-size:11px; font-weight:600; color:var(--text-hi); margin-bottom:4px; }
+.bi-code   {
+    background:var(--bg2); border-radius:4px; padding:5px 7px;
+    font-family:var(--mono, monospace); font-size:10px;
+    max-height:120px; overflow-y:auto;
+    white-space:pre-wrap; word-break:break-word; line-height:1.45;
+    color:var(--text); margin-bottom:4px;
+}
+.bi-link      { font-size:10px; margin-top:2px; }
+.bi-link.ok   { color:var(--green); }
+.bi-link.err  { color:var(--red); }
+.bi-link.case { color:var(--accent); }
+
+/* ── Overlays ───────────────────────────────────────────────────────────── */
+#mini {
+    position:absolute; bottom:10px; left:10px;
+    background:color-mix(in srgb, var(--bg1) 90%, transparent);
+    border:1px solid var(--border); border-radius:5px;
+    padding:3px 9px; font-size:10px; color:var(--text2);
+    pointer-events:none;
+}
+#empty {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:100%; color:var(--text3); font-size:13px; gap:6px; line-height:1.7; text-align:center;
+}
+
+/* ── States added by the parser ─────────────────────────────────────────── */
+#edges .edge.dangling { stroke-dasharray:4 3; }
+
+.bi.off { opacity:.55; border-style:dashed; }
+.bi-head .flag {
+    float:right; font-size:9px; font-weight:600;
+    padding:0 4px; border-radius:3px; margin-left:4px;
+}
+.bi-head .flag.off { background:var(--bg3);         color:var(--text3); }
+.bi-head .flag.opt { background:var(--yellow-tint); color:var(--yellow); }
+.bi-link.dim { opacity:.5; font-style:italic; }
