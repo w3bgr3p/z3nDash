@@ -152,6 +152,40 @@ const ZpDoc = {
         return true;
     },
 
+    /// Создать блок рядом с существующими. Набор атрибутов копируется с уже
+    /// имеющегося <Step>, а не выдумывается: какие из них нужны ProjectMaker,
+    /// доподлинно неизвестно, поэтому повторяем то, что он пишет сам.
+    /// Вставляем рядом с другими Step, а не в конец: после блоков идёт
+    /// <StaticTechnologies>, и порядок узлов лучше не путать.
+    createStep(x, y) {
+        const sample = this.doc.querySelector('Step');
+        if (!sample) return null;
+        const el = this.doc.createElement('Step');
+        [...sample.attributes].forEach(a => el.setAttribute(a.name, a.value));
+        el.setAttribute('ID', crypto.randomUUID());
+        el.setAttribute('x', String(Math.round(x)));
+        el.setAttribute('y', String(Math.round(y)));
+        el.setAttribute('UserText', '');
+        sample.parentNode.insertBefore(el, sample.nextSibling);
+        return el;
+    },
+
+    extractBranch(branchId, x, y) {
+        const el = this.branchEl(branchId);
+        if (!el) return false;
+        const fromStepId = el.parentNode.getAttribute('ID');
+
+        this.snapshot();
+        const step = this.createStep(x, y);
+        if (!step) return false;
+
+        const toStepId = step.getAttribute('ID');
+        step.appendChild(el);
+        this.retarget(fromStepId + '|' + branchId, toStepId + '|' + branchId);
+        this.dropEmptySteps();
+        return true;
+    },
+
     moveStep(stepId, x, y) {
         const el = this.stepEl(stepId);
         if (!el) return false;

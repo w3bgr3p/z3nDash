@@ -26,6 +26,7 @@ function openBuffer(buffer, fileName) {
         buildFromDoc(doc);
         setStatus('✓ ' + fileName + ' · ' + stepList.length + ' steps · ' + edges.length + ' edges', 'ok');
         document.getElementById('empty').style.display = 'none';
+        lastNote = '';
         layoutMode = hasCanvasCoords() ? 'canvas' : 'vertical';
         document.getElementById('btn-layout').textContent = LAYOUTS[layoutMode];
         render();
@@ -38,17 +39,28 @@ function openBuffer(buffer, fileName) {
 
 /// Единственный путь обновления экрана после правки документа. Модель всегда
 /// перечитывается из документа, поэтому рассинхрон невозможен.
-function refresh() {
+function refresh(note) {
     buildFromDoc(ZpDoc.doc);
     render();
-    updateDirtyMark();
+    if (note) lastNote = note;
+    updateStatus();
 }
 
-function updateDirtyMark() {
-    const s = document.getElementById('status');
-    const base = s.textContent.replace(/ · modified$/, '');
-    s.textContent = ZpDoc.dirty ? base + ' · modified' : base;
+/// Строка состояния пересчитывается по документу, а не остаётся с числами
+/// момента загрузки: после правок их становится больше или меньше.
+let lastNote = '';
+
+function updateStatus() {
+    if (!ZpDoc.doc) return;
+    const parts = ['✓ ' + ZpDoc.fileName,
+                   stepList.length + ' steps',
+                   edges.length + ' edges'];
+    if (lastNote) parts.push(lastNote);
+    if (ZpDoc.dirty) parts.push('modified');
+    setStatus(parts.join(' · '), 'ok');
 }
+
+function updateDirtyMark() { updateStatus(); }
 
 function readFile(file) {
     setStatus('reading the file…', 'info');
@@ -313,7 +325,7 @@ document.addEventListener('keydown', e => {
     // например, matches нет вовсе, и обращение к нему рушит обработчик.
     if (isTextField(e.target)) return;
     e.preventDefault();
-    if (undo ? ZpDoc.undo() : ZpDoc.redo()) { closeDetail(); refresh(); }
+    if (undo ? ZpDoc.undo() : ZpDoc.redo()) { closeDetail(); refresh(undo ? 'undo' : 'redo'); }
 });
 
 window.addEventListener('beforeunload', e => {
@@ -362,10 +374,8 @@ function beginStepDrag(step, div, ev) {
         if (!moved) { render(); return; }
         // Сдвиг применяем к исходным x/y из файла: раскладка отсчитывается от
         // левого верхнего угла холста, а координаты в файле — от своего начала.
-        if (ZpDoc.moveStep(step.id, step.x + dx, step.y + dy)) {
-            setStatus('moved "' + stepLabel(step) + '"', 'ok');
-            refresh();
-        }
+        if (ZpDoc.moveStep(step.id, step.x + dx, step.y + dy))
+            refresh('moved "' + stepLabel(step) + '"');
     };
 
     window.addEventListener('mousemove', onMove);
