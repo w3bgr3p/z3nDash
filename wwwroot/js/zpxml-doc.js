@@ -73,6 +73,85 @@ const ZpDoc = {
 
     // ── Операции ─────────────────────────────────────────────────────────
 
+    /// Все места, где может стоять адрес перехода. Case и Default хранят его
+    /// внутри экранированной разметки <Pair>, поэтому там замена по тексту.
+    /// Пропущенная ссылка даёт «переход в никуда», который рантайм ловит уже
+    /// в бою, поэтому список мест должен быть полным.
+    retarget(oldAddr, newAddr) {
+        if (!oldAddr || oldAddr === newAddr) return 0;
+        let n = 0;
+
+        this.doc.querySelectorAll('OnSuccess, OnError').forEach(el => {
+            if ((el.textContent || '').trim() === oldAddr) { el.textContent = newAddr; n++; }
+        });
+
+        this.doc.querySelectorAll('Results > *').forEach(el => {
+            if (!/^Case\d+$|^Default$/.test(el.tagName)) return;
+            const txt = el.textContent || '';
+            if (!txt.includes(oldAddr)) return;
+            el.textContent = txt.split(oldAddr).join(newAddr);
+            n++;
+        });
+
+        ['Start', 'GoodEnd', 'BadEnd'].forEach(tag => {
+            const el = this.doc.querySelector(tag);
+            if (!el || (el.getAttribute('nextAction') || '').trim() !== oldAddr) return;
+            if (newAddr) el.setAttribute('nextAction', newAddr);
+            else el.removeAttribute('nextAction');
+            n++;
+        });
+
+        return n;
+    },
+
+    /// Сколько переходов ведёт на ветку. Нужно, чтобы сообщать пользователю,
+    /// что именно изменилось при удалении.
+    incomingCount(stepId, branchId) {
+        const addr = stepId + '|' + branchId;
+        let n = 0;
+        this.doc.querySelectorAll('OnSuccess, OnError').forEach(el => {
+            if ((el.textContent || '').trim() === addr) n++;
+        });
+        this.doc.querySelectorAll('Results > *').forEach(el => {
+            if (/^Case\d+$|^Default$/.test(el.tagName) && (el.textContent || '').includes(addr)) n++;
+        });
+        ['Start', 'GoodEnd', 'BadEnd'].forEach(tag => {
+            const el = this.doc.querySelector(tag);
+            if (el && (el.getAttribute('nextAction') || '').trim() === addr) n++;
+        });
+        return n;
+    },
+
+    /// Блок без веток в ProjectMaker не существует, а сослаться на него нельзя.
+    dropEmptySteps() {
+        [...this.doc.querySelectorAll('Step')].forEach(s => {
+            if (!s.querySelector('Branch')) s.remove();
+        });
+    },
+
+    /// Перенести ветку в блок toStepId на позицию index. Элемент перемещается
+    /// целиком, а не пересоздаётся: <Parameters> и <SettingsControl> обязаны
+    /// уехать вместе с ним — без них ветка перестанет работать.
+    /// Перестановка внутри блока — это тот же вызов с тем же toStepId; адрес
+    /// при этом не меняется, и retarget не нужен.
+    moveBranch(branchId, toStepId, index) {
+        const el = this.branchEl(branchId);
+        const to = this.stepEl(toStepId);
+        if (!el || !to) return false;
+
+        const fromStepId = el.parentNode.getAttribute('ID');
+        this.snapshot();
+
+        const siblings = [...to.children].filter(c => c.tagName === 'Branch' && c !== el);
+        to.insertBefore(el, siblings[index] || null);
+
+        if (fromStepId !== toStepId)
+            this.retarget(fromStepId + '|' + branchId, toStepId + '|' + branchId);
+
+        this.dropEmptySteps();
+        return true;
+    },
+
     moveStep(stepId, x, y) {
         const el = this.stepEl(stepId);
         if (!el) return false;
