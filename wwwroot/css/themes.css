@@ -126,6 +126,16 @@
     --row-h: 19px;
 
     /* Текст на залитой подложке */
+    /* Матовый синий (тон BMW, H=208), пришёл на смену фиолетовому */
+    /* Бирюза: статус Schedule. Разведена с --steel по тону (177 против 208). */
+    --cyan:             #66d6d1;
+    --cyan-tint:        #0e3432;
+    --cyan-tint-border: #15514e;
+
+    --steel:             #79a6cd;
+    --steel-tint:        #0e202f;
+    --steel-tint-border: #16324b;
+
     --on-accent:   #0d1117;
     --on-solid:    #ffffff;
 
@@ -204,6 +214,16 @@
     --row-h: 19px;
 
     /* Текст на залитой подложке */
+    /* Матовый синий (тон BMW, H=208), пришёл на смену фиолетовому */
+    /* Бирюза: статус Schedule. Разведена с --steel по тону (177 против 208). */
+    --cyan:             #197671;
+    --cyan-tint:        #daf6f4;
+    --cyan-tint-border: #95e4e1;
+
+    --steel:             #2f6493;
+    --steel-tint:        #deebf7;
+    --steel-tint-border: #a5c9e9;
+
     --on-accent:   #ffffff;
     --on-solid:    #1f2328;
 
@@ -282,6 +302,16 @@
     --row-h: 19px;
 
     /* Текст на залитой подложке */
+    /* Матовый синий (тон BMW, H=208), пришёл на смену фиолетовому */
+    /* Бирюза: статус Schedule. Разведена с --steel по тону (177 против 208). */
+    --cyan:             #0affef;
+    --cyan-tint:        #082b2a;
+    --cyan-tint-border: #0d4a47;
+
+    --steel:             #5aa3e2;
+    --steel-tint:        #081b2b;
+    --steel-tint-border: #0d2d4a;
+
     --on-accent:   #000000;
     --on-solid:    #ffffff;
 
@@ -341,9 +371,9 @@
 [data-theme="hyper"] .detail-section h4   { text-shadow: 0 0 6px rgba(0,255,65,0.3); }
 
 [data-theme="hyper"] .st-Stop     { background: transparent !important; border: 1px solid var(--border) !important; color: var(--text3) !important; }
-[data-theme="hyper"] .st-Schedule { background: transparent !important; border: 1px solid #0affef !important; color: #0affef !important; box-shadow: 0 0 6px rgba(10,255,239,0.15); }
+[data-theme="hyper"] .st-Schedule { background: transparent !important; border: 1px solid var(--cyan) !important; color: var(--cyan) !important; box-shadow: 0 0 6px rgba(10,255,239,0.15); }
 [data-theme="hyper"] .st-Perform  { background: transparent !important; border: 1px solid var(--green) !important; color: var(--green) !important; box-shadow: 0 0 6px rgba(0,255,65,0.2); }
-[data-theme="hyper"] .st-Complete { background: transparent !important; border: 1px solid var(--purple) !important; color: var(--purple) !important; }
+[data-theme="hyper"] .st-Complete { background: transparent !important; border: 1px solid var(--steel) !important; color: var(--steel) !important; }
 [data-theme="hyper"] .st-Fail     { background: transparent !important; border: 1px solid var(--red) !important; color: var(--red) !important; }
 [data-theme="hyper"] .st-Newbie   { background: transparent !important; border: 1px solid var(--yellow) !important; color: var(--yellow) !important; }
 

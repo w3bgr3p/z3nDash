@@ -140,8 +140,10 @@ function tagHtml(tag) {
 }
 
 // ── Подсветка внутри строки ───────────────────────────────────────────────────
-//   url | строка в кавычках | key=value | число | стрелка
-var INLINE = /(https?:\/\/[^\s'"<>]+)|('[^'\n]*'|"[^"\n]*")|([A-Za-z_][\w.\-]*=[^\s,;)\]}]+)|(\b0x[0-9a-fA-F]+\b|\b\d+(?:\.\d+)?(?:ms|s|m|h|%)?\b)|(=>|->|<-|::)/g;
+//   url | строка в кавычках | key=value | число | стрелка | скобка
+// Круглых скобок здесь нет намеренно: в обычном тексте они встречаются чаще,
+// чем в структурах, и подсветка каждой пары превращает лог в рябь.
+var INLINE = /(https?:\/\/[^\s'"<>]+)|('[^'\n]*'|"[^"\n]*")|([A-Za-z_][\w.\-]*=[^\s,;)\]}]+)|(\b0x[0-9a-fA-F]+\b|\b\d+(?:\.\d+)?(?:ms|s|m|h|%)?\b)|(=>|->|<-|::)|([{}\[\]])/g;
 
 function highlight(raw) {
     var out = '', last = 0, m;
@@ -156,8 +158,9 @@ function highlight(raw) {
                  + '<span class="ll-op">=</span>'
                  + '<span class="ll-val">' + esc(m[3].slice(eq + 1)) + '</span>';
         }
-        else if (m[4]) out += '<span class="ll-num">' + esc(m[4]) + '</span>';
-        else           out += '<span class="ll-op">'  + esc(m[5]) + '</span>';
+        else if (m[4]) out += '<span class="ll-num">'  + esc(m[4]) + '</span>';
+        else if (m[5]) out += '<span class="ll-op">'   + esc(m[5]) + '</span>';
+        else           out += '<span class="ll-punc">' + esc(m[6]) + '</span>';
         last = m.index + m[0].length;
     }
     return out + esc(raw.slice(last));
@@ -218,8 +221,17 @@ function build(d) {
          + '</div>';
 }
 
+/// Только тело строки, без обёртки, времени и уровня: для панелей, где время,
+/// уровень и поток уже стоят своими колонками (логи ZP7).
+function body(line) {
+    var frame = lastFrame(String(line == null ? '' : line));
+    var plain = stripAnsi(frame);
+    return contentHtml(frame, plain, leadTags(plain));
+}
+
 return {
     build:   build,
+    body:    body,
     level:   function (line) { var p = stripAnsi(lastFrame(String(line || ''))); return levelOf(p, leadTags(p).list); },
     hue:     hashHue,
     plain:   function (line) { return stripAnsi(lastFrame(String(line || ''))); }

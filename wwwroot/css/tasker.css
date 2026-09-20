@@ -53,9 +53,9 @@ body {
 .task-status { font-size: var(--fs-9); padding: var(--sp-1) var(--sp-6); border-radius: var(--radius-sm); text-align: center; font-weight: var(--fw-normal); letter-spacing: 0.2px; text-transform: uppercase; }
 .task-status.newbie  { background: var(--yellow-tint); color: var(--yellow); }
 .task-status.running { background: var(--green-tint); color: var(--text-hi); border: 1px solid var(--green-bg); }
-.task-status.done    { background: var(--purple-tint); color: var(--purple); }
+.task-status.done    { background: var(--steel-tint); color: var(--steel); }
 .task-status.fail    { background: var(--red-tint); color: var(--red); border: 1px solid var(--red-bg); }
-.task-status.planned { background: var(--blue-tint); color: var(--accent); border: 1px solid var(--blue-border); }
+.task-status.planned { background: var(--cyan-tint); color: var(--cyan); border: 1px solid var(--cyan-tint-border); }
 .task-status.paused  { background: var(--bg2); color: var(--text2); }
 
 .resizer   { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; transition: background 0.15s; }
@@ -268,35 +268,6 @@ select.form-input { cursor: pointer; }
 .cm-close { background: none; border: none; color: var(--text2); font-size: var(--fs-16); cursor: pointer; padding: 0 var(--sp-4); line-height: var(--lh-tight); }
 .cm-close:hover { color: var(--text); }
 
-/* Overview (no selection) — stats for all tasks */
-.ov-wrap    { display: flex; flex-direction: column; gap: var(--sp-12); width: 100%; min-height: 100%; box-sizing: border-box; }
-.ov-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sp-8); }
-.ov-stat    { background: var(--bg1); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-8) var(--sp-12) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-2); }
-.ov-stat-num   { font-size: var(--fs-18); font-weight: var(--fw-bold); color: var(--text-hi); line-height: var(--lh-tight); }
-.ov-stat-num.green  { color: var(--green); }
-.ov-stat-num.accent { color: var(--accent); }
-.ov-stat-num.red    { color: var(--red); }
-.ov-stat-num.muted  { color: var(--text2); }
-.ov-stat-label { font-size: var(--fs-9); color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
-.ov-table { border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; background: var(--bg); }
-.ov-head, .ov-row { display: grid; grid-template-columns: 8px minmax(110px, 180px) 58px minmax(70px, 110px) 70px auto minmax(120px, 1fr); gap: var(--sp-8); align-items: center; padding: var(--sp-4) var(--sp-12); min-width: 620px; }
-.ov-head  { background: var(--bg1); border-bottom: 1px solid var(--border); font-size: var(--fs-9); color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; padding: var(--sp-6) var(--sp-12); }
-.ov-row   { border-bottom: 1px solid var(--bg2); cursor: pointer; transition: background 0.08s; }
-.ov-row:last-child { border-bottom: none; }
-.ov-row:hover      { background: var(--bg2); }
-.ov-row.off        { opacity: 0.5; }
-.ov-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-.ov-dot.run  { background: var(--green); box-shadow: 0 0 5px var(--green); }
-.ov-dot.fail { background: var(--red); }
-.ov-dot.off  { background: var(--border); }
-.ov-name { font-size: var(--fs-11); font-weight: var(--fw-medium); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov-cell { font-size: var(--fs-10); color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov-out  { font-family: 'Consolas', monospace; font-size: var(--fs-10); color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov-out.err   { color: var(--red); }
-.ov-out.empty { opacity: 0.4; }
-.ov-links { display: flex; gap: var(--sp-6); flex-wrap: wrap; margin-top: auto; }
-.ov-link  { font-size: var(--fs-10); color: var(--text2); text-decoration: none; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-8); background: var(--bg1); transition: color 0.12s, border-color 0.12s; }
-.ov-link:hover { color: var(--card-color, var(--accent)); border-color: var(--card-color, var(--accent)); }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }

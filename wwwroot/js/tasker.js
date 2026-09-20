@@ -1089,6 +1089,7 @@ var BROWSER_PRESETS = {
 function browserDefaults() {
     return {
         mode: 'patchright', profile: '', cdp: '', close: true, headless: true,
+        proxySource: 'payload',
         api: { method: 'GET', url: '', body: '', ws: '', stopMethod: 'GET', stopUrl: '' }
     };
 }
@@ -1104,6 +1105,7 @@ function browserFromSaved(s) {
             cdp:     p.cdp     || '',
             close:   p.close !== false,
             headless: p.headless !== false,
+            proxySource: p.proxySource || d.proxySource,
             api:     Object.assign(d.api, p.api || {})
         };
     } catch (e) { return d; }
@@ -1165,6 +1167,17 @@ function browserSectionHtml(s) {
         + '<div class="form-label" id="b_close_label">Close after the run</div>'
         + '<div id="b_close_wrap"><input type="checkbox" id="b_close"' + (b.close ? ' checked' : '') + '></div>'
 
+        + '<div class="form-label" id="b_proxy_label">Launch proxy</div>'
+        + '<div id="b_proxy_wrap">'
+        +   '<select class="form-input" id="b_proxy_source">'
+        +   [['payload','From the run payload'],
+             ['template','From the template variable "proxy"'],
+             ['none','None - the template sets it itself']]
+              .map(function(o) { return '<option value="' + o[0] + '"' + (b.proxySource === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+        +   '</select>'
+        +   '<span style="color:var(--text2);font-size:10px">pick "none" when the template builds its own proxy and writes it back into that variable - otherwise the browser starts on the proxy left over from the previous run</span>'
+        + '</div>'
+
         + '<div class="form-label" id="b_headless_label">Headless</div>'
         + '<div id="b_headless_wrap">'
         +   '<input type="checkbox" id="b_headless"' + (b.headless ? ' checked' : '') + '>'
@@ -1188,6 +1201,8 @@ function browserSyncRows() {
     _row('b_stop_label',    'b_stop',         api);
     _row('b_close_label',   'b_close_wrap',   api || shardx);
     _row('b_headless_label', 'b_headless_wrap', mode === 'patchright');
+    // Прокси на старт отдаём только своему браузеру: внешние поднимают его не мы.
+    _row('b_proxy_label',    'b_proxy_wrap',    mode === 'patchright');
 }
 
 function applyBrowserPreset() {
@@ -1208,6 +1223,7 @@ function collectBrowser() {
         cdp:     (_val('b_cdp', '') || '').trim(),
         close:   !!(document.getElementById('b_close') || { checked: true }).checked,
         headless: !!(document.getElementById('b_headless') || { checked: true }).checked,
+        proxySource: _val('b_proxy_source', 'payload'),
         api: {
             method:     _val('b_method', 'GET'),
             url:        (_val('b_url', '') || '').trim(),
