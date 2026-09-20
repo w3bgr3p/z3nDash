@@ -94,6 +94,7 @@ function setStatus(msg, type) {
 }
 
 function clearAll() {
+    dropSession();
     steps = {}; edges = []; stepList = []; terminals = [];
     ZpDoc.doc = null; ZpDoc.dirty = false; ZpDoc.undoStack = []; ZpDoc.redoStack = [];
     document.getElementById('canvas').innerHTML = '';
@@ -328,8 +329,82 @@ document.addEventListener('keydown', e => {
     if (undo ? ZpDoc.undo() : ZpDoc.redo()) { closeDetail(); refresh(undo ? 'undo' : 'redo'); }
 });
 
+// ── Session across page changes ──────────────────────────────────────────────
+
+const SESSION_KEY = 'zpxml-session';
+
+/// Состояние переживает уход на другую страницу приложения: шаблон, вид и
+/// режим правки. Пишется на уходе, а не на каждой правке — документ в этом
+/// шаблоне около 200 КБ, и писать его по каждому движению мыши незачем.
+let sessionSaveFailed = false;
+
+function saveSession() {
+    if (!ZpDoc.doc) return;
+    const state = ZpDoc.exportState();
+    if (!state) return;
+    state.view = { scale, panX, panY, layoutMode };
+    state.editing = editing;
+    state.selected = selected;
+    try {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(state));
+        sessionSaveFailed = false;
+    } catch (e) {
+        // Квота, приватное окно, запрещённые данные сайта — сохранить нечем.
+        sessionSaveFailed = true;
+        console.warn('zpxml: session not saved:', e.name);
+    }
+}
+
+function restoreSession() {
+    let raw = null;
+    try { raw = localStorage.getItem(SESSION_KEY); } catch (e) { return false; }
+    if (!raw) return false;
+
+    let state;
+    try { state = JSON.parse(raw); } catch (e) { dropSession(); return false; }
+    if (!ZpDoc.importState(state)) { dropSession(); return false; }
+
+    buildFromDoc(ZpDoc.doc);
+    document.getElementById('empty').style.display = 'none';
+
+    const v = state.view || {};
+    layoutMode = v.layoutMode || (hasCanvasCoords() ? 'canvas' : 'vertical');
+    document.getElementById('btn-layout').textContent = LAYOUTS[layoutMode];
+    render();
+
+    if (typeof v.scale === 'number') { scale = v.scale; panX = v.panX; panY = v.panY; applyTransform(); }
+    else resetView();
+    updateMini();
+
+    if (state.editing && !editing) toggleEdit();
+
+    selected = state.selected || null;
+    if (selected && steps[selected.stepId]) {
+        if (selected.branchIndex === null) selectStep(selected.stepId);
+        else selectBranch(selected.stepId, selected.branchIndex);
+    } else {
+        selected = null;
+    }
+
+    lastNote = 'restored';
+    updateStatus();
+    return true;
+}
+
+function dropSession() {
+    try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
+}
+
+// pagehide срабатывает и при переходе назад-вперёд, в отличие от beforeunload.
+window.addEventListener('pagehide', saveSession);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveSession();
+});
+
 window.addEventListener('beforeunload', e => {
-    if (!ZpDoc.dirty) return;
+    // Предупреждаем только если состояние сохранить не удалось: иначе правки
+    // переживают переход, и вопрос при каждом уходе — просто помеха.
+    if (!ZpDoc.dirty || !sessionSaveFailed) return;
     e.preventDefault();
     e.returnValue = '';
 });
@@ -559,3 +634,7 @@ function beginEdgeDrag(stepId, branchIndex, slot, ev) {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
 }
+
+// Восстановление идёт последним: оно трогает editing и обработчики, которые
+// объявлены ниже по файлу, и вызов раньше упёрся бы в их временную мёртвую зону.
+restoreSession();

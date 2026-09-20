@@ -40,6 +40,37 @@ const ZpDoc = {
         return this.doc;
     },
 
+    /// Снимок для восстановления после перехода на другую страницу. Историю
+    /// правок не сохраняем: она стоила бы десятки копий документа, а вернуть
+    /// нужно состояние, а не путь к нему.
+    exportState() {
+        if (!this.doc) return null;
+        return {
+            v: 1,
+            fileName: this.fileName,
+            encoding: this.encoding,
+            declaration: this.declaration,
+            dirty: this.dirty,
+            xml: this.serialize()
+        };
+    },
+
+    importState(state) {
+        if (!state || state.v !== 1 || !state.xml) return false;
+        const body = state.xml.replace(/^\s*<\?xml[^?]*\?>/, '');
+        const parsed = new DOMParser().parseFromString(body, 'text/xml');
+        if (parsed.querySelector('parsererror')) return false;
+
+        this.doc = parsed;
+        this.fileName = state.fileName || '';
+        this.encoding = state.encoding || 'utf-8';
+        this.declaration = state.declaration || '';
+        this.dirty = !!state.dirty;
+        this.undoStack = [];
+        this.redoStack = [];
+        return true;
+    },
+
     /// Текст документа вместе с исходным объявлением.
     serialize() {
         const body = new XMLSerializer().serializeToString(this.doc);
