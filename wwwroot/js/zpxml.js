@@ -468,3 +468,31 @@ function beginBranchDrag(step, branchIndex, ev) {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
 }
+
+// ── Deleting a branch ────────────────────────────────────────────────────────
+
+document.addEventListener('keydown', e => {
+    if (!editing || !ZpDoc.doc) return;
+    if (e.key !== 'Delete') return;
+    if (isTextField(e.target)) return;
+    if (!selected || selected.branchIndex === null) return;
+
+    const step = steps[selected.stepId];
+    const branch = step && step.branches[selected.branchIndex];
+    if (!branch) return;
+
+    e.preventDefault();
+    const label = branchRowLabel(branch);
+    const res = ZpDoc.deleteBranch(branch.id);
+    if (!res) return;
+
+    // Диалога нет — вместо него в строке состояния сказано, что именно
+    // произошло с переходами, которые вели на удалённую ветку.
+    const note = 'deleted "' + label + '"' +
+        (res.moved
+            ? ' · ' + res.moved + ' incoming ' +
+              (res.movedToIndex === null ? 'cleared' : 'moved to #' + res.movedToIndex)
+            : '');
+    closeDetail();
+    refresh(note);
+});

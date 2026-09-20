@@ -199,7 +199,8 @@ function renderNodes() {
     terminals.forEach(t => {
         const p = positions[t.id]; if (!p) return;
         const div = document.createElement('div');
-        div.className = 'term term-' + t.kind;
+        // Маршрут без точки входа должен быть заметен, а не получен молча.
+        div.className = 'term term-' + t.kind + ((t.target || '').trim() ? '' : ' term-orphan');
         div.style.left = p.x + 'px';
         div.style.top  = p.y + 'px';
         div.style.width = div.style.height = (TERM_R * 2) + 'px';

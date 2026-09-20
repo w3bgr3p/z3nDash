@@ -193,6 +193,8 @@ body.editing .row            { cursor:grab; }
 .term-start { background:var(--accent); }
 .term-good  { background:var(--green); }
 .term-bad   { background:var(--red); }
+/* Терминалу некуда вести: маршрут без точки входа должен быть заметен. */
+.term-orphan { outline:2px dashed var(--yellow); outline-offset:2px; }
 
 /* ── Detail panel ───────────────────────────────────────────────────────── */
 #detail {

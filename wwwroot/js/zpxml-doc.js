@@ -152,6 +152,31 @@ const ZpDoc = {
         return true;
     },
 
+    /// Удалить ветку. Входящие переходы переводятся на следующую ветку того же
+    /// блока — так маршрут сохраняет смысл. Если удаляемая была последней,
+    /// переходы очищаются: по правилам рантайма пустой переход у последней
+    /// ветки и означает конец маршрута.
+    deleteBranch(branchId) {
+        const el = this.branchEl(branchId);
+        if (!el) return null;
+
+        const stepEl = el.parentNode;
+        const stepId = stepEl.getAttribute('ID');
+        const siblings = [...stepEl.children].filter(c => c.tagName === 'Branch');
+        const pos  = siblings.indexOf(el);
+        const next = siblings[pos + 1] || null;
+
+        const oldAddr = stepId + '|' + branchId;
+        const newAddr = next ? stepId + '|' + next.getAttribute('ID') : '';
+
+        this.snapshot();
+        const moved = this.retarget(oldAddr, newAddr);
+        el.remove();
+        this.dropEmptySteps();
+
+        return { moved, movedToIndex: next ? pos : null };
+    },
+
     /// Создать блок рядом с существующими. Набор атрибутов копируется с уже
     /// имеющегося <Step>, а не выдумывается: какие из них нужны ProjectMaker,
     /// доподлинно неизвестно, поэтому повторяем то, что он пишет сам.
