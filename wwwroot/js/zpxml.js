@@ -36,6 +36,20 @@ function openBuffer(buffer, fileName) {
     }
 }
 
+/// Единственный путь обновления экрана после правки документа. Модель всегда
+/// перечитывается из документа, поэтому рассинхрон невозможен.
+function refresh() {
+    buildFromDoc(ZpDoc.doc);
+    render();
+    updateDirtyMark();
+}
+
+function updateDirtyMark() {
+    const s = document.getElementById('status');
+    const base = s.textContent.replace(/ · modified$/, '');
+    s.textContent = ZpDoc.dirty ? base + ' · modified' : base;
+}
+
 function readFile(file) {
     setStatus('reading the file…', 'info');
     const reader = new FileReader();
@@ -255,3 +269,31 @@ document.getElementById('btn-layout' ).addEventListener('click', toggleLayout);
 document.getElementById('btn-detail-close').addEventListener('click', closeDetail);
 document.getElementById('search').addEventListener('input', function () { filterNodes(this.value); });
 document.getElementById('btn-save').addEventListener('click', saveFile);
+
+// ── Undo / redo ──────────────────────────────────────────────────────────────
+
+/// Стоит ли отдать клавишу полю ввода. Отдельной функцией, потому что target
+/// события — не обязательно элемент.
+function isTextField(target) {
+    return !!(target && typeof target.matches === 'function' && target.matches('input, textarea'));
+}
+
+document.addEventListener('keydown', e => {
+    if (!ZpDoc.doc) return;
+    const key  = e.key.toLowerCase();
+    const undo = (e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey;
+    const redo = (e.ctrlKey || e.metaKey) && (key === 'y' || (key === 'z' && e.shiftKey));
+    if (!undo && !redo) return;
+    // В полях ввода Ctrl+Z должен работать как обычно. Проверка через
+    // необязательный вызов: target не обязан быть элементом — у document,
+    // например, matches нет вовсе, и обращение к нему рушит обработчик.
+    if (isTextField(e.target)) return;
+    e.preventDefault();
+    if (undo ? ZpDoc.undo() : ZpDoc.redo()) { closeDetail(); refresh(); }
+});
+
+window.addEventListener('beforeunload', e => {
+    if (!ZpDoc.dirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+});

@@ -62,5 +62,36 @@ const ZpDoc = {
     },
 
     undoStack: [],
-    redoStack: []
+    redoStack: [],
+    maxHistory: 50,
+
+    /// Снимок до правки. Строка документа — точное состояние, поэтому откат
+    /// возвращает ровно то, что было, а не приблизительную реконструкцию.
+    snapshot() {
+        this.undoStack.push(this.serialize());
+        if (this.undoStack.length > this.maxHistory) this.undoStack.shift();
+        this.redoStack.length = 0;
+        this.dirty = true;
+    },
+
+    _restore(text) {
+        const body = text.replace(/^\s*<\?xml[^?]*\?>/, '');
+        this.doc = new DOMParser().parseFromString(body, 'text/xml');
+    },
+
+    undo() {
+        if (!this.undoStack.length) return false;
+        this.redoStack.push(this.serialize());
+        this._restore(this.undoStack.pop());
+        this.dirty = true;
+        return true;
+    },
+
+    redo() {
+        if (!this.redoStack.length) return false;
+        this.undoStack.push(this.serialize());
+        this._restore(this.redoStack.pop());
+        this.dirty = true;
+        return true;
+    }
 };
