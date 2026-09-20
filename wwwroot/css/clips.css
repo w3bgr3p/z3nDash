@@ -1,0 +1,257 @@
+/* clips.css — вынесено из clips.html */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: var(--fs-12);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Header ── */
+.main-header {
+    background: var(--bg1);
+    padding: var(--sp-8) var(--sp-16);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-10);
+}
+.main-header h1 { font-size: var(--fs-14); font-weight: var(--fw-bold); color: var(--accent); }
+.header-sub { font-size: var(--fs-10); color: var(--text-dim); }
+
+/* ── Layout: tree left, editor right ── */
+.layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    overflow: hidden;
+    height: calc(100vh - 37px);
+}
+
+/* ── Tree pane ── */
+.tree-pane {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tree-toolbar {
+    padding: var(--sp-8) var(--sp-10);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: var(--sp-6);
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.tree-search {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: inherit;
+    font-size: var(--fs-11);
+    padding: var(--sp-4) var(--sp-8);
+    outline: none;
+}
+.tree-search:focus { border-color: var(--accent); }
+
+.tree-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--sp-6) 0;
+}
+
+/* ── Tree nodes ── */
+.tree-node { user-select: none; }
+
+.tree-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: var(--sp-2) var(--sp-8);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    margin: var(--sp-1) var(--sp-4);
+    transition: background 0.08s;
+}
+.tree-row:hover { background: var(--bg2); }
+.tree-row.selected { background: var(--accent-dim); color: var(--accent); }
+.tree-row.leaf:hover .copy-hint { opacity: 1; }
+
+.toggle-icon {
+    font-size: var(--fs-9);
+    color: var(--text-dim);
+    width: 10px;
+    flex-shrink: 0;
+    text-align: center;
+}
+.node-icon { font-size: var(--fs-11); flex-shrink: 0; }
+.node-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-11);
+}
+.copy-hint {
+    font-size: var(--fs-9);
+    color: var(--text-dim);
+    opacity: 0;
+    transition: opacity 0.1s;
+    flex-shrink: 0;
+}
+.tree-children { display: none; }
+.tree-children.open { display: block; }
+
+/* ── Editor pane ── */
+.editor-pane {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.editor-toolbar {
+    padding: var(--sp-8) var(--sp-12);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    flex-shrink: 0;
+}
+
+.editor-title {
+    font-size: var(--fs-11);
+    font-weight: var(--fw-semi);
+    color: var(--text-hi);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.editor-title.placeholder { color: var(--text-dim); font-weight: var(--fw-normal); }
+
+.editor-body {
+    flex: 1;
+    padding: var(--sp-12);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-10);
+    overflow-y: auto;
+}
+
+/* ── Form ── */
+.field-group { display: flex; flex-direction: column; gap: var(--sp-4); }
+.field-label {
+    font-size: var(--fs-10);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+}
+
+.field-row { display: flex; gap: var(--sp-8); }
+.field-row .field-group { flex: 1; }
+
+input[type=text], textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: inherit;
+    font-size: var(--fs-11);
+    padding: var(--sp-6) var(--sp-8);
+    width: 100%;
+    outline: none;
+    transition: border-color 0.1s;
+}
+input[type=text]:focus, textarea:focus { border-color: var(--accent); }
+
+textarea#fContent {
+    min-height:500px;
+    resize: vertical;
+    line-height: var(--lh-loose);
+}
+
+/* ── Buttons ── */
+.btn {
+    padding: var(--sp-4) var(--sp-12);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: var(--fs-11);
+    font-family: inherit;
+    background: var(--bg2);
+    color: var(--text);
+    transition: background 0.1s, border-color 0.1s;
+    white-space: nowrap;
+}
+.btn:hover { border-color: var(--text-dim); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.85; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: color-mix(in srgb, var(--red) 10%, transparent); }
+.btn.sm { padding: var(--sp-2) var(--sp-8); font-size: var(--fs-10); }
+
+.action-row {
+    display: flex;
+    gap: var(--sp-6);
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: var(--sp-4);
+}
+
+/* ── Empty state ── */
+.empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-8);
+    color: var(--text-dim);
+}
+.empty-state .icon { font-size: var(--fs-32); opacity: 0.3; }
+.empty-state p { font-size: var(--fs-11); }
+
+/* ── Toast ── */
+#toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-8) var(--sp-14);
+    font-size: var(--fs-11);
+    color: var(--text);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 9999;
+}
+#toast.show { opacity: 1; }
+#toast.ok { border-color: var(--green); color: var(--green); }
+#toast.err { border-color: var(--red); color: var(--red); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-sm); }
+
+/* ── Depth indent ── */
+/* Лесенка вложенности: база + 14px на уровень. Была набором чисел
+   8/20/36/50/64, где шаг от 8 к 20 выбивался на 2px. */
+.depth-0 .tree-row { padding-left: var(--sp-8); }
+.depth-1 .tree-row { padding-left: calc(var(--sp-8) + 1 * var(--sp-14)); }
+.depth-2 .tree-row { padding-left: calc(var(--sp-8) + 2 * var(--sp-14)); }
+.depth-3 .tree-row { padding-left: calc(var(--sp-8) + 3 * var(--sp-14)); }
+.depth-4 .tree-row { padding-left: calc(var(--sp-8) + 4 * var(--sp-14)); }
