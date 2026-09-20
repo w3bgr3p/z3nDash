@@ -381,3 +381,90 @@ function beginStepDrag(step, div, ev) {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
 }
+
+// ── Dragging a branch row ────────────────────────────────────────────────────
+
+/// Точка экрана в координаты холста — с учётом текущего зума и панорамы.
+function canvasPoint(clientX, clientY) {
+    const r = document.getElementById('canvas-wrap').getBoundingClientRect();
+    return { x: (clientX - r.left - panX) / scale, y: (clientY - r.top - panY) / scale };
+}
+
+/// Куда встанет ветка: блок под курсором и позиция вставки в нём. Над верхней
+/// частью подложки — перед первой строкой, над нижней — после последней.
+function dropTargetAt(clientX, clientY) {
+    const el = document.elementFromPoint(clientX, clientY);
+    const blockEl = el && el.closest ? el.closest('.block') : null;
+    if (!blockEl) return { stepId: null, index: 0 };
+
+    const stepId = blockEl.dataset.step;
+    const step = steps[stepId];
+    if (!step) return { stepId: null, index: 0 };
+
+    const p = positions[stepId];
+    const local = canvasPoint(clientX, clientY).y - p.y - PAD;
+    const rows = blockRows(step).rows.filter(r => r.kind === 'branch');
+    for (let i = 0; i < rows.length; i++)
+        if (local < rows[i].y + rows[i].h / 2) return { stepId, index: i };
+    return { stepId, index: rows.length };
+}
+
+/// Перетаскивание ветки. Пока тянем, документ не трогается: показывается только
+/// линия вставки. Мутация происходит один раз, на отпускании.
+function beginBranchDrag(step, branchIndex, ev) {
+    const branch = step.branches[branchIndex];
+    const startX = ev.clientX, startY = ev.clientY;
+    let dragging = false, drop = null;
+    const line = document.createElement('div');
+    line.className = 'drop-line';
+
+    const onMove = e => {
+        if (!dragging) {
+            // Порог отделяет перетаскивание от клика выбора.
+            if (Math.abs(e.clientX - startX) < 4 && Math.abs(e.clientY - startY) < 4) return;
+            dragging = true;
+            document.getElementById('canvas').appendChild(line);
+        }
+        drop = dropTargetAt(e.clientX, e.clientY);
+        if (!drop.stepId) { line.style.display = 'none'; return; }
+
+        const p = positions[drop.stepId];
+        const geom = blockRows(steps[drop.stepId]);
+        const rows = geom.rows.filter(r => r.kind === 'branch');
+        const row = rows[drop.index];
+        line.style.display = 'block';
+        line.style.left  = (p.x + PAD) + 'px';
+        line.style.width = NW + 'px';
+        line.style.top   = (p.y + PAD + (row ? row.y : geom.height)) + 'px';
+    };
+
+    const onUp = e => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        line.remove();
+        if (!dragging) return;                      // это был клик, не протяжка
+
+        const label = branchRowLabel(branch);
+        if (drop && drop.stepId) {
+            if (ZpDoc.moveBranch(branch.id, drop.stepId, drop.index)) {
+                closeDetail();
+                refresh('moved "' + label + '" → ' + stepLabel(steps[drop.stepId]) + ' #' + drop.index);
+            }
+        } else {
+            const pt = canvasPoint(e.clientX, e.clientY);
+            // Координаты холста в файле отсчитываются от своего начала, а
+            // раскладка — от левого верхнего угла; сдвиг между ними одинаков
+            // для всех блоков, поэтому берём его у любого.
+            const any = stepList.find(st => st.x !== null);
+            const offX = any ? any.x - positions[any.id].x : 0;
+            const offY = any ? any.y - positions[any.id].y : 0;
+            if (ZpDoc.extractBranch(branch.id, pt.x + offX, pt.y + offY)) {
+                closeDetail();
+                refresh('moved "' + label + '" into a new block');
+            }
+        }
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+}

@@ -235,11 +235,12 @@ function renderNodes() {
                       (() => { const p = portHtml(s.id, bi, undefined, ''); return p.right; })() +
                     '</div>';
             if (b.cases.length) {
-                html += '<div class="vrow" style="height:' + VAR_H + 'px">' +
+                html += '<div class="vrow" style="height:' + VAR_H + 'px" data-b="' + bi + '">' +
                             escHtml(b.switchVar || b.action || 'switch') + '</div>';
                 b.cases.forEach((c, ci) => {
                     const cp = portHtml(s.id, bi, ci, 'case');
-                    html += '<div class="crow" style="height:' + CASE_H + 'px">' +
+                    html += '<div class="crow" style="height:' + CASE_H + 'px" data-b="' + bi +
+                              '" data-c="' + ci + '">' +
                               cp.left +
                               '<span class="clabel">' +
                                 (c.isDefault ? 'Default' : escHtml(c.number + ': ' + (c.key || 'undefined'))) +
@@ -258,6 +259,16 @@ function renderNodes() {
             if (e.target.closest('.row, .vrow, .crow')) return;   // строка — не блок
             e.preventDefault(); e.stopPropagation();
             beginStepDrag(s, div, e);
+        });
+        // Слушатели строк вешаются после innerHTML: раньше этих элементов нет.
+        div.querySelectorAll('.row').forEach(rowEl => {
+            const bi = +rowEl.dataset.b;
+            rowEl.addEventListener('mousedown', e => {
+                if (!editing) return;
+                if (e.target.closest('.drag-port')) return;
+                e.preventDefault(); e.stopPropagation();
+                beginBranchDrag(s, bi, e);
+            });
         });
         div.addEventListener('click', e => {
             e.stopPropagation();
