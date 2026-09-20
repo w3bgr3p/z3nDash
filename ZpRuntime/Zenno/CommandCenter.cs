@@ -374,7 +374,12 @@ namespace ZennoLab.CommandCenter
 
         public string GetValue(bool useSelectedItems) => He.GetAttribute("value");
 
-        public string DrawToBitmap(bool isImage, string hash) => He.DrawToBitmap();
+        /// <summary>
+        /// Снимок элемента в base64. hash со значением по умолчанию: перенесённый
+        /// z3n7.Captcha зовёт одноаргументную форму, и в ZP она есть. Оба
+        /// параметра наш слой не использует — снимок всегда PNG целиком.
+        /// </summary>
+        public string DrawToBitmap(bool isImage, string hash = null) => He.DrawToBitmap();
 
         /// <summary>
         /// ZP отдаёт System.Drawing.Bitmap — так его и принимает перенесённый
@@ -393,6 +398,12 @@ namespace ZennoLab.CommandCenter
 
         public HtmlElementCollection FindChildrenByTags(string tags)
             => new HtmlElementCollection(He.FindChildrenByTags(tags));
+
+        /// <summary>
+        /// Потомки элемента: при recursive — все вложенные, иначе только прямые.
+        /// </summary>
+        public HtmlElementCollection GetChildren(bool recursive)
+            => new HtmlElementCollection(He.GetChildren(recursive));
 
         public HtmlElement FindChildByAttribute(string tags, string attrName, string attrValue,
                                                 string searchKind, int number)
@@ -520,11 +531,37 @@ namespace ZennoLab.CommandCenter
         public void RiseEvent(string eventName, Rectangle rectangle, string clickType)
             => T.RiseEvent(eventName, rectangle, clickType);
 
-        public void MouseClick(int x, int y, string button, string mouseEvent, bool considerScroll)
+        /// <summary>
+        /// considerScroll со значением по умолчанию: перенесённый z3n7.Captcha
+        /// зовёт четырёхаргументную форму, и в ZP она есть.
+        /// </summary>
+        public void MouseClick(int x, int y, string button, string mouseEvent,
+                               bool considerScroll = false)
             => T.MouseClick(x, y, button, mouseEvent, considerScroll);
 
         public void MouseMove(int toX, int toY, bool useClick, bool considerScroll)
             => T.FullEmulationMouseMove(toX, toY);
+
+        /// <summary>
+        /// Движение из точки в точку. Курсор сначала ставится в начальную точку,
+        /// затем ведётся в конечную — обе через эмуляцию с промежуточными
+        /// точками, поэтому страница видит цепочку mousemove, а не телепорт.
+        ///
+        /// useClick=true не поддержан: что именно ZP делает с кнопкой во время
+        /// такого движения, я не проверял, а догадка здесь молча дала бы drag
+        /// вместо движения или наоборот. Перенесённый HuntSolver передаёт false;
+        /// кнопку он жмёт сам отдельными MouseClick(..., "down"/"up").
+        /// </summary>
+        public void MouseMove(int fromX, int fromY, int toX, int toY,
+                              bool useClick, bool considerScroll)
+        {
+            if (useClick)
+                throw new NotSupportedException(
+                    "Tab.MouseMove(useClick: true): удержание кнопки во время движения " +
+                    "в ZpRuntime не реализовано — жмите кнопку отдельным MouseClick");
+            T.FullEmulationMouseMove(fromX, fromY);
+            T.FullEmulationMouseMove(toX, toY);
+        }
 
         public void FullEmulationMouseMove(int toX, int toY) => T.FullEmulationMouseMove(toX, toY);
         public void FullEmulationMouseWheel(int deltaX, int deltaY) => T.FullEmulationMouseWheel(deltaX, deltaY);

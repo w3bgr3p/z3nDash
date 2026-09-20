@@ -936,26 +936,55 @@ namespace z3nDash.Browser
         private static T    Sync<T>(Task<T> t) => t.GetAwaiter().GetResult();
         private static void Sync(Task t)        => t.GetAwaiter().GetResult();
 
-        public bool IsVoid
+        // ── Отсутствующий элемент ─────────────────────────────────────────────
+        //
+        // В ZennoPoster Find* — это снимок: элемента нет → возвращается void, и
+        // дальше шаблон сам решает через IsVoid. Обращение к void-элементу —
+        // чтение или действие — не ждёт и не бросает, оно просто ничего не
+        // делает. Исключения в ZP живут выше: в штатных экшенах и в He*-обёртках
+        // z3n7, где ожидание задаётся своим deadline.
+        //
+        // Наш Locator ленивый, и каждый вызов на нём авто-ждёт до 30 секунд, а
+        // потом бросает. Это и ломало шаблоны: идиома
+        //
+        //     he = Find(...); if (he.IsVoid) he = Find(...); he.RiseEvent(...);
+        //
+        // при отсутствии обоих вариантов вставала на полминуты и рвала маршрут,
+        // хотя в ZP проходит насквозь. Поэтому каждый член сперва спрашивает,
+        // есть ли элемент сейчас, и при отсутствии отдаёт пустое значение либо
+        // молча возвращается.
+        //
+        // Ждать этим мы не перестаём совсем: ожидание остаётся там, где оно
+        // есть и в ZP, — в HeGet/HeClick/HeSet с их deadline, которые крутят
+        // поиск в цикле.
+
+        /// <summary>
+        /// Элемента нет на странице прямо сейчас. Считается через CountAsync —
+        /// он не ждёт появления, в отличие от остальных вызовов Locator.
+        /// </summary>
+        private bool Missing
         {
             get { try { return Sync(_loc.CountAsync()) == 0; } catch { return true; } }
         }
 
+        public bool IsVoid => Missing;
+
         /// <summary>В ZP IsNull и IsVoid различаются нюансами; у нас источник один.</summary>
         public bool IsNull => IsVoid;
 
-        public string InnerText => Sync(_loc.InnerTextAsync());
-        public string InnerHtml => Sync(_loc.InnerHTMLAsync());
-        public string OuterHtml => Sync(_loc.EvaluateAsync<string>("el => el.outerHTML")) ?? "";
-        public string TagName   => (Sync(_loc.EvaluateAsync<string>("el => el.tagName")) ?? "").ToLower();
+        public string InnerText => Missing ? "" : Sync(_loc.InnerTextAsync());
+        public string InnerHtml => Missing ? "" : Sync(_loc.InnerHTMLAsync());
+        public string OuterHtml => Missing ? "" : Sync(_loc.EvaluateAsync<string>("el => el.outerHTML")) ?? "";
+        public string TagName   => Missing ? "" : (Sync(_loc.EvaluateAsync<string>("el => el.tagName")) ?? "").ToLower();
 
-        public int Width  => (int)(Sync(_loc.BoundingBoxAsync())?.Width  ?? 0);
-        public int Height => (int)(Sync(_loc.BoundingBoxAsync())?.Height ?? 0);
+        public int Width  => Missing ? 0 : (int)(Sync(_loc.BoundingBoxAsync())?.Width  ?? 0);
+        public int Height => Missing ? 0 : (int)(Sync(_loc.BoundingBoxAsync())?.Height ?? 0);
 
         public System.Drawing.Point DisplacementInBrowser
         {
             get
             {
+                if (Missing) return System.Drawing.Point.Empty;
                 var box = Sync(_loc.BoundingBoxAsync());
                 return box == null
                     ? System.Drawing.Point.Empty
@@ -963,15 +992,21 @@ namespace z3nDash.Browser
             }
         }
 
-        public string GetAttribute(string attr) => attr.ToLower() switch
+        public string GetAttribute(string attr)
         {
-            "innertext" => Sync(_loc.InnerTextAsync()),
-            "value"     => Sync(_loc.InputValueAsync()),
-            _           => Sync(_loc.GetAttributeAsync(attr)) ?? ""
-        };
+            if (Missing) return "";
+            return attr.ToLower() switch
+            {
+                "innertext" => Sync(_loc.InnerTextAsync()),
+                "value"     => Sync(_loc.InputValueAsync()),
+                _           => Sync(_loc.GetAttributeAsync(attr)) ?? ""
+            };
+        }
 
         public void SetAttribute(string attr, string value)
         {
+            if (Missing) return;
+
             // value у input/select — это свойство, а не атрибут: правка атрибута
             // не двинет реальное значение поля, поэтому разводим случаи.
             if (attr.Equals("value", StringComparison.OrdinalIgnoreCase))
@@ -985,13 +1020,25 @@ namespace z3nDash.Browser
         }
 
         public void RemoveAttribute(string attr)
-            => Sync(_loc.EvaluateAsync("(el, a) => el.removeAttribute(a)", attr));
+        {
+            if (Missing) return;
+            Sync(_loc.EvaluateAsync("(el, a) => el.removeAttribute(a)", attr));
+        }
 
-        public void Focus()          => Sync(_loc.FocusAsync());
-        public void ScrollIntoView() => Sync(_loc.ScrollIntoViewIfNeededAsync());
+        public void Focus()
+        {
+            if (Missing) return;
+            Sync(_loc.FocusAsync());
+        }
+
+        public void ScrollIntoView()
+        {
+            if (Missing) return;
+            Sync(_loc.ScrollIntoViewIfNeededAsync());
+        }
 
         public string DrawToBitmap()
-            => Convert.ToBase64String(Sync(_loc.ScreenshotAsync()));
+            => Missing ? "" : Convert.ToBase64String(Sync(_loc.ScreenshotAsync()));
 
         /// <summary>
         /// ZP-шный DrawPartAsBitmap: кусок элемента, координаты от его левого
@@ -1000,6 +1047,8 @@ namespace z3nDash.Browser
         /// </summary>
         public string DrawPartToBitmap(int x, int y, int width, int height)
         {
+            if (Missing) return "";
+
             var box = Sync(_loc.BoundingBoxAsync())
                       ?? throw new InvalidOperationException(
                           "DrawPartAsBitmap: элемент не отрисован — нет геометрии");
@@ -1025,6 +1074,18 @@ namespace z3nDash.Browser
             // Прямые потомки, а не любые вложенные: ZP считает по ним позицию
             // элемента среди братьев, и вложенные сбили бы нумерацию.
             var loc = _loc.Locator(string.Join(", ", list.Select(t => "> " + PlaywrightInstance.CssTag(t))));
+            return Enumerable.Range(0, Sync(loc.CountAsync()))
+                             .Select(i => (IHeElement)new PlaywrightElement(loc.Nth(i)))
+                             .ToList();
+        }
+
+        /// <summary>
+        /// Потомки элемента в порядке документа. recursive=true — все вложенные
+        /// («*»), false — только прямые дети («&gt; *»).
+        /// </summary>
+        public IEnumerable<IHeElement> GetChildren(bool recursive)
+        {
+            var loc = _loc.Locator(recursive ? "*" : "> *");
             return Enumerable.Range(0, Sync(loc.CountAsync()))
                              .Select(i => (IHeElement)new PlaywrightElement(loc.Nth(i)))
                              .ToList();
@@ -1057,6 +1118,9 @@ namespace z3nDash.Browser
         /// </summary>
         public void RiseEvent(string eventName, string emulationLevel)
         {
+            // Элемента нет — в ZP это просто ничего, без ожидания и исключения.
+            if (Missing) return;
+
             bool full = string.Equals(emulationLevel, "superEmulation", StringComparison.OrdinalIgnoreCase)
                      || string.Equals(emulationLevel, "Full",           StringComparison.OrdinalIgnoreCase);
 
@@ -1127,6 +1191,8 @@ namespace z3nDash.Browser
         /// </summary>
         public void SetValue(string value, string mode, bool clear)
         {
+            if (Missing) return;
+
             // Не "Full" — ZP-шное присваивание без эмуляции, оставляем как есть.
             if (mode != "Full")
             {
@@ -1148,7 +1214,7 @@ namespace z3nDash.Browser
             }
         }
 
-        public string GetXPath() => Sync(_loc.EvaluateAsync<string>(@"el => {
+        public string GetXPath() => Missing ? "" : Sync(_loc.EvaluateAsync<string>(@"el => {
             const parts = [];
             let n = el;
             while (n && n.nodeType === 1) {
@@ -1173,6 +1239,10 @@ namespace z3nDash.Browser
         {
             if (child is not PlaywrightElement pe)
                 throw new ArgumentException("ожидается элемент этого же браузера", nameof(child));
+
+            // Нет родителя или нет потомка — сносить нечего. ElementHandleAsync
+            // на отсутствующем потомке иначе ждал бы его появления 30 секунд.
+            if (Missing || pe.Missing) return;
 
             var handle = Sync(pe.Locator.ElementHandleAsync());
             if (handle is null) return;

@@ -8,6 +8,7 @@
 //   ошибка + OnError задан   → прыжок по адресу;
 //   ошибка + OnError пуст    → маршрут падает, если ветка не IsNotNecessarily.
 //   IsDisable="True"         → ветка не исполняется, маршрут идёт по OnSuccess.
+//   ветка выбрала переход сама (Logic/Switch) → её выбор старше OnSuccess.
 //
 // Отдельно считается число шагов: шаблон с циклом, у которого сломано условие
 // выхода, иначе крутится вечно. Предел настраивается, по умолчанию щедрый.
@@ -210,7 +211,12 @@ public sealed class XmlPlayer
 
                 var result = exec.Execute(branch, ct);
                 StoreOutput(branch, result);
-                next = branch.OnSuccess;
+
+                // Ветка могла выбрать переход сама — так делает Logic/Switch.
+                // Её выбор старше OnSuccess, в том числе когда выбран вариант
+                // без стрелки: тогда Goto равен None и дальше работает то же
+                // правило, что при пустом OnSuccess.
+                next = result.Goto ?? branch.OnSuccess;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)

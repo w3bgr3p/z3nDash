@@ -128,7 +128,7 @@ public sealed class XmlCodeRunner
     /// <summary>
     /// Окружение csx плюс то, что объявил сам шаблон: usings из OwnCodeUsings.Text
     /// и сборки из References. Ссылки ищутся среди уже загруженных — z3n7 и
-    /// Newtonsoft у нас в процессе, а вот z3n7.Nmlx или z3n7.Captcha нет, и
+    /// Newtonsoft у нас в процессе, а вот z3n7.Nmlx или z3n7.Socials нет, и
     /// молчать об этом нельзя: ветка упадёт непонятной ошибкой имени.
     /// </summary>
     private ScriptOptions BuildOptions()
@@ -150,9 +150,14 @@ public sealed class XmlCodeRunner
 
         // Using на несуществующее пространство имён — ошибка компиляции, и она
         // убила бы ветку, которая этим пространством не пользуется. Шаблоны
-        // тащат в Text весь набор из ZennoPoster, включая z3n7.Captcha и прочие
+        // тащат в Text весь набор из ZennoPoster, включая z3n7.Socials и прочие
         // проекты, которых у нас нет. Поэтому пропускаем только те, что реально
         // существуют, а остальные показываем списком.
+        //
+        // Существование пространства имён при этом не значит, что в нём есть
+        // всё: из z3n7.Captcha перенесены z3nCap и HuntSolver, остальные восемь
+        // классов нет. Using пройдёт, а обращение к Capsolver упадёт ошибкой
+        // имени — и списком UnknownUsings это не поймается.
         var known = KnownNamespaces(loaded.Values);
         var usable = _context.Usings.Where(known.Contains).ToArray();
         UnknownUsings.AddRange(_context.Usings.Except(usable));

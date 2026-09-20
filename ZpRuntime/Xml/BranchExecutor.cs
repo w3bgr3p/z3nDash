@@ -17,8 +17,18 @@ using ZennoLab.InterfacesLibrary.ProjectModel;
 
 namespace z3nDash.Xml;
 
-/// <summary>Что ветка вернула: текст для OutputVariable, если он есть.</summary>
-public readonly record struct BranchResult(string Output)
+/// <summary>
+/// Что ветка вернула: текст для OutputVariable, если он есть, и — для веток,
+/// которые сами решают, куда идти дальше, — адрес перехода.
+/// </summary>
+/// <param name="Output">Значение для OutputVariable.</param>
+/// <param name="Goto">
+/// Переход вместо OnSuccess. null — ветка выбор не делала, маршрут идёт обычным
+/// правилом. Это не то же самое, что <see cref="BranchRef.None"/>: None значит
+/// «ветка выбрала вариант, у которого перехода нет» — на холсте это вариант без
+/// стрелки, и дальше действует то же правило, что при пустом OnSuccess.
+/// </param>
+public readonly record struct BranchResult(string Output, BranchRef? Goto = null)
 {
     public static readonly BranchResult Empty = new("");
 }
@@ -49,6 +59,8 @@ public sealed class BranchExecutor
             ("WebBrowser",  "CMD_NAVIGATE") => Navigate(branch),
             ("Profile",     "Update")       => UpdateProfile(branch),
             ("Logic",       "Pause")        => Pause(branch, ct),
+            ("Logic",       "Switch")       => Switch(branch),
+            ("Logic",       "Alert")        => Alert(branch),
             ("ImageProcessing", "WaterMark")=> WaterMarkBranch(branch),
             _ => throw new NotSupportedException(
                      $"ветка {branch.Type}/{branch.Action} в плеере не реализована"),
@@ -335,6 +347,68 @@ public sealed class BranchExecutor
 
         if (seconds > 0) ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(seconds));
         ct.ThrowIfCancellationRequested();
+        return BranchResult.Empty;
+    }
+
+    /// <summary>
+    /// Ветвление по значению. В XML: &lt;Parameters&gt;&lt;Variable&gt; — то, что
+    /// сравнивается, а варианты и переход по каждому лежат в &lt;Results&gt;.
+    ///
+    /// Сравнение точное, посимвольное. Приводит ли ZP регистр и обрезает ли
+    /// пробелы — я не проверял, поэтому не приводим и не обрезаем: лишнее
+    /// совпадение увело бы маршрут не туда молча. Чтобы промах было видно, в
+    /// лог идёт и само значение, и выбранный вариант.
+    /// </summary>
+    private BranchResult Switch(Branch branch)
+    {
+        var value = _project.Expand(branch.Param("Variable")) ?? "";
+
+        foreach (var c in branch.Cases)
+        {
+            if (!string.Equals(c.Key, value, StringComparison.Ordinal)) continue;
+
+            _log($"[xml] Switch: «{value}» → вариант «{c.Key}»" +
+                 (c.Target.IsNone ? ", перехода у варианта нет" : $", ухожу в {c.Target}"));
+            return new BranchResult("", c.Target);
+        }
+
+        if (branch.CaseDefault is { } fallback)
+        {
+            _log($"[xml] Switch: «{value}» не совпало ни с одним из " +
+                 $"{branch.Cases.Count} вариантов → Default" +
+                 (fallback.IsNone ? ", перехода у Default нет" : $", ухожу в {fallback}"));
+            return new BranchResult("", fallback);
+        }
+
+        // Ни варианта, ни Default. Молчать нельзя: маршрут пойдёт по обычному
+        // правилу, и это будет выглядеть как «ветка отработала».
+        _log($"[xml] Switch: «{value}» не совпало ни с одним из " +
+             $"{branch.Cases.Count} вариантов, а Default в ветке нет — перехода не будет");
+        return BranchResult.Empty;
+    }
+
+    /// <summary>
+    /// Сообщение в лог. В ProjectMaker это ещё и окно с кнопкой, но окна тут нет
+    /// и быть не может: раннер работает без человека у экрана. Поэтому пишем в
+    /// лог в любом случае, а AlertAutoClose и AlertCloseTimeout не соблюдаем —
+    /// ждать закрытия несуществующего окна значило бы просто спать.
+    ///
+    /// Уровень в XML записан как «Lavel» — это опечатка самого ZennoPoster, в
+    /// файлах поле называется именно так.
+    /// </summary>
+    private BranchResult Alert(Branch branch)
+    {
+        var text = _project.Expand(branch.Param("AlertText")) ?? "";
+        var show = string.Equals(branch.Param("AlertShowInPoster"), "True",
+                                 StringComparison.OrdinalIgnoreCase);
+
+        switch ((branch.Param("Lavel") ?? "").Trim().ToLowerInvariant())
+        {
+            case "error":   _project.SendErrorToLog(text, show);   break;
+            case "warning": _project.SendWarningToLog(text, show); break;
+            default:        _project.SendInfoToLog(text, show);    break;
+        }
+
         return BranchResult.Empty;
     }
 

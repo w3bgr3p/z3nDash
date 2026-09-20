@@ -235,6 +235,8 @@ namespace z3nDash.Browser
         IHeElement FindChildByAttribute(string tag, string attr, string pattern, string mode, int index);
         /// <summary>Прямые потомки с указанными тегами (ZP: FindChildrenByTags).</summary>
         IEnumerable<IHeElement> FindChildrenByTags(string tags);
+        /// <summary>Потомки: все вложенные при recursive, иначе только прямые (ZP: GetChildren).</summary>
+        IEnumerable<IHeElement> GetChildren(bool recursive);
         void      RemoveChild(IHeElement child);
     }
 }

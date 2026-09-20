@@ -690,9 +690,16 @@ public sealed partial class SchedulerService : IDisposable
                     rp.AddLine($"[xml] аккаунт {account.GetValueOrDefault("id", "")} из {accountTable}");
                 }
 
-                var rawProxy = payload.GetValueOrDefault("proxy", "");
-                if (string.IsNullOrWhiteSpace(rawProxy))
-                    rawProxy = tpl.Variables.GetValueOrDefault("proxy", "");
+                // Источник прокси — настройка задачи: см. BrowserConfig.ProxySource.
+                // Раньше payload и переменная шаблона читались подряд, одинаково
+                // для любого шаблона. Но переменная "proxy" бывает выходной, и
+                // тогда до запуска в ней лежит прокси прошлого прогона.
+                var rawProxy = brConfig.ProxySource switch
+                {
+                    "template" => tpl.Variables.GetValueOrDefault("proxy", ""),
+                    "none"     => "",
+                    _          => payload.GetValueOrDefault("proxy", ""),
+                };
                 var proxy = z3nDash.Browser.BrowserSession.NormalizeProxy(rawProxy);
 
                 // Чем поднимать браузер — настройка задачи; какой именно профиль
@@ -763,7 +770,11 @@ public sealed partial class SchedulerService : IDisposable
                         c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
                     var profileDir = Path.Combine(Path.GetTempPath(), "z3nDash-xml", "profile-" + safe);
                     rp.AddLine($"[br] Patchright{(brConfig.Headless ? " (без окна)" : " (с окном)")}, профиль {profileDir}"
-                               + (proxy.Length > 0 ? $", прокси {proxy}" : ", без прокси"));
+                               + (proxy.Length > 0
+                                    ? $", прокси {proxy} (из {brConfig.ProxySource})"
+                                    : brConfig.ProxySource == "none"
+                                        ? ", без прокси — ставит шаблон"
+                                        : $", без прокси ({brConfig.ProxySource} пуст)"));
                     session = await z3nDash.Browser.BrowserSession.LaunchAsync(
                         profileDir, headless: brConfig.Headless, proxy: proxy.Length > 0 ? proxy : null,
                         log: rp.AddLine);

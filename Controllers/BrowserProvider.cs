@@ -24,6 +24,23 @@ public sealed class BrowserConfig
     public bool CloseAfterRun = true;
 
     /// <summary>
+    /// Откуда брать прокси на старт браузера. Признак задачи, а не правило для
+    /// всех: у разных шаблонов прокси устроен по-разному.
+    ///
+    ///   payload  — из данных запуска (по умолчанию);
+    ///   template — из переменной шаблона с именем "proxy";
+    ///   none     — не давать вовсе: шаблон ставит его сам своим SetProxy.
+    ///
+    /// "template" годится только там, где эта переменная — вход. Бывает и
+    /// наоборот: в simroute.megapari.xml шаблон строит прокси из env и кладёт
+    /// результат в неё (project.Var("proxy", proxyString)), то есть до запуска
+    /// в ней лежит прокси прошлого прогона. Браузер поднимался на нём и получал
+    /// пять отказов авторизации, пока шаблон не ставил актуальный. Для таких
+    /// задач здесь "none".
+    /// </summary>
+    public string ProxySource = "payload";   // payload | template | none
+
+    /// <summary>
     /// Окно браузера. По умолчанию его нет: в прогоне оно не нужно, а мешает.
     /// Включается на время разбора — посмотреть, на чём встал шаблон.
     /// Касается только режима patchright: в остальных браузер поднимаем не мы.
@@ -46,6 +63,9 @@ public sealed class BrowserConfig
             cfg.CloseAfterRun = false;
         if (root.TryGetProperty("headless", out var hl) && hl.ValueKind == JsonValueKind.False)
             cfg.Headless = false;
+
+        var src = Str(root, "proxySource", cfg.ProxySource).ToLowerInvariant();
+        if (src is "payload" or "template" or "none") cfg.ProxySource = src;
 
         if (!root.TryGetProperty("api", out var api) || api.ValueKind != JsonValueKind.Object)
             return cfg;

@@ -61,6 +61,16 @@ public readonly record struct BranchRef(string StepId, string BranchId)
 }
 
 /// <summary>
+/// Один вариант ветки Logic/Switch: значение и куда с ним уходить.
+///
+/// В XML лежит экранированной разметкой внутри &lt;Case0&gt;…&lt;CaseN&gt;:
+/// <c>&lt;Pair&gt;&lt;Key&gt;Sent&lt;/Key&gt;&lt;Value&gt;stepId|branchId&lt;/Value&gt;&lt;/Pair&gt;</c>.
+/// Пустой Value — вариант без стрелки на холсте, законный случай: во всех
+/// 21 Switch рабочих шаблонов такие есть.
+/// </summary>
+public readonly record struct SwitchCase(string Key, BranchRef Target);
+
+/// <summary>
 /// Одно действие. Parameters оставлены как XElement: у каждого Type/Action свой
 /// набор полей, и разбирать их заранее — значит писать модель под каждый тип ZP.
 /// Исполнитель берёт то, что ему нужно, через хелперы ниже.
@@ -80,6 +90,15 @@ public sealed class Branch
     public string    OutputVariable { get; init; } = "";
     public BranchRef OnSuccess      { get; init; } = BranchRef.None;
     public BranchRef OnError        { get; init; } = BranchRef.None;
+
+    /// <summary>Варианты Logic/Switch в порядке из XML. У прочих веток пусто.</summary>
+    public IReadOnlyList<SwitchCase> Cases { get; init; } = [];
+
+    /// <summary>
+    /// Переход из &lt;Default&gt;. null — узла Default в ветке нет вовсе; это не
+    /// то же самое, что Default с пустым переходом.
+    /// </summary>
+    public BranchRef? CaseDefault { get; init; }
 
     /// <summary>ZP-шный флаг «не обязательно»: ошибка не валит маршрут.</summary>
     public bool IsOptional { get; init; }
@@ -173,7 +192,13 @@ public sealed class XmlTemplate
         {
             var id = queue.Dequeue();
             if (!seen.Add(id) || StepById(id) is not { } s) continue;
-            foreach (var t in s.Branches.SelectMany(b => new[] { b.OnSuccess, b.OnError }))
+
+            // Переходы Logic/Switch — такие же стрелки на холсте, только
+            // записаны в вариантах, а не в OnSuccess. Без них узлы, куда ведёт
+            // только Switch, объявлялись бы артефактами разработки.
+            foreach (var t in s.Branches.SelectMany(b =>
+                         new[] { b.OnSuccess, b.OnError, b.CaseDefault ?? BranchRef.None }
+                             .Concat(b.Cases.Select(c => c.Target))))
                 if (!t.IsNone) queue.Enqueue(t.StepId);
         }
 
@@ -218,6 +243,9 @@ public sealed class XmlTemplate
                     OutputVariable = results?.Element("OutputVariable")?.Value ?? "",
                     OnSuccess      = BranchRef.Parse(results?.Element("OnSuccess")?.Value),
                     OnError        = BranchRef.Parse(results?.Element("OnError")?.Value),
+
+                    Cases       = ParseCases(results),
+                    CaseDefault = ParsePair(results?.Element("Default")) is { } d ? d.Target : null,
                 });
             }
 
@@ -253,6 +281,46 @@ public sealed class XmlTemplate
         }
 
         return tpl;
+    }
+
+    /// <summary>
+    /// Варианты Switch: Case0, Case1, … по порядку номера, а не по порядку в
+    /// файле. Номер — это позиция варианта в редакторе, и от неё зависит, какой
+    /// из двух одинаковых ключей сработает первым.
+    /// </summary>
+    private static IReadOnlyList<SwitchCase> ParseCases(XElement? results)
+    {
+        if (results is null) return [];
+
+        var cases = new List<(int Number, SwitchCase Case)>();
+        foreach (var el in results.Elements())
+        {
+            var name = el.Name.LocalName;
+            if (!name.StartsWith("Case", StringComparison.Ordinal)) continue;
+            if (!int.TryParse(name["Case".Length..], out var number)) continue;
+            if (ParsePair(el) is { } pair) cases.Add((number, pair));
+        }
+
+        return cases.OrderBy(x => x.Number).Select(x => x.Case).ToList();
+    }
+
+    /// <summary>
+    /// Тело варианта — экранированная разметка, а не узлы: в файле лежит
+    /// «&amp;lt;Pair&amp;gt;…», поэтому содержимое сперва разбирается как
+    /// отдельный документ.
+    /// </summary>
+    private static SwitchCase? ParsePair(XElement? el)
+    {
+        var raw = el?.Value;
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+
+        XElement pair;
+        try { pair = XElement.Parse(raw); }
+        catch (System.Xml.XmlException) { return null; }
+
+        return new SwitchCase(
+            pair.Element("Key")?.Value ?? "",
+            BranchRef.Parse(pair.Element("Value")?.Value));
     }
 
     private static BranchRef NextAction(XElement? stat, string node)
