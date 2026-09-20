@@ -1,0 +1,79 @@
+/* dllgraph.css — вынесено из dllGraph.html */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Iosevka', 'Consolas', monospace;
+    font-size: var(--fs-11); height: 100vh; overflow: hidden;
+    display: flex; flex-direction: column;
+}
+#app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* ── Header ── */
+.main-header {
+    background: var(--bg1); padding: var(--sp-6) var(--sp-14);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-8);
+}
+.main-header h1 { font-size: var(--fs-13); font-weight: var(--fw-bold); color: var(--accent); }
+.header-right { margin-left: auto; display: flex; gap: var(--sp-6); align-items: center; }
+
+/* ── Toolbar ── */
+.toolbar {
+    background: var(--bg1); padding: var(--sp-4) var(--sp-14);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-6);
+}
+.toolbar input[type="text"] {
+    flex: 1; max-width: 520px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-8);
+    color: var(--text); font-size: var(--fs-11); font-family: inherit;
+}
+.toolbar input[type="text"]:focus { outline: none; border-color: var(--accent); }
+.toolbar-label { font-size: var(--fs-10); color: var(--text2); white-space: nowrap; }
+.toolbar-sep { width: 1px; height: 14px; background: var(--border); margin: 0 var(--sp-2); flex-shrink: 0; }
+
+/* ── Buttons ── */
+.btn { padding: var(--sp-2) var(--sp-8); border-radius: var(--radius-sm); border: 1px solid var(--border); cursor: pointer; font-size: var(--fs-10); background: var(--bg2); color: var(--text); font-family: inherit; white-space: nowrap; }
+.btn:hover { background: var(--bg3); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Status bar ── */
+.statusbar {
+    background: var(--bg1); padding: var(--sp-2) var(--sp-14);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-8);
+    font-size: var(--fs-10); color: var(--text2); min-height: 22px;
+}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+.status-dot.ok   { background: var(--green); }
+.status-dot.err  { background: var(--red); }
+.status-dot.busy { background: var(--yellow); animation: blink 0.8s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+#statusText { color: var(--text2); }
+#statusText.ok  { color: var(--green); }
+#statusText.err { color: var(--red); }
+
+/* ── Graph frame ── */
+.graph-area { flex: 1; overflow: hidden; position: relative; }
+#graphFrame {
+    width: 100%; height: 100%;
+    border: none; display: none;
+    background: var(--bg);
+}
+#graphFrame.visible { display: block; }
+
+/* ── Empty state ── */
+#emptyState {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: var(--sp-10); color: var(--text2);
+}
+#emptyState.hidden { display: none; }
+.empty-icon { font-size: var(--fs-32); opacity: 0.25; }
+.empty-title { font-size: var(--fs-13); color: var(--text2); }
+.empty-sub   { font-size: var(--fs-10); color: var(--text2); opacity: 0.6; }
