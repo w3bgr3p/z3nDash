@@ -65,6 +65,14 @@ internal static class SseHub
         }
     }
 
+    /// <summary>
+    /// Есть ли кто-то, кто слушает этот канал. Нужно сессии отладки: пока
+    /// страница открыта, она ждёт сколько угодно, а без слушателей закрывается
+    /// по таймауту — иначе закрытая вкладка оставила бы висеть окно браузера.
+    /// </summary>
+    public static bool HasSubscribers(string scheduleId)
+        => _output.Values.Any(s => s.Filter == scheduleId);
+
     // ── Broadcast ─────────────────────────────────────────────────────────────
 
     public static void BroadcastOutput(string line, string scheduleId)
