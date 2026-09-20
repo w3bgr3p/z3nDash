@@ -278,6 +278,39 @@ body.editing .crow:hover > .drag-port { display:block; }
 .key-edit { width:auto; min-width:70px; max-width:160px; color:var(--accent); }
 .cap-edit { font-size:11px; }
 
+/* ── Код ветки в CodeMirror ─────────────────────────────────────────────── */
+/* Тема редактора не подключается отдельно: перекрашиваем базовую под
+   переменные страницы, иначе на тёмном фоне он остался бы белым. */
+.code-host .CodeMirror {
+    height:auto; max-height:420px;
+    background:var(--bg2); color:var(--text);
+    border:1px solid var(--border); border-radius:4px;
+    font-family:var(--mono, monospace); font-size:10px; line-height:1.5;
+}
+.code-host .CodeMirror-scroll   { max-height:420px; }
+.code-host .CodeMirror-focused  { border-color:var(--accent); }
+.code-host .CodeMirror-gutters  { background:var(--bg1); border-right:1px solid var(--border); }
+.code-host .CodeMirror-linenumber { color:var(--muted); }
+.code-host .CodeMirror-cursor   { border-left:1px solid var(--text-hi); }
+.code-host .CodeMirror-selected { background:var(--bg3); }
+.code-host .CodeMirror-line::selection,
+.code-host .CodeMirror-line > span::selection { background:var(--blue-tint); }
+
+.code-host .cm-keyword  { color:var(--key-color); }
+.code-host .cm-string   { color:var(--string-color); }
+.code-host .cm-string-2 { color:var(--string-color); }
+.code-host .cm-number   { color:var(--number-color); }
+.code-host .cm-comment  { color:var(--muted2); font-style:italic; }
+.code-host .cm-variable,
+.code-host .cm-variable-2 { color:var(--text); }
+.code-host .cm-variable-3,
+.code-host .cm-type     { color:var(--purple); }
+.code-host .cm-def      { color:var(--accent-lo); }
+.code-host .cm-property { color:var(--text-hi); }
+.code-host .cm-operator { color:var(--text2); }
+.code-host .cm-meta     { color:var(--yellow); }
+.code-host .cm-atom     { color:var(--bool-color); }
+
 textarea.bi-code.edit {
     width:100%; box-sizing:border-box; min-height:160px; resize:vertical;
     border:1px solid var(--border); outline:none;

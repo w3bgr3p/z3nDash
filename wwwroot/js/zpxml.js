@@ -196,16 +196,9 @@ function showDetail(step, bi) {
     if (b.code && b.code.trim()) {
         const code = document.createElement('div');
         code.className = 'bi';
-        code.innerHTML = '<div class="bi-head">code</div>' +
-            (editing
-                ? '<textarea class="bi-code full edit" spellcheck="false"></textarea>'
-                : '<div class="bi-code full">' + escHtml(b.code) + '</div>');
+        code.innerHTML = '<div class="bi-head">code</div><div class="code-host"></div>';
         db.appendChild(code);
-        const ta = code.querySelector('textarea');
-        if (ta) {
-            ta.value = b.code;
-            bindEdit(ta, b.code, v => ZpDoc.setCode(b.id, v), 'code', { multiline: true });
-        }
+        mountCode(code.querySelector('.code-host'), b);
     }
 
     // Параметры действия: для HTMLElement это и есть главное — по какому
@@ -272,6 +265,50 @@ function showDetail(step, bi) {
     sib.querySelectorAll('.sib').forEach(el =>
         el.addEventListener('click', () => selectBranch(step.id, +el.dataset.i)));
     db.appendChild(sib);
+}
+
+/// Поле кода. CodeMirror грузится с CDN, а приложение работает локально и
+/// может оказаться без сети — поэтому при его отсутствии остаётся обычное
+/// текстовое поле: без подсветки, но рабочее.
+function mountCode(host, b) {
+    const commit = value => {
+        if (value === b.code) return;
+        if (ZpDoc.setCode(b.id, value)) refresh('edited code');
+    };
+
+    if (typeof CodeMirror !== 'function') {
+        host.innerHTML = editing
+            ? '<textarea class="bi-code full edit" spellcheck="false"></textarea>'
+            : '<div class="bi-code full">' + escHtml(b.code) + '</div>';
+        const ta = host.querySelector('textarea');
+        if (ta) {
+            ta.value = b.code;
+            bindEdit(ta, b.code, v => ZpDoc.setCode(b.id, v), 'code', { multiline: true });
+        }
+        return;
+    }
+
+    const cm = CodeMirror(host, {
+        value: b.code,
+        mode: 'text/x-csharp',
+        lineNumbers: true,
+        lineWrapping: true,
+        readOnly: editing ? false : 'nocursor',
+        viewportMargin: Infinity
+    });
+
+    if (!editing) return;
+
+    let cancelled = false;
+    cm.setOption('extraKeys', {
+        Esc: () => { cancelled = true; cm.setValue(b.code); cm.getInputField().blur(); },
+        // Enter в коде — перевод строки, поэтому применяем по Ctrl+Enter.
+        'Ctrl-Enter': () => { commit(cm.getValue()); }
+    });
+    cm.on('blur', () => {
+        if (cancelled) { cancelled = false; return; }
+        commit(cm.getValue());
+    });
 }
 
 /// Правка применяется по уходу фокуса и по Enter, Esc возвращает прежнее
