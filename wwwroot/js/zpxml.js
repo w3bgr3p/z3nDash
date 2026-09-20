@@ -402,7 +402,7 @@ function dropTargetAt(clientX, clientY) {
     if (!step) return { stepId: null, index: 0 };
 
     const p = positions[stepId];
-    const local = canvasPoint(clientX, clientY).y - p.y - PAD;
+    const local = canvasPoint(clientX, clientY).y - p.y - PAD_TOP;
     const rows = blockRows(step).rows.filter(r => r.kind === 'branch');
     for (let i = 0; i < rows.length; i++)
         if (local < rows[i].y + rows[i].h / 2) return { stepId, index: i };
@@ -435,7 +435,7 @@ function beginBranchDrag(step, branchIndex, ev) {
         line.style.display = 'block';
         line.style.left  = (p.x + PAD) + 'px';
         line.style.width = NW + 'px';
-        line.style.top   = (p.y + PAD + (row ? row.y : geom.height)) + 'px';
+        line.style.top   = (p.y + PAD_TOP + (row ? row.y : geom.height)) + 'px';
     };
 
     const onUp = e => {

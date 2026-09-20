@@ -7,7 +7,10 @@ let positions = {};
 
 // rather than to the block. Switch branches add a row per case below their own.
 const NW = 132;      // block width, without the backing plate
-const PAD = 4;       // backing plate: the margin you grab the whole block by
+// Подложка блока. Сверху она заметно шире остальных сторон: за неё берут весь
+// блок, и в 4px приходилось целиться.
+const PAD = 4;        // боковые и нижнее поле
+const PAD_TOP = 15;   // верхняя полоса — то, за что тянут блок
 const ROW_H = 26;    // one branch row
 const VAR_H = 16;    // the switch variable line above its cases
 const CASE_H = 17;   // one switch case row
@@ -39,7 +42,7 @@ function blockRows(step) {
 }
 
 function stepHeight(step) {
-    if (step._h === undefined) step._h = blockRows(step).height + PAD * 2;
+    if (step._h === undefined) step._h = blockRows(step).height + PAD_TOP + PAD;
     return step._h;
 }
 
@@ -60,7 +63,7 @@ function anchor(ref, side) {
         : rows.find(r => r.kind === 'branch' && r.branchIndex === ref.branchIndex);
     const top = row ? row.y : 0;
     const h   = row ? row.h : ROW_H;
-    return { x: p.x + (side === 'right' ? NW + PAD * 2 : 0), y: p.y + PAD + top + h / 2, side };
+    return { x: p.x + (side === 'right' ? NW + PAD * 2 : 0), y: p.y + PAD_TOP + top + h / 2, side };
 }
 
 /// Pick the shortest sensible route instead of always leaving right and
