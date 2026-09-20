@@ -4,6 +4,57 @@
    Покрывает переменные zp7.html и base.css
    ═══════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════
+   ШКАЛА — одинакова во всех темах.
+   Собрана по инвентарю фактических значений, а не придумана:
+   каждый шаг здесь реально встречается в коде.
+   Тема может переопределить радиусы; отступы и кегли — общие.
+   ═══════════════════════════════════════════════════════ */
+:root {
+    /* ── Отступы: padding / margin / gap ──
+       Имя = значение. Осознанный выбор: делает замену
+       хардкодов механической и проверяемой попиксельно.
+       Семантический слой (--pad-cell и т.п.) появится позже,
+       когда станут видны роли. */
+    --sp-1:   1px;
+    --sp-2:   2px;
+    --sp-4:   4px;
+    --sp-6:   6px;
+    --sp-8:   8px;
+    --sp-10: 10px;
+    --sp-12: 12px;
+    --sp-14: 14px;
+    --sp-16: 16px;
+    --sp-18: 18px;
+    --sp-20: 20px;
+    --sp-24: 24px;
+    --sp-32: 32px;
+    --sp-48: 48px;
+
+    /* ── Кегли ── */
+    --fs-8:   8px;
+    --fs-9:   9px;
+    --fs-10: 10px;
+    --fs-11: 11px;
+    --fs-12: 12px;
+    --fs-13: 13px;
+    --fs-14: 14px;
+    --fs-16: 16px;
+    --fs-18: 18px;
+    --fs-22: 22px;
+
+    /* ── Начертания ── */
+    --fw-normal: 400;
+    --fw-medium: 500;
+    --fw-semi:   600;
+    --fw-bold:   700;
+
+    /* ── Интерлиньяж ── */
+    --lh-tight:  1;
+    --lh-normal: 1.35;
+    --lh-loose:  1.5;
+}
+
 /* ── DARK (default) ── */
 :root,
 [data-theme="dark"] {
@@ -30,7 +81,7 @@
     --green-hi:    #7ee787;
     --green-bg:    #238636;
     --green-bg2:   #2ea043;
-    --green-tint: #23af5c;
+    --green-tint: #0e2f12;
 
     --red:         #f85149;
     --red-lo:      #ff7b72;
@@ -44,11 +95,12 @@
     --yellow-tint: #2a1d0d;
 
     --purple:      #a371f7;
-    --purple-tint: #043904;
+    --purple-tint: #1a0e2f;
 
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-size: 12px;
     --radius: 6px;
+    --radius-sm:   3px;
 
     /* base.css aliases */
     --surface:    var(--bg1);
@@ -72,6 +124,17 @@
 
     --radius-lg: 10px;
     --row-h: 19px;
+
+    /* Текст на залитой подложке */
+    --on-accent:   #0d1117;
+    --on-solid:    #ffffff;
+
+    /* Рамка к --*-tint. Тинт + ~7% светлоты, тот же тон. */
+    --blue-tint-border: #143254;
+    --red-tint-border: #451515;
+    --yellow-tint-border: #453015;
+    --green-tint-border: #164b1d;
+    --purple-tint-border: #29164b;
 }
 
 /* ── LIGHT ── */
@@ -117,6 +180,7 @@
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-size: 12px;
     --radius: 6px;
+    --radius-sm:   3px;
 
     --surface:    var(--bg1);
     --surface2:   var(--bg2);
@@ -138,6 +202,17 @@
 
     --radius-lg: 10px;
     --row-h: 19px;
+
+    /* Текст на залитой подложке */
+    --on-accent:   #ffffff;
+    --on-solid:    #1f2328;
+
+    /* Рамка к --*-tint. Тинт + ~7% светлоты, тот же тон. */
+    --blue-tint-border: #96ddff;
+    --red-tint-border: #ffaaa2;
+    --yellow-tint-border: #ffef7e;
+    --green-tint-border: #9af4ad;
+    --purple-tint-border: #e9a8ff;
 }
 
 /* ── HYPER ── */
@@ -183,6 +258,7 @@
     --font: 'JetBrains Mono', monospace;
     --font-size: 11px;
     --radius: 0px;
+    --radius-sm:   0px;
 
     --surface:    var(--bg1);
     --surface2:   var(--bg2);
@@ -204,6 +280,17 @@
 
     --radius-lg: 0px;
     --row-h: 19px;
+
+    /* Текст на залитой подложке */
+    --on-accent:   #000000;
+    --on-solid:    #ffffff;
+
+    /* Рамка к --*-tint. Тинт + ~7% светлоты, тот же тон. */
+    --blue-tint-border: #003e3e;
+    --red-tint-border: #3e0000;
+    --yellow-tint-border: #3e2f00;
+    --green-tint-border: #003500;
+    --purple-tint-border: #1e1434;
 }
 
 /* ── Hyper: page-specific extras (scanlines, glows) ── */
@@ -227,6 +314,7 @@
 [data-theme="hyper"] .lp-title     { text-shadow: 0 0 8px rgba(0,255,65,0.4); letter-spacing: 0.15em; text-transform: uppercase; }
 
 [data-theme="hyper"] .btn          { background: transparent !important; border-radius: 0 !important; letter-spacing: 0.1em; text-transform: uppercase; }
+[data-theme="hyper"] .btn.primary  { border-color: var(--accent) !important; color: var(--accent) !important; }
 [data-theme="hyper"] .btn-start    { border-color: var(--green) !important; color: var(--green) !important; }
 [data-theme="hyper"] .btn-stop     { border-color: var(--red)   !important; color: var(--red)   !important; }
 [data-theme="hyper"] .btn-update   { border-color: var(--border) !important; color: var(--text2) !important; }
