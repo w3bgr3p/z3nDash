@@ -31,6 +31,7 @@ window.PageState = {
         if (q.includes('page=logs'))   return 'logs';
         if (p.includes('har'))         return 'har';
         if (p.includes('zpxml') || q.toLowerCase().includes('page=zpxml')) return 'zpXml';
+        if (q.includes('page=xml'))    return 'xml';
         if (q.includes('page=config')) return 'config';
         if (p.includes('report'))      return 'report';
         if (p.includes('json'))        return 'json';

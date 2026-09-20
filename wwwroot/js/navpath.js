@@ -11,6 +11,7 @@ window.NAV_CONFIG = {
         'alt+KeyC':   '/?page=clips',
         'alt+KeyH':   '/docsVault',
         'alt+KeyG':   '/?page=dllGraph',
+        'alt+Digit9': '/?page=xml',
     },
     items: [
 
@@ -19,6 +20,7 @@ window.NAV_CONFIG = {
         { id: 'zb',        label: 'ZB',         href: '/?page=zb',       hotkey: '3' },
         { id: 'har',       label: 'HAR',        href: '/har.html',       hotkey: '' },
         { id: 'zpXml',  label: 'zpXml',   href: '/?page=zpxml.html',       hotkey: '' },
+        { id: 'xml',       label: 'XML',        href: '/?page=xml',      hotkey: '9' },
         { id: 'json',      label: 'JSON',       href: '/json',           hotkey: '6' },
         { id: 'text',      label: 'Text',       href: '/?page=text',     hotkey: '7' },
         { id: 'clips',     label: 'Clips',      href: '/?page=clips',    hotkey: 'C' },

@@ -56,6 +56,9 @@
     --lh-tight:  1;
     --lh-normal: 1.35;
     --lh-loose:  1.5;
+
+    /* Моноширинный стек. */
+    --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Consolas', monospace;
 }
 
 /* ── DARK (default) ── */
