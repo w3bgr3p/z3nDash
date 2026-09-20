@@ -369,6 +369,107 @@
 }
 
 /* ── Hyper: page-specific extras (scanlines, glows) ── */
+/* ═══════════════════════════════════════════════════════
+   GRAPHITE — графитовые поверхности, монохромная хрома.
+   Цвет оставлен только там, где он кодирует состояние:
+   статусы, уровни логов, подсветка синтаксиса, категории.
+   Проверено на zp7: серые плашки статусов в семнадцати
+   строках подряд сливаются в один столбец и не читаются.
+   ═══════════════════════════════════════════════════════ */
+[data-theme="graphite"] {
+    /* ── Поверхности и текст: монохром ── */
+    --bg:           #020303;
+    --bg1:          #0c0d0e;
+    --bg2:          #101214;
+    --bg3:          #171b1e;
+    --border:       #333637;
+    --muted:        #6c7275;
+    --muted2:       #8a9093;
+    --text3:        #82898c;
+    --text2:        #a5a9ac;
+    --text:         #eaebeb;
+    --text-hi:     #f7fbff;
+
+    /* ── Акцент: тоже монохром. Это хрома, не состояние. ── */
+    --accent:      #dfe1e2;
+    --accent-lo:   #f7fbff;
+    --blue-border: #45484a;
+    --blue-tint:   #181a1b;
+
+    /* ── Состояния: цвет сохранён ── */
+    --green:       #74be7e;
+    --green-lo:    #93cc9b;
+    --green-hi:    #97ce9e;
+    --green-bg:    #326739;
+    --green-bg2:   #408249;
+    --green-tint:  #172719;
+
+    --red:         #d87d79;
+    --red-lo:      #e2a09c;
+    --red-bg:      #8c3b36;
+    --red-bg2:     #6e2e2b;
+    --red-tint:    #271717;
+    --red-tint2:   #1d1211;
+
+    --yellow:      #c6a96c;
+    --yellow-lo:   #d3bd8d;
+    --yellow-tint: #272217;
+
+    --purple:      #89a5bd;
+    --purple-tint: #171f27;
+
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-size: 12px;
+    --radius:      10px;
+    --radius-sm:   6px;
+    --radius-lg:   14px;
+
+    --surface:    var(--bg1);
+    --surface2:   var(--bg2);
+    --surface3:   var(--bg3);
+    --border2:    #414648;
+    --text-dim:   var(--text2);
+    --text-muted: var(--muted);
+    --accent-dim: var(--blue-tint);
+    --green-dim:  var(--green-tint);
+    --yellow-dim: var(--yellow-tint);
+    --red-dim:    var(--red-tint);
+    --purple-dim: var(--purple-tint);
+
+    /* Подсветка синтаксиса кодирует вид значения — цвет остаётся. */
+    --key-color:    #89a5bd;
+    --string-color: #74be7e;
+    --number-color: #c6a96c;
+    --bool-color:   #d095b6;
+    --null-color:   #9595d0;
+    --row-h: 19px;
+
+    --steel:         #89a5bd;
+    --steel-tint:    #171f27;
+    --steel-tint-border: #27343f;
+    --cyan:          #7ab8b5;
+    --cyan-tint:     #172726;
+    --cyan-tint-border: #273f3e;
+    --gold:          #c7bb75;
+    --gold-tint:     #272417;
+    --gold-tint-border: #3f3c27;
+    --indigo:        #9595d0;
+    --indigo-tint:   #171727;
+    --indigo-tint-border: #27273f;
+    --pink:          #d095b6;
+    --pink-tint:     #271720;
+    --pink-tint-border: #3f2735;
+
+    --on-accent:   #020303;
+    --on-solid:    #f7fbff;
+
+    --blue-tint-border:   #2c2f30;
+    --red-tint-border:    #3f2827;
+    --yellow-tint-border: #3f3727;
+    --green-tint-border:  #273f2a;
+    --purple-tint-border: #27343f;
+}
+
 [data-theme="hyper"] body::before {
     content: '';
     position: fixed;

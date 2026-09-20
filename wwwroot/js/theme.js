@@ -16,6 +16,7 @@ const THEMES = [
     { id: 'dark',      label: '⬛  Dark' },
     { id: 'light',     label: '⬜  Light' },
     { id: 'hyper',     label: '🟩  Hyper' },
+    { id: 'graphite',  label: '⬛  Graphite' },
 ];
 
 const THEME_IDS = THEMES.map(t => t.id);
