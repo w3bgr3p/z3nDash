@@ -10,7 +10,7 @@ const NW = 132;      // block width, without the backing plate
 // Подложка блока. Сверху она заметно шире остальных сторон: за неё берут весь
 // блок, и в 4px приходилось целиться.
 const PAD = 4;        // боковые и нижнее поле
-const PAD_TOP = 15;   // верхняя полоса — то, за что тянут блок
+const PAD_TOP = 10;   // верхняя полоса — то, за что тянут блок
 const ROW_H = 26;    // one branch row
 const VAR_H = 16;    // the switch variable line above its cases
 const CASE_H = 17;   // one switch case row

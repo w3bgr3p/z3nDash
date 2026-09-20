@@ -92,7 +92,7 @@ svg#edges { position:absolute; top:0; left:0; pointer-events:none; overflow:visi
     /* Подложка: поле, за которое берут весь блок — как в ProjectMaker.
        Сверху шире: в 4px приходилось целиться. */
     background:var(--bg3);
-    padding:15px 4px 4px;
+    padding:10px 4px 4px;
     overflow:hidden;
     cursor:pointer; user-select:none;
 }
