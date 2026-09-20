@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>zpXml — flow viewer</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <link rel="stylesheet" href="/css/zpxml.css">
+    <style>
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body {
+            font-family:var(--font, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+            background:var(--bg); color:var(--text);
+            font-size:14px;
+        }
+    </style>
+</head>
+<body id="zpxml">
+<div id="app">
+  <div id="top">
+    <div id="top-left">
+      <div id="drop-zone">📂 pick an XML file or drop it here</div>
+      <input type="file" id="file-input" accept=".xml,.zp,.txt">
+      <div id="top-row">
+        <button class="btn" id="btn-clear">clear</button>
+        <span id="status"></span>
+      </div>
+    </div>
+    <div id="top-hint">
+      <b>File format:</b> XML from ZennoPoster<br>
+      (save the output of <code>ExtractXml()</code> as .xml)<br>
+      <br>
+      <b>Controls:</b> drag the background · wheel to zoom · click a node for details
+    </div>
+  </div>
+
+  <div id="toolbar">
+    <button class="btn" id="btn-zoom-in">＋</button>
+    <button class="btn" id="btn-zoom-out">－</button>
+    <button class="btn" id="btn-reset">reset</button>
+    <button class="btn active" id="btn-layout">↕ vertical</button>
+    <input id="search" type="text" placeholder="search by label / ID…">
+    <div class="legend">
+      <div class="ld"><div class="ldot good"></div>start/good</div>
+      <div class="ld"><div class="ldot bad"></div>bad end</div>
+      <div class="ld"><div class="lline ok"></div>ok</div>
+      <div class="ld"><div class="lline err"></div>error</div>
+      <div class="ld"><div class="lline case"></div>switch/case</div>
+    </div>
+  </div>
+
+  <div id="canvas-wrap">
+    <svg id="edges"></svg>
+    <div id="canvas"></div>
+    <div id="detail">
+      <div id="detail-resizer" title="drag to resize"></div>
+      <button id="btn-detail-close">✕</button>
+      <h3 id="d-label"></h3>
+      <div class="dl" id="d-meta"></div>
+      <div id="d-branches"></div>
+    </div>
+    <div id="mini"></div>
+    <div id="empty">
+      <span>pick an XML file above</span>
+      <span style="font-size:11px">save the output of ExtractXml() / LoadFromBytesArray() as .xml</span>
+    </div>
+  </div>
+</div>
+
+<script src="/js/zpxml-model.js"></script>
+<script src="/js/zpxml-view.js"></script>
+<script src="/js/zpxml.js"></script>
+</body>
+</html>

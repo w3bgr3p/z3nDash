@@ -1,0 +1,266 @@
+/* zpxml.js — склейка: ввод файла, панель деталей, панорама и зум, тулбар. */
+
+let selected = null, filterText = '';
+let isDragging = false, startX, startY, startPX, startPY;
+
+// ── File input ──────────────────────────────────────────────────────────────
+
+document.getElementById('file-input').addEventListener('change', function () {
+    if (this.files[0]) readFile(this.files[0]);
+});
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('click', () => document.getElementById('file-input').click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over');
+    if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+});
+
+function readFile(file) {
+    setStatus('reading the file…', 'info');
+    const reader = new FileReader();
+    reader.onload  = e => processXml(decodeBytes(e.target.result), file.name);
+    reader.onerror = () => setStatus('could not read the file', 'err');
+    // Read bytes, not text: ZennoPoster saves templates as UTF-16 LE, and
+    // decoding those as UTF-8 yields garbage that fails at the first character.
+    reader.readAsArrayBuffer(file);
+}
+
+/// Decode by byte order mark, falling back to UTF-8 when there is none.
+function decodeBytes(buffer) {
+    const b = new Uint8Array(buffer);
+    let enc = 'utf-8', skip = 0;
+    if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) { enc = 'utf-16le'; skip = 2; }
+    else if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) { enc = 'utf-16be'; skip = 2; }
+    else if (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) { skip = 3; }
+    try {
+        return new TextDecoder(enc).decode(b.subarray(skip));
+    } catch (e) {
+        // utf-16be is not decodable everywhere; utf-8 at least fails loudly.
+        return new TextDecoder('utf-8').decode(b.subarray(skip));
+    }
+}
+
+function processXml(raw, filename) {
+    try {
+        // Drop the XML declaration — DOMParser chokes on some encodings there.
+        raw = raw.replace(/^﻿/, '').replace(/^\s*<\?xml[^?]*\?>\s*/, '');
+
+        const parser = new DOMParser();
+        const doc  = parser.parseFromString(raw, 'text/xml');
+        const perr = doc.querySelector('parsererror');
+        if (perr) {
+            // Second try: the file may be a fragment without a single root.
+            const doc2  = parser.parseFromString('<root>' + raw + '</root>', 'text/xml');
+            const perr2 = doc2.querySelector('parsererror');
+            if (perr2) throw new Error(perr.textContent.replace(/\s+/g, ' ').substring(0, 180));
+            buildFromDoc(doc2);
+        } else {
+            buildFromDoc(doc);
+        }
+        setStatus('✓ ' + filename + ' · ' + stepList.length + ' steps · ' + edges.length + ' edges', 'ok');
+        document.getElementById('empty').style.display = 'none';
+        layoutMode = hasCanvasCoords() ? 'canvas' : 'vertical';
+        document.getElementById('btn-layout').textContent = LAYOUTS[layoutMode];
+        render();
+        resetView();
+    } catch (e) {
+        setStatus('error: ' + e.message, 'err');
+        console.error(e);
+    }
+}
+
+function setStatus(msg, type) {
+    const s = document.getElementById('status');
+    s.textContent = msg;
+    s.className = type === 'err' ? 'err' : type === 'ok' ? 'ok' : '';
+}
+
+function clearAll() {
+    steps = {}; edges = []; stepList = [];
+    document.getElementById('canvas').innerHTML = '';
+    document.getElementById('edges').innerHTML  = '';
+    document.getElementById('empty').style.display = 'flex';
+    setStatus('', 'info');
+    document.getElementById('file-input').value = '';
+    closeDetail();
+}
+
+// ── Detail panel ─────────────────────────────────────────────────────────────
+
+/// Selection is one branch row, not the whole block: a step on the canvas
+/// stacks many actions, and showing all of them at once buries the one that was
+/// clicked.
+function selectBranch(stepId, branchIndex) {
+    selected = { stepId, branchIndex };
+    renderNodes();
+    showDetail(steps[stepId], branchIndex);
+}
+
+/// Where the transition of this branch actually goes, spelled out. An empty
+/// OnSuccess is not "no transition": the runtime falls through to the next
+/// branch of the same step, and ends the route on the last one.
+function targetText(raw) {
+    const ref = parseRef(raw);
+    if (!ref) return null;
+    const step = steps[ref.stepId];
+    const b    = step.branches[ref.branchIndex];
+    return stepLabel(step) + ' · #' + ref.branchIndex +
+           (b ? ' ' + branchRowLabel(b) : '') + (ref.dangling ? ' (branch not in file)' : '');
+}
+
+function showDetail(step, bi) {
+    const b = step.branches[bi];
+    if (!b) return;
+    document.getElementById('detail').classList.add('open');
+    document.getElementById('d-label').textContent = branchRowLabel(b);
+
+    document.getElementById('d-meta').innerHTML =
+        '<dt>action</dt><dd>' + escHtml(b.type + ' / ' + b.action) + '</dd>' +
+        '<dt>branch</dt><dd>#' + bi + ' of ' + step.branches.length + '</dd>' +
+        '<dt>branch id</dt><dd>' + escHtml(b.id) + '</dd>' +
+        '<dt>step</dt><dd>' + escHtml(stepLabel(step)) + '</dd>' +
+        '<dt>step id</dt><dd>' + escHtml(step.id) + '</dd>' +
+        (step.x !== null ? '<dt>canvas</dt><dd>' + step.x + ', ' + step.y + '</dd>' : '') +
+        '<dt>reached</dt><dd>' + (step.reachable === false ? 'no — dead code' : 'yes') + '</dd>' +
+        (b.disabled ? '<dt>state</dt><dd>disabled — not executed</dd>' : '') +
+        (b.optional ? '<dt>state</dt><dd>optional — errors do not fail the route</dd>' : '') +
+        (b.outputVariable ? '<dt>output</dt><dd>' + escHtml(b.outputVariable) + '</dd>' : '');
+
+    const db = document.getElementById('d-branches');
+    db.innerHTML = '';
+
+    if (b.code && b.code.trim()) {
+        const code = document.createElement('div');
+        code.className = 'bi';
+        code.innerHTML = '<div class="bi-head">code</div>' +
+                         '<div class="bi-code full">' + escHtml(b.code.trim()) + '</div>';
+        db.appendChild(code);
+    }
+
+    const links = document.createElement('div');
+    links.className = 'bi';
+    let html = '<div class="bi-head">transitions</div>';
+    const okTarget = targetText(b.onSuccess);
+    html += okTarget
+        ? '<div class="bi-link ok">→ ok: ' + escHtml(okTarget) + '</div>'
+        : '<div class="bi-link ok dim">→ ok: ' +
+          (bi + 1 < step.branches.length ? 'next branch (#' + (bi + 1) + ')' : 'end of route') + '</div>';
+    const errTarget = targetText(b.onError);
+    html += errTarget
+        ? '<div class="bi-link err">→ err: ' + escHtml(errTarget) + '</div>'
+        : '<div class="bi-link err dim">→ err: ' +
+          (b.optional ? 'skipped, branch is optional' : 'route fails') + '</div>';
+    b.cases.forEach(c => {
+        const t = targetText(c.val);
+        html += '<div class="bi-link case' + (t ? '' : ' dim') + '">→ ' +
+                (c.isDefault ? 'Default' : c.number + ': "' + escHtml(c.key) + '"') + ': ' +
+                escHtml(t || 'no arrow') + '</div>';
+    });
+    links.innerHTML = html;
+    db.appendChild(links);
+
+    // The other actions of the same block, one line each, so the step is still
+    // navigable without dumping every branch body into the panel.
+    const sib = document.createElement('div');
+    sib.className = 'bi';
+    sib.innerHTML = '<div class="bi-head">step branches</div>' +
+        step.branches.map((o, i) =>
+            '<div class="sib' + (i === bi ? ' on' : '') + (o.disabled ? ' off' : '') +
+                 '" data-i="' + i + '">#' + i + ' · ' + escHtml(branchRowLabel(o)) + '</div>').join('');
+    sib.querySelectorAll('.sib').forEach(el =>
+        el.addEventListener('click', () => selectBranch(step.id, +el.dataset.i)));
+    db.appendChild(sib);
+}
+
+function escHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function closeDetail() {
+    document.getElementById('detail').classList.remove('open');
+    selected = null;
+    renderNodes();
+}
+
+// ── Pan / zoom ───────────────────────────────────────────────────────────────
+
+const wrap = document.getElementById('canvas-wrap');
+wrap.addEventListener('mousedown', e => {
+    if (e.target.closest('.block') || e.target.closest('#detail')) return;
+    isDragging = true;
+    startX = e.clientX; startY = e.clientY; startPX = panX; startPY = panY;
+    wrap.classList.add('grabbing');
+});
+window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    panX = startPX + (e.clientX - startX);
+    panY = startPY + (e.clientY - startY);
+    applyTransform();
+});
+window.addEventListener('mouseup', () => { isDragging = false; wrap.classList.remove('grabbing'); });
+wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    scale = Math.max(0.1, Math.min(4, scale * (e.deltaY > 0 ? 0.88 : 1.12)));
+    applyTransform(); updateMini();
+}, { passive: false });
+wrap.addEventListener('click', e => {
+    if (!e.target.closest('.block') && !e.target.closest('#detail')) closeDetail();
+});
+
+// ── Toolbar wiring ───────────────────────────────────────────────────────────
+
+// ── Detail panel resizer ─────────────────────────────────────────────────────
+
+const DETAIL_W_KEY = 'zpxml-detail-w';
+
+function setDetailWidth(px) {
+    const w = Math.max(200, Math.min(Math.round(px), window.innerWidth - 120));
+    document.documentElement.style.setProperty('--detail-w', w + 'px');
+    // Browser storage can be blocked or empty; the panel must work regardless.
+    try { localStorage.setItem(DETAIL_W_KEY, String(w)); } catch (e) { /* ignore */ }
+    return w;
+}
+
+try {
+    const saved = parseInt(localStorage.getItem(DETAIL_W_KEY) || '', 10);
+    if (isFinite(saved)) setDetailWidth(saved);
+} catch (e) { /* ignore */ }
+
+(function () {
+    const grip = document.getElementById('detail-resizer');
+    const panel = document.getElementById('detail');
+    let dragging = false;
+
+    grip.addEventListener('mousedown', e => {
+        e.preventDefault(); e.stopPropagation();
+        dragging = true;
+        grip.classList.add('dragging');
+        document.body.style.userSelect = 'none';
+    });
+    window.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        e.preventDefault();
+        setDetailWidth(panel.getBoundingClientRect().right - e.clientX);
+    });
+    window.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        grip.classList.remove('dragging');
+        document.body.style.userSelect = '';
+    });
+    // A double click restores the default width.
+    grip.addEventListener('dblclick', e => { e.stopPropagation(); setDetailWidth(290); });
+})();
+
+document.getElementById('btn-clear'  ).addEventListener('click', clearAll);
+document.getElementById('btn-zoom-in').addEventListener('click', zoomIn);
+document.getElementById('btn-zoom-out').addEventListener('click', zoomOut);
+document.getElementById('btn-reset'  ).addEventListener('click', resetView);
+document.getElementById('btn-layout' ).addEventListener('click', toggleLayout);
+document.getElementById('btn-detail-close').addEventListener('click', closeDetail);
+document.getElementById('search').addEventListener('input', function () { filterNodes(this.value); });
