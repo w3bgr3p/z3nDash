@@ -11,6 +11,7 @@ if (args.Length == 0)
     Console.WriteLine("  --profile   каталог профиля: куки, localStorage, отпечаток");
     Console.WriteLine("  --headless  только для разбора шаблона: headless видно по десятку признаков");
     Console.WriteLine("  --proxy     прокси браузера; задаётся при запуске, на живом инстансе не меняется");
+    Console.WriteLine("  --steps N   выполняет N веток по одной и печатает, где остановился");
     Console.WriteLine("  --compile   компилирует общий код и каждую достижимую ветку OwnCode,");
     Console.WriteLine("              ничего не исполняя: показывает, что шаблону не хватает");
     return 2;
@@ -23,6 +24,7 @@ string? Arg(string name)
 }
 
 var run        = args.Contains("--run");
+var steps      = int.TryParse(Arg("--steps"), out var stepsN) ? stepsN : 0;
 var wantLocal  = args.Contains("--browser");
 var headless   = args.Contains("--headless");
 var attachTo   = Arg("--attach");
@@ -164,7 +166,8 @@ if (args.Contains("--compile"))
     return bad.Count == 0 ? 0 : 1;
 }
 
-if (!run) return gaps.Count == 0 ? 0 : 1;
+// --steps исполняет шаблон так же, как --run, поэтому ранний выход учитывает оба.
+if (!run && steps == 0) return gaps.Count == 0 ? 0 : 1;
 
 Console.WriteLine();
 Console.WriteLine("── запуск ──────────────────────────────────────────────");
@@ -204,6 +207,44 @@ else if (wantLocal)
 var instance = session?.Instance ?? new ZennoLab.CommandCenter.Instance();
 if (session is null)
     Console.WriteLine("[br] браузера нет: ветки со страницей откажут (--browser или --attach)");
+
+// Пошаговый режим: тот же PlaySession, что и у отладчика на странице, только
+// без интерфейса. Нужен, чтобы сверять пошаговый обход с непрерывным в консоли.
+if (steps > 0)
+{
+    var dir = Path.GetDirectoryName(Path.GetFullPath(path))!;
+    PlaySession stepper;
+    try
+    {
+        stepper = new PlaySession(tpl, dir, project, instance, Console.WriteLine);
+    }
+    catch (PlaySetupException ex)
+    {
+        Console.WriteLine($"[xml] окружение шаблона не собрано: {ex.Message}");
+        if (session is not null) await session.DisposeAsync();
+        return 1;
+    }
+
+    // Та же строка, что печатает XmlPlayer: без неё вывод двух режимов
+    // невозможно сравнить построчно, а ради этого режим и делался.
+    Console.WriteLine($"[xml] {(string.IsNullOrWhiteSpace(project.Name) ? tpl.Name : project.Name)}: "
+                      + $"старт с {tpl.Start}");
+
+    var done = 0;
+    for (; done < steps; done++)
+    {
+        var r = stepper.StepOnce();
+        if (r.Outcome == StepOutcome.Moved) continue;
+        Console.WriteLine($"[steps] остановлено на шаге {done + 1}: {r.Outcome} {r.Message}");
+        break;
+    }
+
+    Console.WriteLine($"[steps] позиция: {(stepper.Current is { } at ? at.ToString() : "маршрут закончен")}"
+                      + $", выполнено веток: {stepper.BranchesRun}");
+
+    if (session is not null) await session.DisposeAsync();
+    return 0;
+}
 
 var player = new XmlPlayer(project, instance, Console.WriteLine);
 var result = player.Play(tpl, Path.GetDirectoryName(Path.GetFullPath(path))!);
