@@ -30,6 +30,5 @@ window.NAV_CONFIG = {
         { id: 'docsVault', label: 'docsVault',  href: '/docsVault',       hotkey: 'H' },
         { id: 'dllGraph',  label: 'dllGraph',   href: '/?page=dllGraph', hotkey: 'G' },
         { id: 'config',    label: 'Config',     href: '/?page=config',   hotkey: '0' },
-        //{ id: 'terminal',      label: 'Terminal',       href: '/?page=terminal',           hotkey: 'R' },
     ],
 };
