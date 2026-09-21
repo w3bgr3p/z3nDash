@@ -17,6 +17,7 @@ namespace z3nDash;
 ///   POST /dbg/runto   { stepId, branchId } — дойти до ветки
 ///   POST /dbg/stop    — прервать и освободить браузер
 ///   GET  /dbg/file    ?path=... — содержимое шаблона байтами, как на диске
+///   POST /dbg/inspect ?{frame, script} — документы вкладки и скрипт в любом из них
 ///   GET  /dbg/state   — текущее состояние одним ответом
 ///   GET  /dbg/events  — поток событий (SSE)
 ///
@@ -65,6 +66,16 @@ public sealed class ZpDebugHandler : IScriptHandler
                 ctx.Response.ContentType     = "application/octet-stream";
                 ctx.Response.ContentLength64 = bytes.Length;
                 await ctx.Response.OutputStream.WriteAsync(bytes);
+                ctx.Response.Close();
+                return true;
+            }
+
+            // Осмотр страницы сессии: какие документы есть и что в них.
+            if (path == "/dbg/inspect" && method == "POST")
+            {
+                var body = await ReadBody(ctx.Request);
+                var frame = body.TryGetProperty("frame", out var f) && f.TryGetInt32(out var fi) ? fi : 0;
+                await WriteJson(ctx.Response, ZpDebugService.Inspect(frame, Str(body, "script")));
                 ctx.Response.Close();
                 return true;
             }

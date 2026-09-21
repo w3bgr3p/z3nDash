@@ -54,6 +54,36 @@ internal static class ZpDebugService
 
     public static object CurrentState() => Snapshot(null);
 
+    /// <summary>
+    /// Осмотреть страницу сессии: список документов и выполнение скрипта в
+    /// любом из них. Нужно, чтобы разбирать отказы по тому, что на странице
+    /// есть на самом деле, а не по догадкам о ней.
+    /// </summary>
+    public static object Inspect(int frame, string script)
+    {
+        var session = _session;
+        if (session is null) return new { ok = false, error = "сессии нет" };
+
+        // Instance — обёртка ZP над браузером; сам браузер лежит в Browser.
+        if (session.Instance.IsVoid ||
+            session.Instance.Browser is not z3nDash.Browser.PlaywrightInstance page)
+            return new { ok = false, error = "у сессии нет браузера" };
+
+        try
+        {
+            var frames = page.FrameUrls();
+            if (string.IsNullOrWhiteSpace(script))
+                return new { ok = true, frames, result = "" };
+
+            return new { ok = true, frames, result = page.EvaluateInFrame(frame, script) };
+        }
+        catch (Exception ex)
+        {
+            // Дословно: что спросили и что ответил браузер.
+            return new { ok = false, error = $"{ex.GetType().Name}: {Cut(ex.Message, 400)}" };
+        }
+    }
+
     /// <summary>Положить команду в очередь. false — сессии нет.</summary>
     public static bool Enqueue(DebugCommand cmd)
     {

@@ -408,6 +408,27 @@ namespace z3nDash.Browser
         public IHeElement FindElementById(string id)
             => new PlaywrightElement(_activePage.Locator($"#{id}"));
 
+        /// <summary>
+        /// Документы вкладки: главный и вложенные. Нужен отладчику — понять, в
+        /// каком документе лежит искомый элемент, иначе поиск, работающий
+        /// только по главному, выглядит как «элемента нет».
+        /// </summary>
+        public IList<string> FrameUrls()
+            => _activePage.Frames.Select(f => f.Url ?? "").ToList();
+
+        /// <summary>
+        /// Выполнить скрипт в конкретном документе вкладки. index 0 — главный,
+        /// дальше в порядке FrameUrls.
+        /// </summary>
+        public string EvaluateInFrame(int index, string js)
+        {
+            var frames = _activePage.Frames;
+            if (index < 0 || index >= frames.Count) return "";
+            var value = Sync(frames[index].EvaluateAsync<System.Text.Json.JsonElement?>(
+                "() => { " + js + " }"));
+            return value?.ToString() ?? "";
+        }
+
         public IHeElement FindElementByName(string name)
             => new PlaywrightElement(_activePage.Locator($"[name='{name}']"));
 
