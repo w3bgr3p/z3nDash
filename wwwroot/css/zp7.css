@@ -248,7 +248,10 @@ body {
 
    Цвета через !important: тема hyper перекрывает .btn-update цветом
    --text2 с !important, и без этого иконки уходили в серый #888. */
-.btn-icon {
+/* .btn идёт ниже по файлу и при равной специфичности перебивал
+   этот padding: 0. Иконка получала 36-24-2 = 10px вместо 23px,
+   а в просторной теме 36-32-2 = 2px. Отсюда .btn.btn-icon. */
+.btn.btn-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -260,7 +263,7 @@ body {
     line-height: var(--lh-tight);
     color: var(--text-hi) !important;
 }
-.btn-icon svg { width: 23px; height: 23px; display: block; }
+.btn.btn-icon svg { width: 23px; height: 23px; display: block; flex: none; }
 /* Фон задаётся явно: у этих кнопок нет .btn-update, а без правила фона
    браузер рисует кнопку светлой. */
 /* Иконочные кнопки не носят .btn-update: тема перекрывает его через
