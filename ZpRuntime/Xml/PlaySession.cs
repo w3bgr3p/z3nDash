@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // PlaySession.cs — контекст одного прогона шаблона.
 //
 // Держит всё, что живёт между ветками: проект с переменными и профилем,
@@ -268,15 +268,20 @@ public sealed class PlaySession
         // падает на «countryName is empty», хотя в настройках стоит ET.
         foreach (var (name, value) in tpl.InputDefaults)
         {
-            if (value.Length == 0) continue;
             if (assigned?.IsAssigned(name) == true) continue;
-            if (string.IsNullOrEmpty(Project.Variables[name].Value))
-                Project.Variables[name].Value = value;
+            Project.Variables[name].Value = value;
         }
 
+        // Поле настроек старше собственного значения переменной, и пустое поле
+        // тоже. Наблюдение: в simroute.megapari у настройки proxy_country
+        // DefaultValue пустой, а у переменной proxy_iso Value="id"; первая же
+        // ветка шаблона написана под пустой proxy_iso — она подставляет туда
+        // location. Оставленное "id" эту подстановку отменяет, и прогон уходит
+        // на индонезийский прокси с эфиопским номером.
         foreach (var (name, value) in tpl.Variables)
         {
             if (assigned?.IsAssigned(name) == true) continue;
+            if (tpl.InputDefaults.ContainsKey(name)) continue;
             if (string.IsNullOrEmpty(Project.Variables[name].Value))
                 Project.Variables[name].Value = value;
         }

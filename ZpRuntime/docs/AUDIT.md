@@ -188,6 +188,44 @@ python ZpRuntime/tools/ext_inventory.py
 
 Записи снизу вверх, новые сверху.
 
+### 2026-09-21 — пустое поле настроек проигрывало значению переменной
+
+`SolveHunt` на боевом `simroute.megapari` отвечал `Hunt canvas was not found`.
+Капчи на странице действительно не было — и она там не могла появиться.
+
+**Что наблюдалось.** На паузе перед `SolveHunt` осмотр страницы через
+`/dbg/inspect` дал: `canvas` на странице 0 шт., `#huntCaptcha` нет, кнопка
+`registration-field-phone-mega-confirmation-submit` — `disabled: true`, в поле
+телефона `70 320 273 1` при коде страны `62`. Переменные сессии:
+`location=ET`, `numCountryId=ET`, `numPhone=251703202731`, но `proxy_iso=id` и
+прокси `...-country-id-...`.
+
+**Откуда `id`.** В шаблоне два источника начального значения:
+
+```
+<InputSetting Name="proxy_country{...}" DefaultValue="" OutputVariable="{-Variable.proxy_iso-}" />
+<Variable Name="proxy_iso" Value="id" />
+```
+
+Первая же ветка шаблона написана под пустой `proxy_iso`:
+
+```csharp
+if (string.IsNullOrEmpty(project.Var("proxy_iso")))
+    project.Var("proxy_iso", project.Var("location"));
+```
+
+`SeedVariables` пропускал настройки с пустым `DefaultValue` (`if (value.Length == 0)
+continue;`), и до переменной доходило её собственное `id`. Подстановка
+`location` не срабатывала никогда — прогон шёл на индонезийском прокси
+с эфиопским номером, сайт по гео выставлял код `+62`, форма не валидировалась,
+кнопка оставалась заблокированной, SMS не уходила и капча не показывалась.
+
+**Что изменено.** Настройка проекта теперь задаёт свою переменную всегда,
+включая пустое значение, а `<Variable Value>` для таких имён больше не применяется.
+
+**Чем проверено.** Следующий прогон того же шаблона: `proxy_iso=ET`,
+прокси `...-country-ET-...`, номер `251799770656`.
+
 ### 2026-09-18 — ветки `Logic/Switch` и `Logic/Alert` в плеере
 
 `прервано на ветке Logic/Switch: ветка Logic/Switch в плеере не реализована`.
