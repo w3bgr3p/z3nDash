@@ -66,16 +66,26 @@ async function dbgStart() {
 
 
 async function dbgRunTo(stepId, branchId) {
+    const before = dbgState;
+    dbgSetState('running');
     const res = await dbgPost('runto', { stepId, branchId });
-    if (!res.ok) setStatus('debug: ' + (res.error || 'не принято'), 'err');
+    if (!res.ok) { setStatus('debug: ' + (res.error || 'не принято'), 'err'); dbgSetState(before); }
 }
 
 // ── Состояние кнопок ─────────────────────────────────────────────────────────
 
+/// Состояние кнопок — единственный источник правды о том, что сейчас можно.
+/// Пока ветка выполняется, step/run/start недоступны: иначе непонятно, идёт
+/// работа или уже закончилась, и легко нажать второй раз.
 function dbgSetState(state) {
     dbgState = state;
-    document.getElementById('dbg-state').textContent = state;
+
+    const label = document.getElementById('dbg-state');
+    label.textContent = state === 'running' ? 'running…' : state;
+    label.className = 'st-' + state;
+
     document.body.classList.toggle('debugging', state !== 'idle');
+    document.body.classList.toggle('dbg-busy', state === 'running');
 
     const on = (id, enabled) => { document.getElementById(id).disabled = !enabled; };
     on('dbg-start', state === 'idle' || state === 'finished' || state === 'failed');
@@ -83,6 +93,21 @@ function dbgSetState(state) {
     on('dbg-run',   state === 'paused');
     on('dbg-pause', state === 'running');
     on('dbg-stop',  state === 'paused' || state === 'running');
+    document.getElementById('dbg-vars-btn').disabled =
+        !document.querySelector('#dbg-vars dt') || state === 'idle';
+}
+
+/// Команда, после которой сессия работает. Состояние переводится сразу, не
+/// дожидаясь события: между нажатием и ответом ветка уже выполняется, и
+/// кнопки обязаны это показывать.
+async function dbgRunCommand(action) {
+    const before = dbgState;
+    dbgSetState('running');
+    const res = await dbgPost(action);
+    if (!res.ok) {
+        setStatus('debug: ' + (res.error || 'команда не принята'), 'err');
+        dbgSetState(before);
+    }
 }
 
 // ── Лог и навигация ──────────────────────────────────────────────────────────
@@ -214,7 +239,6 @@ function dbgRenderVars(snap) {
         '<dt' + (changed.has(v.name) ? ' class="changed"' : '') + '>' + escHtml(v.name) + '</dt>' +
         '<dd>' + escHtml(v.value) + '</dd>').join('');
 
-    document.getElementById('dbg-vars-btn').disabled = vars.length === 0;
     dbgApplyVarFilter();
 }
 
@@ -287,8 +311,8 @@ function dbgListen() {
 
 (function () {
     document.getElementById('dbg-start').addEventListener('click', dbgStart);
-    document.getElementById('dbg-step' ).addEventListener('click', () => dbgPost('step'));
-    document.getElementById('dbg-run'  ).addEventListener('click', () => dbgPost('run'));
+    document.getElementById('dbg-step' ).addEventListener('click', () => dbgRunCommand('step'));
+    document.getElementById('dbg-run'  ).addEventListener('click', () => dbgRunCommand('run'));
     document.getElementById('dbg-pause').addEventListener('click', () => dbgPost('pause'));
     document.getElementById('dbg-stop' ).addEventListener('click', async () => {
         await dbgPost('stop');

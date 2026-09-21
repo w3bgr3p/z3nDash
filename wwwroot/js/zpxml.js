@@ -3,20 +3,11 @@
 let selected = null, filterText = '';
 let isDragging = false, startX, startY, startPX, startPY;
 
-// ── File input ──────────────────────────────────────────────────────────────
-
-document.getElementById('file-input').addEventListener('change', function () {
-    if (this.files[0]) readFile(this.files[0]);
-});
-
-const dz = document.getElementById('drop-zone');
-dz.addEventListener('click', () => document.getElementById('file-input').click());
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-dz.addEventListener('drop', e => {
-    e.preventDefault(); dz.classList.remove('over');
-    if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
-});
+// ── Открытие шаблона ────────────────────────────────────────────────────────
+//
+// Браузерного выбора файла здесь нет намеренно: он отдаёт только содержимое и
+// не отдаёт путь, а без пути не найти ни .env, ни то, что ищет Constantes.
+// Шаблон открывается системным диалогом — он даёт полный путь.
 
 /// Открыть шаблон из байтов. Вынесено отдельно от readFile, чтобы файл можно
 /// было подать и не через выбор в диалоге.
@@ -107,14 +98,6 @@ async function openFromDisk() {
 let templatePath = '';
 try { templatePath = localStorage.getItem('zpxml-template-path') || ''; } catch (e) { /* ignore */ }
 
-function readFile(file) {
-    setStatus('reading the file…', 'info');
-    const reader = new FileReader();
-    reader.onload  = e => openBuffer(e.target.result, file.name);
-    reader.onerror = () => setStatus('could not read the file', 'err');
-    reader.readAsArrayBuffer(file);
-}
-
 /// Отдать шаблон файлом. Кодировка и объявление — исходные: UTF-8 ProjectMaker
 /// не открывает.
 function saveFile() {
@@ -146,7 +129,6 @@ function clearAll() {
     document.getElementById('edges').innerHTML  = '';
     document.getElementById('empty').style.display = 'flex';
     setStatus('', 'info');
-    document.getElementById('file-input').value = '';
     closeDetail();
 }
 

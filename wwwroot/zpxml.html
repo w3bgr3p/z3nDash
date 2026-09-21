@@ -23,10 +23,8 @@
 <div id="app">
   <div id="top">
     <div id="top-left">
-      <div id="drop-zone">📂 pick an XML file or drop it here</div>
-      <button class="btn" id="btn-open-path">📁 open from disk…</button>
-      <input type="file" id="file-input" accept=".xml,.zp,.txt">
       <div id="top-row">
+        <button class="btn" id="btn-open-path">📁 open…</button>
         <button class="btn" id="btn-clear">clear</button>
         <button class="btn" id="btn-save">save .xml</button>
         <span id="status"></span>
@@ -90,8 +88,8 @@
     </div>
     <div id="mini"></div>
     <div id="empty">
-      <span>pick an XML file above</span>
-      <span style="font-size:11px">save the output of ExtractXml() / LoadFromBytesArray() as .xml</span>
+      <span>open a template with «📁 open…»</span>
+      <span style="font-size:11px">a ZennoPoster .xml saved from ExtractXml()</span>
     </div>
   </div>
 </div>

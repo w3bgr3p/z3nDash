@@ -463,3 +463,22 @@ body.debugging #dbg-state { color:var(--yellow); }
     padding-bottom:3px;
 }
 #dbg-vars dt { color:var(--text2); }
+
+/* ── Состояние отладки ──────────────────────────────────────────────────── */
+/* Цвет индикатора отвечает на «идёт или закончилось» быстрее, чем чтение слова. */
+#dbg-state.st-running  { color:var(--yellow); }
+#dbg-state.st-paused   { color:var(--accent); }
+#dbg-state.st-finished { color:var(--green); }
+#dbg-state.st-failed   { color:var(--red); }
+#dbg-state.st-idle     { color:var(--text3); }
+
+/* Пока ветка выполняется, курсор над холстом показывает занятость: ждать
+   нечего — команда уже принята. */
+body.dbg-busy #canvas-wrap { cursor:progress; }
+
+/* Недоступная кнопка должна выглядеть недоступной, а не просто не нажиматься. */
+#zpxml .btn:disabled {
+    opacity:.4; cursor:default;
+    background:var(--bg1); border-color:var(--border);
+}
+#zpxml .btn:disabled:hover { background:var(--bg1); border-color:var(--border); }
