@@ -24,7 +24,7 @@
     <span style="color:var(--text-dim)">Key:</span>
     <span id="zbKeyStatus" style="color:var(--text-dim)">—</span>
     <span class="sep">|</span>
-    <a href="/?page=config" style="font-size:10px;color:var(--accent,#58a6ff);text-decoration:none">⚙ Config</a>
+    <a href="/?page=config" style="font-size:10px;color:var(--accent);text-decoration:none">⚙ Config</a>
     <button class="btn sm" id="btnConnect" style="margin-left:auto">↻ Connect</button>
 </div>
 
@@ -336,7 +336,7 @@
             const midCell = inst
                 ? `<span style="font-size:10px;color:var(--text-dim)">PID ${pid||'—'} · ${upSec != null ? fmtUptime(upSec) : '—'}</span>`
                 : `<span class="mono">${lastStart}</span>`;
-            return `<tr${inst?' style="background:rgba(63,185,80,0.06)"':''}>
+            return `<tr${inst?' style="background:color-mix(in srgb, var(--green) 6%, transparent)"':''}>
             <td class="name-cell" title="${p.id}">${p.name||p.id.slice(0,8)}</td>
             <td class="mono">${folderName}</td>
             <td>${tags||'—'}</td>

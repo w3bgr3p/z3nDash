@@ -68,7 +68,7 @@
             <div id="bottomPanels" style="display:none;flex-shrink:0;height:220px;display:none;flex-direction:column;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--bg1);">
                 <div class="log-panel-header">
                     <div class="log-panel-title"><span class="icon">▶</span> Output</div>
-                    <span id="liveBadgeBottom" style="display:none;font-size:9px;padding:2px 6px;border-radius:3px;background:var(--green-bg,rgba(63,185,80,0.15));color:var(--green,#3fb950);animation:blink 1.2s infinite;">LIVE</span>
+                    <span id="liveBadgeBottom" style="display:none;font-size:9px;padding:2px 6px;border-radius:3px;background:var(--green-bg);color:var(--green);animation:blink 1.2s infinite;">LIVE</span>
                     <div id="runChips" class="run-chips" title="Run threads: click one to show only its lines"></div>
                     <div class="log-panel-actions">
                         <select id="outLevel" class="panel-refresh" style="padding:1px 3px;" onchange="setOutputLevel(this.value)" title="Levels to show">
@@ -77,7 +77,7 @@
                             <option value="err">errors</option>
                         </select>
                         <button class="panel-refresh" onclick="reloadOutput()" title="Refresh">↺</button>
-                        <button class="panel-refresh" onclick="clearOutputBottom()" style="color:var(--red,#f85149);border-color:var(--red,#f85149);" title="Clear output">🗑</button>
+                        <button class="panel-refresh" onclick="clearOutputBottom()" style="color:var(--red);border-color:var(--red);" title="Clear output">🗑</button>
                     </div>
                 </div>
                 <div id="outputBox" style="flex:1;overflow-y:auto;font-family:Consolas,monospace;font-size:10px;"><div class="out-line empty">(no output yet)</div></div>

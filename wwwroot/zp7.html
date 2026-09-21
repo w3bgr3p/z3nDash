@@ -41,7 +41,7 @@
             <span class="panel-title">Tasks</span>
             <span class="count-badge" id="visibleCount">0</span>
             <div style="margin-left:auto;display:flex;gap:5px;">
-                <button class="auto-badge" onclick="refreshTasks()" style="color:#c9d1d9;">↺ Refresh</button>
+                <button class="auto-badge" onclick="refreshTasks()" style="color:var(--text);">↺ Refresh</button>
             </div>
         </div>
 
@@ -80,7 +80,7 @@
         <div class="detail-panel">
             <div class="panel-header">
                 <span class="panel-title">Task Detail</span>
-                <span id="detailTaskId" style="font-size:10px;color:#484f58;margin-left:7px;"></span>
+                <span id="detailTaskId" style="font-size:10px;color:var(--muted);margin-left:7px;"></span>
             </div>
             <div class="detail-body" id="detailBody">
             </div>
@@ -198,7 +198,7 @@
         <div class="modal-footer">
             <button class="btn btn-update" onclick="closeInputSettingsModal()">Cancel</button>
             <button class="btn btn-update" id="inputSettingsViewBtn" onclick="toggleInputSettingsView()" title="Switch between the rendered form and raw JSON">{ } JSON</button>
-            <button class="btn btn-update" id="inputSettingsPayloadBtn" onclick="copyInputSettingsPayload()" style="border-color:#58a6ff;color:#58a6ff;" title="Copy settings as scheduler payload">&#128203; Copy Payload</button>
+            <button class="btn btn-update" id="inputSettingsPayloadBtn" onclick="copyInputSettingsPayload()" style="border-color:var(--accent);color:var(--accent);" title="Copy settings as scheduler payload">&#128203; Copy Payload</button>
             <button class="btn btn-start" id="inputSettingsSaveBtn" onclick="saveInputSettings()">&#128190; Apply</button>
         </div>
     </div>
@@ -1183,8 +1183,8 @@
                         <div>
                             <div class="sub">Execution</div>
                             <div class="kv"><span class="k">Status</span><span class="v"><span class="task-status ${stClass}">${status || '—'}</span></span></div>
-                            <div class="kv"><span class="k">Is Working</span><span class="v" style="color:${isWork ? '#3fb950' : '#8b949e'}">${isWork ? 'Yes' : 'No'}</span></div>
-                            <div class="kv"><span class="k">Done</span><span class="v" style="color:#3fb950">${done}</span></div>
+                            <div class="kv"><span class="k">Is Working</span><span class="v" style="color:${isWork ? 'var(--green)' : 'var(--text2)'}">${isWork ? 'Yes' : 'No'}</span></div>
+                            <div class="kv"><span class="k">Done</span><span class="v" style="color:var(--green)">${done}</span></div>
                             <div class="kv"><span class="k">Total</span><span class="v">${doneAll}</span></div>
                             <div class="kv"><span class="k">Tries</span><span class="v">${t.ExecutionSettings_NumberOfTries || '—'}</span></div>
                             <div class="kv"><span class="k">Priority</span><span class="v">${t.ExecutionSettings_Priority || '—'}</span></div>
@@ -1196,7 +1196,7 @@
                             <div class="kv"><span class="k">Last Run</span><span class="v" title="${escHtml(ovTime(lastRun) === '—' ? '' : lastRun)}">${escHtml(lastRun) || '—'}</span></div>
                             <div class="kv"><span class="k">Period</span><span class="v">${t.Scheduler7Settings_ExecutePeriod || '—'}</span></div>
                             <div class="kv"><span class="k">Repeat</span><span class="v">${t.Scheduler7Settings_RepeatType || '—'}</span></div>
-                            <div class="kv"><span class="k">Running</span><span class="v" style="color:${t.Scheduler7Settings_IsTaskRunning==='True'?'#3fb950':'#8b949e'}">${t.Scheduler7Settings_IsTaskRunning || '—'}</span></div>
+                            <div class="kv"><span class="k">Running</span><span class="v" style="color:${t.Scheduler7Settings_IsTaskRunning==='True'?'var(--green)':'var(--text2)'}">${t.Scheduler7Settings_IsTaskRunning || '—'}</span></div>
                         </div>
                     </div>
                 </div>
@@ -1749,10 +1749,10 @@
             <div class="field-group">
                 <span class="field-label">Is Active<span class="field-key">IsActive</span></span>
                 <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
-                    <div id="sched_IsActive_toggle" onclick="toggleIsActive()" style="cursor:pointer;width:40px;height:22px;border-radius:11px;position:relative;transition:background 0.2s;background:${t.Scheduler7Settings_IsActive==='True'?'#238636':'#da3633'}">
-                        <div style="position:absolute;top:3px;left:${t.Scheduler7Settings_IsActive==='True'?'20':'3'}px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left 0.2s;"></div>
+                    <div id="sched_IsActive_toggle" onclick="toggleIsActive()" style="cursor:pointer;width:40px;height:22px;border-radius:11px;position:relative;transition:background 0.2s;background:${t.Scheduler7Settings_IsActive==='True'?'var(--green-bg)':'var(--red-bg)'}">
+                        <div style="position:absolute;top:3px;left:${t.Scheduler7Settings_IsActive==='True'?'20':'3'}px;width:16px;height:16px;border-radius:50%;background:var(--on-solid);transition:left 0.2s;"></div>
                     </div>
-                    <span id="sched_IsActive_label" style="font-size:11px;color:${t.Scheduler7Settings_IsActive==='True'?'#3fb950':'#f85149'}">${t.Scheduler7Settings_IsActive==='True'?'Active':'Inactive'}</span>
+                    <span id="sched_IsActive_label" style="font-size:11px;color:${t.Scheduler7Settings_IsActive==='True'?'var(--green)':'var(--red)'}">${t.Scheduler7Settings_IsActive==='True'?'Active':'Inactive'}</span>
                 </div>
                 <input type="hidden" id="sched_IsActive" value="${t.Scheduler7Settings_IsActive||'False'}">
             </div>
@@ -1792,7 +1792,7 @@
         const label = document.getElementById('sched_IsActive_label');
         const isNowActive = inp.value !== 'True';
         inp.value = isNowActive ? 'True' : 'False';
-        toggle.style.background = isNowActive ? '#238636' : '#da3633';
+        toggle.style.background = isNowActive ? 'var(--green-bg)' : 'var(--red-bg)';
         toggle.querySelector('div').style.left = isNowActive ? '20px' : '3px';
         label.textContent = isNowActive ? 'Active' : 'Inactive';
         label.style.color = isNowActive ? '#3fb950' : '#f85149';

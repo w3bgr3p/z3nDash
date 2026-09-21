@@ -290,10 +290,10 @@
 
     function colorizeJson(str) {
         return escHtml(str)
-            .replace(/(&quot;[^&]*&quot;)(\s*:)/g, '<span style="color:#7c9ef8">$1</span>$2')
-            .replace(/:\s*(&quot;[^&]*&quot;)/g, ': <span style="color:#ce9178">$1</span>')
-            .replace(/:\s*(true|false)/g, ': <span style="color:#569cd6">$1</span>')
-            .replace(/:\s*(\d+)/g, ': <span style="color:#b5cea8">$1</span>');
+            .replace(/(&quot;[^&]*&quot;)(\s*:)/g, '<span style="color:var(--key-color)">$1</span>$2')
+            .replace(/:\s*(&quot;[^&]*&quot;)/g, ': <span style="color:var(--string-color)">$1</span>')
+            .replace(/:\s*(true|false)/g, ': <span style="color:var(--bool-color)">$1</span>')
+            .replace(/:\s*(\d+)/g, ': <span style="color:var(--number-color)">$1</span>');
     }
 
     function switchTab(name) {
