@@ -202,6 +202,20 @@ namespace z3n7.Captcha
         {
             var canvas = WaitForCanvas(false);
 
+            // Канвас появляется в DOM раньше, чем виджет начинает отрабатывать
+            // перетаскивание, а WaitForCanvas возвращает элемент сразу, как только он есть.
+            //
+            // Замер 2026-09-21 на живой капче megapari, запись событий со страницы:
+            // нажатие через 214 мс после вставки канваса — мяч не двигался ни на
+            // пиксель за шесть шагов (3 прогона из 4); повторное нажатие в ту же точку
+            // на том же самом канвасе через 3.7 с тянуло нормально. С паузой ниже
+            // первая попытка тянет 3 прогона из 3.
+            //
+            // События при этом доходили: цель — сам канвас, координаты верные,
+            // isTrusted=true. Почему виджет их игнорирует и где его порог — не выяснено;
+            // 1500 мс — значение, на котором проводился замер, а не найденная граница.
+            Thread.Sleep(1500);
+
             var width = canvas.BoundingClientWidth;
             var height = canvas.BoundingClientHeight;
             var position = canvas.DisplacementInTabWindow;
@@ -311,7 +325,11 @@ namespace z3n7.Captcha
                 {
                     var canvas = _instance.ActiveTab.FindElementByAttribute(
                         "canvas", "fulltag", "canvas", "text", 0);
-                    if (canvas != null && !canvas.IsVoid)
+                    // Размер — часть условия, а не придирка. Наблюдалось 2026-09-21:
+                    // канвас ушёл со страницы между проверкой и чтением геометрии, в лог
+                    // ушло «канвас 0,0 0x0», и нажатие ушло в точку (0,0) по чужому div.
+                    if (canvas != null && !canvas.IsVoid &&
+                        canvas.BoundingClientWidth > 0 && canvas.BoundingClientHeight > 0)
                         return canvas;
                 }
                 Thread.Sleep(250);
