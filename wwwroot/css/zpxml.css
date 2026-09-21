@@ -540,3 +540,11 @@ body.dbg-busy #canvas-wrap { cursor:progress; }
     border-bottom:1px solid color-mix(in srgb, var(--text) 7%, transparent);
     padding-bottom:3px;
 }
+
+/* Переключатель шума в логе — рядом с заголовком, не отдельной строкой. */
+.log-noise {
+    float:right; display:inline-flex; align-items:center; gap:4px;
+    font-size:9px; color:var(--text3); cursor:pointer; font-weight:400;
+}
+.log-noise input { margin:0; cursor:pointer; }
+#dbg-log-note { font-size:9px; color:var(--text3); margin-top:4px; }

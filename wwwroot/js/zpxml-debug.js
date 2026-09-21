@@ -115,12 +115,32 @@ async function dbgRunCommand(action) {
 /// Лог плеера копится в памяти. Предел нужен: шаблон на тысячи веток иначе
 /// съест вкладку.
 const dbgLines = [];
+let dbgShowNoise = false;
+
+/// Шум браузера. Chrome сам лезет в свои сервисы, прокси их режет, и лог
+/// заполняется отказами, к шаблону не относящимися: по такому логу кажется,
+/// что сломалось всё, хотя сломалось ровно одно.
+function dbgIsNoise(line) {
+    if (line.indexOf('[proxy]') !== 0) return false;
+    return /clients\d?\.google\.com|mtalk\.google\.com|facebook\.com|gstatic\.com|googleapis\.com|digital\.gov\.ru|webtrafficsource\.com|safebrowsing/.test(line);
+}
 
 function dbgLog(line) {
     dbgLines.push(line);
-    if (dbgLines.length > 500) dbgLines.shift();
+    if (dbgLines.length > 800) dbgLines.shift();
+    dbgPaintLog();
+}
+
+function dbgPaintLog() {
     const host = document.getElementById('dbg-log');
-    if (host) { host.textContent = dbgLines.join('\n'); host.scrollTop = host.scrollHeight; }
+    if (!host) return;
+    const shown = dbgShowNoise ? dbgLines : dbgLines.filter(l => !dbgIsNoise(l));
+    host.textContent = shown.join(String.fromCharCode(10));
+    host.scrollTop = host.scrollHeight;
+
+    const hidden = dbgLines.length - shown.length;
+    const note = document.getElementById('dbg-log-note');
+    if (note) note.textContent = hidden > 0 ? 'скрыто фоновых запросов браузера: ' + hidden : '';
 }
 
 /// Подтянуть холст к текущей ветке — но только если её не видно.
@@ -215,10 +235,14 @@ function dbgRenderSnapshot(snap) {
                 '<dt>login</dt><dd>' + escHtml(snap.profile.login || '') + '</dd>' +
               '</div></div>'
             : '') +
-        '<div class="bi"><div class="bi-head">player log</div><pre id="dbg-log"></pre></div>';
+        '<div class="bi"><div class="bi-head">player log' +
+            '<label class="log-noise"><input type="checkbox" id="dbg-noise"' +
+            (dbgShowNoise ? ' checked' : '') + '>browser noise</label></div>' +
+            '<pre id="dbg-log"></pre><div id="dbg-log-note"></div></div>';
 
-    const log = document.getElementById('dbg-log');
-    if (log) { log.textContent = dbgLines.join(String.fromCharCode(10)); log.scrollTop = log.scrollHeight; }
+    const noise = document.getElementById('dbg-noise');
+    if (noise) noise.addEventListener('change', () => { dbgShowNoise = noise.checked; dbgPaintLog(); });
+    dbgPaintLog();
 
     dbgRenderVars(snap);
 }
@@ -282,7 +306,13 @@ function dbgListen() {
             dbgSnap = ev;
             renderNodes();
             dbgScrollToCurrent();
-            if (ev.state === 'paused' || ev.state === 'finished') {
+            if (ev.last && ev.last.outcome === 'Failed') {
+            // В бою такая ветка обрывает маршрут. Здесь позиция остаётся на ней,
+            // и это надо сказать вслух: иначе непонятно, что делать дальше.
+            setStatus('debug: ветка упала, позиция осталась на ней — можно поправить '
+                    + 'и нажать step ещё раз, либо stop', 'err');
+        }
+        if (ev.state === 'paused' || ev.state === 'finished') {
                 // Выделение идёт следом за исполнением: иначе панель branch
                 // продолжает показывать ту ветку, которую кликнули раньше, и
                 // кажется, будто шаг никуда не сдвинулся.
