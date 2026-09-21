@@ -336,7 +336,7 @@ function renderGlobalStats() {
         { icon: (typeof ICONS !== 'undefined' ? ICONS.http       : ''), title: 'Traffic',    desc: 'HTTP traffic from the nodes and z3nDash, with details and replay.',   url: '/?page=zp7#traffic',     color: '#d29922' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.json       : ''), title: 'JSON',       desc: 'Interactive JSON tree with auth/captcha detection and replay.',       url: '/json',           color: '#4e9eff' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.clips      : ''), title: 'Clips',      desc: 'Copy-paste snippets organised into a tree.',                       url: '/?page=clips',    color: '#f0883e' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.text       : ''), title: 'Text Tools', desc: 'URL encode/decode, C# escaper, Base64, JSON escape.',                 url: '/text.html',      color: '#a371f7' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.text       : ''), title: 'Text Tools', desc: 'URL encode/decode, C# escaper, Base64, JSON escape.',                 url: '/text.html',      color: 'var(--steel)' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.config     : ''), title: 'Config',     desc: 'Server status, configuration editor, log storage management.', url: '/?page=config',   color: '#f78166' },
     ];
     document.getElementById('detailHeader').style.display  = 'none';
@@ -480,8 +480,8 @@ function renderDetailActions(s) {
         + '</div>'
         + '<div class="action-group">'
         + (s.script_path ? '<button class="btn sm" onclick="openAiForTask(\'' + escHtml(s.id) + '\')" style="border-color:var(--accent);color:var(--accent);">⟡ AI</button>' : '')
-        + (s.script_path ? '<button class="btn sm" onclick="openInTerminal(\'' + escHtml(s.id) + '\')" style="border-color:#a371f7;color:#a371f7;">⌨ Terminal</button>' : '')
-        + (s.executor === 'csx' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:#a371f7;color:#a371f7;">🔨 Build csx</button>' : '')
+        + (s.script_path ? '<button class="btn sm" onclick="openInTerminal(\'' + escHtml(s.id) + '\')" style="border-color:var(--steel);color:var(--steel);">⌨ Terminal</button>' : '')
+        + (s.executor === 'csx' ? '<button class="btn sm" onclick="buildCsx(\'' + id + '\')" style="border-color:var(--steel);color:var(--steel);">🔨 Build csx</button>' : '')
         + '</div>';
 
     // async: добавить кнопки config/install если нужно
@@ -2020,7 +2020,7 @@ async function buildCsx(id) {
         if (data.ok) { btn.textContent = '✅ OK'; btn.style.borderColor = '#3fb950'; btn.style.color = '#3fb950'; }
         else { btn.textContent = '❌ Err'; btn.style.borderColor = '#f85149'; btn.style.color = '#f85149'; await Dialog.alert(data.errors.join('\n'), '🔨 Check errors'); }
     } catch(e) { btn.textContent = '❌'; }
-    finally { setTimeout(function() { btn.disabled = false; btn.textContent = '🔨 Check'; btn.style.borderColor = '#a371f7'; btn.style.color = '#a371f7'; }, 3000); }
+    finally { setTimeout(function() { btn.disabled = false; btn.textContent = '🔨 Check'; btn.style.borderColor = 'var(--steel)'; btn.style.color = 'var(--steel)'; }, 3000); }
 }
 
 /// Сколько прогонов ждёт очереди. Остановка всех инстансов без этого выглядела бы

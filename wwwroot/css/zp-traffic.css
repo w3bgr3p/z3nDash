@@ -53,7 +53,7 @@
 #zpTraffic .ztr-details-body { flex: 1; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
 #zpTraffic .ov-url { font-family: var(--mono); font-size: 11px; word-break: break-all; padding-bottom: 6px; border-bottom: 1px solid var(--border); cursor: pointer; }
 #zpTraffic .ov-badges, #zpTraffic .ov-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-#zpTraffic .badge-duration { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: var(--mono); background: rgba(163,113,247,.12); color: #a371f7; }
+#zpTraffic .badge-duration { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: var(--mono); background: var(--steel-tint); color: var(--steel); }
 #zpTraffic .badge-meta { padding: 2px 7px; border-radius: 4px; font-size: 10px; background: var(--bg2); color: var(--text2); font-family: var(--mono); }
 #zpTraffic .badge-origin { padding: 2px 7px; border-radius: 4px; font-size: 10px; background: rgba(41,182,246,.1); color: #29b6f6; font-family: var(--mono); }
 
@@ -70,7 +70,7 @@
 #zpTraffic .act-btn.hybrid { background: rgba(210,153,34,.12);  border-color: rgba(210,153,34,.4);  color: var(--yellow-lo); }
 #zpTraffic .act-btn.python { background: rgba(255,166,88,.12);  border-color: rgba(255,166,88,.4);  color: #f0883e; }
 #zpTraffic .act-btn.ts     { background: rgba(41,182,246,.12);  border-color: rgba(41,182,246,.4);  color: #29b6f6; }
-#zpTraffic .act-btn.curl   { background: rgba(163,113,247,.12); border-color: rgba(163,113,247,.4); color: #a371f7; }
+#zpTraffic .act-btn.curl   { background: var(--steel-tint); border-color: var(--steel-tint-border); color: var(--steel); }
 
 /* ── сворачиваемые секции Request / Response ── */
 #zpTraffic .detail-section { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
