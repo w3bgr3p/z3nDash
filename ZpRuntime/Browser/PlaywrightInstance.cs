@@ -716,11 +716,53 @@ namespace z3nDash.Browser
         /// waiting until load». В ZP исключения в этом месте нет.
         /// </summary>
         public void Navigate(string url, string referer = "")
-            => Sync(_page.GotoAsync(url, new PageGotoOptions
+        {
+            var before = SafeUrl();
+            try
             {
-                Referer   = referer == "" ? null : referer,
-                WaitUntil = WaitUntilState.Commit,
-            }));
+                Sync(_page.GotoAsync(url, new PageGotoOptions
+                {
+                    Referer   = referer == "" ? null : referer,
+                    WaitUntil = WaitUntilState.Commit,
+                }));
+            }
+            catch (PlaywrightException)
+            {
+                // Редирект отменяет исходную навигацию, и Playwright сообщает
+                // net::ERR_FAILED, хотя документ сменился и страница открылась.
+                // В ZP переход в такой ситуации успешен, и ронять ветку на
+                // открытой странице нельзя.
+                //
+                // Успех доказывается положительным признаком: документ должен
+                // смениться. Просто «нет исключения» или «URL не пуст» не
+                // годится — about:blank не пуст, а прежний URL остаётся на
+                // месте, когда переход не состоялся вовсе.
+                if (!DocumentChanged(before)) throw;
+            }
+        }
+
+        /// <summary>URL страницы; пусто, если её уже нет.</summary>
+        private string SafeUrl()
+        {
+            try { return _page.Url ?? ""; } catch { return ""; }
+        }
+
+        /// <summary>
+        /// Дождаться смены документа после отменённой навигации. Редирект
+        /// доезжает не мгновенно, поэтому ждём коротко — но ждём, иначе проверка
+        /// сработает раньше, чем браузер успеет сменить адрес.
+        /// </summary>
+        private bool DocumentChanged(string before)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                var now = SafeUrl();
+                if (now.Length > 0 && now != "about:blank" && now != before) return true;
+                Thread.Sleep(100);
+            }
+            return false;
+        }
 
         public void MouseClick(int x, int y, string button, string mouseEvent, bool considerScroll)
         {
