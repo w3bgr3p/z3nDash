@@ -549,31 +549,31 @@ window.PageState = {
             }
             #dialogOverlay.open { display: flex; }
             #dialogBox {
-                background: var(--bg1, #161b22); border: 1px solid var(--border, #30363d);
+                background: var(--bg1); border: 1px solid var(--border);
                 border-radius: 8px; width: 340px; padding: 18px;
                 display: flex; flex-direction: column; gap: 12px;
             }
             #dialogIcon { font-size: 20px; }
-            #dialogTitle { font-size: 13px; font-weight: 600; color: var(--text-hi, #e6edf3); }
-            #dialogMsg { font-size: 12px; color: var(--text2, #8b949e); line-height: 1.5; white-space: pre-wrap; }
+            #dialogTitle { font-size: 13px; font-weight: 600; color: var(--text-hi); }
+            #dialogMsg { font-size: 12px; color: var(--text2); line-height: 1.5; white-space: pre-wrap; }
             #dialogInput {
-                background: var(--bg, #0d1117); border: 1px solid var(--border, #30363d);
-                border-radius: 4px; color: var(--text, #c9d1d9); padding: 5px 9px;
+                background: var(--bg); border: 1px solid var(--border);
+                border-radius: 4px; color: var(--text); padding: 5px 9px;
                 font-size: 12px; width: 100%; box-sizing: border-box; display: none;
                 font-family: inherit;
             }
-            #dialogInput:focus { outline: none; border-color: var(--accent, #388bfd); }
+            #dialogInput:focus { outline: none; border-color: var(--accent); }
             #dialogButtons { display: flex; gap: 7px; justify-content: flex-end; }
             .dialog-btn {
-                padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border, #30363d);
-                font-size: 11px; cursor: pointer; background: var(--bg2, #21262d);
-                color: var(--text, #c9d1d9); font-family: inherit;
+                padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border);
+                font-size: 11px; cursor: pointer; background: var(--bg2);
+                color: var(--text); font-family: inherit;
             }
-            .dialog-btn:hover { background: var(--border, #30363d); }
-            .dialog-btn.primary { background: var(--green-bg, #238636); border-color: var(--green-bg, #238636); color: #fff; }
-            .dialog-btn.primary:hover { background: var(--green-bg2, #2ea043); }
-            .dialog-btn.danger { background: var(--red-bg, #da3633); border-color: var(--red-bg, #da3633); color: #fff; }
-            .dialog-btn.danger:hover { background: var(--red, #f85149); }
+            .dialog-btn:hover { background: var(--border); }
+            .dialog-btn.primary { background: var(--green-bg); border-color: var(--green-bg); color: var(--on-solid); }
+            .dialog-btn.primary:hover { background: var(--green-bg2); }
+            .dialog-btn.danger { background: var(--red-bg); border-color: var(--red-bg); color: var(--on-solid); }
+            .dialog-btn.danger:hover { background: var(--red); }
         `;
         document.head.appendChild(style);
 

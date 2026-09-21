@@ -248,7 +248,7 @@ function renderList() {
         if (showGrp && grp !== lastGrp) {
             var grpRunning = filtered.filter(function(x) { return getGroupName(x.name) === grp && x.status === 'running'; }).length;
             var dots = grpRunning > 0
-                ? Array(grpRunning).fill('<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green,#3fb950);margin-right:2px"></span>').join('')
+                ? Array(grpRunning).fill('<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:2px"></span>').join('')
                 : '';
             var isCollapsed = collapsedGroups.has(grp);
             html += '<div class="group-header" onclick="toggleGroup(\'' + grp + '\')">'
@@ -330,14 +330,14 @@ function _lastOutputLine(s) {
 
 function renderGlobalStats() {
     var NAV_PAGES = [
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.scheduler : ''), title: 'z3nDash',      desc: 'Runs .py, .js, .exe, .bat on cron or intervals (you are here)', url: '/tasker.html', color: '#e3b341' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.zp7       : ''), title: 'ZP7',        desc: 'ZennoPoster node and task control',                                                      url: '/?page=zp7',      color: '#58a6ff' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.logs       : ''), title: 'allLogs',    desc: 'Log history from every ZP7 node, filtered by level, machine, project and thread.', url: '/?page=zp7#allLogs',     color: '#3fb950' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.http       : ''), title: 'Traffic',    desc: 'HTTP traffic from the nodes and z3nDash, with details and replay.',   url: '/?page=zp7#traffic',     color: '#d29922' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.json       : ''), title: 'JSON',       desc: 'Interactive JSON tree with auth/captcha detection and replay.',       url: '/json',           color: '#4e9eff' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.clips      : ''), title: 'Clips',      desc: 'Copy-paste snippets organised into a tree.',                       url: '/?page=clips',    color: '#f0883e' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.scheduler : ''), title: 'z3nDash',      desc: 'Runs .py, .js, .exe, .bat on cron or intervals (you are here)', url: '/tasker.html', color: 'var(--yellow-lo)' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.zp7       : ''), title: 'ZP7',        desc: 'ZennoPoster node and task control',                                                      url: '/?page=zp7',      color: 'var(--accent)' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.logs       : ''), title: 'allLogs',    desc: 'Log history from every ZP7 node, filtered by level, machine, project and thread.', url: '/?page=zp7#allLogs',     color: 'var(--green)' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.http       : ''), title: 'Traffic',    desc: 'HTTP traffic from the nodes and z3nDash, with details and replay.',   url: '/?page=zp7#traffic',     color: 'var(--yellow)' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.json       : ''), title: 'JSON',       desc: 'Interactive JSON tree with auth/captcha detection and replay.',       url: '/json',           color: 'var(--accent)' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.clips      : ''), title: 'Clips',      desc: 'Copy-paste snippets organised into a tree.',                       url: '/?page=clips',    color: 'var(--yellow-lo)' },
         { icon: (typeof ICONS !== 'undefined' ? ICONS.text       : ''), title: 'Text Tools', desc: 'URL encode/decode, C# escaper, Base64, JSON escape.',                 url: '/text.html',      color: 'var(--steel)' },
-        { icon: (typeof ICONS !== 'undefined' ? ICONS.config     : ''), title: 'Config',     desc: 'Server status, configuration editor, log storage management.', url: '/?page=config',   color: '#f78166' },
+        { icon: (typeof ICONS !== 'undefined' ? ICONS.config     : ''), title: 'Config',     desc: 'Server status, configuration editor, log storage management.', url: '/?page=config',   color: 'var(--red-lo)' },
     ];
     document.getElementById('detailHeader').style.display  = 'none';
     document.getElementById('hResizer').style.display      = 'none';
@@ -460,22 +460,22 @@ function renderDetailActions(s) {
         + '<button class="btn primary sm" onclick="runNow(\'' + id + '\')">' + runLabel + '</button>'
         + (scheduled ? '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled || 'true') + '\')">' + pauseLabel + '</button>' : '')
         + (scheduleHeld(s) ? '<button class="btn sm" title="Clear script pause and deferral" onclick="resumeSchedule(\'' + id + '\')">Resume schedule</button>' : '')
-        + '<button class="btn sm" title="Restart" onclick="restartNow(\'' + id + '\')" style="border-color:#d29922;color:#d29922;">↺</button>'
+        + '<button class="btn sm" title="Restart" onclick="restartNow(\'' + id + '\')" style="border-color:var(--yellow);color:var(--yellow);">↺</button>'
         + '<button class="btn stop sm" title="Interrupt" onclick="stopNow(\'' + id + '\')">■</button>'
         + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🗑</button>'
-        + '<button class="btn sm" onclick="duplicateSchedule(\'' + id + '\')" style="border-color:#d29922;color:#d29922;">📋📋</button>'
+        + '<button class="btn sm" onclick="duplicateSchedule(\'' + id + '\')" style="border-color:var(--yellow);color:var(--yellow);">📋📋</button>'
         + '</div>'
         + '<div class="action-group">'
         + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">⚙ </button>'
         + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🔧 </button>'
-        + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📥 </button>'
-        + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:#58a6ff;color:#58a6ff;">📤 </button>'
-        + '<button class="btn sm" title="Clear payload" onclick="clearPayload(\'' + id + '\',\'' + escHtml(s.name || '') + '\')" style="border-color:#f85149;color:#f85149;">🗑 </button>'
+        + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:var(--accent);color:var(--accent);">📥 </button>'
+        + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:var(--accent);color:var(--accent);">📤 </button>'
+        + '<button class="btn sm" title="Clear payload" onclick="clearPayload(\'' + id + '\',\'' + escHtml(s.name || '') + '\')" style="border-color:var(--red);color:var(--red);">🗑 </button>'
         + '</div>'
         + '<div class="action-group">'
         
-        + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFile(this.dataset.fp)" style="border-color:#3fb950;color:#3fb950;">📄</button>' : '')
-        + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFolder(this.dataset.fp)" style="border-color:#3fb950;color:#3fb950;">📁</button>' : '')
+        + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFile(this.dataset.fp)" style="border-color:var(--green);color:var(--green);">📄</button>' : '')
+        + (s.script_path ? '<button class="btn sm" data-fp="' + escHtml(s.script_path) + '" onclick="openScriptFolder(this.dataset.fp)" style="border-color:var(--green);color:var(--green);">📁</button>' : '')
 
         + '</div>'
         + '<div class="action-group">'
@@ -556,7 +556,7 @@ async function extendDetailActions(s) {
     var cfgLabel = _isJs(s.executor) ? 'config.json' : 'config.py';
     var cfgBtn   = document.createElement('button');
     cfgBtn.className = 'btn sm';
-    cfgBtn.style.cssText = 'border-color:#58a6ff;color:#58a6ff;';
+    cfgBtn.style.cssText = 'border-color:var(--accent);color:var(--accent);';
     cfgBtn.textContent = (info.has_config ? '⚙ ' : '+ ') + cfgLabel;
     cfgBtn.onclick = function() { openCmModal(s, 'config'); };
     group.appendChild(cfgBtn);
@@ -564,7 +564,7 @@ async function extendDetailActions(s) {
     if (_isJs(s.executor)) {
         var pkgBtn = document.createElement('button');
         pkgBtn.className = 'btn sm';
-        pkgBtn.style.cssText = 'border-color:#58a6ff;color:#58a6ff;';
+        pkgBtn.style.cssText = 'border-color:var(--accent);color:var(--accent);';
         pkgBtn.textContent = (info.has_package_json ? '📦 package.json' : '+ package.json');
         pkgBtn.onclick = function() { openCmModal(s, 'package'); };
         group.appendChild(pkgBtn);
@@ -575,7 +575,7 @@ async function extendDetailActions(s) {
         var instLabel = _isJs(s.executor) ? '📦 npm install' : '📦 pip install';
         var instBtn   = document.createElement('button');
         instBtn.className = 'btn sm';
-        instBtn.style.cssText = 'border-color:#3fb950;color:#3fb950;';
+        instBtn.style.cssText = 'border-color:var(--green);color:var(--green);';
         instBtn.textContent = instLabel;
         instBtn.onclick = function() { runInstall(s, instBtn); };
         group.appendChild(instBtn);
@@ -1520,11 +1520,11 @@ async function previewSchedule() {
         });
         var data = await res.json();
         if (!data.ok) {
-            box.innerHTML = '<span style="color:var(--red,#f85149)">' + (data.errors || []).map(escHtml).join('<br>') + '</span>';
+            box.innerHTML = '<span style="color:var(--red)">' + (data.errors || []).map(escHtml).join('<br>') + '</span>';
             return;
         }
         if (!data.times || data.times.length === 0) {
-            box.innerHTML = '<span style="color:var(--red,#f85149)">No upcoming runs — check the settings</span>';
+            box.innerHTML = '<span style="color:var(--red)">No upcoming runs — check the settings</span>';
             return;
         }
         box.innerHTML = 'Upcoming runs (UTC):<br>' + data.times.map(escHtml).join('<br>');
@@ -2017,8 +2017,8 @@ async function buildCsx(id) {
     try {
         var res  = await fetch('/tasker/build', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
         var data = await res.json();
-        if (data.ok) { btn.textContent = '✅ OK'; btn.style.borderColor = '#3fb950'; btn.style.color = '#3fb950'; }
-        else { btn.textContent = '❌ Err'; btn.style.borderColor = '#f85149'; btn.style.color = '#f85149'; await Dialog.alert(data.errors.join('\n'), '🔨 Check errors'); }
+        if (data.ok) { btn.textContent = '✅ OK'; btn.style.borderColor = 'var(--green)'; btn.style.color = 'var(--green)'; }
+        else { btn.textContent = '❌ Err'; btn.style.borderColor = 'var(--red)'; btn.style.color = 'var(--red)'; await Dialog.alert(data.errors.join('\n'), '🔨 Check errors'); }
     } catch(e) { btn.textContent = '❌'; }
     finally { setTimeout(function() { btn.disabled = false; btn.textContent = '🔨 Check'; btn.style.borderColor = 'var(--steel)'; btn.style.color = 'var(--steel)'; }, 3000); }
 }

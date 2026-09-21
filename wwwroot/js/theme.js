@@ -95,9 +95,9 @@ function createThemeSelect(container) {
     sel.addEventListener('change', () => setTheme(sel.value));
 
     sel.style.cssText = [
-        'background: var(--bg2, #21262d)',
-        'color: var(--text, #c9d1d9)',
-        'border: 1px solid var(--border, #30363d)',
+        'background: var(--bg2)',
+        'color: var(--text)',
+        'border: 1px solid var(--border)',
         'border-radius: var(--radius, 6px)',
         'padding: 2px 6px',
         'font: inherit',

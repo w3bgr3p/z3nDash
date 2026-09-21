@@ -58,11 +58,11 @@
         transition: background 0.15s;
         align-self: stretch;
       }
-      #ai-panel-resizer:hover { background: var(--accent, #58a6ff); opacity: 0.6; }
+      #ai-panel-resizer:hover { background: var(--accent); opacity: 0.6; }
       #ai-panel {
         flex: 1;
-        background: var(--bg1, #161b22);
-        border-left: 1px solid var(--border, #30363d);
+        background: var(--bg1);
+        border-left: 1px solid var(--border);
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -73,42 +73,42 @@
         align-items: center;
         gap: 8px;
         padding: 8px 12px;
-        border-bottom: 1px solid var(--border, #30363d);
+        border-bottom: 1px solid var(--border);
         flex-shrink: 0;
-        background: var(--bg1, #161b22);
+        background: var(--bg1);
       }
       #ai-panel-header h3 {
         font-size: 12px;
         font-weight: 700;
-        color: var(--accent, #58a6ff);
+        color: var(--accent);
         margin: 0;
         flex: 1;
       }
       .ai-hbtn {
         background: none;
-        border: 1px solid var(--border, #30363d);
+        border: 1px solid var(--border);
         border-radius: 3px;
-        color: var(--text2, #8b949e);
+        color: var(--text2);
         cursor: pointer;
         font-size: 10px;
         padding: 2px 7px;
         line-height: 1.4;
       }
-      .ai-hbtn:hover { color: var(--text, #e6edf3); border-color: var(--text2, #8b949e); }
-      .ai-hbtn.danger:hover { color: var(--red, #f85149); border-color: var(--red, #f85149); }
+      .ai-hbtn:hover { color: var(--text); border-color: var(--text2); }
+      .ai-hbtn.danger:hover { color: var(--red); border-color: var(--red); }
       .ai-hbtn:disabled { opacity: 0.5; cursor: not-allowed; }
       #ai-model-select {
-        background: var(--bg, #0d1117);
-        border: 1px solid var(--border, #30363d);
+        background: var(--bg);
+        border: 1px solid var(--border);
         border-radius: 3px;
-        color: var(--text, #e6edf3);
+        color: var(--text);
         font-size: 10px;
         padding: 2px 6px;
         cursor: pointer;
         max-width: 150px;
       }
       #ai-model-select:hover {
-        border-color: var(--accent, #58a6ff);
+        border-color: var(--accent);
       }
       #ai-panel-msgs {
         flex: 1;
@@ -129,28 +129,28 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.4px;
-        color: var(--text2, #8b949e);
+        color: var(--text2);
       }
-      .ai-msg.user .ai-msg-role { color: var(--accent, #58a6ff); }
-      .ai-msg.assistant .ai-msg-role { color: var(--green, #3fb950); }
+      .ai-msg.user .ai-msg-role { color: var(--accent); }
+      .ai-msg.assistant .ai-msg-role { color: var(--green); }
       .ai-msg-body {
         font-size: 11px;
         line-height: 1.6;
-        color: var(--text, #e6edf3);
+        color: var(--text);
         white-space: pre-wrap;
         word-break: break-word;
       }
       .ai-msg.user .ai-msg-body {
-        background: var(--bg2, #21262d);
+        background: var(--bg2);
         border-radius: 4px;
         padding: 6px 10px;
       }
       .ai-tool-call {
         font-size: 10px;
         font-family: Consolas, monospace;
-        color: var(--yellow, #d29922);
-        background: var(--bg, #0d1117);
-        border: 1px solid var(--border, #30363d);
+        color: var(--yellow);
+        background: var(--bg);
+        border: 1px solid var(--border);
         border-radius: 4px;
         padding: 4px 8px;
         margin-top: 3px;
@@ -158,20 +158,20 @@
         word-break: break-all;
       }
       #ai-panel-footer {
-        border-top: 1px solid var(--border, #30363d);
+        border-top: 1px solid var(--border);
         padding: 8px 12px;
         display: flex;
         flex-direction: column;
         gap: 6px;
         flex-shrink: 0;
-        background: var(--bg1, #161b22);
+        background: var(--bg1);
       }
       #ai-panel-input {
         width: 100%;
-        background: var(--bg, #0d1117);
-        border: 1px solid var(--border, #30363d);
+        background: var(--bg);
+        border: 1px solid var(--border);
         border-radius: 4px;
-        color: var(--text, #e6edf3);
+        color: var(--text);
         font-size: 11px;
         font-family: inherit;
         padding: 7px 10px;
@@ -182,7 +182,7 @@
         box-sizing: border-box;
         line-height: 1.5;
       }
-      #ai-panel-input:focus { border-color: var(--accent, #58a6ff); }
+      #ai-panel-input:focus { border-color: var(--accent); }
       #ai-panel-input:disabled { opacity: 0.5; }
       .ai-footer-row {
         display: flex;
@@ -191,8 +191,8 @@
         justify-content: flex-end;
       }
       #ai-send-btn {
-        background: var(--accent, #58a6ff);
-        color: #fff;
+        background: var(--accent);
+        color: var(--on-accent);
         border: none;
         border-radius: 3px;
         padding: 4px 14px;
@@ -206,13 +206,13 @@
         display: inline-block;
         width: 7px;
         height: 12px;
-        background: var(--accent, #58a6ff);
+        background: var(--accent);
         vertical-align: text-bottom;
         animation: ai-blink 0.8s steps(1) infinite;
       }
       @keyframes ai-blink { 0%,100%{opacity:1} 50%{opacity:0} }
       .ai-empty {
-        color: var(--text2, #8b949e);
+        color: var(--text2);
         font-size: 11px;
         text-align: center;
         padding: 30px 10px;
@@ -245,7 +245,7 @@
         <div id="ai-panel-footer">
           <textarea id="ai-panel-input" placeholder="Message… (Ctrl+Enter to send)"></textarea>
           <div class="ai-footer-row">
-            <span id="ai-status" style="font-size:9px;color:var(--text2,#8b949e);flex:1;"></span>
+            <span id="ai-status" style="font-size:9px;color:var(--text2);flex:1;"></span>
             <button id="ai-send-btn">Send</button>
           </div>
         </div>

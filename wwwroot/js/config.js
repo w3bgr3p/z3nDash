@@ -94,7 +94,7 @@
             const pct = Math.min(100, Math.round((d.totalBytes ?? 0) / maxBytes * 100));
             const bar = document.getElementById('storageBar');
             bar.style.width = pct + '%';
-            bar.style.background = pct > 80 ? '#f85149' : pct > 50 ? '#d29922' : '#388bfd';
+            bar.style.background = pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--yellow)' : 'var(--accent)';
             document.getElementById('storageMaxHint').textContent = pct + '% of soft limit';
 
             const list = document.getElementById('fileList');
@@ -306,7 +306,7 @@
         kInp.placeholder = 'key';
         kInp.value       = key ?? '';
         kInp.className   = 'jv-key';
-        kInp.style.cssText = 'background:var(--surface2,#0d1117); border:1px solid var(--border); border-radius:5px; color:var(--text-hi,#e6edf3); font-family:"JetBrains Mono",monospace; font-size:11px; padding:6px 9px; outline:none; width:100%;';
+        kInp.style.cssText = 'background:var(--surface2); border:1px solid var(--border); border-radius:5px; color:var(--text-hi); font-family:"JetBrains Mono",monospace; font-size:11px; padding:6px 9px; outline:none; width:100%;';
 
         const vInp = document.createElement('input');
         vInp.type        = isPassword ? 'password' : 'text';
@@ -737,7 +737,7 @@
         const ta = document.createElement('textarea');
         ta.dataset.id    = dataId;
         ta.placeholder   = placeholder;
-        ta.style.cssText = 'width:100%; min-height:100px; resize:vertical; background:var(--bg,#0d1117); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px; font-family:inherit; font-size:11px; box-sizing:border-box;';
+        ta.style.cssText = 'width:100%; min-height:100px; resize:vertical; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px; font-family:inherit; font-size:11px; box-sizing:border-box;';
         parent.appendChild(ta);
     }
 
