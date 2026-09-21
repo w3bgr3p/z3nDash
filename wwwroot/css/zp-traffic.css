@@ -25,14 +25,14 @@
 #zpTraffic .ztr-row:hover { background: var(--bg1); }
 #zpTraffic .ztr-row.selected { background: var(--bg2); box-shadow: inset 3px 0 0 var(--accent); }
 #zpTraffic .ztr-empty { padding: 14px; color: var(--text2); font-size: 11px; }
-#zpTraffic .ztr-ts { color: var(--text3); font-family: ui-monospace, monospace; font-size: 10px; }
+#zpTraffic .ztr-ts { color: var(--text3); font-family: var(--mono); font-size: 10px; }
 #zpTraffic .ztr-machine { color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #zpTraffic .ztr-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#zpTraffic .ztr-dur { color: var(--text2); font-family: ui-monospace, monospace; font-size: 11px; text-align: right; }
+#zpTraffic .ztr-dur { color: var(--text2); font-family: var(--mono); font-size: 11px; text-align: right; }
 #zpTraffic .ztr-acc { color: var(--green-hi); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── бейджи метода и статуса ── */
-#zpTraffic .m, #zpTraffic .s { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; text-align: center; font-family: ui-monospace, monospace; }
+#zpTraffic .m, #zpTraffic .s { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; text-align: center; font-family: var(--mono); }
 #zpTraffic .m.GET    { background: rgba(88,166,255,.15); color: var(--accent-lo); }
 #zpTraffic .m.POST   { background: rgba(63,185,80,.15);  color: var(--green-lo); }
 #zpTraffic .m.PUT    { background: rgba(210,153,34,.15); color: var(--yellow-lo); }
@@ -51,11 +51,11 @@
 #zpTraffic .ztr-details-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg1); border-bottom: 1px solid var(--border); font-weight: 600; }
 #zpTraffic .ztr-details-head button { margin-left: auto; }
 #zpTraffic .ztr-details-body { flex: 1; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-#zpTraffic .ov-url { font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; padding-bottom: 6px; border-bottom: 1px solid var(--border); cursor: pointer; }
+#zpTraffic .ov-url { font-family: var(--mono); font-size: 11px; word-break: break-all; padding-bottom: 6px; border-bottom: 1px solid var(--border); cursor: pointer; }
 #zpTraffic .ov-badges, #zpTraffic .ov-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-#zpTraffic .badge-duration { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: ui-monospace, monospace; background: rgba(163,113,247,.12); color: #a371f7; }
-#zpTraffic .badge-meta { padding: 2px 7px; border-radius: 4px; font-size: 10px; background: var(--bg2); color: var(--text2); font-family: ui-monospace, monospace; }
-#zpTraffic .badge-origin { padding: 2px 7px; border-radius: 4px; font-size: 10px; background: rgba(41,182,246,.1); color: #29b6f6; font-family: ui-monospace, monospace; }
+#zpTraffic .badge-duration { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: var(--mono); background: rgba(163,113,247,.12); color: #a371f7; }
+#zpTraffic .badge-meta { padding: 2px 7px; border-radius: 4px; font-size: 10px; background: var(--bg2); color: var(--text2); font-family: var(--mono); }
+#zpTraffic .badge-origin { padding: 2px 7px; border-radius: 4px; font-size: 10px; background: rgba(41,182,246,.1); color: #29b6f6; font-family: var(--mono); }
 
 /* ── кнопки действий ── */
 #zpTraffic .action-rows { display: flex; flex-direction: column; gap: 4px; }
@@ -82,14 +82,14 @@
 #zpTraffic .section-body.open, #zpTraffic .subsection-body.open { display: block; }
 #zpTraffic .subsection-toggle { display: flex; align-items: center; gap: 5px; padding: 5px 10px; cursor: pointer; user-select: none; font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--bg2); background: var(--bg); }
 #zpTraffic .subsection-toggle:hover { background: var(--bg1); }
-#zpTraffic .header-item { padding: 5px 10px; border-bottom: 1px solid var(--bg2); display: grid; grid-template-columns: 150px 1fr; gap: 6px; font-family: ui-monospace, monospace; font-size: 11px; cursor: pointer; }
+#zpTraffic .header-item { padding: 5px 10px; border-bottom: 1px solid var(--bg2); display: grid; grid-template-columns: 150px 1fr; gap: 6px; font-family: var(--mono); font-size: 11px; cursor: pointer; }
 #zpTraffic .header-item:last-child { border-bottom: none; }
 #zpTraffic .header-item:hover { background: var(--bg2); }
 #zpTraffic .header-key { color: var(--green-hi); }
 #zpTraffic .header-value { word-break: break-all; }
-#zpTraffic .body-block { max-height: 400px; overflow: auto; padding: 8px 10px; font-family: ui-monospace, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; cursor: pointer; min-height: 24px; }
+#zpTraffic .body-block { max-height: 400px; overflow: auto; padding: 8px 10px; font-family: var(--mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; cursor: pointer; min-height: 24px; }
 #zpTraffic .body-block:hover { background: var(--bg1); }
-#zpTraffic .cookies-block { max-height: 200px; overflow: auto; padding: 8px 10px; font-family: ui-monospace, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; color: var(--yellow-lo); cursor: pointer; }
+#zpTraffic .cookies-block { max-height: 200px; overflow: auto; padding: 8px 10px; font-family: var(--mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; color: var(--yellow-lo); cursor: pointer; }
 #zpTraffic .cookies-block:hover { background: var(--bg1); }
 #zpTraffic .empty-note { color: var(--text3); font-style: italic; padding: 8px 10px; font-size: 11px; }
 
@@ -101,12 +101,12 @@
 #zpTraffic .ztr-dialog.auto { height: auto; max-height: 70%; }
 #zpTraffic .ztr-dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; font-weight: 700; }
 #zpTraffic .ztr-url-row { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center; }
-#zpTraffic .ztr-url-row input { flex: 1; font-family: ui-monospace, monospace; }
+#zpTraffic .ztr-url-row input { flex: 1; font-family: var(--mono); }
 #zpTraffic .ztr-dialog-body { display: flex; flex: 1; overflow: hidden; }
 #zpTraffic .ztr-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 #zpTraffic .ztr-pane + .ztr-pane { border-left: 1px solid var(--border); }
 #zpTraffic .ztr-label { font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; padding: 6px 12px 4px; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-#zpTraffic .ztr-area { flex: 1; background: var(--bg); border: none; border-radius: 0; outline: none; font-family: ui-monospace, monospace; font-size: 10.5px; padding: 8px 12px; resize: none; line-height: 1.5; }
+#zpTraffic .ztr-area { flex: 1; background: var(--bg); border: none; border-radius: 0; outline: none; font-family: var(--mono); font-size: 10.5px; padding: 8px 12px; resize: none; line-height: 1.5; }
 #zpTraffic .ztr-dialog-foot { padding: 8px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 #zpTraffic .ztr-send { background: var(--green-bg); border-color: rgba(240,246,252,.1); color: #fff; font-weight: 600; white-space: nowrap; }
 #zpTraffic .ztr-send:hover { background: var(--green-bg2); }

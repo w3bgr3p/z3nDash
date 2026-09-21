@@ -3,7 +3,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     background: var(--bg); color: var(--text);
-    font-family: 'Iosevka', 'Consolas', monospace;
+    font-family: var(--mono);
     font-size: var(--fs-11); height: 100vh; overflow: hidden;
     display: flex; flex-direction: column;
 }

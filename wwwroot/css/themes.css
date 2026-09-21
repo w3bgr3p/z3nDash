@@ -418,8 +418,8 @@
     --purple:      #89a5bd;
     --purple-tint: #171f27;
 
-    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-size: 12px;
+    --font: var(--mono);
+    --font-size: 13px;
     --radius:      10px;
     --radius-sm:   6px;
     --radius-lg:   14px;
@@ -442,7 +442,33 @@
     --number-color: #c6a96c;
     --bool-color:   #d095b6;
     --null-color:   #9595d0;
-    --row-h: 19px;
+    /* ── Плотность graphite: просторнее общей шкалы примерно в 1.4 раза.
+       Переобъявляются только изменяемые ступени — остальные берутся из :root.
+       Проверено: другие темы это не задевает. ── */
+    --sp-2:   3px;
+    --sp-4:   6px;
+    --sp-6:   8px;
+    --sp-8:  11px;
+    --sp-10: 14px;
+    --sp-12: 16px;
+    --sp-14: 19px;
+    --sp-16: 22px;
+    --sp-18: 24px;
+    --sp-20: 28px;
+    --sp-24: 32px;
+
+    --fs-8:   9px;
+    --fs-9:  10px;
+    --fs-10: 11px;
+    --fs-11: 12px;
+    --fs-12: 13px;
+    --fs-13: 14px;
+    --fs-14: 15px;
+
+    --lh-normal: 1.45;
+    --lh-loose:  1.6;
+
+    --row-h: 24px;
 
     --steel:         #89a5bd;
     --steel-tint:    #171f27;

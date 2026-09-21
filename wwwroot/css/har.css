@@ -9,7 +9,7 @@
 body {
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font);
     font-size: var(--fs-12);
     overflow: hidden;
     height: 100vh;
@@ -203,7 +203,7 @@ body {
 
 /* ── OVERVIEW SECTION ── */
 .ov-url {
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: var(--fs-11);
     color: var(--text);
     word-break: break-all;
@@ -231,7 +231,7 @@ body {
     border-radius: var(--radius-sm);
     font-size: var(--fs-11);
     font-weight: var(--fw-semi);
-    font-family: monospace;
+    font-family: var(--mono);
 }
 .badge-method.GET    { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-lo); }
 .badge-method.POST   { background: color-mix(in srgb, var(--green) 15%, transparent);  color: var(--green-lo); }
@@ -245,7 +245,7 @@ body {
     border-radius: var(--radius-sm);
     font-size: var(--fs-11);
     font-weight: var(--fw-semi);
-    font-family: monospace;
+    font-family: var(--mono);
 }
 .badge-status.s2xx { background: color-mix(in srgb, var(--green) 15%, transparent);  color: var(--green-lo); }
 .badge-status.s3xx { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-lo); }
@@ -258,7 +258,7 @@ body {
     border-radius: var(--radius-sm);
     font-size: var(--fs-11);
     font-weight: var(--fw-semi);
-    font-family: monospace;
+    font-family: var(--mono);
     background: color-mix(in srgb, var(--steel) 12%, transparent);
     color: var(--steel);
 }
@@ -270,7 +270,7 @@ body {
     font-weight: var(--fw-medium);
     background: var(--bg2);
     color: var(--text2);
-    font-family: monospace;
+    font-family: var(--mono);
 }
 
 .badge-origin {
@@ -280,7 +280,7 @@ body {
     font-weight: var(--fw-medium);
     background: color-mix(in srgb, var(--cyan) 10%, transparent);
     color: var(--cyan);
-    font-family: monospace;
+    font-family: var(--mono);
 }
 
 /* ── ACTION BUTTONS ── */
@@ -397,7 +397,7 @@ body {
     display: grid;
     grid-template-columns: 150px 1fr;
     gap: var(--sp-6);
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: var(--fs-11);
     cursor: pointer;
     transition: background 0.1s;
@@ -420,7 +420,7 @@ body {
     overflow-y: auto;
     background: var(--bg);
     padding: var(--sp-8) var(--sp-10);
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: var(--fs-11);
     white-space: pre-wrap;
     word-break: break-all;
@@ -436,7 +436,7 @@ body {
     overflow-y: auto;       /* <-- добавить */
     background: var(--bg);
     padding: var(--sp-8) var(--sp-10);
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: var(--fs-11);
     white-space: pre-wrap;
     word-break: break-all;
@@ -497,7 +497,7 @@ body {
     font-size: var(--fs-11);
     font-weight: var(--fw-semi);
     text-align: center;
-    font-family: monospace;
+    font-family: var(--mono);
 }
 
 .method.GET    { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-lo); }
@@ -511,7 +511,7 @@ body {
     font-size: var(--fs-11);
     font-weight: var(--fw-semi);
     text-align: center;
-    font-family: monospace;
+    font-family: var(--mono);
 }
 
 .status.s2xx { background: color-mix(in srgb, var(--green) 15%, transparent);  color: var(--green-lo); }
@@ -528,14 +528,14 @@ body {
 
 .duration {
     color: var(--text2);
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: var(--fs-11);
     text-align: right;
 }
 
 .timestamp {
     color: var(--text3);
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: var(--fs-10);
 }
 
@@ -557,7 +557,7 @@ body {
 .play-modal-left { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
 .play-modal-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .play-modal-label { font-size: var(--fs-9); color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; padding: var(--sp-6) var(--sp-12) var(--sp-4); background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.play-modal-area { flex: 1; background: var(--bg); border: none; outline: none; color: var(--text); font-family: monospace; font-size: var(--fs-10); padding: var(--sp-8) var(--sp-12); resize: none; line-height: var(--lh-loose); }
+.play-modal-area { flex: 1; background: var(--bg); border: none; outline: none; color: var(--text); font-family: var(--mono); font-size: var(--fs-10); padding: var(--sp-8) var(--sp-12); resize: none; line-height: var(--lh-loose); }
 .play-modal-footer { padding: var(--sp-8) var(--sp-16); border-top: 1px solid var(--border); display: flex; gap: var(--sp-8); align-items: center; flex-shrink: 0; }
 
 .play-method-select {
@@ -566,7 +566,7 @@ body {
 }
 .play-url-input {
     flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
-    font-family: monospace; font-size: var(--fs-11); padding: var(--sp-4) var(--sp-8); border-radius: var(--radius-sm); outline: none;
+    font-family: var(--mono); font-size: var(--fs-11); padding: var(--sp-4) var(--sp-8); border-radius: var(--radius-sm); outline: none;
 }
 .play-url-input:focus { border-color: var(--accent); }
 .play-send-btn {
@@ -577,13 +577,13 @@ body {
 .play-send-btn:hover { background: var(--green-bg2); }
 .play-textarea {
     width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
-    font-family: monospace; font-size: var(--fs-10); padding: var(--sp-6) var(--sp-8); border-radius: var(--radius-sm);
+    font-family: var(--mono); font-size: var(--fs-10); padding: var(--sp-6) var(--sp-8); border-radius: var(--radius-sm);
     outline: none; resize: vertical; line-height: var(--lh-loose); min-height: 60px;
 }
 .play-textarea:focus { border-color: var(--accent); }
 .play-response-area {
     flex: 1; width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
-    font-family: monospace; font-size: var(--fs-10); padding: var(--sp-6) var(--sp-8); border-radius: var(--radius-sm);
+    font-family: var(--mono); font-size: var(--fs-10); padding: var(--sp-6) var(--sp-8); border-radius: var(--radius-sm);
     outline: none; resize: none; line-height: var(--lh-loose); min-height: 80px;
 }
 .play-status { font-size: var(--fs-10); color: var(--text2); margin-left: auto; }

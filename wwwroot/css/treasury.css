@@ -3,7 +3,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     background: var(--bg); color: var(--text);
-    font-family: 'Iosevka', 'Consolas', monospace;
+    font-family: var(--mono);
     font-size: var(--fs-11); overflow: hidden; height: 100vh;
     display: flex; flex-direction: column;
 }
@@ -96,7 +96,7 @@ td.id-cell {
 }
 td.address-cell {
     position: sticky; left: 35px; z-index: 5;
-    background: var(--bg); font-family: 'Courier New', monospace;
+    background: var(--bg); font-family: var(--mono);
     font-size: var(--fs-9); padding: var(--sp-4) var(--sp-6); text-align: left; color: var(--text);
     border-right: 2px solid var(--border); white-space: nowrap; min-width: 150px;
 }
@@ -235,12 +235,12 @@ td.action-col { background: var(--bg); border-left: 2px solid var(--border); pad
 }
 .tooltip.show { opacity: 1; }
 .tooltip-header { font-weight: var(--fw-semi); color: var(--accent); margin-bottom: var(--sp-6); font-size: var(--fs-11); padding-bottom: var(--sp-4); border-bottom: 1px solid var(--border); }
-.tooltip-address { font-size: var(--fs-9); color: var(--text2); font-family: 'Courier New', monospace; margin-bottom: var(--sp-8); }
+.tooltip-address { font-size: var(--fs-9); color: var(--text2); font-family: var(--mono); margin-bottom: var(--sp-8); }
 .tooltip-content { max-height: 250px; overflow-y: auto; }
 .token-item { display: flex; justify-content: space-between; padding: var(--sp-2) var(--sp-4); margin: var(--sp-2) 0; background: color-mix(in srgb, var(--border) 40%, transparent); border-radius: var(--radius-sm); border-left: 2px solid var(--green-bg); font-size: var(--fs-9); }
 .token-left { display: flex; flex-direction: column; gap: var(--sp-1); }
 .token-symbol { font-weight: var(--fw-semi); color: var(--green-hi); font-size: var(--fs-9); }
-.token-amount { color: var(--text2); font-size: var(--fs-8); font-family: 'Courier New', monospace; }
+.token-amount { color: var(--text2); font-size: var(--fs-8); font-family: var(--mono); }
 .token-value  { color: var(--gold); font-weight: var(--fw-semi); font-size: var(--fs-9); white-space: nowrap; }
 .total-value  { margin-top: var(--sp-6); padding-top: var(--sp-4); border-top: 1px solid var(--border); font-weight: var(--fw-semi); color: var(--gold); text-align: right; }
 

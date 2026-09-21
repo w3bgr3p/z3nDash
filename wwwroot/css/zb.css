@@ -1,7 +1,7 @@
 /* zb.css — вынесено из ZB.html */
 
 * { box-sizing: border-box; }
-body { margin: 0; padding: var(--sp-20) var(--sp-20) var(--sp-80); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--fs-12); background: var(--bg); color: var(--text); }
+body { margin: 0; padding: var(--sp-20) var(--sp-20) var(--sp-80); font-family: var(--mono); font-size: var(--fs-12); background: var(--bg); color: var(--text); }
 
 .page-header { display: flex; align-items: center; gap: var(--sp-12); margin-bottom: var(--sp-18); }
 .page-header h1 { font-size: var(--fs-16); font-weight: var(--fw-bold); color: var(--text-hi); margin: 0; letter-spacing: 0.04em; }
@@ -40,7 +40,7 @@ tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; 
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--surface2); }
 td { padding: var(--sp-6) var(--sp-10); font-size: var(--fs-11); color: var(--text); vertical-align: middle; }
-td.mono       { font-family: 'JetBrains Mono', monospace; font-size: var(--fs-10); color: var(--text-dim); }
+td.mono       { font-family: var(--mono); font-size: var(--fs-10); color: var(--text-dim); }
 td.name-cell  { color: var(--text-hi); font-weight: var(--fw-semi); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 td.token-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-10); color: var(--text-dim); }
 

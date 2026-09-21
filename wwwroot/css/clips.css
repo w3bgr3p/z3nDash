@@ -3,7 +3,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--mono);
     font-size: var(--fs-12);
     background: var(--bg);
     color: var(--text);

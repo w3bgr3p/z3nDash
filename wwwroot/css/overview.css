@@ -26,7 +26,7 @@
 .ov-dot.off  { background: var(--border); }
 .ov-name { font-size: var(--fs-11); font-weight: var(--fw-medium); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-cell { font-size: var(--fs-10); color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov-out  { font-family: 'Consolas', monospace; font-size: var(--fs-10); color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-out  { font-family: var(--mono); font-size: var(--fs-10); color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-out.err   { color: var(--red); }
 .ov-out.empty { opacity: 0.4; }
 .ov-links { display: flex; gap: var(--sp-6); flex-wrap: wrap; margin-top: auto; }
