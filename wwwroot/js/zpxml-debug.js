@@ -98,13 +98,38 @@ function dbgLog(line) {
     if (host) { host.textContent = dbgLines.join('\n'); host.scrollTop = host.scrollHeight; }
 }
 
-/// На тринадцати блоках текущая ветка регулярно оказывается за экраном.
+/// Подтянуть холст к текущей ветке — но только если её не видно.
+///
+/// Раньше здесь было безусловное центрирование, и каждый шаг возвращал холст
+/// на своё усмотрение: ты расставил вид как удобно, нажал step — и всё уехало.
+/// Двигать чужой вид без нужды нельзя, поэтому сначала проверяем видимость, а
+/// если двигать всё же приходится — сдвигаем на минимум, а не центрируем.
 function dbgScrollToCurrent() {
     if (!dbgCurrent || !steps[dbgCurrent.stepId] || !positions[dbgCurrent.stepId]) return;
-    const p = positions[dbgCurrent.stepId];
+
+    const step = steps[dbgCurrent.stepId];
+    const p    = positions[dbgCurrent.stepId];
+    const rows = blockRows(step).rows.filter(r => r.kind === 'branch');
+    const i    = step.branches.findIndex(b => b.id === dbgCurrent.branchId);
+    const row  = i >= 0 ? rows[i] : null;
+
+    // Прямоугольник строки в экранных координатах.
+    const top    = p.y + PAD + (row ? row.y : 0);
+    const height = row ? row.h : ROW_H;
+    const x1 = p.x * scale + panX,             x2 = (p.x + NW + PAD * 2) * scale + panX;
+    const y1 = top * scale + panY,             y2 = (top + height) * scale + panY;
+
     const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-    panX = wrap.width  / 2 - (p.x + NW / 2) * scale;
-    panY = wrap.height / 2 - (p.y + stepHeight(steps[dbgCurrent.stepId]) / 2) * scale;
+    const m = 40;                                   // поле, чтобы строка не липла к краю
+    const visible = x1 >= m && x2 <= wrap.width - m && y1 >= m && y2 <= wrap.height - m;
+    if (visible) return;                            // видно — не трогаем вид вовсе
+
+    // Сдвигаем ровно настолько, чтобы строка попала в поле зрения.
+    if (x1 < m)                 panX += m - x1;
+    else if (x2 > wrap.width - m)  panX -= x2 - (wrap.width - m);
+    if (y1 < m)                 panY += m - y1;
+    else if (y2 > wrap.height - m) panY -= y2 - (wrap.height - m);
+
     applyTransform();
 }
 
