@@ -4,36 +4,19 @@
 
 /* ── Top bar ────────────────────────────────────────────────────────────── */
 #top {
-    padding:10px 14px;
+    padding:6px 12px;
     background:var(--bg1);
     border-bottom:1px solid var(--border);
-    display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;
+    display:flex; gap:6px; align-items:center; flex-wrap:wrap;
 }
-#top-left  { display:flex; flex-direction:column; gap:8px; }
-#top-row   { display:flex; gap:6px; align-items:center; }
-#top-hint  { font-size:11px; color:var(--text2); line-height:1.7; }
-
-#file-input { display:none; }
-#drop-zone {
-    border:2px dashed var(--border);
-    border-radius:var(--radius-lg, 10px);
-    padding:10px 18px;
-    font-size:12px; color:var(--text2);
-    cursor:pointer; white-space:nowrap;
-    background:var(--bg2);
-}
-#drop-zone:hover, #drop-zone.over {
-    border-color:var(--accent); color:var(--accent);
-    background:var(--blue-tint);
-}
-#status { font-size:11px; color:var(--text2); align-self:center; max-width:400px; }
+#status { font-size:11px; color:var(--text2); margin-left:6px; flex:1; min-width:0; }
 #status.ok  { color:var(--green); }
 #status.err { color:var(--red); }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
 #toolbar {
     display:flex; gap:6px; align-items:center; flex-wrap:wrap;
-    padding:7px 14px;
+    padding:5px 12px;
     background:var(--bg1);
     border-bottom:1px solid var(--border);
 }
@@ -57,7 +40,7 @@
 }
 #search:focus { border-color:var(--accent); }
 
-.legend { display:flex; gap:10px; align-items:center; font-size:11px; color:var(--text2); margin-left:6px; flex-wrap:wrap; }
+.legend { display:flex; gap:8px; align-items:center; font-size:11px; color:var(--text2); margin-left:6px; flex-wrap:wrap; }
 .ld    { display:flex; align-items:center; gap:4px; }
 .ldot  { width:10px; height:10px; border-radius:50%; border:1.5px solid; flex-shrink:0; }
 .lline { width:20px; height:2px; border-radius:1px; opacity:.8; }

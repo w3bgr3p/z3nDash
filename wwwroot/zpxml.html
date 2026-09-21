@@ -22,20 +22,10 @@
 <body id="zpxml">
 <div id="app">
   <div id="top">
-    <div id="top-left">
-      <div id="top-row">
-        <button class="btn" id="btn-open-path">📁 open…</button>
-        <button class="btn" id="btn-clear">clear</button>
-        <button class="btn" id="btn-save">save .xml</button>
-        <span id="status"></span>
-      </div>
-    </div>
-    <div id="top-hint">
-      <b>File format:</b> XML from ZennoPoster<br>
-      (save the output of <code>ExtractXml()</code> as .xml)<br>
-      <br>
-      <b>Controls:</b> drag the background · wheel to zoom · click a node for details
-    </div>
+    <button class="btn" id="btn-open-path">📁 open…</button>
+    <button class="btn" id="btn-clear">clear</button>
+    <button class="btn" id="btn-save">save .xml</button>
+    <span id="status"></span>
   </div>
 
   <div id="toolbar">
@@ -54,13 +44,6 @@
       <span id="dbg-state">idle</span>
     </span>
     <input id="search" type="text" placeholder="search by label / ID…">
-    <div class="legend">
-      <div class="ld"><div class="ldot good"></div>start/good</div>
-      <div class="ld"><div class="ldot bad"></div>bad end</div>
-      <div class="ld"><div class="lline ok"></div>ok</div>
-      <div class="ld"><div class="lline err"></div>error</div>
-      <div class="ld"><div class="lline case"></div>switch/case</div>
-    </div>
   </div>
 
   <div id="canvas-wrap">
