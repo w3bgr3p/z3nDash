@@ -58,7 +58,11 @@
     --lh-loose:  1.5;
 
     /* Моноширинный стек. */
-    --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+    /* Замерено по ширине глифа: JetBrains Mono в системе нет (0.449 —
+       это дефолтный пропорциональный), ui-monospace Chrome не знает.
+       Приложение всегда рисовало Consolas (0.550). Cascadia (0.586)
+       в стеке впереди Consolas делала строку на 6.5% шире. */
+    --mono: 'JetBrains Mono', Consolas, monospace;
 }
 
 /* ── DARK (default) ── */
@@ -423,7 +427,7 @@
     --purple-tint: #171f27;
 
     --font: var(--mono);
-    --font-size: 13px;
+    --font-size: 12px;
     --radius:      10px;
     --radius-sm:   6px;
     --radius-lg:   14px;
@@ -461,13 +465,6 @@
     --sp-20: 28px;
     --sp-24: 32px;
 
-    --fs-8:   9px;
-    --fs-9:  10px;
-    --fs-10: 11px;
-    --fs-11: 12px;
-    --fs-12: 13px;
-    --fs-13: 14px;
-    --fs-14: 15px;
 
     --lh-normal: 1.45;
     --lh-loose:  1.6;
