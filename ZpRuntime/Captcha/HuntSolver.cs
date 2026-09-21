@@ -47,6 +47,8 @@ namespace z3n7.Captcha
             if (minimumDelayMs < 0 || maximumDelayMs < minimumDelayMs)
                 throw new ArgumentException("Invalid click delay range");
 
+            var lastFailure = "";
+
             for (var attempt = 0; attempt < attempts; attempt++)
             {
                 var responseCount = VerificationBodies().Count;
@@ -65,22 +67,41 @@ namespace z3n7.Captcha
                         return true;
                     }
 
+                    lastFailure = responses.Count == 0 ? "no verification response" : "verification failed";
                     _project.SendInfoToLog(
-                        responses.Count == 0
-                            ? "Hunt " + type + " attempt " + (attempt + 1) + " | no verification response"
-                            : "Hunt " + type + " attempt " + (attempt + 1) + " | verification failed");
+                        "Hunt " + type + " " + (attempt + 1) + "/" + attempts + " | " + lastFailure);
                 }
                 catch (Exception error)
                 {
+                    // В лог — одна строка: что за ошибка и на какой попытке.
+                    // Раньше сюда уходил Exception целиком, то есть сообщение
+                    // со стеком, и десять попыток превращали лог в простыню,
+                    // в которой не найти ни причины, ни того, что было дальше.
+                    lastFailure = Describe(error);
                     _project.SendErrorToLog(
-                        "Hunt " + type + " attempt failed:" + Environment.NewLine + error);
+                        "Hunt " + type + " " + (attempt + 1) + "/" + attempts + " | " + lastFailure);
+
                     if (type == "shapes")
                         ClickMainButton();
                 }
             }
 
-            _project.SendErrorToLog("Hunt " + type + " | failed", true);
+            _project.SendErrorToLog(
+                "Hunt " + type + " | failed after " + attempts + " attempts"
+                + (lastFailure.Length > 0 ? ": " + lastFailure : ""), true);
             return false;
+        }
+
+        /// <summary>
+        /// Короткое описание отказа: тип исключения и первая строка сообщения.
+        /// У Playwright в сообщении следом идёт «Call log» на десяток строк — в
+        /// логе он не помогает, а причину прячет.
+        /// </summary>
+        private static string Describe(Exception error)
+        {
+            var message = (error.Message ?? "").Split(new[] { (char)13, (char)10 })[0].Trim();
+            if (message.Length > 160) message = message.Substring(0, 160) + "…";
+            return error.GetType().Name + ": " + message;
         }
 
         private static bool VerificationPassed(IList<string> responses)
