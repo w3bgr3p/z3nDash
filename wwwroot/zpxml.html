@@ -45,6 +45,15 @@
     <button class="btn" id="btn-reset">reset</button>
     <button class="btn active" id="btn-layout">↕ vertical</button>
     <button class="btn" id="btn-edit">✎ edit</button>
+    <span class="dbg-group">
+      <input id="dbg-dir" type="text" placeholder="project dir…" spellcheck="false">
+      <button class="btn" id="dbg-start">▶ start</button>
+      <button class="btn" id="dbg-step" disabled>⏭ step</button>
+      <button class="btn" id="dbg-run" disabled>▶▶ run</button>
+      <button class="btn" id="dbg-pause" disabled>⏸ pause</button>
+      <button class="btn" id="dbg-stop" disabled>⏹ stop</button>
+      <span id="dbg-state">idle</span>
+    </span>
     <input id="search" type="text" placeholder="search by label / ID…">
     <div class="legend">
       <div class="ld"><div class="ldot good"></div>start/good</div>
@@ -61,9 +70,14 @@
     <div id="detail">
       <div id="detail-resizer" title="drag to resize"></div>
       <button id="btn-detail-close">✕</button>
+      <div id="d-tabs">
+        <button class="dtab active" data-tab="branch">branch</button>
+        <button class="dtab" data-tab="debug">debug</button>
+      </div>
       <h3 id="d-label"></h3>
       <div class="dl" id="d-meta"></div>
       <div id="d-branches"></div>
+      <div id="d-debug"></div>
     </div>
     <div id="mini"></div>
     <div id="empty">
@@ -77,5 +91,6 @@
 <script src="/js/zpxml-model.js"></script>
 <script src="/js/zpxml-view.js"></script>
 <script src="/js/zpxml.js"></script>
+<script src="/js/zpxml-debug.js"></script>
 </body>
 </html>

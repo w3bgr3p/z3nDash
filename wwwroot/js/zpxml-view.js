@@ -230,8 +230,11 @@ function renderNodes() {
         let html = '';
         s.branches.forEach((b, bi) => {
             const on = selected && selected.stepId === s.id && selected.branchIndex === bi;
+            // Где стоит исполнение — отдельно от того, что выделено мышью.
+            const atCursor = typeof dbgCurrent !== 'undefined' && dbgCurrent
+                             && dbgCurrent.stepId === s.id && dbgCurrent.branchId === b.id;
             html += '<div class="row t-' + typeClass(b.type) + (b.disabled ? ' off' : '') +
-                        (b.optional ? ' opt' : '') + (on ? ' on' : '') +
+                        (b.optional ? ' opt' : '') + (on ? ' on' : '') + (atCursor ? ' at-cursor' : '') +
                         '" style="height:' + ROW_H + 'px" data-b="' + bi + '">' +
                       (() => { const p = portHtml(s.id, bi, undefined, ''); return p.left; })() +
                       '<span class="mark ' + typeClass(b.type) + '">' + branchMark(b) + '</span>' +
@@ -271,6 +274,13 @@ function renderNodes() {
         // Слушатели строк вешаются после innerHTML: раньше этих элементов нет.
         div.querySelectorAll('.row').forEach(rowEl => {
             const bi = +rowEl.dataset.b;
+            // Правый клик — выполнить до этой ветки. Кнопка в тулбаре требовала
+            // бы сперва выбрать строку, потом нажать: два действия вместо одного.
+            rowEl.addEventListener('contextmenu', e => {
+                if (typeof dbgState === 'undefined' || dbgState !== 'paused') return;
+                e.preventDefault(); e.stopPropagation();
+                dbgRunTo(s.id, s.branches[bi].id);
+            });
             rowEl.addEventListener('mousedown', e => {
                 if (!editing) return;
                 if (e.target.closest('.drag-port')) return;

@@ -363,3 +363,52 @@ textarea.bi-code.edit:focus { border-color:var(--accent); }
 .bi-head .flag.off { background:var(--bg3);         color:var(--text3); }
 .bi-head .flag.opt { background:var(--yellow-tint); color:var(--yellow); }
 .bi-link.dim { opacity:.5; font-style:italic; }
+
+/* ── Пульт отладки ──────────────────────────────────────────────────────── */
+.dbg-group {
+    display:inline-flex; align-items:center; gap:4px;
+    padding-left:8px; margin-left:4px;
+    border-left:1px solid var(--border);
+}
+#dbg-dir {
+    font-size:11px; padding:4px 8px; width:180px;
+    border:1px solid var(--border); border-radius:var(--radius, 6px);
+    background:var(--bg2); color:var(--text); outline:none;
+    font-family:var(--mono, monospace);
+}
+#dbg-dir:focus { border-color:var(--accent); }
+#dbg-state { font-size:10px; color:var(--text2); min-width:52px; font-family:var(--mono, monospace); }
+body.debugging #dbg-state { color:var(--yellow); }
+
+/* Где стоит исполнение — отдельно от того, что выделено мышью. */
+.row.at-cursor {
+    box-shadow:inset 3px 0 0 var(--yellow);
+    background:color-mix(in srgb, var(--yellow) 18%, var(--bg1));
+}
+
+/* ── Вкладки панели ─────────────────────────────────────────────────────── */
+#d-tabs { display:flex; gap:4px; margin-bottom:8px; }
+.dtab {
+    font-size:10px; padding:3px 10px; cursor:pointer;
+    background:var(--bg2); color:var(--text2);
+    border:1px solid var(--border); border-radius:var(--radius, 6px);
+    font-family:var(--font);
+}
+.dtab.active { background:var(--blue-tint); color:var(--accent); border-color:var(--blue-border); }
+
+#d-debug { display:none; }
+#d-debug.on { display:block; }
+.dl.params dt.changed { color:var(--yellow); font-weight:600; }
+
+#dbg-log {
+    max-height:160px; overflow-y:auto; margin:0;
+    font-family:var(--mono, monospace); font-size:9px; line-height:1.5;
+    color:var(--text2); white-space:pre-wrap; word-break:break-word;
+}
+#dbg-var-filter {
+    width:100%; box-sizing:border-box; margin-bottom:4px;
+    font-size:10px; padding:2px 5px;
+    border:1px solid var(--border); border-radius:3px;
+    background:var(--bg2); color:var(--text); outline:none;
+}
+#dbg-var-filter:focus { border-color:var(--accent); }
