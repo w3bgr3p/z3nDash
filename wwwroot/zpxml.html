@@ -24,6 +24,7 @@
   <div id="top">
     <div id="top-left">
       <div id="drop-zone">📂 pick an XML file or drop it here</div>
+      <button class="btn" id="btn-open-path">📁 open from disk…</button>
       <input type="file" id="file-input" accept=".xml,.zp,.txt">
       <div id="top-row">
         <button class="btn" id="btn-clear">clear</button>
@@ -46,8 +47,6 @@
     <button class="btn active" id="btn-layout">↕ vertical</button>
     <button class="btn" id="btn-edit">✎ edit</button>
     <span class="dbg-group">
-      <input id="dbg-dir" type="text" placeholder="project dir…" spellcheck="false">
-      <button class="btn" id="dbg-pick" title="выбрать каталог проекта">…</button>
       <button class="btn" id="dbg-start">▶ start</button>
       <button class="btn" id="dbg-step" disabled>⏭ step</button>
       <button class="btn" id="dbg-run" disabled>▶▶ run</button>

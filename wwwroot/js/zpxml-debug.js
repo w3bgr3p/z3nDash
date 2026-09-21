@@ -1,8 +1,6 @@
 /* zpxml-debug.js — пульт отладки: команды серверной сессии и приём её событий.
    Про устройство плеера не знает: шлёт команды и рисует то, что пришло. */
 
-const DBG_DIR_KEY = 'zpxml-project-dir';
-
 let dbgState   = 'idle';
 let dbgCurrent = null;      // { stepId, branchId } — где стоит исполнение
 let dbgSnap    = null;      // последний снимок состояния
@@ -36,43 +34,36 @@ async function dbgPost(action, body) {
     }
 }
 
-/// Каталог проекта выбирается системным диалогом: браузер полного пути
-/// выбранного файла не отдаёт, а шаблону нужен каталог — там лежит .env и то,
-/// что ищет Constantes. Диалог уже есть в приложении, GET /tasker/pick.
-async function dbgPickDir() {
-    const field = document.getElementById('dbg-dir');
-    try {
-        const r = await fetch('/tasker/pick?mode=folder&start=' + encodeURIComponent(field.value.trim()));
-        const res = await r.json();
-        if (!res.ok) { setStatus('debug: ' + (res.error || 'диалог не открылся'), 'err'); return; }
-        if (!res.path) return;                       // отмена — не ошибка
-        field.value = res.path;
-        try { localStorage.setItem(DBG_DIR_KEY, res.path); } catch (e) { /* ignore */ }
-        setStatus('debug: каталог ' + res.path, 'ok');
-    } catch (e) {
-        setStatus('debug: выбор каталога не сработал: ' + e.message, 'err');
-    }
+/// Каталог из пути файла. Без регулярки намеренно: разделитель на Windows —
+/// обратный слэш, и любое лишнее экранирование при генерации кода превращает
+/// выражение в тихо неработающее.
+function dirNameOf(fullPath) {
+    const cut = Math.max(fullPath.lastIndexOf('\\'), fullPath.lastIndexOf('/'));
+    return cut > 0 ? fullPath.slice(0, cut) : fullPath;
 }
 
 async function dbgStart() {
     if (!ZpDoc.doc) { setStatus('nothing to debug', 'err'); return; }
 
-    const dir = document.getElementById('dbg-dir').value.trim();
-    if (!dir) {
-        setStatus('debug: не указан каталог проекта — нажми «…» рядом с полем', 'err');
+    // Каталог — это каталог открытого шаблона, отдельно его не спрашиваем.
+    // Он известен, только если файл открыт системным диалогом: браузерный
+    // пикер пути не отдаёт принципиально.
+    if (!templatePath) {
+        setStatus('debug: открой шаблон кнопкой «open from disk» — из браузерного '
+                + 'выбора не виден путь, а он нужен для .env и общего кода', 'err');
         return;
     }
-    // Каталог запоминается: браузер не отдаёт путь выбранного файла, и вводить
-    // его заново на каждый запуск — лишнее.
-    try { localStorage.setItem(DBG_DIR_KEY, dir); } catch (e) { /* ignore */ }
+
+    const dir = dirNameOf(templatePath);
 
     setStatus('debug: starting…', 'info');
     const res = await dbgPost('start', {
         xml: ZpDoc.serialize(), projectDir: dir, headless: false
     });
     if (!res.ok) { setStatus('debug: ' + (res.error || 'не запустилось'), 'err'); return; }
-    setStatus('debug: session started', 'ok');
+    setStatus('debug: session started · ' + dir, 'ok');
 }
+
 
 async function dbgRunTo(stepId, branchId) {
     const res = await dbgPost('runto', { stepId, branchId });
@@ -246,13 +237,6 @@ function dbgListen() {
 // ── Подключение ──────────────────────────────────────────────────────────────
 
 (function () {
-    try {
-        const saved = localStorage.getItem(DBG_DIR_KEY);
-        if (saved) document.getElementById('dbg-dir').value = saved;
-    } catch (e) { /* ignore */ }
-
-    document.getElementById('dbg-dir').addEventListener('keydown', e => e.stopPropagation());
-    document.getElementById('dbg-pick' ).addEventListener('click', dbgPickDir);
     document.getElementById('dbg-start').addEventListener('click', dbgStart);
     document.getElementById('dbg-step' ).addEventListener('click', () => dbgPost('step'));
     document.getElementById('dbg-run'  ).addEventListener('click', () => dbgPost('run'));

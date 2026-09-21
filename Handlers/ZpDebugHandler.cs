@@ -16,6 +16,7 @@ namespace z3nDash;
 ///   POST /dbg/pause   — встать на текущей ветке
 ///   POST /dbg/runto   { stepId, branchId } — дойти до ветки
 ///   POST /dbg/stop    — прервать и освободить браузер
+///   GET  /dbg/file    ?path=... — содержимое шаблона байтами, как на диске
 ///   GET  /dbg/state   — текущее состояние одним ответом
 ///   GET  /dbg/events  — поток событий (SSE)
 ///
@@ -42,6 +43,29 @@ public sealed class ZpDebugHandler : IScriptHandler
             if (path == "/dbg/events" && method == "GET")
             {
                 await SseHub.SubscribeOutput(ctx.Response, "zp-debug", CancellationToken.None);
+                return true;
+            }
+
+            // Файл отдаётся байтами как есть: страница разбирает его тем же
+            // кодом, что и выбранный локально, и кодировка определяется по BOM.
+            // Читать его текстом нельзя — шаблоны ZennoPoster в UTF-16, и
+            // Encoding.UTF8.GetString дал бы мусор с первого символа.
+            if (path == "/dbg/file" && method == "GET")
+            {
+                var file = ctx.Request.QueryString["path"] ?? "";
+                if (!File.Exists(file))
+                {
+                    ctx.Response.StatusCode = 404;
+                    await WriteJson(ctx.Response, new { ok = false, error = $"файл не найден: {file}" });
+                    ctx.Response.Close();
+                    return true;
+                }
+
+                var bytes = await File.ReadAllBytesAsync(file);
+                ctx.Response.ContentType     = "application/octet-stream";
+                ctx.Response.ContentLength64 = bytes.Length;
+                await ctx.Response.OutputStream.WriteAsync(bytes);
+                ctx.Response.Close();
                 return true;
             }
 

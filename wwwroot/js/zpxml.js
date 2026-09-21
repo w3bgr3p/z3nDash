@@ -66,6 +66,47 @@ function updateStatus() {
 
 function updateDirtyMark() { updateStatus(); }
 
+/// Открыть шаблон системным диалогом. Браузерный пикер отдаёт только
+/// содержимое, а шаблону нужен ещё и каталог — там лежит .env и то, что ищет
+/// Constantes. Системный диалог отдаёт полный путь, и каталог берётся из него:
+/// спрашивать его отдельно незачем, это каталог выбранного файла.
+async function openFromDisk() {
+    setStatus('choosing a file…', 'info');
+    let picked;
+    try {
+        const r = await fetch('/tasker/pick?mode=file&ext=xml&start=' + encodeURIComponent(templatePath || ''));
+        picked = await r.json();
+    } catch (e) {
+        setStatus('file dialog failed: ' + e.message, 'err');
+        return;
+    }
+    if (!picked.ok) { setStatus('file dialog: ' + (picked.error || 'не открылся'), 'err'); return; }
+    if (!picked.path) { setStatus('', 'info'); return; }      // отмена — не ошибка
+
+    let buf;
+    try {
+        const r = await fetch('/dbg/file?path=' + encodeURIComponent(picked.path));
+        if (!r.ok) {
+            const body = await r.text();
+            setStatus('cannot read file: ' + body.slice(0, 160), 'err');
+            return;
+        }
+        buf = await r.arrayBuffer();
+    } catch (e) {
+        setStatus('cannot read file: ' + e.message, 'err');
+        return;
+    }
+
+    templatePath = picked.path;
+    try { localStorage.setItem('zpxml-template-path', templatePath); } catch (e) { /* ignore */ }
+    openBuffer(buf, picked.path.split(/[\/]/).pop());
+}
+
+/// Полный путь открытого шаблона. Пусто, если файл выбран браузерным пикером:
+/// тот путь не отдаёт, и тогда отладка не знает каталога проекта.
+let templatePath = '';
+try { templatePath = localStorage.getItem('zpxml-template-path') || ''; } catch (e) { /* ignore */ }
+
 function readFile(file) {
     setStatus('reading the file…', 'info');
     const reader = new FileReader();
@@ -775,3 +816,4 @@ function beginEdgeDrag(stepId, branchIndex, slot, ev) {
 // Восстановление идёт последним: оно трогает editing и обработчики, которые
 // объявлены ниже по файлу, и вызов раньше упёрся бы в их временную мёртвую зону.
 restoreSession();
+document.getElementById('btn-open-path').addEventListener('click', openFromDisk);
