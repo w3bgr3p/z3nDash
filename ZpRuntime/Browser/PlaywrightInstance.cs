@@ -869,8 +869,40 @@ namespace z3nDash.Browser
         public string GetPagePreview()
             => Convert.ToBase64String(Sync(_page.ScreenshotAsync()));
 
+        /// <summary>
+        /// Нажатие клавиши. Аргумент <paramref name="type"/> раньше принимался
+        /// и игнорировался: любой вызов делал полное нажатие, то есть код,
+        /// зажимавший клавишу отдельным keydown, получал сразу и keyup.
+        /// Тот же дефект был у <see cref="MouseClick"/>.
+        ///
+        /// Удержание модификатора на половинке нажатия — наше прочтение, а не
+        /// сверенное с ZP: модификатор жмётся перед клавишей и отпускается после
+        /// неё, как сделал бы человек. Ни один вызывающий код сейчас модификатор
+        /// вместе с половинкой не передаёт.
+        /// </summary>
         public void KeyEvent(string key, string type, string modifier = "")
-            => Sync(_page.Keyboard.PressAsync(string.IsNullOrEmpty(modifier) ? key : $"{modifier}+{key}"));
+        {
+            var hasMod = !string.IsNullOrEmpty(modifier);
+
+            switch ((type ?? "").Trim().ToLowerInvariant())
+            {
+                case "down":
+                case "keydown":
+                    if (hasMod) Sync(_page.Keyboard.DownAsync(modifier));
+                    Sync(_page.Keyboard.DownAsync(key));
+                    break;
+
+                case "up":
+                case "keyup":
+                    Sync(_page.Keyboard.UpAsync(key));
+                    if (hasMod) Sync(_page.Keyboard.UpAsync(modifier));
+                    break;
+
+                default:
+                    Sync(_page.Keyboard.PressAsync(hasMod ? $"{modifier}+{key}" : key));
+                    break;
+            }
+        }
 
         public void InsertText(string text)
             => Sync(_page.Keyboard.InsertTextAsync(text));

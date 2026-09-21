@@ -62,6 +62,7 @@ public sealed class BranchExecutor
             ("Logic",       "Switch")       => Switch(branch),
             ("Logic",       "Alert")        => Alert(branch),
             ("Emulation",   "KeyBoard")     => KeyBoard(branch, ct),
+            ("Emulation",   "MouseClick")   => EmulatedClick(branch),
             ("ImageProcessing", "WaterMark")=> WaterMarkBranch(branch),
             _ => throw new NotSupportedException(
                      $"ветка {branch.Type}/{branch.Action} в плеере не реализована"),
@@ -397,6 +398,49 @@ public sealed class BranchExecutor
     /// Уровень в XML записан как «Lavel» — это опечатка самого ZennoPoster, в
     /// файлах поле называется именно так.
     /// </summary>
+    /// <summary>
+    /// Клик по координатам окна, а не по элементу. В XML задан прямоугольник
+    /// Xmin/Xmax/Ymin/Ymax — в шаблонах он обычно вырожден в точку.
+    ///
+    /// Что означает ClickDistribution внутри прямоугольника, я не проверял:
+    /// точка берётся равномерно. Это влияет на то, куда именно внутри
+    /// прямоугольника придётся клик, и никак — на вырожденный случай.
+    /// Незнакомое значение не отменяет клик: отказаться было бы хуже, чем
+    /// кликнуть не по той кривой.
+    ///
+    /// Курсор сначала подводится эмуляцией, а потом жмётся кнопка.
+    /// Замер 2026-09-21 на капче megapari: нажатие без подвода, сразу после
+    /// телепорта курсора, страница иногда не отрабатывает, а ветка названа Emulation.
+    /// </summary>
+    private BranchResult EmulatedClick(Branch branch)
+    {
+        int Coord(string name)
+        {
+            _ = int.TryParse(_project.Expand(branch.Param(name)), out var v);
+            return v;
+        }
+
+        int Between(int a, int b) => a == b ? a : Random.Shared.Next(Math.Min(a, b), Math.Max(a, b) + 1);
+
+        var x = Between(Coord("Xmin"), Coord("Xmax"));
+        var y = Between(Coord("Ymin"), Coord("Ymax"));
+
+        var button = (branch.Param("MouseButtonClick") ?? "").Trim().ToLowerInvariant() switch
+        {
+            "right"  => "right",
+            "middle" => "middle",
+            _        => "left",
+        };
+
+        _log($"[xml] MouseClick: {button} в {x},{y}");
+
+        _instance.ActiveTab.FullEmulationMouseMove(x, y);
+        _instance.ActiveTab.MouseClick(x, y, button, "click", false);
+
+        SettleAfterAction();
+        return BranchResult.Empty;
+    }
+
     /// <summary>
     /// Ввод с клавиатуры. В XML: &lt;Text&gt; — что набрать, &lt;Latency&gt; —
     /// миллисекунды между нажатиями. Специальные клавиши записаны вставками
