@@ -1120,7 +1120,13 @@ namespace z3nDash.Browser
         /// </summary>
         public string DrawToBitmap()
         {
-            if (Missing) return "";
+            // Пустую строку не отдаём: она уезжает в распознаватель и
+            // возвращается оттуда как «z3nCap error (400): Empty request body»
+            // — сообщение, по которому не понять, что снимка не было вовсе.
+            // Наблюдалось в прогоне simroute.megapari 2026-09-20.
+            if (Missing)
+                throw new InvalidOperationException(
+                    "DrawToBitmap: элемента нет на странице на момент снимка");
 
             var data = Sync(_loc.EvaluateAsync<string>(
                 "el => el.tagName && el.tagName.toLowerCase() === 'canvas' "
@@ -1131,7 +1137,15 @@ namespace z3nDash.Browser
                 // toDataURL отдаёт «data:image/png;base64,…» — приёмник ждёт
                 // тот же чистый base64, что возвращал скриншот.
                 var comma = data.IndexOf(',');
-                return comma >= 0 ? data.Substring(comma + 1) : data;
+                var payload = comma >= 0 ? data.Substring(comma + 1) : data;
+
+                // Пустой канвас тоже отдаёт корректный data:URL — короткий.
+                // Отправлять такое дальше незачем: ответ будет невнятным.
+                if (payload.Length < 128)
+                    throw new InvalidOperationException(
+                        $"DrawToBitmap: канвас отдал пустой снимок ({payload.Length} симв. base64)");
+
+                return payload;
             }
 
             // Остальным элементам — снимок, но без ожидания анимаций: на живой
