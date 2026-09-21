@@ -526,3 +526,17 @@ body.dbg-busy #canvas-wrap { cursor:progress; }
     color:var(--text3);
 }
 .ts-empty { color:var(--text3); font-size:11px; padding:10px 0; }
+
+#ts-tabs { display:flex; gap:4px; padding:8px 14px 0; }
+.ts-tab {
+    font-size:10px; padding:4px 12px; cursor:pointer;
+    background:var(--bg2); color:var(--text2);
+    border:1px solid var(--border); border-radius:var(--radius, 6px);
+    font-family:var(--font);
+}
+.ts-tab.active { background:var(--blue-tint); color:var(--accent); border-color:var(--blue-border); }
+.dl.ts-profile { grid-template-columns:minmax(150px, 40%) 1fr; margin-bottom:4px; }
+.dl.ts-profile dt, .dl.ts-profile dd {
+    border-bottom:1px solid color-mix(in srgb, var(--text) 7%, transparent);
+    padding-bottom:3px;
+}
