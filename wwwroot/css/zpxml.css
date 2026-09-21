@@ -421,3 +421,45 @@ body.debugging #dbg-state { color:var(--yellow); }
     font-size:10px; line-height:1.5;
 }
 .bi.warn .bi-head { color:var(--yellow); }
+
+/* ── Панель переменных ──────────────────────────────────────────────────── */
+/* Переменных под сотню, поэтому они живут отдельно и открываются кнопкой:
+   под профилем такая простыня заставляла прокручивать её ради лога. */
+#vars-panel {
+    position:absolute; top:0; bottom:0;
+    right:var(--detail-w, 290px);
+    width:300px;
+    display:none; flex-direction:column;
+    background:var(--bg1);
+    border-left:1px solid var(--border);
+    border-right:1px solid var(--border);
+    padding:10px; z-index:39;
+    box-shadow:-2px 0 8px rgba(0,0,0,.2);
+}
+#vars-panel.open { display:flex; }
+
+#vars-head {
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:11px; font-weight:600; color:var(--text-hi);
+    margin-bottom:6px;
+}
+#vars-close {
+    border:none; background:none; cursor:pointer;
+    color:var(--text3); font-size:14px; padding:0;
+}
+#vars-close:hover { color:var(--text-hi); }
+
+#vars-panel #dbg-vars {
+    flex:1; overflow-y:auto; margin-bottom:0;
+    align-content:start;
+    /* Имена вроде ANYMESSAGE_TOKEN не должны переноситься по слогам. */
+    grid-template-columns:minmax(118px, 44%) 1fr;
+}
+
+/* Еле заметная линия между переменными: взгляд цепляется за границу строки,
+   не отвлекаясь на саму линию. */
+#dbg-vars dt, #dbg-vars dd {
+    border-bottom:1px solid color-mix(in srgb, var(--text) 7%, transparent);
+    padding-bottom:3px;
+}
+#dbg-vars dt { color:var(--text2); }

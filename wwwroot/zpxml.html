@@ -52,6 +52,7 @@
       <button class="btn" id="dbg-run" disabled>▶▶ run</button>
       <button class="btn" id="dbg-pause" disabled>⏸ pause</button>
       <button class="btn" id="dbg-stop" disabled>⏹ stop</button>
+      <button class="btn" id="dbg-vars-btn" disabled>vars</button>
       <span id="dbg-state">idle</span>
     </span>
     <input id="search" type="text" placeholder="search by label / ID…">
@@ -78,6 +79,14 @@
       <div class="dl" id="d-meta"></div>
       <div id="d-branches"></div>
       <div id="d-debug"></div>
+    </div>
+    <div id="vars-panel">
+      <div id="vars-head">
+        <span>variables</span>
+        <button id="vars-close" title="закрыть">✕</button>
+      </div>
+      <input id="dbg-var-filter" placeholder="filter…" spellcheck="false">
+      <div class="dl params" id="dbg-vars"></div>
     </div>
     <div id="mini"></div>
     <div id="empty">

@@ -129,11 +129,6 @@ function dbgRenderSnapshot(snap) {
     const host = document.getElementById('d-debug');
     if (!host) return;
 
-    const changed = new Set(snap.changed || []);
-    const vars = [...(snap.vars || [])].sort((a, b) =>
-        (changed.has(b.name) ? 1 : 0) - (changed.has(a.name) ? 1 : 0) ||
-        a.name.localeCompare(b.name));
-
     // Сессия живёт на сервере и переживает смену файла на странице. Если её
     // текущей ветки нет в открытом шаблоне, значит отлаживается другой — и
     // молчать об этом нельзя: панель выглядела бы исправной, показывая чужое.
@@ -170,32 +165,52 @@ function dbgRenderSnapshot(snap) {
                 '<dt>login</dt><dd>' + escHtml(snap.profile.login || '') + '</dd>' +
               '</div></div>'
             : '') +
-        '<div class="bi"><div class="bi-head">player log</div><pre id="dbg-log"></pre></div>' +
-        '<div class="bi"><div class="bi-head">variables</div>' +
-            '<input id="dbg-var-filter" placeholder="filter…" spellcheck="false">' +
-            '<div class="dl params" id="dbg-vars">' +
-            vars.map(v => '<dt' + (changed.has(v.name) ? ' class="changed"' : '') + '>' +
-                escHtml(v.name) + '</dt><dd>' + escHtml(v.value) + '</dd>').join('') +
-            '</div></div>';
+        '<div class="bi"><div class="bi-head">player log</div><pre id="dbg-log"></pre></div>';
 
     const log = document.getElementById('dbg-log');
-    if (log) { log.textContent = dbgLines.join('\n'); log.scrollTop = log.scrollHeight; }
-    dbgBindVarFilter();
+    if (log) { log.textContent = dbgLines.join(String.fromCharCode(10)); log.scrollTop = log.scrollHeight; }
+
+    dbgRenderVars(snap);
 }
 
-function dbgBindVarFilter() {
+/// Переменные живут в своей панели и по умолчанию закрыты: их 85, и держать
+/// такую простыню под профилем — значит прокручивать её каждый раз, чтобы
+/// добраться до лога.
+function dbgRenderVars(snap) {
+    const list = document.getElementById('dbg-vars');
+    if (!list) return;
+
+    const changed = new Set(snap.changed || []);
+    const vars = [...(snap.vars || [])].sort((a, b) =>
+        (changed.has(b.name) ? 1 : 0) - (changed.has(a.name) ? 1 : 0) ||
+        a.name.localeCompare(b.name));
+
+    list.innerHTML = vars.map(v =>
+        '<dt' + (changed.has(v.name) ? ' class="changed"' : '') + '>' + escHtml(v.name) + '</dt>' +
+        '<dd>' + escHtml(v.value) + '</dd>').join('');
+
+    document.getElementById('dbg-vars-btn').disabled = vars.length === 0;
+    dbgApplyVarFilter();
+}
+
+function dbgToggleVars(show) {
+    const panel = document.getElementById('vars-panel');
+    const open = show === undefined ? !panel.classList.contains('open') : show;
+    panel.classList.toggle('open', open);
+    document.getElementById('dbg-vars-btn').classList.toggle('active', open);
+}
+
+function dbgApplyVarFilter() {
     const input = document.getElementById('dbg-var-filter');
     if (!input) return;
-    input.addEventListener('keydown', e => e.stopPropagation());
-    input.addEventListener('input', () => {
-        const q = input.value.toLowerCase().trim();
-        document.querySelectorAll('#dbg-vars dt').forEach(dt => {
-            const hide = q && !dt.textContent.toLowerCase().includes(q);
-            dt.style.display = hide ? 'none' : '';
-            if (dt.nextElementSibling) dt.nextElementSibling.style.display = hide ? 'none' : '';
-        });
+    const q = input.value.toLowerCase().trim();
+    document.querySelectorAll('#dbg-vars dt').forEach(dt => {
+        const hide = q && !dt.textContent.toLowerCase().includes(q);
+        dt.style.display = hide ? 'none' : '';
+        if (dt.nextElementSibling) dt.nextElementSibling.style.display = hide ? 'none' : '';
     });
 }
+
 
 // ── Поток событий ────────────────────────────────────────────────────────────
 
@@ -219,6 +234,15 @@ function dbgListen() {
             renderNodes();
             dbgScrollToCurrent();
             if (ev.state === 'paused' || ev.state === 'finished') {
+                // Выделение идёт следом за исполнением: иначе панель branch
+                // продолжает показывать ту ветку, которую кликнули раньше, и
+                // кажется, будто шаг никуда не сдвинулся.
+                if (ev.current && steps[ev.current.stepId]) {
+                    const st = steps[ev.current.stepId];
+                    const i  = st.branches.findIndex(b => b.id === ev.current.branchId);
+                    if (i >= 0) selected = { stepId: st.id, branchIndex: i };
+                }
+                renderNodes();
                 document.getElementById('detail').classList.add('open');
                 dbgShowTab('debug');
                 dbgRenderSnapshot(ev);
@@ -250,6 +274,11 @@ function dbgListen() {
 
     document.querySelectorAll('.dtab').forEach(b =>
         b.addEventListener('click', () => dbgShowTab(b.dataset.tab)));
+
+    document.getElementById('dbg-vars-btn').addEventListener('click', () => dbgToggleVars());
+    document.getElementById('vars-close').addEventListener('click', () => dbgToggleVars(false));
+    document.getElementById('dbg-var-filter').addEventListener('input', dbgApplyVarFilter);
+    document.getElementById('dbg-var-filter').addEventListener('keydown', e => e.stopPropagation());
 
     // Состояние спрашивается при загрузке: сессия могла пережить перезагрузку
     // страницы, и пульт должен показать её, а не «idle».
