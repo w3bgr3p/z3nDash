@@ -1,121 +1,121 @@
 /* Модалка traffic в zp7. Каркас — как у zp-all-logs.css, наполнение панели
    деталей перенесено со страницы http.html. */
 
-#zpTraffic { width: calc(100vw - 32px); max-width: 1700px; height: calc(100vh - 48px); max-height: 980px; margin: auto; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; font-size: 12px; }
+#zpTraffic { width: calc(100vw - 32px); max-width: 1700px; height: calc(100vh - 48px); max-height: 980px; margin: auto; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); font: inherit; font-size: var(--fs-12); }
 #zpTraffic[open] { display: flex; flex-direction: column; }
 #zpTraffic::backdrop { background: rgba(0,0,0,.65); }
-#zpTraffic header { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg1); border-bottom: 1px solid var(--border); }
-#zpTraffic h2 { font-size: 15px; color: var(--accent); margin: 0; }
+#zpTraffic header { display: flex; align-items: center; gap: var(--sp-12); padding: var(--sp-12); background: var(--bg1); border-bottom: 1px solid var(--border); }
+#zpTraffic h2 { font-size: var(--fs-14); color: var(--accent); margin: 0; }
 #zpTraffic header #ztr-close { margin-left: auto; }
-#zpTraffic button, #zpTraffic select, #zpTraffic input, #zpTraffic textarea { font: inherit; color: var(--text); background: var(--bg1); border: 1px solid var(--border); border-radius: 4px; padding: 5px 7px; }
+#zpTraffic button, #zpTraffic select, #zpTraffic input, #zpTraffic textarea { font: inherit; color: var(--text); background: var(--bg1); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--sp-4) var(--sp-6); }
 #zpTraffic button { cursor: pointer; }
 #zpTraffic button:hover { border-color: var(--accent); }
 #zpTraffic :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-#zpTraffic .ztr-controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; }
+#zpTraffic .ztr-controls { display: flex; flex-wrap: wrap; gap: var(--sp-6); padding: var(--sp-10); }
 #zpTraffic .ztr-controls input[type="search"] { min-width: 100px; width: 170px; }
 #zpTraffic .ztr-controls input[type="number"] { width: 70px; }
 #zpTraffic .ztr-controls select { max-width: 210px; }
-#zpTraffic .ztr-status { padding: 0 12px 8px; color: var(--text2); font-size: 11px; white-space: pre-wrap; max-height: 90px; overflow: auto; }
+#zpTraffic .ztr-status { padding: 0 var(--sp-12) var(--sp-8); color: var(--text2); font-size: var(--fs-11); white-space: pre-wrap; max-height: 90px; overflow: auto; }
 #zpTraffic .ztr-status.error { color: var(--red); }
-#zpTraffic .ztr-content { display: flex; flex: 1; min-height: 0; gap: 8px; padding: 0 10px 10px; }
+#zpTraffic .ztr-content { display: flex; flex: 1; min-height: 0; gap: var(--sp-8); padding: 0 var(--sp-10) var(--sp-10); }
 
 /* ── список запросов ── */
-#zpTraffic .ztr-list { flex: 1; min-width: 0; overflow: auto; border: 1px solid var(--border); border-radius: 5px; }
-#zpTraffic .ztr-row { padding: 6px 10px; border-bottom: 1px solid var(--bg2); cursor: pointer; display: grid; grid-template-columns: 74px 96px 54px auto 48px 62px 92px; gap: 6px; align-items: center; }
+#zpTraffic .ztr-list { flex: 1; min-width: 0; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+#zpTraffic .ztr-row { padding: var(--sp-6) var(--sp-10); border-bottom: 1px solid var(--bg2); cursor: pointer; display: grid; grid-template-columns: 74px 96px 54px auto 48px 62px 92px; gap: var(--sp-6); align-items: center; }
 #zpTraffic .ztr-row:hover { background: var(--bg1); }
 #zpTraffic .ztr-row.selected { background: var(--bg2); box-shadow: inset 3px 0 0 var(--accent); }
-#zpTraffic .ztr-empty { padding: 14px; color: var(--text2); font-size: 11px; }
-#zpTraffic .ztr-ts { color: var(--text3); font-family: var(--mono); font-size: 10px; }
+#zpTraffic .ztr-empty { padding: var(--sp-14); color: var(--text2); font-size: var(--fs-11); }
+#zpTraffic .ztr-ts { color: var(--text3); font-family: var(--mono); font-size: var(--fs-10); }
 #zpTraffic .ztr-machine { color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #zpTraffic .ztr-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#zpTraffic .ztr-dur { color: var(--text2); font-family: var(--mono); font-size: 11px; text-align: right; }
+#zpTraffic .ztr-dur { color: var(--text2); font-family: var(--mono); font-size: var(--fs-11); text-align: right; }
 #zpTraffic .ztr-acc { color: var(--green-hi); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── бейджи метода и статуса ── */
-#zpTraffic .m, #zpTraffic .s { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; text-align: center; font-family: var(--mono); }
-#zpTraffic .m.GET    { background: rgba(88,166,255,.15); color: var(--accent-lo); }
-#zpTraffic .m.POST   { background: rgba(63,185,80,.15);  color: var(--green-lo); }
-#zpTraffic .m.PUT    { background: rgba(210,153,34,.15); color: var(--yellow-lo); }
-#zpTraffic .m.PATCH  { background: rgba(210,153,34,.15); color: var(--yellow-lo); }
-#zpTraffic .m.DELETE { background: rgba(248,81,73,.15);  color: var(--red-lo); }
-#zpTraffic .m.HEAD   { background: rgba(88,166,255,.15); color: var(--accent-lo); }
-#zpTraffic .s.s2xx { background: rgba(63,185,80,.15);  color: var(--green-lo); }
-#zpTraffic .s.s3xx { background: rgba(88,166,255,.15); color: var(--accent-lo); }
-#zpTraffic .s.s4xx { background: rgba(210,153,34,.15); color: var(--yellow-lo); }
-#zpTraffic .s.s5xx { background: rgba(248,81,73,.15);  color: var(--red-lo); }
-#zpTraffic .s.s0xx { background: rgba(248,81,73,.12);  color: var(--red-lo); }
+#zpTraffic .m, #zpTraffic .s { padding: var(--sp-2) var(--sp-6); border-radius: var(--radius-sm); font-size: var(--fs-11); font-weight: var(--fw-semi); text-align: center; font-family: var(--mono); }
+#zpTraffic .m.GET    { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-lo); }
+#zpTraffic .m.POST   { background: color-mix(in srgb, var(--green) 15%, transparent);  color: var(--green-lo); }
+#zpTraffic .m.PUT    { background: color-mix(in srgb, var(--yellow) 15%, transparent); color: var(--yellow-lo); }
+#zpTraffic .m.PATCH  { background: color-mix(in srgb, var(--yellow) 15%, transparent); color: var(--yellow-lo); }
+#zpTraffic .m.DELETE { background: color-mix(in srgb, var(--red) 15%, transparent);  color: var(--red-lo); }
+#zpTraffic .m.HEAD   { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-lo); }
+#zpTraffic .s.s2xx { background: color-mix(in srgb, var(--green) 15%, transparent);  color: var(--green-lo); }
+#zpTraffic .s.s3xx { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-lo); }
+#zpTraffic .s.s4xx { background: color-mix(in srgb, var(--yellow) 15%, transparent); color: var(--yellow-lo); }
+#zpTraffic .s.s5xx { background: color-mix(in srgb, var(--red) 15%, transparent);  color: var(--red-lo); }
+#zpTraffic .s.s0xx { background: color-mix(in srgb, var(--red) 12%, transparent);  color: var(--red-lo); }
 
 /* ── панель деталей ── */
-#zpTraffic .ztr-details { flex: 0 0 46%; min-width: 320px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+#zpTraffic .ztr-details { flex: 0 0 46%; min-width: 320px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 #zpTraffic .ztr-details[hidden] { display: none; }
-#zpTraffic .ztr-details-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg1); border-bottom: 1px solid var(--border); font-weight: 600; }
+#zpTraffic .ztr-details-head { display: flex; align-items: center; gap: var(--sp-8); padding: var(--sp-8) var(--sp-10); background: var(--bg1); border-bottom: 1px solid var(--border); font-weight: var(--fw-semi); }
 #zpTraffic .ztr-details-head button { margin-left: auto; }
-#zpTraffic .ztr-details-body { flex: 1; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-#zpTraffic .ov-url { font-family: var(--mono); font-size: 11px; word-break: break-all; padding-bottom: 6px; border-bottom: 1px solid var(--border); cursor: pointer; }
-#zpTraffic .ov-badges, #zpTraffic .ov-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-#zpTraffic .badge-duration { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: var(--mono); background: var(--steel-tint); color: var(--steel); }
-#zpTraffic .badge-meta { padding: 2px 7px; border-radius: 4px; font-size: 10px; background: var(--bg2); color: var(--text2); font-family: var(--mono); }
-#zpTraffic .badge-origin { padding: 2px 7px; border-radius: 4px; font-size: 10px; background: rgba(41,182,246,.1); color: #29b6f6; font-family: var(--mono); }
+#zpTraffic .ztr-details-body { flex: 1; overflow: auto; padding: var(--sp-10); display: flex; flex-direction: column; gap: var(--sp-10); }
+#zpTraffic .ov-url { font-family: var(--mono); font-size: var(--fs-11); word-break: break-all; padding-bottom: var(--sp-6); border-bottom: 1px solid var(--border); cursor: pointer; }
+#zpTraffic .ov-badges, #zpTraffic .ov-meta { display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: center; }
+#zpTraffic .badge-duration { padding: var(--sp-2) var(--sp-6); border-radius: var(--radius-sm); font-size: var(--fs-11); font-weight: var(--fw-semi); font-family: var(--mono); background: var(--steel-tint); color: var(--steel); }
+#zpTraffic .badge-meta { padding: var(--sp-2) var(--sp-6); border-radius: var(--radius-sm); font-size: var(--fs-10); background: var(--bg2); color: var(--text2); font-family: var(--mono); }
+#zpTraffic .badge-origin { padding: var(--sp-2) var(--sp-6); border-radius: var(--radius-sm); font-size: var(--fs-10); background: color-mix(in srgb, var(--cyan) 10%, transparent); color: var(--cyan); font-family: var(--mono); }
 
 /* ── кнопки действий ── */
-#zpTraffic .action-rows { display: flex; flex-direction: column; gap: 4px; }
-#zpTraffic .action-row { display: flex; gap: 4px; flex-wrap: wrap; }
-#zpTraffic .act-btn { padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600; border: 1px solid; }
+#zpTraffic .action-rows { display: flex; flex-direction: column; gap: var(--sp-4); }
+#zpTraffic .action-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
+#zpTraffic .act-btn { padding: var(--sp-4) var(--sp-10); border-radius: var(--radius); font-size: var(--fs-11); font-weight: var(--fw-semi); border: 1px solid; }
 #zpTraffic .act-btn:hover { filter: brightness(1.2); }
-#zpTraffic .act-btn.play   { background: rgba(63,185,80,.15);   border-color: rgba(63,185,80,.4);   color: var(--green-lo); }
+#zpTraffic .act-btn.play   { background: color-mix(in srgb, var(--green) 15%, transparent);   border-color: color-mix(in srgb, var(--green) 40%, transparent);   color: var(--green-lo); }
 #zpTraffic .act-btn.api-sk,
-#zpTraffic .act-btn.api-ex { background: rgba(255,123,114,.12); border-color: rgba(255,123,114,.4); color: #ff7b72; }
-#zpTraffic .act-btn.httpcl { background: rgba(88,166,255,.12);  border-color: rgba(88,166,255,.4);  color: var(--accent-lo); }
-#zpTraffic .act-btn.zp7    { background: rgba(63,185,80,.12);   border-color: rgba(63,185,80,.4);   color: var(--green-lo); }
-#zpTraffic .act-btn.hybrid { background: rgba(210,153,34,.12);  border-color: rgba(210,153,34,.4);  color: var(--yellow-lo); }
-#zpTraffic .act-btn.python { background: rgba(255,166,88,.12);  border-color: rgba(255,166,88,.4);  color: #f0883e; }
-#zpTraffic .act-btn.ts     { background: rgba(41,182,246,.12);  border-color: rgba(41,182,246,.4);  color: #29b6f6; }
+#zpTraffic .act-btn.api-ex { background: color-mix(in srgb, var(--red-lo) 12%, transparent); border-color: color-mix(in srgb, var(--red-lo) 40%, transparent); color: var(--red-lo); }
+#zpTraffic .act-btn.httpcl { background: color-mix(in srgb, var(--accent) 12%, transparent);  border-color: color-mix(in srgb, var(--accent) 40%, transparent);  color: var(--accent-lo); }
+#zpTraffic .act-btn.zp7    { background: color-mix(in srgb, var(--green) 12%, transparent);   border-color: color-mix(in srgb, var(--green) 40%, transparent);   color: var(--green-lo); }
+#zpTraffic .act-btn.hybrid { background: color-mix(in srgb, var(--yellow) 12%, transparent);  border-color: color-mix(in srgb, var(--yellow) 40%, transparent);  color: var(--yellow-lo); }
+#zpTraffic .act-btn.python { background: color-mix(in srgb, var(--yellow-lo) 12%, transparent);  border-color: color-mix(in srgb, var(--yellow-lo) 40%, transparent);  color: var(--yellow-lo); }
+#zpTraffic .act-btn.ts     { background: color-mix(in srgb, var(--cyan) 12%, transparent);  border-color: color-mix(in srgb, var(--cyan) 40%, transparent);  color: var(--cyan); }
 #zpTraffic .act-btn.curl   { background: var(--steel-tint); border-color: var(--steel-tint-border); color: var(--steel); }
 
 /* ── сворачиваемые секции Request / Response ── */
-#zpTraffic .detail-section { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-#zpTraffic .section-toggle { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--bg1); cursor: pointer; user-select: none; font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
+#zpTraffic .detail-section { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+#zpTraffic .section-toggle { display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-10); background: var(--bg1); cursor: pointer; user-select: none; font-size: var(--fs-11); font-weight: var(--fw-semi); color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
 #zpTraffic .section-toggle:hover { background: var(--bg2); }
-#zpTraffic .section-arrow, #zpTraffic .subsection-arrow { font-size: 9px; transition: transform .15s; color: var(--text3); }
+#zpTraffic .section-arrow, #zpTraffic .subsection-arrow { font-size: var(--fs-9); transition: transform .15s; color: var(--text3); }
 #zpTraffic .section-toggle.open .section-arrow, #zpTraffic .subsection-toggle.open .subsection-arrow { transform: rotate(90deg); }
 #zpTraffic .section-body, #zpTraffic .subsection-body { display: none; }
 #zpTraffic .section-body.open, #zpTraffic .subsection-body.open { display: block; }
-#zpTraffic .subsection-toggle { display: flex; align-items: center; gap: 5px; padding: 5px 10px; cursor: pointer; user-select: none; font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--bg2); background: var(--bg); }
+#zpTraffic .subsection-toggle { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) var(--sp-10); cursor: pointer; user-select: none; font-size: var(--fs-10); font-weight: var(--fw-semi); color: var(--text3); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--bg2); background: var(--bg); }
 #zpTraffic .subsection-toggle:hover { background: var(--bg1); }
-#zpTraffic .header-item { padding: 5px 10px; border-bottom: 1px solid var(--bg2); display: grid; grid-template-columns: 150px 1fr; gap: 6px; font-family: var(--mono); font-size: 11px; cursor: pointer; }
+#zpTraffic .header-item { padding: var(--sp-4) var(--sp-10); border-bottom: 1px solid var(--bg2); display: grid; grid-template-columns: 150px 1fr; gap: var(--sp-6); font-family: var(--mono); font-size: var(--fs-11); cursor: pointer; }
 #zpTraffic .header-item:last-child { border-bottom: none; }
 #zpTraffic .header-item:hover { background: var(--bg2); }
 #zpTraffic .header-key { color: var(--green-hi); }
 #zpTraffic .header-value { word-break: break-all; }
-#zpTraffic .body-block { max-height: 400px; overflow: auto; padding: 8px 10px; font-family: var(--mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; cursor: pointer; min-height: 24px; }
+#zpTraffic .body-block { max-height: 400px; overflow: auto; padding: var(--sp-8) var(--sp-10); font-family: var(--mono); font-size: var(--fs-11); white-space: pre-wrap; word-break: break-all; cursor: pointer; min-height: 24px; }
 #zpTraffic .body-block:hover { background: var(--bg1); }
-#zpTraffic .cookies-block { max-height: 200px; overflow: auto; padding: 8px 10px; font-family: var(--mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; color: var(--yellow-lo); cursor: pointer; }
+#zpTraffic .cookies-block { max-height: 200px; overflow: auto; padding: var(--sp-8) var(--sp-10); font-family: var(--mono); font-size: var(--fs-11); white-space: pre-wrap; word-break: break-all; color: var(--yellow-lo); cursor: pointer; }
 #zpTraffic .cookies-block:hover { background: var(--bg1); }
-#zpTraffic .empty-note { color: var(--text3); font-style: italic; padding: 8px 10px; font-size: 11px; }
+#zpTraffic .empty-note { color: var(--text3); font-style: italic; padding: var(--sp-8) var(--sp-10); font-size: var(--fs-11); }
 
 /* ── вложенные оверлеи: плеер и cURL Import ──
    Лежат внутри самого <dialog>, иначе его top layer перекроет их. */
 #zpTraffic .ztr-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 10; align-items: center; justify-content: center; }
 #zpTraffic .ztr-overlay.show { display: flex; }
-#zpTraffic .ztr-dialog { background: var(--bg1); border: 1px solid var(--border); border-radius: 10px; width: 900px; max-width: 92%; height: 82%; display: flex; flex-direction: column; overflow: hidden; }
+#zpTraffic .ztr-dialog { background: var(--bg1); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 900px; max-width: 92%; height: 82%; display: flex; flex-direction: column; overflow: hidden; }
 #zpTraffic .ztr-dialog.auto { height: auto; max-height: 70%; }
-#zpTraffic .ztr-dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; font-weight: 700; }
-#zpTraffic .ztr-url-row { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center; }
+#zpTraffic .ztr-dialog-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-10) var(--sp-16); border-bottom: 1px solid var(--border); flex-shrink: 0; font-weight: var(--fw-bold); }
+#zpTraffic .ztr-url-row { display: flex; gap: var(--sp-6); padding: var(--sp-8) var(--sp-12); border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center; }
 #zpTraffic .ztr-url-row input { flex: 1; font-family: var(--mono); }
 #zpTraffic .ztr-dialog-body { display: flex; flex: 1; overflow: hidden; }
 #zpTraffic .ztr-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 #zpTraffic .ztr-pane + .ztr-pane { border-left: 1px solid var(--border); }
-#zpTraffic .ztr-label { font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; padding: 6px 12px 4px; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-#zpTraffic .ztr-area { flex: 1; background: var(--bg); border: none; border-radius: 0; outline: none; font-family: var(--mono); font-size: 10.5px; padding: 8px 12px; resize: none; line-height: 1.5; }
-#zpTraffic .ztr-dialog-foot { padding: 8px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
-#zpTraffic .ztr-send { background: var(--green-bg); border-color: rgba(240,246,252,.1); color: #fff; font-weight: 600; white-space: nowrap; }
+#zpTraffic .ztr-label { font-size: var(--fs-9); color: var(--text2); text-transform: uppercase; letter-spacing: .08em; padding: var(--sp-6) var(--sp-12) var(--sp-4); background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#zpTraffic .ztr-area { flex: 1; background: var(--bg); border: none; border-radius: 0; outline: none; font-family: var(--mono); font-size: var(--fs-10); padding: var(--sp-8) var(--sp-12); resize: none; line-height: 1.5; }
+#zpTraffic .ztr-dialog-foot { padding: var(--sp-8) var(--sp-16); border-top: 1px solid var(--border); display: flex; gap: var(--sp-8); align-items: center; flex-shrink: 0; }
+#zpTraffic .ztr-send { background: var(--green-bg); border-color: color-mix(in srgb, var(--text-hi) 10%, transparent); color: var(--on-solid); font-weight: var(--fw-semi); white-space: nowrap; }
 #zpTraffic .ztr-send:hover { background: var(--green-bg2); }
-#zpTraffic .ztr-play-status { font-size: 10px; color: var(--text2); margin-left: auto; }
+#zpTraffic .ztr-play-status { font-size: var(--fs-10); color: var(--text2); margin-left: auto; }
 #zpTraffic .ztr-play-status.ok { color: var(--green-lo); }
 #zpTraffic .ztr-play-status.err { color: var(--red-lo); }
-#zpTraffic .ztr-error { color: var(--red-lo); font-size: 11px; }
+#zpTraffic .ztr-error { color: var(--red-lo); font-size: var(--fs-11); }
 
-#zpTraffic .ztr-flash { position: fixed; bottom: 16px; right: 16px; background: rgba(63,185,80,.2); border: 1px solid rgba(63,185,80,.4); color: var(--green-lo); padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 20; }
+#zpTraffic .ztr-flash { position: fixed; bottom: 16px; right: 16px; background: color-mix(in srgb, var(--green) 20%, transparent); border: 1px solid color-mix(in srgb, var(--green) 40%, transparent); color: var(--green-lo); padding: var(--sp-6) var(--sp-14); border-radius: var(--radius); font-size: var(--fs-11); font-weight: var(--fw-semi); pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 20; }
 #zpTraffic .ztr-flash.show { opacity: 1; }
 
 @media (max-width: 900px) {

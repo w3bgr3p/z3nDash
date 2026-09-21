@@ -25,16 +25,16 @@
 }
 
 /* Тег в начале строки */
-.ll-tag { display: inline-block; margin-right: 5px; padding: 0 4px; border-radius: 3px; font-weight: 600;
+.ll-tag { display: inline-block; margin-right: var(--sp-4); padding: 0 var(--sp-4); border-radius: var(--radius-sm); font-weight: var(--fw-semi);
           color: hsl(var(--ll-h) var(--ll-s) var(--ll-l));
           background: hsl(var(--ll-h) var(--ll-s) var(--ll-l) / 0.14); }
-.ll-tag.ll-ERROR   { color: var(--red);      background: rgba(255,85,102,0.15); }
-.ll-tag.ll-WARNING { color: var(--yellow);   background: rgba(255,213,102,0.15); }
-.ll-tag.ll-OK      { color: var(--green);    background: rgba(78,204,163,0.15); }
-.ll-tag.ll-DEBUG   { color: var(--text-dim); background: rgba(128,128,128,0.13); }
+.ll-tag.ll-ERROR   { color: var(--red);      background: color-mix(in srgb, var(--red) 15%, transparent); }
+.ll-tag.ll-WARNING { color: var(--yellow);   background: color-mix(in srgb, var(--yellow) 15%, transparent); }
+.ll-tag.ll-OK      { color: var(--green);    background: color-mix(in srgb, var(--green) 15%, transparent); }
+.ll-tag.ll-DEBUG   { color: var(--text-dim); background: color-mix(in srgb, var(--muted2) 13%, transparent); }
 
 /* Подсветка внутри строки */
-.ll-url { color: var(--accent); text-decoration: underline; text-decoration-color: rgba(78,158,255,0.35); }
+.ll-url { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent); }
 .ll-str { color: var(--string-color); }
 .ll-key { color: var(--key-color); }
 .ll-val { color: var(--text-hi); }
