@@ -405,6 +405,8 @@ public sealed class BranchExecutor
     /// Порядок важен: сначала разбиваем исходную строку на клавиши и
     /// куски текста, и только потом раскрываем макросы в кусках. Иначе
     /// значение переменной с фигурной скобкой внутри будет прочтено как клавиша.
+    /// Сам макрос при этом из разбора исключён: он тоже в фигурных
+    /// скобках, и без этого {-Variable.numPhone-} читался как клавиша.
     ///
     /// Список имён клавиш ниже — наш, а не выписанный из ZP: полного набора
     /// его вставок я не проверял. Незнакомая вставка поэтому не набирается
@@ -455,7 +457,16 @@ public sealed class BranchExecutor
             }
 
             if (open > at) yield return (false, raw.Substring(at, open - at));
-            yield return (true, raw.Substring(open + 1, close - open - 1));
+
+            var inner = raw.Substring(open + 1, close - open - 1);
+
+            // Макрос ZP записан в тех же фигурных скобках, что и клавиша:
+            // {-Variable.numPhone-} рядом с {BACKSPACE}. Различает их дефис внутри
+            // скобки — макрос уходит в текст целиком и раскрывается дальше.
+            yield return inner.StartsWith("-", StringComparison.Ordinal)
+                ? (false, raw.Substring(open, close - open + 1))
+                : (true, inner);
+
             at = close + 1;
         }
     }
