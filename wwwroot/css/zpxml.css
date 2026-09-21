@@ -4,25 +4,25 @@
 
 /* ── Top bar ────────────────────────────────────────────────────────────── */
 #top {
-    padding:6px 12px;
+    padding:var(--sp-6) var(--sp-12);
     background:var(--bg1);
     border-bottom:1px solid var(--border);
-    display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+    display:flex; gap:var(--sp-6); align-items:center; flex-wrap:wrap;
 }
-#status { font-size:11px; color:var(--text2); margin-left:6px; flex:1; min-width:0; }
+#status { font-size:var(--fs-11); color:var(--text2); margin-left:var(--sp-6); flex:1; min-width:0; }
 #status.ok  { color:var(--green); }
 #status.err { color:var(--red); }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
 #toolbar {
-    display:flex; gap:6px; align-items:center; flex-wrap:wrap;
-    padding:5px 12px;
+    display:flex; gap:var(--sp-6); align-items:center; flex-wrap:wrap;
+    padding:var(--sp-4) var(--sp-12);
     background:var(--bg1);
     border-bottom:1px solid var(--border);
 }
 #zpxml .btn {
-    font-size:12px; padding:5px 12px;
-    border-radius:var(--radius, 6px);
+    font-size:var(--fs-12); padding:var(--sp-4) var(--sp-12);
+    border-radius:var(--radius, var(--radius));
     border:1px solid var(--border);
     background:var(--bg2); color:var(--text);
     cursor:pointer;
@@ -32,16 +32,16 @@
     background:var(--blue-tint); color:var(--accent); border-color:var(--blue-border);
 }
 #search {
-    font-size:12px; padding:4px 9px;
-    border-radius:var(--radius, 6px);
+    font-size:var(--fs-12); padding:var(--sp-4) var(--sp-8);
+    border-radius:var(--radius, var(--radius));
     border:1px solid var(--border);
     background:var(--bg2); color:var(--text);
     width:180px; outline:none;
 }
 #search:focus { border-color:var(--accent); }
 
-.legend { display:flex; gap:8px; align-items:center; font-size:11px; color:var(--text2); margin-left:6px; flex-wrap:wrap; }
-.ld    { display:flex; align-items:center; gap:4px; }
+.legend { display:flex; gap:var(--sp-8); align-items:center; font-size:var(--fs-11); color:var(--text2); margin-left:var(--sp-6); flex-wrap:wrap; }
+.ld    { display:flex; align-items:center; gap:var(--sp-4); }
 .ldot  { width:10px; height:10px; border-radius:50%; border:1.5px solid; flex-shrink:0; }
 .lline { width:20px; height:2px; border-radius:1px; opacity:.8; }
 .ldot.good { background:color-mix(in srgb, var(--green) 16%, var(--bg1)); border-color:var(--green); }
@@ -60,7 +60,7 @@ svg#edges { position:absolute; top:0; left:0; pointer-events:none; overflow:visi
 #edges .edge-ok   { stroke:var(--green); }
 #edges .edge-err  { stroke:var(--red); }
 #edges .edge-case { stroke:var(--accent); }
-#edges .elabel      { font-size:9px; font-family:var(--mono, monospace); opacity:.9; }
+#edges .elabel      { font-size:var(--fs-9); font-family:var(--mono, monospace); opacity:.9; }
 #edges .elabel-err  { fill:var(--red); }
 #edges .elabel-case { fill:var(--accent); }
 #edges #a-ok   path { fill:var(--green);  opacity:.8; }
@@ -71,11 +71,11 @@ svg#edges { position:absolute; top:0; left:0; pointer-events:none; overflow:visi
 .block {
     position:absolute;
     border:1px solid var(--border);
-    border-radius:4px;
+    border-radius:var(--radius-sm);
     /* Подложка: поле, за которое берут весь блок — как в ProjectMaker.
        Сверху шире: в 4px приходилось целиться. */
     background:var(--bg3);
-    padding:10px 4px 4px;
+    padding:var(--sp-10) var(--sp-4) var(--sp-4);
     overflow:hidden;
     cursor:pointer; user-select:none;
 }
@@ -100,8 +100,8 @@ body.editing .row            { cursor:grab; }
 .block.unreachable:hover { opacity:1; }
 
 .row {
-    display:flex; align-items:center; gap:5px;
-    padding:0 5px;
+    display:flex; align-items:center; gap:var(--sp-4);
+    padding:0 var(--sp-4);
     border-bottom:1px solid var(--border);
     background:var(--bg2);
 }
@@ -120,20 +120,20 @@ body.editing .row            { cursor:grab; }
 .mark {
     flex-shrink:0; width:16px; height:16px;
     display:flex; align-items:center; justify-content:center;
-    border-radius:3px;
-    font-family:var(--mono, monospace); font-size:8px; font-weight:700;
-    background:var(--red); color:#fff;
+    border-radius:var(--radius-sm);
+    font-family:var(--mono, monospace); font-size:var(--fs-8); font-weight: var(--fw-bold);
+    background:var(--red); color:var(--on-accent);
 }
 .mark.own     { background:var(--red); }
-.mark.html    { background:var(--cyan); color:#000; }
+.mark.html    { background:var(--cyan); color:var(--on-accent); }
 .mark.web     { background:var(--accent); }
-.mark.logic   { background:var(--yellow); color:#000; }
-.mark.profile { background:var(--green);  color:#000; }
+.mark.logic   { background:var(--yellow); color:var(--on-accent); }
+.mark.profile { background:var(--green);  color:var(--on-accent); }
 .mark.other   { background:var(--muted2); }
 
 .rlabel {
     flex:1; min-width:0;
-    font-size:9px; color:var(--text-hi);
+    font-size:var(--fs-9); color:var(--text-hi);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .port {
@@ -142,8 +142,8 @@ body.editing .row            { cursor:grab; }
 }
 .port.case { background:var(--accent); }
 /* A row can have a port on either edge — whichever side its arrow leaves from. */
-.port.pl { margin-left:-3px; }
-.port.pr { margin-right:-3px; }
+.port.pl { margin-left:-var(--sp-2); }
+.port.pr { margin-right:-var(--sp-2); }
 
 /* Порты протяжки: появляются только в режиме правки и только у строки под
    курсором, иначе блок превращается в россыпь точек. */
@@ -168,20 +168,20 @@ body.editing .crow:hover > .drag-port { display:block; }
 /* Switch rows: the tested value, then one row per case. */
 .vrow {
     display:flex; align-items:center;
-    padding:0 5px;
-    font-size:8px; color:var(--green-hi);
+    padding:0 var(--sp-4);
+    font-size:var(--fs-8); color:var(--green-hi);
     background:var(--bg1);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .crow {
-    display:flex; align-items:center; gap:4px;
-    padding:0 5px;
+    display:flex; align-items:center; gap:var(--sp-4);
+    padding:0 var(--sp-4);
     background:var(--bg1);
     border-top:1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 .clabel {
     flex:1; min-width:0;
-    font-size:8px; color:var(--text2);
+    font-size:var(--fs-8); color:var(--text2);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 
@@ -190,8 +190,8 @@ body.editing .crow:hover > .drag-port { display:block; }
     position:absolute;
     border-radius:50%;
     display:flex; align-items:center; justify-content:center;
-    text-align:center; line-height:1.15;
-    font-size:9px; font-weight:600; color:#fff;
+    text-align:center; line-height: var(--lh-tight);
+    font-size:var(--fs-9); font-weight: var(--fw-semi); color:var(--on-accent);
     user-select:none;
 }
 .term-start { background:var(--accent); }
@@ -207,7 +207,7 @@ body.editing .crow:hover > .drag-port { display:block; }
     min-width:200px; max-width:80vw;
     background:var(--bg1);
     border-left:1px solid var(--border);
-    padding:12px; overflow-y:auto; font-size:12px;
+    padding:var(--sp-12); overflow-y:auto; font-size:var(--fs-12);
     display:none; z-index:40;
     box-shadow:-2px 0 8px rgba(0,0,0,.25);
 }
@@ -220,50 +220,50 @@ body.editing .crow:hover > .drag-port { display:block; }
 /* Drag handle on the panel's inner edge. */
 #detail-resizer {
     position:absolute; left:0; top:0; bottom:0; width:6px;
-    margin-left:-3px; cursor:col-resize; z-index:41;
+    margin-left:-var(--sp-2); cursor:col-resize; z-index:41;
 }
 #detail-resizer:hover, #detail-resizer.dragging { background:var(--accent); opacity:.5; }
 
 /* One line per sibling branch of the selected step. */
 .sib {
-    font-size:10px; color:var(--text2);
-    padding:2px 4px; border-radius:3px; cursor:pointer;
+    font-size:var(--fs-10); color:var(--text2);
+    padding:var(--sp-2) var(--sp-4); border-radius:var(--radius-sm); cursor:pointer;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .sib:hover { background:var(--bg2); color:var(--text); }
-.sib.on    { background:var(--blue-tint); color:var(--accent); font-weight:600; }
+.sib.on    { background:var(--blue-tint); color:var(--accent); font-weight: var(--fw-semi); }
 .sib.off   { opacity:.5; }
 
 .bi-code.full { max-height:none; }
-#btn-detail-close { float:right; cursor:pointer; color:var(--text3); font-size:16px; border:none; background:none; padding:0; }
+#btn-detail-close { float:right; cursor:pointer; color:var(--text3); font-size:var(--fs-16); border:none; background:none; padding:0; }
 #btn-detail-close:hover { color:var(--text-hi); }
-#detail h3 { font-size:13px; font-weight:600; margin:0 0 8px; color:var(--text-hi); padding-right:20px; }
+#detail h3 { font-size:var(--fs-13); font-weight: var(--fw-semi); margin:0 0 var(--sp-8); color:var(--text-hi); padding-right:var(--sp-20); }
 
-.dl    { display:grid; grid-template-columns:72px 1fr; gap:3px 8px; margin-bottom:10px; }
-.dl dt { color:var(--text2); font-size:11px; }
-.dl dd { color:var(--text); font-size:11px; word-break:break-all; font-family:var(--mono, monospace); }
+.dl    { display:grid; grid-template-columns:72px 1fr; gap:var(--sp-2) var(--sp-8); margin-bottom:var(--sp-10); }
+.dl dt { color:var(--text2); font-size:var(--fs-11); }
+.dl dd { color:var(--text); font-size:var(--fs-11); word-break:break-all; font-family:var(--mono, monospace); }
 
 /* Параметры действия: путей много и они длинные, поэтому колонка шире и
    значения переносятся по словам, а не рвутся посимвольно. */
-.dl.params    { grid-template-columns:minmax(80px, 40%) 1fr; gap:2px 8px; margin-bottom:0; }
-.dl.params dt { font-size:10px; color:var(--text3); word-break:break-all; }
-.dl.params dd { font-size:10px; white-space:pre-wrap; word-break:break-word; }
+.dl.params    { grid-template-columns:minmax(80px, 40%) 1fr; gap:var(--sp-2) var(--sp-8); margin-bottom:0; }
+.dl.params dt { font-size:var(--fs-10); color:var(--text3); word-break:break-all; }
+.dl.params dd { font-size:var(--fs-10); white-space:pre-wrap; word-break:break-word; }
 
 /* Поля правки в панели. Выглядят как текст, пока их не тронули: панель прежде
    всего читают, и десяток рамок превратил бы её в форму. */
 .pedit, .cap-edit, .key-edit {
     width:100%; box-sizing:border-box;
     background:transparent; color:var(--text);
-    border:1px solid transparent; border-radius:3px;
-    font-family:var(--mono, monospace); font-size:10px;
-    padding:1px 3px; outline:none;
+    border:1px solid transparent; border-radius:var(--radius-sm);
+    font-family:var(--mono, monospace); font-size:var(--fs-10);
+    padding:var(--sp-1) var(--sp-2); outline:none;
 }
 .pedit:hover, .cap-edit:hover, .key-edit:hover { border-color:var(--border); }
 .pedit:focus, .cap-edit:focus, .key-edit:focus {
     border-color:var(--accent); background:var(--bg2);
 }
 .key-edit { width:auto; min-width:70px; max-width:160px; color:var(--accent); }
-.cap-edit { font-size:11px; }
+.cap-edit { font-size:var(--fs-11); }
 
 /* ── Код ветки в CodeMirror ─────────────────────────────────────────────── */
 /* Тема редактора не подключается отдельно: перекрашиваем базовую под
@@ -271,8 +271,8 @@ body.editing .crow:hover > .drag-port { display:block; }
 .code-host .CodeMirror {
     height:auto; max-height:420px;
     background:var(--bg2); color:var(--text);
-    border:1px solid var(--border); border-radius:4px;
-    font-family:var(--mono, monospace); font-size:10px; line-height:1.5;
+    border:1px solid var(--border); border-radius:var(--radius-sm);
+    font-family:var(--mono, monospace); font-size:var(--fs-10); line-height: var(--lh-loose);
 }
 .code-host .CodeMirror-scroll   { max-height:420px; }
 .code-host .CodeMirror-focused  { border-color:var(--accent); }
@@ -305,23 +305,23 @@ textarea.bi-code.edit {
 textarea.bi-code.edit:focus { border-color:var(--accent); }
 
 .flag-box {
-    display:inline-flex; align-items:center; gap:3px;
-    margin-right:8px; font-size:10px; color:var(--text2); cursor:pointer;
+    display:inline-flex; align-items:center; gap:var(--sp-2);
+    margin-right:var(--sp-8); font-size:var(--fs-10); color:var(--text2); cursor:pointer;
     font-family:var(--font);
 }
 .flag-box input { margin:0; cursor:pointer; }
 
-.bi        { border:1px solid var(--border); border-radius:var(--radius, 6px); padding:7px 9px; margin-bottom:7px; }
-.bi-head   { font-size:10px; color:var(--text2); margin-bottom:3px; font-weight:500; }
-.bi-utext  { font-size:11px; font-weight:600; color:var(--text-hi); margin-bottom:4px; }
+.bi        { border:1px solid var(--border); border-radius:var(--radius, var(--radius)); padding:var(--sp-6) var(--sp-8); margin-bottom:var(--sp-6); }
+.bi-head   { font-size:var(--fs-10); color:var(--text2); margin-bottom:var(--sp-2); font-weight: var(--fw-medium); }
+.bi-utext  { font-size:var(--fs-11); font-weight: var(--fw-semi); color:var(--text-hi); margin-bottom:var(--sp-4); }
 .bi-code   {
-    background:var(--bg2); border-radius:4px; padding:5px 7px;
-    font-family:var(--mono, monospace); font-size:10px;
+    background:var(--bg2); border-radius:var(--radius-sm); padding:var(--sp-4) var(--sp-6);
+    font-family:var(--mono, monospace); font-size:var(--fs-10);
     max-height:120px; overflow-y:auto;
     white-space:pre-wrap; word-break:break-word; line-height:1.45;
-    color:var(--text); margin-bottom:4px;
+    color:var(--text); margin-bottom:var(--sp-4);
 }
-.bi-link      { font-size:10px; margin-top:2px; }
+.bi-link      { font-size:var(--fs-10); margin-top:var(--sp-2); }
 .bi-link.ok   { color:var(--green); }
 .bi-link.err  { color:var(--red); }
 .bi-link.case { color:var(--accent); }
@@ -330,13 +330,13 @@ textarea.bi-code.edit:focus { border-color:var(--accent); }
 #mini {
     position:absolute; bottom:10px; left:10px;
     background:color-mix(in srgb, var(--bg1) 90%, transparent);
-    border:1px solid var(--border); border-radius:5px;
-    padding:3px 9px; font-size:10px; color:var(--text2);
+    border:1px solid var(--border); border-radius:var(--radius);
+    padding:var(--sp-2) var(--sp-8); font-size:var(--fs-10); color:var(--text2);
     pointer-events:none;
 }
 #empty {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    height:100%; color:var(--text3); font-size:13px; gap:6px; line-height:1.7; text-align:center;
+    height:100%; color:var(--text3); font-size:var(--fs-13); gap:var(--sp-6); line-height:1.7; text-align:center;
 }
 
 /* ── States added by the parser ─────────────────────────────────────────── */
@@ -344,8 +344,8 @@ textarea.bi-code.edit:focus { border-color:var(--accent); }
 
 .bi.off { opacity:.55; border-style:dashed; }
 .bi-head .flag {
-    float:right; font-size:9px; font-weight:600;
-    padding:0 4px; border-radius:3px; margin-left:4px;
+    float:right; font-size:var(--fs-9); font-weight: var(--fw-semi);
+    padding:0 var(--sp-4); border-radius:var(--radius-sm); margin-left:var(--sp-4);
 }
 .bi-head .flag.off { background:var(--bg3);         color:var(--text3); }
 .bi-head .flag.opt { background:var(--yellow-tint); color:var(--yellow); }
@@ -353,18 +353,18 @@ textarea.bi-code.edit:focus { border-color:var(--accent); }
 
 /* ── Пульт отладки ──────────────────────────────────────────────────────── */
 .dbg-group {
-    display:inline-flex; align-items:center; gap:4px;
-    padding-left:8px; margin-left:4px;
+    display:inline-flex; align-items:center; gap:var(--sp-4);
+    padding-left:var(--sp-8); margin-left:var(--sp-4);
     border-left:1px solid var(--border);
 }
 #dbg-dir {
-    font-size:11px; padding:4px 8px; width:180px;
-    border:1px solid var(--border); border-radius:var(--radius, 6px);
+    font-size:var(--fs-11); padding:var(--sp-4) var(--sp-8); width:180px;
+    border:1px solid var(--border); border-radius:var(--radius, var(--radius));
     background:var(--bg2); color:var(--text); outline:none;
     font-family:var(--mono, monospace);
 }
 #dbg-dir:focus { border-color:var(--accent); }
-#dbg-state { font-size:10px; color:var(--text2); min-width:52px; font-family:var(--mono, monospace); }
+#dbg-state { font-size:var(--fs-10); color:var(--text2); min-width:52px; font-family:var(--mono, monospace); }
 body.debugging #dbg-state { color:var(--yellow); }
 
 /* Где стоит исполнение — отдельно от того, что выделено мышью. */
@@ -374,11 +374,11 @@ body.debugging #dbg-state { color:var(--yellow); }
 }
 
 /* ── Вкладки панели ─────────────────────────────────────────────────────── */
-#d-tabs { display:flex; gap:4px; margin-bottom:8px; }
+#d-tabs { display:flex; gap:var(--sp-4); margin-bottom:var(--sp-8); }
 .dtab {
-    font-size:10px; padding:3px 10px; cursor:pointer;
+    font-size:var(--fs-10); padding:var(--sp-2) var(--sp-10); cursor:pointer;
     background:var(--bg2); color:var(--text2);
-    border:1px solid var(--border); border-radius:var(--radius, 6px);
+    border:1px solid var(--border); border-radius:var(--radius, var(--radius));
     font-family:var(--font);
 }
 .dtab.active { background:var(--blue-tint); color:var(--accent); border-color:var(--blue-border); }
@@ -388,17 +388,17 @@ body.debugging #dbg-state { color:var(--yellow); }
 
 /* Лог занимает всё, что осталось по высоте: в 160px он был бесполезен. */
 #d-debug .bi-log { display:flex; flex-direction:column; flex:1 1 auto; min-height:180px; }
-.dl.params dt.changed { color:var(--yellow); font-weight:600; }
+.dl.params dt.changed { color:var(--yellow); font-weight: var(--fw-semi); }
 
 #dbg-log {
     flex:1 1 auto; min-height:160px; overflow-y:auto; margin:0;
-    font-family:var(--mono, monospace); font-size:9px; line-height:1.5;
+    font-family:var(--mono, monospace); font-size:var(--fs-9); line-height: var(--lh-loose);
     color:var(--text2); white-space:pre-wrap; word-break:break-word;
 }
 #dbg-var-filter {
-    width:100%; box-sizing:border-box; margin-bottom:4px;
-    font-size:10px; padding:2px 5px;
-    border:1px solid var(--border); border-radius:3px;
+    width:100%; box-sizing:border-box; margin-bottom:var(--sp-4);
+    font-size:var(--fs-10); padding:var(--sp-2) var(--sp-4);
+    border:1px solid var(--border); border-radius:var(--radius-sm);
     background:var(--bg2); color:var(--text); outline:none;
 }
 #dbg-var-filter:focus { border-color:var(--accent); }
@@ -408,7 +408,7 @@ body.debugging #dbg-state { color:var(--yellow); }
     border-color:var(--yellow);
     background:color-mix(in srgb, var(--yellow) 12%, var(--bg1));
     color:var(--text);
-    font-size:10px; line-height:1.5;
+    font-size:var(--fs-10); line-height: var(--lh-loose);
 }
 .bi.warn .bi-head { color:var(--yellow); }
 
@@ -423,19 +423,19 @@ body.debugging #dbg-state { color:var(--yellow); }
     background:var(--bg1);
     border-left:1px solid var(--border);
     border-right:1px solid var(--border);
-    padding:10px; z-index:39;
+    padding:var(--sp-10); z-index:39;
     box-shadow:-2px 0 8px rgba(0,0,0,.2);
 }
 #vars-panel.open { display:flex; }
 
 #vars-head {
     display:flex; align-items:center; justify-content:space-between;
-    font-size:11px; font-weight:600; color:var(--text-hi);
-    margin-bottom:6px;
+    font-size:var(--fs-11); font-weight: var(--fw-semi); color:var(--text-hi);
+    margin-bottom:var(--sp-6);
 }
 #vars-close {
     border:none; background:none; cursor:pointer;
-    color:var(--text3); font-size:14px; padding:0;
+    color:var(--text3); font-size:var(--fs-14); padding:0;
 }
 #vars-close:hover { color:var(--text-hi); }
 
@@ -450,7 +450,7 @@ body.debugging #dbg-state { color:var(--yellow); }
    не отвлекаясь на саму линию. */
 #dbg-vars dt, #dbg-vars dd {
     border-bottom:1px solid color-mix(in srgb, var(--text) 7%, transparent);
-    padding-bottom:3px;
+    padding-bottom:var(--sp-2);
 }
 #dbg-vars dt { color:var(--text2); }
 
@@ -485,76 +485,76 @@ body.dbg-busy #canvas-wrap { cursor:progress; }
     width:min(560px, 92vw); max-height:82vh;
     display:flex; flex-direction:column;
     background:var(--bg1);
-    border:1px solid var(--border); border-radius:var(--radius-lg, 10px);
+    border:1px solid var(--border); border-radius:var(--radius-lg, var(--radius-lg));
     box-shadow:0 12px 40px rgba(0,0,0,.45);
 }
 
 #ts-head {
     display:flex; align-items:center; justify-content:space-between;
-    padding:10px 14px; border-bottom:1px solid var(--border);
-    font-size:12px; font-weight:600; color:var(--text-hi);
+    padding:var(--sp-10) var(--sp-14); border-bottom:1px solid var(--border);
+    font-size:var(--fs-12); font-weight: var(--fw-semi); color:var(--text-hi);
 }
-#ts-close { border:none; background:none; cursor:pointer; color:var(--text3); font-size:15px; padding:0; }
+#ts-close { border:none; background:none; cursor:pointer; color:var(--text3); font-size:var(--fs-14); padding:0; }
 #ts-close:hover { color:var(--text-hi); }
 
-#ts-body { flex:1; overflow-y:auto; padding:12px 14px; }
+#ts-body { flex:1; overflow-y:auto; padding:var(--sp-12) var(--sp-14); }
 #ts-foot {
-    display:flex; gap:8px; justify-content:flex-end;
-    padding:10px 14px; border-top:1px solid var(--border);
+    display:flex; gap:var(--sp-8); justify-content:flex-end;
+    padding:var(--sp-10) var(--sp-14); border-top:1px solid var(--border);
 }
 
 /* Поле: подпись сверху, ключ переменной рядом — по нему видно, куда ляжет. */
-.ts-field { margin-bottom:12px; }
-.ts-label { display:flex; align-items:baseline; gap:6px; margin-bottom:4px; font-size:11px; color:var(--text); }
-.ts-key   { font-family:var(--mono, monospace); font-size:9px; color:var(--text3); }
+.ts-field { margin-bottom:var(--sp-12); }
+.ts-label { display:flex; align-items:baseline; gap:var(--sp-6); margin-bottom:var(--sp-4); font-size:var(--fs-11); color:var(--text); }
+.ts-key   { font-family:var(--mono, monospace); font-size:var(--fs-9); color:var(--text3); }
 
 .ts-field input[type=text],
 .ts-field input[type=password],
 .ts-field select,
 .ts-field textarea {
     width:100%; box-sizing:border-box;
-    padding:5px 8px; font-size:11px;
+    padding:var(--sp-4) var(--sp-8); font-size:var(--fs-11);
     font-family:var(--mono, monospace);
     background:var(--bg2); color:var(--text);
-    border:1px solid var(--border); border-radius:var(--radius, 6px);
+    border:1px solid var(--border); border-radius:var(--radius, var(--radius));
     outline:none;
 }
 .ts-field textarea { min-height:70px; resize:vertical; }
 .ts-field input:focus, .ts-field select:focus, .ts-field textarea:focus { border-color:var(--accent); }
 .ts-field input[type=checkbox] { cursor:pointer; }
 
-.ts-multi { display:flex; flex-wrap:wrap; gap:6px 12px; }
-.ts-multi-item { display:inline-flex; align-items:center; gap:4px; font-size:10px; color:var(--text2); cursor:pointer; }
+.ts-multi { display:flex; flex-wrap:wrap; gap:var(--sp-6) var(--sp-12); }
+.ts-multi-item { display:inline-flex; align-items:center; gap:var(--sp-4); font-size:var(--fs-10); color:var(--text2); cursor:pointer; }
 
 .ts-divider {
-    margin:14px 0 8px; padding-bottom:4px;
+    margin:var(--sp-14) 0 var(--sp-8); padding-bottom:var(--sp-4);
     border-bottom:1px solid var(--border);
-    font-size:10px; text-transform:uppercase; letter-spacing:.06em;
+    font-size:var(--fs-10); text-transform:uppercase; letter-spacing:.06em;
     color:var(--text3);
 }
-.ts-empty { color:var(--text3); font-size:11px; padding:10px 0; }
+.ts-empty { color:var(--text3); font-size:var(--fs-11); padding:var(--sp-10) 0; }
 
-#ts-tabs { display:flex; gap:4px; padding:8px 14px 0; }
+#ts-tabs { display:flex; gap:var(--sp-4); padding:var(--sp-8) var(--sp-14) 0; }
 .ts-tab {
-    font-size:10px; padding:4px 12px; cursor:pointer;
+    font-size:var(--fs-10); padding:var(--sp-4) var(--sp-12); cursor:pointer;
     background:var(--bg2); color:var(--text2);
-    border:1px solid var(--border); border-radius:var(--radius, 6px);
+    border:1px solid var(--border); border-radius:var(--radius, var(--radius));
     font-family:var(--font);
 }
 .ts-tab.active { background:var(--blue-tint); color:var(--accent); border-color:var(--blue-border); }
-.dl.ts-profile { grid-template-columns:minmax(150px, 40%) 1fr; margin-bottom:4px; }
+.dl.ts-profile { grid-template-columns:minmax(150px, 40%) 1fr; margin-bottom:var(--sp-4); }
 .dl.ts-profile dt, .dl.ts-profile dd {
     border-bottom:1px solid color-mix(in srgb, var(--text) 7%, transparent);
-    padding-bottom:3px;
+    padding-bottom:var(--sp-2);
 }
 
 /* Переключатель шума в логе — рядом с заголовком, не отдельной строкой. */
 .log-noise {
-    float:right; display:inline-flex; align-items:center; gap:4px;
-    font-size:9px; color:var(--text3); cursor:pointer; font-weight:400;
+    float:right; display:inline-flex; align-items:center; gap:var(--sp-4);
+    font-size:var(--fs-9); color:var(--text3); cursor:pointer; font-weight: var(--fw-normal);
 }
 .log-noise input { margin:0; cursor:pointer; }
-#dbg-log-note { font-size:9px; color:var(--text3); margin-top:4px; }
+#dbg-log-note { font-size:var(--fs-9); color:var(--text3); margin-top:var(--sp-4); }
 
 /* Поля профиля среди переменных — тем же списком, но видно, что они не из
    <Variables>, а сгенерированы. */
