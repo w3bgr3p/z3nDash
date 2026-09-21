@@ -211,7 +211,7 @@ function dbgRenderSnapshot(snap) {
                 const i  = st.branches.findIndex(b => b.id === snap.current.branchId);
                 return stepLabel(st) + (i >= 0 ? ' · #' + i + ' ' + branchRowLabel(st.branches[i]) : '');
               })()
-            : 'ветка ' + snap.current.branchId.substring(0, 8) + ' — не из открытого шаблона')
+            : 'шаг ' + snap.current.branchId.substring(0, 8) + ' — не из открытого шаблона')
         : 'маршрут закончен';
 
     host.innerHTML =
@@ -309,7 +309,7 @@ function dbgListen() {
             if (ev.last && ev.last.outcome === 'Failed') {
             // В бою такая ветка обрывает маршрут. Здесь позиция остаётся на ней,
             // и это надо сказать вслух: иначе непонятно, что делать дальше.
-            setStatus('debug: ветка упала, позиция осталась на ней — можно поправить '
+            setStatus('debug: шаг упал, позиция осталась на нём — можно поправить '
                     + 'и нажать step ещё раз, либо stop', 'err');
         }
         if (ev.state === 'paused' || ev.state === 'finished') {

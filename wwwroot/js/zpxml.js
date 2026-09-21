@@ -145,12 +145,12 @@ function showStepDetail(step) {
     document.getElementById('detail').classList.add('open');
     document.getElementById('d-label').textContent = stepLabel(step);
     document.getElementById('d-meta').innerHTML =
-        '<dt>step id</dt><dd>' + escHtml(step.id) + '</dd>' +
-        '<dt>branches</dt><dd>' + step.branches.length + '</dd>' +
+        '<dt>block id</dt><dd>' + escHtml(step.id) + '</dd>' +
+        '<dt>steps</dt><dd>' + step.branches.length + '</dd>' +
         (step.x !== null ? '<dt>canvas</dt><dd>' + step.x + ', ' + step.y + '</dd>' : '') +
         '<dt>reached</dt><dd>' + (step.reachable === false ? 'no — dead code' : 'yes') + '</dd>';
     const db = document.getElementById('d-branches');
-    db.innerHTML = '<div class="bi"><div class="bi-head">step branches</div>' +
+    db.innerHTML = '<div class="bi"><div class="bi-head">steps of this block</div>' +
         step.branches.map((o, i) =>
             '<div class="sib' + (o.disabled ? ' off' : '') + '" data-i="' + i + '">#' + i +
             ' · ' + escHtml(branchRowLabel(o)) + '</div>').join('') + '</div>';
@@ -187,9 +187,9 @@ function showDetail(step, bi) {
 
     document.getElementById('d-meta').innerHTML =
         '<dt>action</dt><dd>' + escHtml(b.type + ' / ' + b.action) + '</dd>' +
-        '<dt>branch</dt><dd>#' + bi + ' of ' + step.branches.length + '</dd>' +
-        '<dt>branch id</dt><dd>' + escHtml(b.id) + '</dd>' +
-        '<dt>step id</dt><dd>' + escHtml(step.id) +
+        '<dt>step</dt><dd>#' + bi + ' of ' + step.branches.length + '</dd>' +
+        '<dt>step id</dt><dd>' + escHtml(b.id) + '</dd>' +
+        '<dt>block id</dt><dd>' + escHtml(step.id) +
             (step.label.trim() ? ' · ' + escHtml(step.label.trim()) : '') + '</dd>' +
         (step.x !== null ? '<dt>canvas</dt><dd>' + step.x + ', ' + step.y + '</dd>' : '') +
         '<dt>reached</dt><dd>' + (step.reachable === false ? 'no — dead code' : 'yes') + '</dd>' +
@@ -285,7 +285,7 @@ function showDetail(step, bi) {
     // navigable without dumping every branch body into the panel.
     const sib = document.createElement('div');
     sib.className = 'bi';
-    sib.innerHTML = '<div class="bi-head">step branches</div>' +
+    sib.innerHTML = '<div class="bi-head">steps of this block</div>' +
         step.branches.map((o, i) =>
             '<div class="sib' + (i === bi ? ' on' : '') + (o.disabled ? ' off' : '') +
                  '" data-i="' + i + '">#' + i + ' · ' + escHtml(branchRowLabel(o)) + '</div>').join('');
