@@ -9,16 +9,30 @@ let dbgSnap    = null;      // последний снимок состояни�
 
 // ── Команды ──────────────────────────────────────────────────────────────────
 
+/// Ответ разбирается вручную, а не через r.json(): когда маршрута нет,
+/// сервер отвечает пустым 200, и r.json() падает с «Unexpected end of JSON
+/// input» — по такому сообщению не понять, что произошло. Здесь в ошибку идёт
+/// наблюдение: код ответа и то, что тело пустое.
 async function dbgPost(action, body) {
+    let r;
     try {
-        const r = await fetch('/zp-debug/' + action, {
+        r = await fetch('/zp-debug/' + action, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body || {})
         });
-        return await r.json();
     } catch (e) {
-        return { ok: false, error: 'сервер недоступен: ' + e.message };
+        return { ok: false, error: 'запрос не ушёл: ' + e.message };
+    }
+
+    const text = await r.text();
+    if (!text.trim())
+        return { ok: false, error: 'HTTP ' + r.status + ', пустой ответ — обработчик /zp-debug не отвечает' };
+
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        return { ok: false, error: 'HTTP ' + r.status + ', ответ не JSON: ' + text.slice(0, 120) };
     }
 }
 
