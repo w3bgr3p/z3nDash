@@ -119,6 +119,24 @@ public sealed class PlaySession
         // Личность нужна до первой ветки: {-Profile.Name-} встречается уже в
         // SetAttribute, а ветки присваивают Profile.Password напрямую.
         ProfileGenerator.Fill(project, tpl.Profile);
+
+        // UserAgent берём у живого браузера, а не из заготовки в StubProfile.
+        // Перенесённый HTTP-слой шлёт именно project.Profile.UserAgent
+        // (NetHttp, Rqst, CookieCollector), и если он не совпадает с браузером,
+        // запросы и вкладка представляются разными клиентами.
+        // Чтение через страницу, поэтому побочное и падать на нём нечему.
+        try
+        {
+            if (!instance.IsVoid && instance.Browser is { } browser
+                && browser.Profile.UserAgent is { Length: > 0 } live)
+                project.Profile.UserAgent = live;
+        }
+        catch (Exception ex)
+        {
+            _log($"[xml] UserAgent у браузера не прочёлся ({ex.GetType().Name}), " +
+                 "остался заготовленный");
+        }
+
         _log($"[xml] профиль: {project.Profile.Name} {project.Profile.Surname}, " +
              $"{project.Profile.Gender}, {project.Profile.BirthDate}, login {project.Profile.Login}");
 
