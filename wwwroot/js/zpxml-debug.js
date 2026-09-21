@@ -117,12 +117,17 @@ async function dbgRunCommand(action) {
 const dbgLines = [];
 let dbgShowNoise = false;
 
-/// Шум браузера. Chrome сам лезет в свои сервисы, прокси их режет, и лог
-/// заполняется отказами, к шаблону не относящимися: по такому логу кажется,
-/// что сломалось всё, хотя сломалось ровно одно.
+/// Шум браузера. Страница тянет рекламу, аналитику и телеметрию с десятков
+/// доменов, прокси их режет, и лог заполняется отказами, к шаблону не
+/// относящимися.
+///
+/// Фильтровать по списку доменов бессмысленно — он бесконечен: bidswitch,
+/// adcontroll, adjs.media, pixel.big-media, on.aws и так далее. Поэтому
+/// прячем сам вид сообщения: отказ в CONNECT. Если из-за него упадёт шаг,
+/// ошибка всё равно придёт от самого шага, с адресом.
 function dbgIsNoise(line) {
     if (line.indexOf('[proxy]') !== 0) return false;
-    return /clients\d?\.google\.com|mtalk\.google\.com|facebook\.com|gstatic\.com|googleapis\.com|digital\.gov\.ru|webtrafficsource\.com|safebrowsing/.test(line);
+    return line.indexOf('CONNECT') >= 0;
 }
 
 function dbgLog(line) {
