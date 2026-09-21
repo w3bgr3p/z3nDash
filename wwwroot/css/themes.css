@@ -12,6 +12,20 @@
     font-style: normal;
     font-display: swap;
 }
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/static/fonts/JetBrainsMonoNerdFont-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/static/fonts/JetBrainsMonoNerdFont-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
 
 /* ═══════════════════════════════════════════════════════
    themes.css — все темы для всех страниц
