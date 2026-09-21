@@ -875,6 +875,10 @@ namespace z3nDash.Browser
         public void InsertText(string text)
             => Sync(_page.Keyboard.InsertTextAsync(text));
 
+        public void TypeText(string text, int delayMs)
+            => Sync(_page.Keyboard.TypeAsync(text,
+                    new KeyboardTypeOptions { Delay = delayMs < 0 ? 0 : delayMs }));
+
         public void FullEmulationMouseWheel(int x, int y)
             => Sync(_page.Mouse.WheelAsync(x, y));
 

@@ -528,6 +528,13 @@ namespace ZennoLab.CommandCenter
         /// </summary>
         public void InsertText(string text) => T.InsertText(text);
 
+        /// <summary>
+        /// Посимвольный набор с задержкой. В ZP такого метода у вкладки
+        /// нет — там это делает ветка Emulation/KeyBoard через Emulator.
+        /// Здесь он нужен плееру, чтобы эту ветку исполнять.
+        /// </summary>
+        public void TypeText(string text, int delayMs) => T.TypeText(text, delayMs);
+
         public void RiseEvent(string eventName, Rectangle rectangle, string clickType)
             => T.RiseEvent(eventName, rectangle, clickType);
 

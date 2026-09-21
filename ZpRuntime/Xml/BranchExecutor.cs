@@ -61,6 +61,7 @@ public sealed class BranchExecutor
             ("Logic",       "Pause")        => Pause(branch, ct),
             ("Logic",       "Switch")       => Switch(branch),
             ("Logic",       "Alert")        => Alert(branch),
+            ("Emulation",   "KeyBoard")     => KeyBoard(branch, ct),
             ("ImageProcessing", "WaterMark")=> WaterMarkBranch(branch),
             _ => throw new NotSupportedException(
                      $"ветка {branch.Type}/{branch.Action} в плеере не реализована"),
@@ -396,6 +397,92 @@ public sealed class BranchExecutor
     /// Уровень в XML записан как «Lavel» — это опечатка самого ZennoPoster, в
     /// файлах поле называется именно так.
     /// </summary>
+    /// <summary>
+    /// Ввод с клавиатуры. В XML: &lt;Text&gt; — что набрать, &lt;Latency&gt; —
+    /// миллисекунды между нажатиями. Специальные клавиши записаны вставками
+    /// вида <c>{BACKSPACE}</c> вперемежку с обычным текстом.
+    ///
+    /// Порядок важен: сначала разбиваем исходную строку на клавиши и
+    /// куски текста, и только потом раскрываем макросы в кусках. Иначе
+    /// значение переменной с фигурной скобкой внутри будет прочтено как клавиша.
+    ///
+    /// Список имён клавиш ниже — наш, а не выписанный из ZP: полного набора
+    /// его вставок я не проверял. Незнакомая вставка поэтому не набирается
+    /// буквально, а роняет ветку с её именем в тексте: набранный в поле
+    /// «{F13}» нашёлся бы через три ветки и в другом месте.
+    /// </summary>
+    private BranchResult KeyBoard(Branch branch, CancellationToken ct)
+    {
+        var raw = branch.Param("Text") ?? "";
+        if (raw.Length == 0) return BranchResult.Empty;
+
+        _ = int.TryParse(branch.Param("Latency"), out var latency);
+        if (latency < 0) latency = 0;
+
+        foreach (var (isKey, value) in SplitKeys(raw))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (isKey)
+            {
+                _instance.ActiveTab.KeyEvent(KeyName(value), "press");
+                if (latency > 0) ct.WaitHandle.WaitOne(latency);
+                continue;
+            }
+
+            var text = _project.Expand(value);
+            if (text.Length > 0) _instance.ActiveTab.TypeText(text, latency);
+        }
+
+        SettleAfterAction();
+        return BranchResult.Empty;
+    }
+
+    /// <summary>Разбор «abc{ENTER}def» на чередующиеся куски.</summary>
+    private static IEnumerable<(bool IsKey, string Value)> SplitKeys(string raw)
+    {
+        int at = 0;
+        while (at < raw.Length)
+        {
+            var open = raw.IndexOf('{', at);
+            var close = open < 0 ? -1 : raw.IndexOf('}', open + 1);
+
+            // Одинокая «{» без пары — обычный символ, а не ошибка.
+            if (open < 0 || close < 0)
+            {
+                yield return (false, raw.Substring(at));
+                yield break;
+            }
+
+            if (open > at) yield return (false, raw.Substring(at, open - at));
+            yield return (true, raw.Substring(open + 1, close - open - 1));
+            at = close + 1;
+        }
+    }
+
+    /// <summary>Имя вставки ZP → имя клавиши Playwright.</summary>
+    private static string KeyName(string token) => token.Trim().ToUpperInvariant() switch
+    {
+        "ENTER" or "RETURN" => "Enter",
+        "TAB"               => "Tab",
+        "BACKSPACE" or "BS" => "Backspace",
+        "DELETE" or "DEL"   => "Delete",
+        "ESC" or "ESCAPE"   => "Escape",
+        "SPACE"             => "Space",
+        "UP"                => "ArrowUp",
+        "DOWN"              => "ArrowDown",
+        "LEFT"              => "ArrowLeft",
+        "RIGHT"             => "ArrowRight",
+        "HOME"              => "Home",
+        "END"               => "End",
+        "PGUP" or "PAGEUP"     => "PageUp",
+        "PGDN" or "PAGEDOWN"   => "PageDown",
+        "INSERT" or "INS"      => "Insert",
+        _ => throw new NotSupportedException(
+                 $"Emulation/KeyBoard: вставка {{{token}}} не разобрана — " +
+                 "такой клавиши в таблице плеера нет"),
+    };
+
     private BranchResult Alert(Branch branch)
     {
         var text = _project.Expand(branch.Param("AlertText")) ?? "";
