@@ -152,6 +152,7 @@ python ZpRuntime/tools/ext_inventory.py
 | `HtmlElementCollection.*` | **проверено** | 2026-08-13: `Count`, `IsVoid`, индексатор, `GetByNumber`, `IndexOf`, `AttributesToString` |
 | `Tab.MouseMove(from, to, useClick, considerScroll)` | **проверено при `useClick: false`** | 2026-09-21: живая капча megapari — с зажатой кнопкой мяч на канвасе едет за курсором (`262.5,201` → `283,218.5` → `137.5,174`). `useClick: true` — **отказ**: что ZP делает с кнопкой во время такого движения, не проверял |
 | `Tab.MouseClick(x, y, button, event)`, `HtmlElement.DrawToBitmap(isImage)` | **проверено через использование** | 2026-09-18: добавлены только значения по умолчанию к уже проверенным пятиаргументной и двухаргументной формам, тело то же |
+| `Tab.KeyEvent(key, type, modifier)` — фазы клавиши | **проверено** | 2026-09-21: `type` принимался и игнорировался — всё было полным нажатием. Стенд `input_probe.xml`: `down`+`up` дают ровно `keydown a, keypress a, keyup a`, а не два набора событий. Модификатор на половинке — наше прочтение, вызывающих нет |
 | `Tab.MouseClick(..., event)` — фазы кнопки | **проверено** | 2026-09-21: параметр `event` принимался и игнорировался — любой вызов делал полный клик. Реализованы `down`, `up`, `move`; живая капча megapari: `down` → `MouseMove` → `up` тащит ползунок, итог — `Hunt football | solved`. Фаза `move` отдельно не проверялась |
 | `ZennoPoster.AddTask`/`StartTask`/`TasksList` и прочее управление задачами | отказ | очереди ZP нет, планировщик свой |
 | `ZennoPoster.ImageProcessing*` | отказ | не реализовано |
@@ -187,6 +188,54 @@ python ZpRuntime/tools/ext_inventory.py
 ## Дневник
 
 Записи снизу вверх, новые сверху.
+
+### 2026-09-21 — ветки Emulation, фазы клавиши и чей UserAgent у профиля
+
+`ветка Emulation/KeyBoard в плеере не реализована` — сообщение читалось как
+сбой ввода, а было отказом диспетчера веток: до клавиатуры дело не доходило.
+
+**Что добавлено.**
+
+- `Emulation/KeyBoard`: `<Text>` с вставками вида `{BACKSPACE}` вперемежку с текстом,
+  `<Latency>` — миллисекунды между нажатиями. Макросы ZP записаны в тех же
+  фигурных скобках, поэтому различаются по дефису внутри: `{-Variable.x-}`
+  уходит в текст, `{TAB}` — в клавишу. Список имён клавиш наш, из ZP не
+  выписан; незнакомая вставка роняет ветку с её именем, а не набирается
+  буквально.
+- `Emulation/MouseClick`: точка равномерно внутри Xmin..Xmax × Ymin..Ymax; курсор
+  подводится эмуляцией до нажатия. `ClickDistribution` не воспроизводится —
+  что он означает, не проверял, и незнакомое значение клик не отменяет.
+- `TypeText(text, delayMs)` — посимвольный набор. `InsertText` здесь не годится:
+  одно событие на весь текст, и маска телефона его не видит.
+- `project.Profile.UserAgent` брался из зашитой в `StubProfile` строки Chrome 124 и
+  никогда — у браузера. Перенесённый HTTP-слой шлёт именно его, то есть
+  запросы и вкладка представлялись разными клиентами. Теперь `PlaySession`
+  читает `navigator.userAgent` у живого браузера.
+- Веса `BrowsersV2`/`OperationSystemsV2`/`PlatformsV2` мы исполнить не можем —
+  `BrowserSession` поднимает настоящий Chrome без подмены UserAgent, и это
+  условие запуска, а не упущение. Теперь расхождение говорится вслух при
+  старте. Читаются только V2-атрибуты: старые им противоречат — в
+  simroute.megapari `Browsers` говорит FireFox=100, а `BrowsersV2` — PureChrome=100.
+
+**Чем проверено.** `xml_example/input_probe.xml` — стенд без сети: страница
+с полем и коробкой собирается на about:blank и сама записывает события.
+
+```
+KEYS  ["keydown a","keypress a","keyup a","keydown b","keypress b","keyup b",
+       "keydown 7",...,"keydown x",...,"keydown Backspace","keyup Backspace",
+       "keydown 9",...,"keydown 4",...,"keydown 2","keypress 2","keyup 2"]
+MOUSE ["mousedown 60,60","mouseup 60,60","click 60,60"]
+FIELD [ab7942]
+UA    Mozilla/5.0 (Windows NT 10.0; Win64; x64) ... Chrome/148.0.0.0 Safari/537.36
+[xml] профиль: шаблон просит браузер Firefox=70, поднимается Chrome
+[xml] профиль: шаблон просит ОС Android=50, поднимается Windows
+```
+
+По `keydown a, keypress a, keyup a` видно, что фазы различаются: раньше на одну
+букву вышло бы шесть событий. `FIELD [ab7942]` показывает весь разбор
+`7x{BACKSPACE}9{-Variable.probeTail-}` сразу: вставка стёрла «x», макрос раскрылся
+в «42». UA — Chrome 148, то есть взят у браузера, а не из заготовки Chrome 124.
+`PlatformsV2: Desktop=100` предупреждения не дал — его мы исполняем.
 
 ### 2026-09-21 — первое нажатие приходилось на ещё не готовый виджет
 

@@ -140,6 +140,9 @@ public sealed class PlaySession
         _log($"[xml] профиль: {project.Profile.Name} {project.Profile.Surname}, " +
              $"{project.Profile.Gender}, {project.Profile.BirthDate}, login {project.Profile.Login}");
 
+        foreach (var unrunnable in tpl.Profile.UnrunnableRequests())
+            _log($"[xml] профиль: {unrunnable}");
+
         XmlCodeRunner code;
         try
         {

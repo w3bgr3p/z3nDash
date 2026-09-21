@@ -33,6 +33,62 @@ public sealed class ProfileRules
     public int      MaxAge      { get; init; } = 45;
     public string   LoginRule   { get; init; } = "";
 
+    /// <summary>
+    /// Веса выбора браузера, ОС и платформы из XML, как написаны.
+    /// Читаются только V2-атрибуты: у тех же шаблонов рядом лежат
+    /// старые Browsers/OperationSystems/Resolutions, и они ему противоречат
+    /// — в simroute.megapari старый говорит FireFox=100, а новый PureChrome=100.
+    /// </summary>
+    public string BrowsersV2         { get; init; } = "";
+    public string OperationSystemsV2 { get; init; } = "";
+    public string PlatformsV2        { get; init; } = "";
+
+    /// <summary>
+    /// Чего шаблон просит, а мы таким быть не можем. Браузер здесь —
+    /// настоящий Chrome под Windows на рабочем столе, без подмены UserAgent
+    /// и без принудительного вьюпорта: это условие запуска, а не упущение.
+    /// Поэтому веса не исполняются — но и молчать о них нельзя: расхождение
+    /// между «что задано в шаблоне» и «что поднялось» иначе не видно никак.
+    /// </summary>
+    public IReadOnlyList<string> UnrunnableRequests()
+    {
+        var said = new List<string>();
+
+        Check(BrowsersV2,         ["Chrome", "PureChrome"], "браузер",  "Chrome");
+        Check(OperationSystemsV2, ["Windows"],              "ОС",       "Windows");
+        Check(PlatformsV2,        ["Desktop"],              "платформу", "Desktop");
+
+        return said;
+
+        void Check(string raw, string[] canBe, string what, string weAre)
+        {
+            var asked = Weights(raw)
+                .Where(w => w.Weight > 0 &&
+                            !canBe.Contains(w.Name, StringComparer.OrdinalIgnoreCase))
+                .Select(w => $"{w.Name}={w.Weight}")
+                .ToArray();
+
+            if (asked.Length > 0)
+                said.Add($"шаблон просит {what} {string.Join(", ", asked)}, " +
+                         $"поднимается {weAre} — вес не исполняется");
+        }
+    }
+
+    /// <summary>
+    /// Значение вида { "Chrome": 0, "PureChrome": 100 } — в пары имя/вес.
+    /// Разбор выборкой, а не JSON-парсером: атрибут пишет чужой
+    /// редактор, и споткнуться на его формате ради предупреждения незачем.
+    /// </summary>
+    private static IEnumerable<(string Name, int Weight)> Weights(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) yield break;
+
+        foreach (System.Text.RegularExpressions.Match m in
+                 System.Text.RegularExpressions.Regex.Matches(raw, "\u0022([^\u0022]+)\u0022\\s*:\\s*(\\d+)"))
+            if (int.TryParse(m.Groups[2].Value, out var weight))
+                yield return (m.Groups[1].Value, weight);
+    }
+
     public static ProfileRules From(XElement? profile)
     {
         if (profile is null) return new ProfileRules();
@@ -52,6 +108,10 @@ public sealed class ProfileRules
             MinAge    = Int("MinAge", 20),
             MaxAge    = Int("MaxAge", 45),
             LoginRule = profile.Attribute("LoginGenerationRule")?.Value ?? "",
+
+            BrowsersV2         = profile.Attribute("BrowsersV2")?.Value ?? "",
+            OperationSystemsV2 = profile.Attribute("OperationSystemsV2")?.Value ?? "",
+            PlatformsV2        = profile.Attribute("PlatformsV2")?.Value ?? "",
         };
     }
 }
