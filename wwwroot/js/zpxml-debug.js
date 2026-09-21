@@ -36,10 +36,32 @@ async function dbgPost(action, body) {
     }
 }
 
+/// Каталог проекта выбирается системным диалогом: браузер полного пути
+/// выбранного файла не отдаёт, а шаблону нужен каталог — там лежит .env и то,
+/// что ищет Constantes. Диалог уже есть в приложении, GET /tasker/pick.
+async function dbgPickDir() {
+    const field = document.getElementById('dbg-dir');
+    try {
+        const r = await fetch('/tasker/pick?mode=folder&start=' + encodeURIComponent(field.value.trim()));
+        const res = await r.json();
+        if (!res.ok) { setStatus('debug: ' + (res.error || 'диалог не открылся'), 'err'); return; }
+        if (!res.path) return;                       // отмена — не ошибка
+        field.value = res.path;
+        try { localStorage.setItem(DBG_DIR_KEY, res.path); } catch (e) { /* ignore */ }
+        setStatus('debug: каталог ' + res.path, 'ok');
+    } catch (e) {
+        setStatus('debug: выбор каталога не сработал: ' + e.message, 'err');
+    }
+}
+
 async function dbgStart() {
     if (!ZpDoc.doc) { setStatus('nothing to debug', 'err'); return; }
 
     const dir = document.getElementById('dbg-dir').value.trim();
+    if (!dir) {
+        setStatus('debug: не указан каталог проекта — нажми «…» рядом с полем', 'err');
+        return;
+    }
     // Каталог запоминается: браузер не отдаёт путь выбранного файла, и вводить
     // его заново на каждый запуск — лишнее.
     try { localStorage.setItem(DBG_DIR_KEY, dir); } catch (e) { /* ignore */ }
@@ -230,6 +252,7 @@ function dbgListen() {
     } catch (e) { /* ignore */ }
 
     document.getElementById('dbg-dir').addEventListener('keydown', e => e.stopPropagation());
+    document.getElementById('dbg-pick' ).addEventListener('click', dbgPickDir);
     document.getElementById('dbg-start').addEventListener('click', dbgStart);
     document.getElementById('dbg-step' ).addEventListener('click', () => dbgPost('step'));
     document.getElementById('dbg-run'  ).addEventListener('click', () => dbgPost('run'));
