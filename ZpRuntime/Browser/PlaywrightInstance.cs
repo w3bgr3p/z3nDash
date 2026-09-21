@@ -1079,8 +1079,42 @@ namespace z3nDash.Browser
             Sync(_loc.ScrollIntoViewIfNeededAsync());
         }
 
+        /// <summary>
+        /// Снимок элемента в base64.
+        ///
+        /// У canvas берём его собственные пиксели через toDataURL, а не снимок
+        /// области экрана. Playwright перед скриншотом элемента ждёт, пока тот
+        /// перестанет двигаться, а канвас капчи анимируется непрерывно — мяч
+        /// летит. Стабильность не наступает, элемент успевает пересоздаться, и
+        /// приходит «Element is not attached to the DOM» на полностью рабочей
+        /// странице. В ZennoPoster DrawToBitmap ничего подобного не ждёт.
+        ///
+        /// Заодно toDataURL отдаёт ровно содержимое канваса, без того, что
+        /// могло оказаться поверх него на экране.
+        /// </summary>
         public string DrawToBitmap()
-            => Missing ? "" : Convert.ToBase64String(Sync(_loc.ScreenshotAsync()));
+        {
+            if (Missing) return "";
+
+            var data = Sync(_loc.EvaluateAsync<string>(
+                "el => el.tagName && el.tagName.toLowerCase() === 'canvas' "
+                + "? el.toDataURL('image/png') : null"));
+
+            if (!string.IsNullOrEmpty(data))
+            {
+                // toDataURL отдаёт «data:image/png;base64,…» — приёмник ждёт
+                // тот же чистый base64, что возвращал скриншот.
+                var comma = data.IndexOf(',');
+                return comma >= 0 ? data.Substring(comma + 1) : data;
+            }
+
+            // Остальным элементам — снимок, но без ожидания анимаций: на живой
+            // странице всегда что-нибудь движется.
+            return Convert.ToBase64String(Sync(_loc.ScreenshotAsync(new LocatorScreenshotOptions
+            {
+                Animations = ScreenshotAnimations.Disabled,
+            })));
+        }
 
         /// <summary>
         /// ZP-шный DrawPartAsBitmap: кусок элемента, координаты от его левого
