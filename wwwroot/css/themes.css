@@ -1,4 +1,19 @@
 /* ═══════════════════════════════════════════════════════
+   Шрифт лежал в wwwroot/static/fonts, но @font-face в проекте
+   не было ни одного, а внутреннее имя файла — «JetBrainsMono NF»,
+   не «JetBrains Mono». Поэтому все ссылки на 'JetBrains Mono'
+   молча проваливались в Consolas. Объявляем под тем именем,
+   которым его и зовут в коде.
+   ═══════════════════════════════════════════════════════ */
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/static/fonts/JetBrainsMonoNerdFont-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* ═══════════════════════════════════════════════════════
    themes.css — все темы для всех страниц
    Применяется через data-theme="dark|light|hyper" на <html>
    Покрывает переменные zp7.html и base.css
