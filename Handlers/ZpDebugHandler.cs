@@ -7,14 +7,17 @@ namespace z3nDash;
 /// <summary>
 /// Пульт отладки шаблона.
 ///
-///   POST /zp-debug/start   { xml, projectDir, headless } — собрать сессию
-///   POST /zp-debug/step    — выполнить одну ветку
-///   POST /zp-debug/run     — идти до конца, точки останова или паузы
-///   POST /zp-debug/pause   — встать на текущей ветке
-///   POST /zp-debug/runto   { stepId, branchId } — дойти до ветки
-///   POST /zp-debug/stop    — прервать и освободить браузер
-///   GET  /zp-debug/state   — текущее состояние одним ответом
-///   GET  /zp-debug/events  — поток событий (SSE)
+/// Префикс «/dbg», а не «/zp-debug»: обработчики выбираются по StartsWith, и
+/// «/zp-debug/...» перехватывал бы ZpOrchestratorHandler с префиксом «/zp».
+///
+///   POST /dbg/start   { xml, projectDir, headless } — собрать сессию
+///   POST /dbg/step    — выполнить одну ветку
+///   POST /dbg/run     — идти до конца, точки останова или паузы
+///   POST /dbg/pause   — встать на текущей ветке
+///   POST /dbg/runto   { stepId, branchId } — дойти до ветки
+///   POST /dbg/stop    — прервать и освободить браузер
+///   GET  /dbg/state   — текущее состояние одним ответом
+///   GET  /dbg/events  — поток событий (SSE)
 ///
 /// start отвечает синхронно: дешёвые проверки — каталог, разбор шаблона,
 /// сборка общего кода — успевают до ответа, и об их провале честнее сказать
@@ -23,7 +26,7 @@ namespace z3nDash;
 /// </summary>
 public sealed class ZpDebugHandler : IScriptHandler
 {
-    public string PathPrefix => "/zp-debug";
+    public string PathPrefix => "/dbg";
 
     public void Init() { }
 
@@ -32,17 +35,17 @@ public sealed class ZpDebugHandler : IScriptHandler
         var path   = ctx.Request.Url?.AbsolutePath.ToLowerInvariant() ?? "";
         var method = ctx.Request.HttpMethod;
 
-        if (!path.StartsWith("/zp-debug")) return false;
+        if (!path.StartsWith("/dbg")) return false;
 
         try
         {
-            if (path == "/zp-debug/events" && method == "GET")
+            if (path == "/dbg/events" && method == "GET")
             {
                 await SseHub.SubscribeOutput(ctx.Response, "zp-debug", CancellationToken.None);
                 return true;
             }
 
-            if (path == "/zp-debug/state" && method == "GET")
+            if (path == "/dbg/state" && method == "GET")
             {
                 await WriteJson(ctx.Response, ZpDebugService.CurrentState());
                 ctx.Response.Close();
@@ -51,7 +54,7 @@ public sealed class ZpDebugHandler : IScriptHandler
 
             if (method != "POST") return false;
 
-            if (path == "/zp-debug/start")
+            if (path == "/dbg/start")
             {
                 var body = await ReadBody(ctx.Request);
                 var (ok, error) = await ZpDebugService.StartAsync(
@@ -62,7 +65,7 @@ public sealed class ZpDebugHandler : IScriptHandler
                 return true;
             }
 
-            if (path == "/zp-debug/stop")
+            if (path == "/dbg/stop")
             {
                 await ZpDebugService.StopAsync("остановлено с пульта");
                 await WriteJson(ctx.Response, new { ok = true });
@@ -72,10 +75,10 @@ public sealed class ZpDebugHandler : IScriptHandler
 
             var cmd = path switch
             {
-                "/zp-debug/step"  => DebugCommand.Step,
-                "/zp-debug/run"   => DebugCommand.Run,
-                "/zp-debug/pause" => DebugCommand.Pause,
-                "/zp-debug/runto" => DebugCommand.RunTo,
+                "/dbg/step"  => DebugCommand.Step,
+                "/dbg/run"   => DebugCommand.Run,
+                "/dbg/pause" => DebugCommand.Pause,
+                "/dbg/runto" => DebugCommand.RunTo,
                 _                 => (DebugCommand?)null
             };
             if (cmd is null) return false;

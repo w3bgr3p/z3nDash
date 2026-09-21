@@ -27,6 +27,10 @@ function openBuffer(buffer, fileName) {
         setStatus('✓ ' + fileName + ' · ' + stepList.length + ' steps · ' + edges.length + ' edges', 'ok');
         document.getElementById('empty').style.display = 'none';
         lastNote = '';
+        // Сессия отладки живёт на сервере и про смену файла не знает. Молча
+        // оставить её — значит показывать позицию чужого прогона на чужом графе.
+        if (typeof dbgState !== 'undefined' && dbgState !== 'idle')
+            setStatus('debug: открыт другой шаблон — сессия отладки относится к прежнему', 'err');
         layoutMode = hasCanvasCoords() ? 'canvas' : 'vertical';
         document.getElementById('btn-layout').textContent = LAYOUTS[layoutMode];
         render();

@@ -412,3 +412,12 @@ body.debugging #dbg-state { color:var(--yellow); }
     background:var(--bg2); color:var(--text); outline:none;
 }
 #dbg-var-filter:focus { border-color:var(--accent); }
+
+/* Предупреждение в панели отладки: сессия относится к другому шаблону. */
+.bi.warn {
+    border-color:var(--yellow);
+    background:color-mix(in srgb, var(--yellow) 12%, var(--bg1));
+    color:var(--text);
+    font-size:10px; line-height:1.5;
+}
+.bi.warn .bi-head { color:var(--yellow); }

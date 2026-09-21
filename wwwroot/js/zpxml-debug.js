@@ -16,7 +16,7 @@ let dbgSnap    = null;      // последний снимок состояни�
 async function dbgPost(action, body) {
     let r;
     try {
-        r = await fetch('/zp-debug/' + action, {
+        r = await fetch('/dbg/' + action, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body || {})
@@ -27,7 +27,7 @@ async function dbgPost(action, body) {
 
     const text = await r.text();
     if (!text.trim())
-        return { ok: false, error: 'HTTP ' + r.status + ', пустой ответ — обработчик /zp-debug не отвечает' };
+        return { ok: false, error: 'HTTP ' + r.status + ', пустой ответ — обработчик /dbg не отвечает' };
 
     try {
         return JSON.parse(text);
@@ -121,15 +121,28 @@ function dbgRenderSnapshot(snap) {
         (changed.has(b.name) ? 1 : 0) - (changed.has(a.name) ? 1 : 0) ||
         a.name.localeCompare(b.name));
 
-    const where = snap.current && steps[snap.current.stepId]
-        ? (() => {
-            const st = steps[snap.current.stepId];
-            const i  = st.branches.findIndex(b => b.id === snap.current.branchId);
-            return stepLabel(st) + (i >= 0 ? ' · #' + i + ' ' + branchRowLabel(st.branches[i]) : '');
-          })()
+    // Сессия живёт на сервере и переживает смену файла на странице. Если её
+    // текущей ветки нет в открытом шаблоне, значит отлаживается другой — и
+    // молчать об этом нельзя: панель выглядела бы исправной, показывая чужое.
+    const foreign = !!snap.current && !steps[snap.current.stepId];
+
+    const where = snap.current
+        ? (steps[snap.current.stepId]
+            ? (() => {
+                const st = steps[snap.current.stepId];
+                const i  = st.branches.findIndex(b => b.id === snap.current.branchId);
+                return stepLabel(st) + (i >= 0 ? ' · #' + i + ' ' + branchRowLabel(st.branches[i]) : '');
+              })()
+            : 'ветка ' + snap.current.branchId.substring(0, 8) + ' — не из открытого шаблона')
         : 'маршрут закончен';
 
     host.innerHTML =
+        (foreign
+            ? '<div class="bi warn"><div class="bi-head">внимание</div>' +
+              'Сессия отладки идёт по другому шаблону, не по тому, что открыт на ' +
+              'странице. Останови её и запусти заново, иначе позиция и переменные ' +
+              'относятся к чужому прогону.</div>'
+            : '') +
         '<div class="bi"><div class="bi-head">position</div><div class="dl">' +
             '<dt>state</dt><dd>' + escHtml(snap.state || '') + '</dd>' +
             '<dt>next</dt><dd>' + escHtml(where) + '</dd>' +
@@ -177,10 +190,10 @@ function dbgBindVarFilter() {
 /// пульт молча перестаёт показывать состояние, хотя выглядит рабочим.
 function dbgListen() {
     let es;
-    try { es = new EventSource('/zp-debug/events'); }
+    try { es = new EventSource('/dbg/events'); }
     catch (e) { setTimeout(dbgListen, 5000); return; }
 
-    es.onmessage = e => {
+    const onEvent = e => {
         let ev;
         try { ev = JSON.parse(e.data); } catch (err) { return; }
 
@@ -199,6 +212,11 @@ function dbgListen() {
             }
         }
     };
+
+    // SseHub рассылает именованное событие «output», а onmessage ловит только
+    // безымянные — без этой подписки поток выглядит живым, но молчит.
+    es.addEventListener('output', onEvent);
+    es.onmessage = onEvent;
 
     es.onerror = () => { es.close(); setTimeout(dbgListen, 3000); };
 }
@@ -228,7 +246,7 @@ function dbgListen() {
 
     // Состояние спрашивается при загрузке: сессия могла пережить перезагрузку
     // страницы, и пульт должен показать её, а не «idle».
-    fetch('/zp-debug/state')
+    fetch('/dbg/state')
         .then(r => r.json())
         .then(s => { if (s && s.state) { dbgSetState(s.state); dbgCurrent = s.current || null; renderNodes(); } })
         .catch(() => { /* сервера нет — пульт остаётся в idle */ });
