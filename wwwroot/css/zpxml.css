@@ -211,7 +211,11 @@ body.editing .crow:hover > .drag-port { display:block; }
     display:none; z-index:40;
     box-shadow:-2px 0 8px rgba(0,0,0,.25);
 }
-#detail.open { display:block; }
+#detail.open { display:flex; flex-direction:column; overflow:hidden; }
+/* Во вкладке step прокручивается содержимое, а не вся панель: иначе лог на
+   вкладке debug не может занять оставшуюся высоту. */
+#detail.open > #d-meta { flex:0 0 auto; overflow-y:auto; max-height:40%; }
+#detail.open > #d-branches { flex:1 1 auto; overflow-y:auto; min-height:0; }
 
 /* Drag handle on the panel's inner edge. */
 #detail-resizer {
@@ -380,11 +384,14 @@ body.debugging #dbg-state { color:var(--yellow); }
 .dtab.active { background:var(--blue-tint); color:var(--accent); border-color:var(--blue-border); }
 
 #d-debug { display:none; }
-#d-debug.on { display:block; }
+#d-debug.on { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow-y:auto; }
+
+/* Лог занимает всё, что осталось по высоте: в 160px он был бесполезен. */
+#d-debug .bi-log { display:flex; flex-direction:column; flex:1 1 auto; min-height:180px; }
 .dl.params dt.changed { color:var(--yellow); font-weight:600; }
 
 #dbg-log {
-    max-height:160px; overflow-y:auto; margin:0;
+    flex:1 1 auto; min-height:160px; overflow-y:auto; margin:0;
     font-family:var(--mono, monospace); font-size:9px; line-height:1.5;
     color:var(--text2); white-space:pre-wrap; word-break:break-word;
 }
@@ -548,3 +555,7 @@ body.dbg-busy #canvas-wrap { cursor:progress; }
 }
 .log-noise input { margin:0; cursor:pointer; }
 #dbg-log-note { font-size:9px; color:var(--text3); margin-top:4px; }
+
+/* Поля профиля среди переменных — тем же списком, но видно, что они не из
+   <Variables>, а сгенерированы. */
+#dbg-vars dt.from-profile { color:var(--green-hi); }

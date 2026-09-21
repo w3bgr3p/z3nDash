@@ -405,6 +405,9 @@ window.addEventListener('mousemove', e => {
 });
 window.addEventListener('mouseup', () => { isDragging = false; wrap.classList.remove('grabbing'); });
 wrap.addEventListener('wheel', e => {
+    // Панели лежат внутри canvas-wrap, поэтому колесо над ними приходило сюда
+    // и крутило холст вместо их содержимого.
+    if (e.target.closest && e.target.closest('#detail, #vars-panel, #ts-modal')) return;
     e.preventDefault();
     scale = Math.max(0.1, Math.min(4, scale * (e.deltaY > 0 ? 0.88 : 1.12)));
     applyTransform(); updateMini();

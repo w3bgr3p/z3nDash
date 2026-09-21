@@ -233,14 +233,7 @@ function dbgRenderSnapshot(snap) {
             (snap.last && snap.last.message
                 ? '<dt>last</dt><dd>' + escHtml(snap.last.message) + '</dd>' : '') +
         '</div></div>' +
-        (snap.profile
-            ? '<div class="bi"><div class="bi-head">profile</div><div class="dl">' +
-                '<dt>name</dt><dd>' + escHtml(snap.profile.name || '') + '</dd>' +
-                '<dt>email</dt><dd>' + escHtml(snap.profile.email || '') + '</dd>' +
-                '<dt>login</dt><dd>' + escHtml(snap.profile.login || '') + '</dd>' +
-              '</div></div>'
-            : '') +
-        '<div class="bi"><div class="bi-head">player log' +
+        '<div class="bi bi-log"><div class="bi-head">player log' +
             '<label class="log-noise"><input type="checkbox" id="dbg-noise"' +
             (dbgShowNoise ? ' checked' : '') + '>browser noise</label></div>' +
             '<pre id="dbg-log"></pre><div id="dbg-log-note"></div></div>';
@@ -264,7 +257,15 @@ function dbgRenderVars(snap) {
         (changed.has(b.name) ? 1 : 0) - (changed.has(a.name) ? 1 : 0) ||
         a.name.localeCompare(b.name));
 
-    list.innerHTML = vars.map(v =>
+    // Профиль — такие же данные прогона, как переменные: имя, почта и логин
+    // подставляются в поля формы. Место им здесь, а не среди служебного.
+    const profile = snap.profile
+        ? ['name', 'email', 'login'].map(k =>
+            '<dt class="from-profile">Profile.' + k + '</dt><dd>' +
+            escHtml(snap.profile[k] || '') + '</dd>').join('')
+        : '';
+
+    list.innerHTML = profile + vars.map(v =>
         '<dt' + (changed.has(v.name) ? ' class="changed"' : '') + '>' + escHtml(v.name) + '</dt>' +
         '<dd>' + escHtml(v.value) + '</dd>').join('');
 
