@@ -46,6 +46,8 @@ Console.WriteLine($"Start    : {tpl.Start}");
 Console.WriteLine($"GoodEnd  : {tpl.GoodEnd}");
 Console.WriteLine($"BadEnd   : {tpl.BadEnd}");
 Console.WriteLine($"артефактов (недостижимых узлов): {dead.Count}");
+Console.WriteLine($"настроек проекта: {tpl.InputDefaults.Count}"
+                  + $" ({string.Join(", ", tpl.InputDefaults.Where(d => d.Value.Length > 0).Select(d => d.Key + "=" + d.Value))})");
 Console.WriteLine($"переменных: {tpl.Variables.Count}, usings: {tpl.OwnCode.Usings.Length}, "
                   + $"CommonCode: {tpl.OwnCode.CommonCode.Length} симв., "
                   + $"References: {string.Join(", ", tpl.OwnCode.References)}");

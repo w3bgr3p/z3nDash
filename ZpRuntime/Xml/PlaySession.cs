@@ -261,6 +261,19 @@ public sealed class PlaySession
         var assigned = Project.Variables as
             ZennoLab.InterfacesLibrary.ProjectModel.Collections.VariableList;
 
+        // Настройки проекта идут первыми: в ZennoPoster это то, что человек
+        // выбирает перед запуском, и оно старше значения по умолчанию самой
+        // переменной. Без этого шага у simroute.megapari пустым остаётся
+        // location, а из него берутся numCountryId и proxy_iso — и шаблон
+        // падает на «countryName is empty», хотя в настройках стоит ET.
+        foreach (var (name, value) in tpl.InputDefaults)
+        {
+            if (value.Length == 0) continue;
+            if (assigned?.IsAssigned(name) == true) continue;
+            if (string.IsNullOrEmpty(Project.Variables[name].Value))
+                Project.Variables[name].Value = value;
+        }
+
         foreach (var (name, value) in tpl.Variables)
         {
             if (assigned?.IsAssigned(name) == true) continue;

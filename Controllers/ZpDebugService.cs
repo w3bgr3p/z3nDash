@@ -112,6 +112,12 @@ internal static class ZpDebugService
         var profileDir = Path.Combine(Path.GetTempPath(), "z3nDash-xml", "debug-profile");
         Log($"[dbg] браузер{(headless ? " (без окна)" : " (с окном)")}, профиль {profileDir}");
 
+        // Chrome помечает профиль как «Crashed» и при следующем запуске
+        // восстанавливает вкладки прошлой сессии. В отладке это хуже, чем
+        // просто лишнее окно: на экране оказывается страница прошлого прогона,
+        // и по ней кажется, что текущий шаг прошёл, хотя он упал.
+        Safe("снятие признака аварийного выхода", () => ClearCrashFlag(profileDir));
+
         try
         {
             _browser      = await BrowserSession.LaunchAsync(profileDir, headless, proxy: null, log: Log);
@@ -494,6 +500,29 @@ internal static class ZpDebugService
     {
         try { await fn(); }
         catch (Exception ex) { Console.WriteLine($"[dbg] {label} не выполнено: {Cut(ex.Message, 200)}"); }
+    }
+
+    /// <summary>
+    /// Снять «Crashed» из Preferences профиля. Правим только два поля, остальное
+    /// не трогаем: в файле лежат настройки браузера, и переписывать его целиком
+    /// значит рисковать ими ради мелочи.
+    /// </summary>
+    private static void ClearCrashFlag(string profileDir)
+    {
+        foreach (var rel in new[] { Path.Combine("Default", "Preferences"), "Preferences" })
+        {
+            var file = Path.Combine(profileDir, rel);
+            if (!File.Exists(file)) continue;
+
+            var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file));
+            var profile = node?["profile"];
+            if (profile is null) continue;
+
+            profile["exit_type"]      = "Normal";
+            profile["exited_cleanly"] = true;
+            File.WriteAllText(file, node!.ToJsonString());
+            Log("[dbg] профиль: снят признак аварийного выхода, вкладки прошлой сессии не восстановятся");
+        }
     }
 
     /// <summary>Полный стек — в файл: в панели он нечитаем, но при разборе нужен.</summary>

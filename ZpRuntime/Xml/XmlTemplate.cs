@@ -161,6 +161,14 @@ public sealed class XmlTemplate
     /// <summary>Объявленные переменные проекта с начальными значениями.</summary>
     public Dictionary<string, string> Variables { get; init; } = new();
 
+    /// <summary>
+    /// Значения из настроек проекта (&lt;InputSettings&gt;): имя переменной из
+    /// OutputVariable → DefaultValue. В ZennoPoster это то, что видит человек
+    /// перед запуском, и оно ложится в переменные раньше их собственных
+    /// значений по умолчанию.
+    /// </summary>
+    public Dictionary<string, string> InputDefaults { get; init; } = new();
+
     public OwnCodeContext OwnCode { get; init; } = new();
 
     /// <summary>Правила генерации личности из &lt;Profile&gt;.</summary>
@@ -272,6 +280,8 @@ public sealed class XmlTemplate
             GoodEnd = NextAction(stat, "GoodEnd"),
             BadEnd  = NextAction(stat, "BadEnd"),
 
+            InputDefaults = ParseInputDefaults(stat),
+
             Variables = stat?.Element("Variables")?.Elements("Variable")
                             .Where(v => v.Attribute("Name") is not null)
                             .ToDictionary(v => v.Attribute("Name")!.Value,
@@ -290,6 +300,31 @@ public sealed class XmlTemplate
         }
 
         return tpl;
+    }
+
+    /// <summary>
+    /// Настройки проекта. Ключ поля лежит в OutputVariable как
+    /// {-Variable.имя-}; поля без него (Label, Comment, Tab) — это разметка
+    /// формы, значения они не несут.
+    /// </summary>
+    private static Dictionary<string, string> ParseInputDefaults(XElement? stat)
+    {
+        var result = new Dictionary<string, string>();
+        var settings = stat?.Element("InputSettings");
+        if (settings is null) return result;
+
+        foreach (var item in settings.Elements("InputSetting"))
+        {
+            var output = item.Attribute("OutputVariable")?.Value
+                         ?? item.Element("OutputVariable")?.Value ?? "";
+            var name = output.Replace("{-Variable.", "").Replace("-}", "").Trim();
+            if (name.Length == 0) continue;
+
+            var value = item.Attribute("DefaultValue")?.Value
+                        ?? item.Element("DefaultValue")?.Value ?? "";
+            result[name] = value;
+        }
+        return result;
     }
 
     /// <summary>
