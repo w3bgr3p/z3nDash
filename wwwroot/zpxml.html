@@ -34,6 +34,7 @@
     <button class="btn" id="btn-reset">reset</button>
     <button class="btn active" id="btn-layout">↕ vertical</button>
     <button class="btn" id="btn-edit">✎ edit</button>
+    <button class="btn" id="btn-settings">⚙ settings</button>
     <span class="dbg-group">
       <button class="btn" id="dbg-start">▶ start</button>
       <button class="btn" id="dbg-step" disabled>⏭ step</button>
@@ -77,10 +78,26 @@
   </div>
 </div>
 
+<div id="ts-modal">
+  <div id="ts-window">
+    <div id="ts-head">
+      <span>template settings · InputSettings</span>
+      <button id="ts-close" title="закрыть">✕</button>
+    </div>
+    <div id="ts-body"></div>
+    <div id="ts-foot">
+      <button class="btn" id="ts-cancel">cancel</button>
+      <button class="btn" id="ts-apply">apply</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/zpxml-doc.js"></script>
 <script src="/js/zpxml-model.js"></script>
 <script src="/js/zpxml-view.js"></script>
 <script src="/js/zpxml.js"></script>
+<script src="/js/zp-settings.js"></script>
+<script src="/js/zpxml-settings.js"></script>
 <script src="/js/zpxml-debug.js"></script>
 </body>
 </html>

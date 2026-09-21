@@ -270,6 +270,30 @@ const ZpDoc = {
         return true;
     },
 
+    /// Записать значения настроек проекта. Ключ — имя переменной из
+    /// OutputVariable вида {-Variable.location-}. Правится DefaultValue: это
+    /// то, с чем шаблон стартует. Типы полей и списки вариантов не трогаем —
+    /// они часть разметки формы, а не значение.
+    setInputDefaults(values) {
+        const nodes = [...this.doc.querySelectorAll('InputSettings > InputSetting')];
+        if (!nodes.length) return 0;
+
+        const wanted = [];
+        nodes.forEach(node => {
+            const out = node.getAttribute('OutputVariable') || '';
+            const key = out.replace('{-Variable.', '').replace('-}', '').trim();
+            if (!key || !(key in values)) return;
+            const next = String(values[key] ?? '');
+            if ((node.getAttribute('DefaultValue') || '') === next) return;
+            wanted.push([node, next]);
+        });
+
+        if (!wanted.length) return 0;
+        this.snapshot();
+        wanted.forEach(([node, next]) => node.setAttribute('DefaultValue', next));
+        return wanted.length;
+    },
+
     /// Записать переход ветки. slot: 'ok' | 'err' | 'case:N' | 'default',
     /// где N — номер из имени тега <CaseN>, а не позиция в файле.
     /// target вида stepId|branchId, либо null — стереть переход.

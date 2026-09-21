@@ -65,15 +65,24 @@
         return (holder.textContent || '').trim();
     }
 
+    /// Поле InputSetting приходит в двух видах: из ZennoPoster — дочерними
+    /// элементами, а в сохранённом шаблоне — атрибутами тега. Читаем оба, иначе
+    /// на файле .xml разбор молча возвращает пустые поля.
     function childText(element, tag) {
         var node = element.getElementsByTagName(tag)[0];
-        return node ? node.textContent || '' : '';
+        if (node) return node.textContent || '';
+        return element.getAttribute ? (element.getAttribute(tag) || '') : '';
     }
 
     /// Список полей в порядке XML. Tab и Comment остаются в списке: по ним
     /// строятся вкладки и разделители, ключа у них нет.
     function parseFields(xmlB64, values) {
         var xml = decodeBase64Utf8(xmlB64);
+        return parseFieldsXml(xml, values);
+    }
+
+    /// То же, но из готового XML: шаблон на диске не закодирован в base64.
+    function parseFieldsXml(xml, values) {
         var doc = new DOMParser().parseFromString(xml, 'application/xml');
         if (doc.getElementsByTagName('parsererror').length)
             throw new Error('Input settings XML is not well-formed');
@@ -89,7 +98,11 @@
                 type: childText(node, 'Type') || 'Text',
                 key: key,
                 label: fieldLabel(childText(node, 'Name')),
-                value: Object.prototype.hasOwnProperty.call(current, key) ? current[key] : childText(node, 'Value'),
+                // В сохранённом шаблоне текущего значения нет — есть только
+                // DefaultValue, с которым шаблон и стартует.
+                value: Object.prototype.hasOwnProperty.call(current, key)
+                    ? current[key]
+                    : (childText(node, 'Value') || childText(node, 'DefaultValue')),
                 outputVar: outputVariable,
                 help: childText(node, 'Help')
             });
@@ -139,6 +152,7 @@
 
     return {
         decodeInputSettings: decodeInputSettings,
+        parseFieldsXml: parseFieldsXml,
         buildInputPayload: buildInputPayload,
         parseFields: parseFields,
         fieldOptions: fieldOptions,
