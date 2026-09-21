@@ -785,6 +785,16 @@ namespace z3nDash.Browser
             return false;
         }
 
+        /// <summary>
+        /// Клик или отдельная фаза кнопки.
+        ///
+        /// mouseEvent здесь принимался и игнорировался: любой вызов делал
+        /// полный клик. Для «down» это ломает всё, что тянут мышью — код
+        /// зажимает кнопку, ведёт курсор и отпускает, а у нас вместо зажатия
+        /// происходил щелчок, движение шло с ненажатой кнопкой и ничего не
+        /// перетаскивалось. Так устроен HuntSolver.SolveFootball, и в ZP он
+        /// работает именно потому, что фазы там раздельные.
+        /// </summary>
         public void MouseClick(int x, int y, string button, string mouseEvent, bool considerScroll)
         {
             var btn = button?.ToLower() switch
@@ -793,7 +803,28 @@ namespace z3nDash.Browser
                 "middle" => MouseButton.Middle,
                 _        => MouseButton.Left,
             };
-            Sync(_page.Mouse.ClickAsync(x, y, new MouseClickOptions { Button = btn }));
+
+            switch ((mouseEvent ?? "").Trim().ToLowerInvariant())
+            {
+                case "down":
+                    Sync(_page.Mouse.MoveAsync(x, y));
+                    Sync(_page.Mouse.DownAsync(new MouseDownOptions { Button = btn }));
+                    break;
+
+                case "up":
+                    Sync(_page.Mouse.MoveAsync(x, y));
+                    Sync(_page.Mouse.UpAsync(new MouseUpOptions { Button = btn }));
+                    break;
+
+                case "move":
+                    Sync(_page.Mouse.MoveAsync(x, y));
+                    break;
+
+                default:
+                    Sync(_page.Mouse.ClickAsync(x, y, new MouseClickOptions { Button = btn }));
+                    break;
+            }
+
             MouseEmulation.Remember(_page, x, y);
         }
 

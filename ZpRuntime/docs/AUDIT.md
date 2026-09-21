@@ -152,6 +152,7 @@ python ZpRuntime/tools/ext_inventory.py
 | `HtmlElementCollection.*` | **проверено** | 2026-08-13: `Count`, `IsVoid`, индексатор, `GetByNumber`, `IndexOf`, `AttributesToString` |
 | `Tab.MouseMove(from, to, useClick, considerScroll)` | **не проверено** | 2026-09-18: курсор ставится в начальную точку и ведётся в конечную, обе через эмуляцию. `useClick: true` — **отказ**: что ZP делает с кнопкой во время такого движения, не проверял |
 | `Tab.MouseClick(x, y, button, event)`, `HtmlElement.DrawToBitmap(isImage)` | **проверено через использование** | 2026-09-18: добавлены только значения по умолчанию к уже проверенным пятиаргументной и двухаргументной формам, тело то же |
+| `Tab.MouseClick(..., event)` — фазы кнопки | **не проверено на живой странице** | 2026-09-21: параметр `event` принимался и игнорировался — любой вызов делал полный клик, поэтому `down` не зажимал кнопку и последующий `MouseMove` ничего не тащил. Реализованы `down`, `up`, `move`; проверено чтением кода и сборкой, прогоном на странице с капчей — нет |
 | `ZennoPoster.AddTask`/`StartTask`/`TasksList` и прочее управление задачами | отказ | очереди ZP нет, планировщик свой |
 | `ZennoPoster.ImageProcessing*` | отказ | не реализовано |
 | `Instance.Launch`, `Reload`, `Tab.Stop` | отказ | — |
