@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 using static z3nDash.HttpHelpers;
 
@@ -94,7 +94,8 @@ public sealed class ZpDebugHandler : IScriptHandler
                 var body = await ReadBody(ctx.Request);
                 var (ok, error) = await ZpDebugService.StartAsync(
                     Str(body, "xml"), Str(body, "projectDir"),
-                    body.TryGetProperty("headless", out var h) && h.ValueKind == JsonValueKind.True);
+                    body.TryGetProperty("headless", out var h) && h.ValueKind == JsonValueKind.True,
+                    Str(body, "name"));
                 await WriteJson(ctx.Response, new { ok, error });
                 ctx.Response.Close();
                 return true;

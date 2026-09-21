@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -213,6 +213,13 @@ namespace z3n7.Captcha
 
             try
             {
+                // Диагностика: без неё «target was not reached» не отличить от
+                // «ползунок не двигался» — в обоих случаях цикл просто кончается.
+                _project.SendInfoToLog(
+                    "Hunt football: канвас " + position.X + "," + position.Y +
+                    " " + width + "x" + height + ", ползунок y=" + sliderY +
+                    ", x=" + sliderX + " [" + minimumX + ".." + maximumX + "]", true);
+
                 _instance.ActiveTab.MouseClick(sliderX, sliderY, "left", "down");
                 mouseDown = true;
                 var result = DetectFootball(canvas, confidence);
@@ -231,6 +238,12 @@ namespace z3n7.Captcha
                         mouseDown = false;
                         return;
                     }
+
+                    _project.SendInfoToLog(
+                        "Hunt football: шаг " + attempt + " ползунок=" + sliderX +
+                        " мяч=" + ball.CenterX + "," + ball.CenterY +
+                        " цель=[" + circle.X1 + ".." + circle.X2 + "]x[" +
+                        circle.Y1 + ".." + circle.Y2 + "]", true);
 
                     var previousX = sliderX;
                     var previousBallX = ball.CenterX;
@@ -308,6 +321,16 @@ namespace z3n7.Captcha
             throw new InvalidOperationException("Hunt canvas was not found");
         }
 
+        /// <summary>
+        /// Y полосы, за которую тянем. Проверка размера добавлена наша:
+        /// на странице регистрации megapari селектор находит элемент с пустым
+        /// прямоугольником, и формула даёт верх окна вместо ползунка.
+        ///
+        /// Наблюдение из двух прогонов 2026-09-21: канвас на y=162 — вернулось 0,
+        /// канвас на y=205 — вернулось -1; оба раза мяч за шесть шагов не сдвинулся
+        /// ни на пиксель — кнопка жалась выше канваса. Без размера элемент не
+        /// отрисован, тянуть его невозможно, и запасная ветка ближе к истине.
+        /// </summary>
         private int FindSliderY(HtmlElement canvas, int canvasY, int canvasHeight)
         {
             var slider = _instance.ActiveTab.MainDocument.EvaluateScript(@"
@@ -317,6 +340,7 @@ namespace z3n7.Captcha
                     if (!canvas || !control) return null;
                     var c = canvas.getBoundingClientRect();
                     var r = control.getBoundingClientRect();
+                    if (r.width < 2 || r.height < 2) return null;
                     return JSON.stringify({ top: r.top - c.top, height: r.height });
                 })();
             ");

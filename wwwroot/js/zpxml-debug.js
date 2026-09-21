@@ -42,6 +42,14 @@ function dirNameOf(fullPath) {
     return cut > 0 ? fullPath.slice(0, cut) : fullPath;
 }
 
+/// Имя файла из пути. Шаблоны simroute разбирают project.Name на части
+/// точкой — «simroute.megapari.xml» даёт им и сервис, и направление, —
+/// поэтому подставлять вместо него заглушку нельзя.
+function baseNameOf(fullPath) {
+    const cut = Math.max(fullPath.lastIndexOf('\\'), fullPath.lastIndexOf('/'));
+    return cut >= 0 ? fullPath.slice(cut + 1) : fullPath;
+}
+
 async function dbgStart() {
     if (!ZpDoc.doc) { setStatus('nothing to debug', 'err'); return; }
 
@@ -58,7 +66,8 @@ async function dbgStart() {
 
     setStatus('debug: starting…', 'info');
     const res = await dbgPost('start', {
-        xml: ZpDoc.serialize(), projectDir: dir, headless: false
+        xml: ZpDoc.serialize(), projectDir: dir,
+        name: baseNameOf(templatePath), headless: false
     });
     if (!res.ok) { setStatus('debug: ' + (res.error || 'не запустилось'), 'err'); return; }
     setStatus('debug: session started · ' + dir, 'ok');

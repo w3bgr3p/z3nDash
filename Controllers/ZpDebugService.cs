@@ -1,4 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
+﻿// ══════════════════════════════════════════════════════════════════════════════
 // ZpDebugService.cs — сессия отладки шаблона: живой контекст, браузер с окном и
 // очередь команд.
 //
@@ -111,7 +111,7 @@ internal static class ZpDebugService
     /// на каждой попытке.
     /// </summary>
     public static async Task<(bool ok, string error)> StartAsync(
-        string xml, string projectDir, bool headless)
+        string xml, string projectDir, bool headless, string name = "")
     {
         if (string.IsNullOrWhiteSpace(projectDir) || !Directory.Exists(projectDir))
             return (false, $"каталог проекта не найден: {projectDir}");
@@ -130,13 +130,20 @@ internal static class ZpDebugService
 
         await StopAsync("вытеснена новой сессией");
 
+        // Остановка не прерывает ветку, которая уже считает: код ветки пишет
+        // человек, токен отмены он не смотрит. Наблюдалось 2026-09-21: закрытая
+        // сессия ещё пять минут писала «Hunt football 4/10…» в лог уже следующего
+        // прогона. Номер поколения отсекает чужие строки.
+        var generation = Interlocked.Increment(ref _generation);
+        void LogHere(string line) { if (Volatile.Read(ref _generation) == generation) Log(line); }
+
         var project = new StubProject
         {
             // Имя проекта — файл шаблона, как в ZennoPoster: шаблоны разбирают
             // его на части, а Constantes.ProjectName ищет по нему файл.
-            Name  = "debug.xml",
+            Name  = string.IsNullOrWhiteSpace(name) ? "debug.xml" : name,
             Path  = projectDir,
-            OnLog = Log
+            OnLog = LogHere
         };
 
         var profileDir = Path.Combine(Path.GetTempPath(), "z3nDash-xml", "debug-profile");
@@ -160,7 +167,7 @@ internal static class ZpDebugService
 
         try
         {
-            _session = new PlaySession(tpl, projectDir, project, _browser.Instance, Log);
+            _session = new PlaySession(tpl, projectDir, project, _browser.Instance, LogHere);
         }
         catch (PlaySetupException ex)
         {
@@ -504,6 +511,8 @@ internal static class ZpDebugService
         => Safe("отправка состояния", () =>
                SseHub.BroadcastOutput(
                    JsonSerializer.Serialize(new { state = _state.ToString().ToLowerInvariant() }), Channel));
+
+    private static int _generation;
 
     private static void Log(string line)
         => Safe("лог", () => SseHub.BroadcastOutput(JsonSerializer.Serialize(new { log = line }), Channel));
