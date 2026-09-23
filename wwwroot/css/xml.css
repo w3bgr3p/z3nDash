@@ -44,6 +44,7 @@ body {
     border-bottom: 1px solid var(--border);
     padding: var(--sp-6) var(--sp-14);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-8);
     flex-shrink: 0;
@@ -74,52 +75,55 @@ body {
 }
 .xml-input::placeholder { color: var(--text2); opacity: 0.5; }
 
-/* ── Output tabs ── */
-.out-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--bg1); }
-.out-tab {
-    padding: var(--sp-4) var(--sp-14); font-size: var(--fs-10); color: var(--text2); cursor: pointer;
-    border-bottom: 2px solid transparent; user-select: none;
+/* ── Search / depth controls ── */
+.search-input {
+    flex-shrink: 0; width: 220px; padding: var(--sp-2) var(--sp-8);
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-size: var(--fs-10); font-family: var(--font);
 }
-.out-tab:hover { color: var(--text); }
-.out-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.search-input::placeholder { color: var(--text2); }
+.depth-row { display: flex; align-items: center; gap: var(--sp-4); flex-shrink: 0; }
+.depth-label { font-size: var(--fs-9); color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; margin-right: var(--sp-2); }
+.depth-btn {
+    width: 20px; height: 20px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg2);
+    color: var(--text2); font-size: var(--fs-9); cursor: pointer;
+}
+.depth-btn:hover { color: var(--text); }
+.depth-btn.active { background: var(--blue-tint); border-color: var(--accent); color: var(--accent); }
+.stats-row { display: flex; gap: var(--sp-6); margin-left: auto; flex-shrink: 0; }
+.stat-chip {
+    font-size: var(--fs-9); color: var(--text2); background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-6); white-space: nowrap;
+}
 
-/* ── Output code ── */
-.output-wrap { flex: 1; overflow: auto; background: var(--bg); }
-.output-code {
-    font-family: var(--mono);
-    font-size: var(--fs-11);
-    line-height: var(--lh-loose);
-    padding: var(--sp-12) var(--sp-14);
-    white-space: pre;
-    color: var(--text);
-    min-height: 100%;
+/* ── Virtual-scrolled tree (same technique as json.html) ── */
+.vscroll-wrap { flex: 1; overflow: auto; background: var(--bg); position: relative; }
+.vscroll-spacer { width: 1px; }
+.vscroll-rows { position: absolute; top: 0; left: 0; right: 0; will-change: transform; }
+.xv-row {
+    /* Фиксировано, как строки в json.css — виртуальный скролл в JS считает
+       по константе ROW_H, и она не пересчитывается при смене темы. */
+    height: 19px; line-height: 19px; white-space: nowrap; overflow: hidden;
+    font-family: var(--mono); font-size: var(--fs-11); padding-right: var(--sp-10);
 }
+.xv-row:hover { background: var(--bg2); }
+.xv-toggle {
+    display: inline-block; width: 12px; text-align: center; color: var(--text2); cursor: pointer;
+    user-select: none;
+}
+.xv-toggle-empty { cursor: default; }
+.xv-punc { color: var(--text2); }
+.xv-tag  { color: var(--accent); }
+.xv-attr { color: var(--yellow-lo); }
+.xv-val  { color: var(--green); }
+.xv-body { color: var(--text); }
+.xv-text { color: var(--text); font-style: italic; }
+.xv-comment { color: var(--text2); font-style: italic; }
+.xv-cdata   { color: var(--yellow); }
+.xv-pi      { color: var(--text2); }
+.xv-count { color: var(--text2); font-style: italic; }
 
-/* ── Preview table ── */
-.preview-wrap { padding: var(--sp-12) var(--sp-14); overflow: auto; flex: 1; }
-.field-table { width: 100%; border-collapse: collapse; }
-.field-table th {
-    text-align: left; padding: var(--sp-4) var(--sp-10); font-size: var(--fs-9); text-transform: uppercase;
-    letter-spacing: 0.5px; color: var(--text2); border-bottom: 1px solid var(--border);
-    background: var(--bg1);
-}
-.field-table td { padding: var(--sp-4) var(--sp-10); border-bottom: 1px solid var(--border); font-size: var(--fs-11); vertical-align: top; }
-.field-table tr:hover td { background: var(--bg2); }
-.type-badge {
-    display: inline-block; padding: var(--sp-1) var(--sp-6); border-radius: var(--radius-sm); font-size: var(--fs-9);
-    font-weight: var(--fw-semi); font-family: var(--mono); letter-spacing: 0.3px;
-}
-.type-tab        { background: var(--blue-tint); color: var(--accent); }
-.type-section    { background: var(--yellow-tint);  color: var(--yellow); }
-.type-html       { background: var(--yellow-tint);  color: var(--yellow); }
-.type-text       { background: var(--green-tint);   color: var(--green); }
-.type-boolean    { background: var(--red-tint);    color: var(--red); }
-.type-select     { background: var(--blue-tint);  color: var(--accent-lo); }
-.type-multiselect{ background: var(--blue-tint);  color: var(--accent-lo); }
-.type-password   { background: var(--red-tint);    color: var(--red); }
-.td-key   { font-family: var(--mono); color: var(--accent); font-size: var(--fs-10); }
-.td-val   { font-family: var(--mono); color: var(--text2); font-size: var(--fs-10); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.td-help  { color: var(--text2); font-size: var(--fs-10); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .empty-msg { color: var(--text2); font-size: var(--fs-11); padding: var(--sp-20); text-align: center; }
 
 /* ── Buttons ── */

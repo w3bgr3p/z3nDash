@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>XML → Payload Converter</title>
+    <title>XML Viewer</title>
     <link rel="stylesheet" href="/css/themes.css">
     <script src="/js/theme.js"></script>
     <script src="/js/nav.js"></script>
@@ -12,512 +12,84 @@
 
 <div class="header">
     <div>
-        <div class="header-title">XML → Payload Converter</div>
-        <div class="header-sub">InputSettings XML → scheduler schema + values JSON</div>
+        <div class="header-title">XML Viewer</div>
+        <div class="header-sub">Paste, drop or open a file — tree with search and collapse, like the JSON viewer</div>
     </div>
     <div class="header-right">
-        <button class="btn sm" onclick="loadExample()">Load example</button>
-        <button class="btn sm primary" onclick="convert()">Convert ▶</button>
+        <button class="btn sm" onclick="openFromDisk()">Open XML…</button>
+        <button class="btn sm" onclick="formatInput()">Format</button>
+        <button class="btn sm primary" onclick="parseXml()">Parse ▶</button>
     </div>
 </div>
 
 <div class="main">
 
-    <!-- Left: XML input -->
+    <!-- Left: raw XML -->
     <div class="panel" id="leftPanel">
         <div class="panel-header">
             <span class="panel-title">XML Input</span>
             <span class="panel-badge" id="inputBadge">paste XML</span>
-            <div style="margin-left:auto;display:flex;gap:6px">
-                <button class="btn sm" onclick="openFromDisk()">Open XML…</button>
-                <button class="btn sm" onclick="clearInput()">Clear</button>
+            <div style="margin-left:auto;display:flex;gap:var(--sp-6)">
+                <button class="btn sm" onclick="copyAll()">Copy</button>
+                <button class="btn sm" onclick="clearAll()">Clear</button>
             </div>
         </div>
         <div class="panel-body" style="padding:0">
-            <textarea class="xml-input" id="xmlInput" placeholder="Paste <InputSettings>...</InputSettings> XML here...&#10;&#10;Auto-converts on input." oninput="scheduleConvert()"></textarea>
+            <textarea class="xml-input" id="xmlInput" placeholder="Paste XML here, drop a file anywhere on the page, or Open XML…&#10;&#10;Parses as you type." spellcheck="false"></textarea>
         </div>
     </div>
 
     <div class="resizer" id="mainResizer"></div>
 
-    <!-- Right: output -->
-    <div class="panel" id="rightPanel" style="flex:1.2">
+    <!-- Right: tree -->
+    <div class="panel" id="rightPanel">
         <div class="panel-header">
-            <span class="panel-title">Output</span>
-            <span class="panel-badge" id="outputBadge">—</span>
-            <div style="margin-left:auto;display:flex;gap:6px">
-                <button class="btn sm" onclick="copyOutput()">Copy</button>
+            <span class="panel-title">Tree</span>
+            <span class="panel-badge" id="outputBadge">0 rows</span>
+            <div class="depth-row">
+                <span class="depth-label">Depth</span>
+                <button class="depth-btn" data-depth="1" onclick="expandToDepth(1)">1</button>
+                <button class="depth-btn" data-depth="2" onclick="expandToDepth(2)">2</button>
+                <button class="depth-btn active" data-depth="3" onclick="expandToDepth(3)">3</button>
+                <button class="depth-btn" data-depth="5" onclick="expandToDepth(5)">5</button>
+                <button class="btn sm" onclick="expandAll()">Expand all</button>
+                <button class="btn sm" onclick="collapseAll()">Collapse all</button>
             </div>
+            <input class="search-input" id="search" placeholder="Filter tags, attributes, text…" oninput="onSearch()">
+            <span id="stats" class="stats-row"></span>
         </div>
-
-        <div class="out-tabs">
-            <div class="out-tab active" onclick="switchTab('schema')" id="tab-schema">Schema JSON</div>
-            <div class="out-tab" onclick="switchTab('values')" id="tab-values">Values JSON</div>
-            <div class="out-tab" onclick="switchTab('combined')" id="tab-combined">Combined</div>
-            <div class="out-tab" onclick="switchTab('preview')" id="tab-preview">Preview</div>
-        </div>
-
-        <div id="errorBlock" class="error-block"></div>
-
-        <div id="outputSchemaWrap" class="output-wrap">
-            <div class="output-code" id="outputSchema"><span style="color:var(--text2)">// Convert XML to see output</span></div>
-        </div>
-        <div id="outputValuesWrap" class="output-wrap" style="display:none">
-            <div class="output-code" id="outputValues"></div>
-        </div>
-        <div id="outputCombinedWrap" class="output-wrap" style="display:none">
-            <div class="output-code" id="outputCombined"></div>
-        </div>
-        <div id="outputPreviewWrap" class="preview-wrap" style="display:none">
-            <div id="outputPreview"></div>
+        <div class="error-block" id="errorBlock"></div>
+        <div class="vscroll-wrap" id="vscrollWrap">
+            <div class="vscroll-spacer" id="vscrollSpacer"></div>
+            <div class="vscroll-rows" id="vscrollRows"></div>
         </div>
     </div>
 
 </div>
 
+<script src="/js/xmlview.js"></script>
 <script>
-    var convertTimer = null;
-    var lastSchema = [];
-    var lastValues = {};
-    var activeTabName = 'schema';
-
-    function scheduleConvert() {
-        clearTimeout(convertTimer);
-        convertTimer = setTimeout(convert, 300);
-    }
-
-    // ── Type mapping ──
-    function mapType(xmlType) {
-        switch ((xmlType || '').trim()) {
-            case 'Tab':                return 'tab';
-            case 'Comment':            return 'section';
-            case 'Boolean':            return 'boolean';
-            case 'DropDown':           return 'select';
-            case 'DropDownMultiSelect': return 'multiselect';
-            case 'Label':              return 'text';
-            case 'Number':             return 'text';
-            case 'Text':               return 'text';
-            case 'FileName':           return 'text';
-            case 'Password':           return 'password';
-            default:                   return 'text';
-        }
-    }
-
-    // Extract options from Name like "WorkMode{Cooldown|NewRandom|UpdateToken}"
-    function extractOptions(nameRaw) {
-        var m = nameRaw.match(/\{([^}]+)\}/);
-        if (!m) return { cleanName: nameRaw, options: '' };
-        var cleanName = nameRaw.replace(/\{[^}]+\}/, '').trim();
-        var options = m[1].split('|').map(function(s){ return s.trim(); }).join(', ');
-        return { cleanName: cleanName, options: options };
-    }
-
-    // Strip HTML/color tags used in section headers
-    function stripMarkup(str) {
-        if (!str) return '';
-        // str is already decoded textContent from XML parser
-        // Remove any remaining tag-like patterns (e.g. <color=#xxx>, <b>, <size=N>)
-        var cleaned = str.replace(/<[^>]+>/g, '');
-        // Remove unicode block/divider characters (▪▪▪, ─── etc)
-        cleaned = cleaned.replace(/[\u25aa\u2500-\u257f\u2580-\u259f\u25b2\u25ba\u25bc\u25c4]+/g, '');
-        // Collapse whitespace and newlines
-        cleaned = cleaned.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
-        return cleaned;
-    }
-
-    // ── Core field processor ──
-    function processField(nameRaw, value, outVar, typeRaw, help, schema, values) {
-        var mappedType = mapType(typeRaw);
-        var keyMatch   = outVar.match(/\{-Variable\.([^-]+)-\}/);
-        var key        = keyMatch ? keyMatch[1] : '';
-
-        if (mappedType === 'tab') {
-            var label = stripMarkup(nameRaw) || nameRaw.trim();
-            schema.push({ key: key || '', label: label, type: 'tab' });
-            return;
-        }
-        if (mappedType === 'section') {
-            var label = stripMarkup(nameRaw);
-            if (!label) label = value.trim();
-            schema.push({ key: '', label: label, type: 'section' });
-            return;
-        }
-        var opts       = extractOptions(nameRaw);
-        var cleanLabel = stripMarkup(opts.cleanName) || opts.cleanName.trim();
-        var field      = { key: key, label: cleanLabel, type: mappedType };
-        if ((mappedType === 'select' || mappedType === 'multiselect') && opts.options)
-            field.options = opts.options;
-        if (help) field.help = help;
-        schema.push(field);
-        if (key && value !== undefined && value !== '') values[key] = value;
-    }
-
-    // ── Regex fallback (handles <n> tags, entities in names) ──
-    function parseViaRegex(xmlStr) {
-        var schema = [], values = {};
-        var itemRx = /<InputSetting>([\s\S]*?)<\/InputSetting>/gi;
-        function tagVal(tag, str) {
-            var m = str.match(new RegExp('<' + tag + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/' + tag + '>', 'i'));
-            return m ? m[1] : '';
-        }
-        function decodeEntities(s) {
-            return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#13;/g,'').replace(/&#10;/g,'\n');
-        }
-        var match;
-        while ((match = itemRx.exec(xmlStr)) !== null) {
-            var block   = match[1];
-            var nameRaw = decodeEntities(tagVal('Name', block) || tagVal('n', block));
-            var value   = tagVal('Value', block);
-            var outVar  = tagVal('OutputVariable', block);
-            var type    = tagVal('Type', block).trim();
-            var help    = decodeEntities(tagVal('Help', block)).trim();
-            processField(nameRaw, value, outVar, type, help, schema, values);
-        }
-        return { schema: schema, values: values, count: schema.length };
-    }
-
-    function convert() {
-        var raw   = document.getElementById('xmlInput').value.trim();
-        var errEl = document.getElementById('errorBlock');
-        errEl.classList.remove('show');
-
-        if (!raw) {
-            setOutputBadge('—'); setInputBadge('paste XML');
-            renderOutputs([], {}); return;
-        }
-
-        // Целый проект приходит с объявлением <?xml ...?> и своим
-        // <InputSettings> внутри — заворачивать его ещё раз нельзя.
-        var xml = raw;
-        if (xml.indexOf('<InputSettings') === -1) xml = '<InputSettings>' + xml + '</InputSettings>';
-
-        var schema = [], values = {}, nodeCount = 0, usedFallback = false;
-
-        // Try strict XML DOM parse first
-        var useRegex = false;
-        try {
-            var doc      = new DOMParser().parseFromString(xml, 'application/xml');
-            var parseErr = doc.querySelector('parsererror');
-            if (parseErr) { useRegex = true; throw new Error('parsererror'); }
-            var settings = doc.querySelectorAll('InputSetting');
-            if (!settings.length) { useRegex = true; throw new Error('no items'); }
-            nodeCount = settings.length;
-            // ZennoPoster пишет поля двумя способами: атрибутами
-            // (<InputSetting Name=".." Type=".." />) в выгрузке проекта и
-            // дочерними элементами (<Name>..</Name>) в ручных выборках.
-            // Сначала атрибут, потом элемент — так берутся обе формы.
-            function pick(el, tag) {
-                var a = el.getAttribute(tag);
-                if (a !== null && a !== '') return a;
-                var child = el.querySelector(tag) || (tag === 'Name' ? el.querySelector('n') : null);
-                return child ? child.textContent : '';
-            }
-            settings.forEach(function(el) {
-                var nameRaw = pick(el, 'Name');
-                var value   = pick(el, 'Value') || pick(el, 'DefaultValue');
-                var outVar  = pick(el, 'OutputVariable');
-                var typeRaw = pick(el, 'Type').trim();
-                var help    = pick(el, 'Help').trim();
-                processField(nameRaw, value, outVar, typeRaw, help, schema, values);
-            });
-        } catch(e) {
-            useRegex = true;
-        }
-
-        // Regex fallback — always works with the native <n> tag format
-        if (useRegex) {
-            usedFallback = true;
-            try {
-                var result = parseViaRegex(xml);
-                schema = result.schema; values = result.values; nodeCount = result.count;
-            } catch(e2) {
-                errEl.textContent = 'Parse failed: ' + e2.message;
-                errEl.classList.add('show');
-                setOutputBadge('error', true); setInputBadge('error', true); return;
-            }
-        }
-
-        if (!schema.length) {
-            errEl.textContent = 'No InputSetting elements found. Check that the XML is valid.';
-            errEl.classList.add('show');
-            setOutputBadge('0 fields'); setInputBadge('empty'); return;
-        }
-
-        lastSchema = schema; lastValues = values;
-        var count = schema.filter(function(f){ return f.key; }).length;
-        setOutputBadge(count + ' fields', false, true);
-        setInputBadge(nodeCount + ' nodes' + (usedFallback ? ' (regex)' : ''), false, true);
-        renderOutputs(schema, values);
-    }
-
-    function renderOutputs(schema, values) {
-        var schemaJson   = JSON.stringify(schema, null, 2);
-        var valuesJson   = JSON.stringify(values, null, 2);
-        var combinedJson = JSON.stringify({ schema: JSON.stringify(schema), values: JSON.stringify(values) }, null, 2);
-
-        document.getElementById('outputSchema').textContent   = schemaJson;
-        document.getElementById('outputValues').textContent   = valuesJson;
-        document.getElementById('outputCombined').textContent = combinedJson;
-        renderPreview(schema, values);
-        colorizeAll();
-    }
-
-    function renderPreview(schema, values) {
-        var el = document.getElementById('outputPreview');
-        if (!schema.length) {
-            el.innerHTML = '<div class="empty-msg">No fields parsed yet.</div>';
-            return;
-        }
-        var rows = schema.map(function(f) {
-            var typeCls = 'type-' + f.type;
-            var keyCell  = f.key  ? '<span class="td-key">'  + escHtml(f.key)  + '</span>' : '<span style="color:var(--border)">—</span>';
-            var valCell  = f.key && values[f.key] !== undefined ? '<span class="td-val">' + escHtml(values[f.key]) + '</span>' : '<span style="color:var(--border)">—</span>';
-            var helpCell = f.help ? '<span class="td-help" title="' + escHtml(f.help) + '">' + escHtml(f.help.slice(0,60)) + (f.help.length>60?'…':'') + '</span>' : '';
-            var optCell  = f.options ? '<span class="td-val">' + escHtml(f.options) + '</span>' : '';
-            return '<tr>'
-                + '<td><span class="type-badge ' + typeCls + '">' + f.type + '</span></td>'
-                + '<td>' + keyCell + '</td>'
-                + '<td>' + escHtml(f.label || '') + '</td>'
-                + '<td>' + valCell + '</td>'
-                + '<td>' + (optCell || helpCell) + '</td>'
-                + '</tr>';
-        }).join('');
-        el.innerHTML = '<table class="field-table"><thead><tr>'
-            + '<th>Type</th><th>Key</th><th>Label</th><th>Default</th><th>Options / Help</th>'
-            + '</tr></thead><tbody>' + rows + '</tbody></table>';
-    }
-
-    function escHtml(s) {
-        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    // Simple JSON colorizer
-    function colorizeAll() {
-        ['outputSchema','outputValues','outputCombined'].forEach(function(id) {
-            var el = document.getElementById(id);
-            if (!el) return;
-            el.innerHTML = colorizeJson(el.textContent);
+    // Разделитель панелей — ширина запоминается между визитами, как в json.html.
+    (function () {
+        var left = document.getElementById('leftPanel');
+        var resizer = document.getElementById('mainResizer');
+        var saved = parseInt(localStorage.getItem('xmlview-split') || '0', 10);
+        if (saved > 100) left.style.flex = '0 0 ' + saved + 'px';
+        var dragging = false;
+        resizer.addEventListener('mousedown', function (e) { dragging = true; e.preventDefault(); });
+        document.addEventListener('mousemove', function (e) {
+            if (!dragging) return;
+            var rect = document.querySelector('.main').getBoundingClientRect();
+            var w = Math.max(240, Math.min(rect.width - 240, e.clientX - rect.left));
+            left.style.flex = '0 0 ' + w + 'px';
         });
-    }
-
-    function colorizeJson(str) {
-        return escHtml(str)
-            .replace(/(&quot;[^&]*&quot;)(\s*:)/g, '<span style="color:var(--key-color)">$1</span>$2')
-            .replace(/:\s*(&quot;[^&]*&quot;)/g, ': <span style="color:var(--string-color)">$1</span>')
-            .replace(/:\s*(true|false)/g, ': <span style="color:var(--bool-color)">$1</span>')
-            .replace(/:\s*(\d+)/g, ': <span style="color:var(--number-color)">$1</span>');
-    }
-
-    function switchTab(name) {
-        activeTabName = name;
-        ['schema','values','combined','preview'].forEach(function(t) {
-            document.getElementById('tab-' + t).classList.toggle('active', t === name);
-            document.getElementById('output' + cap(t) + 'Wrap').style.display = t === name ? (t==='preview'?'':'block') : 'none';
-            if (t === 'preview' && name === 'preview') document.getElementById('outputPreviewWrap').style.display = 'block';
-        });
-    }
-    function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
-    function setOutputBadge(text, isErr, isOk) {
-        var el = document.getElementById('outputBadge');
-        el.textContent = text;
-        el.className = 'panel-badge' + (isErr?' err':'') + (isOk?' ok':'');
-    }
-    function setInputBadge(text, isErr, isOk) {
-        var el = document.getElementById('inputBadge');
-        el.textContent = text;
-        el.className = 'panel-badge' + (isErr?' err':'') + (isOk?' ok':'');
-    }
-
-    function copyOutput() {
-        var id = { schema:'outputSchema', values:'outputValues', combined:'outputCombined', preview:null }[activeTabName];
-        if (!id) { alert('Switch to a JSON tab to copy.'); return; }
-        var text = document.getElementById(id).textContent;
-        navigator.clipboard.writeText(text).then(function() {
-            var btn = event.target;
-            btn.textContent = 'Copied!';
-            setTimeout(function(){ btn.textContent = 'Copy'; }, 1500);
-        });
-    }
-
-    // ── Открытие файла ──────────────────────────────────────────────────────
-    // Шаблоны ZennoPoster сохраняются в UTF-16, поэтому кодировку определяем по
-    // BOM. Положиться на UTF-8 по умолчанию нельзя: весь текст приедет мусором.
-    // Тот же приём, что в zpxml-doc.js.
-    function decodeXmlBuffer(buffer) {
-        var b = new Uint8Array(buffer), skip = 0, enc = 'utf-8';
-        if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE)      { enc = 'utf-16le'; skip = 2; }
-        else if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) { enc = 'utf-16be'; skip = 2; }
-        else if (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) { skip = 3; }
-        try { return new TextDecoder(enc).decode(b.subarray(skip)); }
-        catch (e) { return new TextDecoder('utf-8').decode(b.subarray(skip)); }
-    }
-
-    function acceptXmlText(text, fileName) {
-        document.getElementById('xmlInput').value = text;
-        setInputBadge(fileName || 'loaded', false, true);
-        convert();
-    }
-
-    var _lastXmlPath = '';
-    try { _lastXmlPath = localStorage.getItem('xml-conv-path') || ''; } catch (e) { /* ignore */ }
-
-    // Системный диалог — тот же, что у zpxml: помнит каталог и отдаёт полный путь.
-    async function openFromDisk() {
-        setInputBadge('choosing a file...', false, false);
-        var picked;
-        try {
-            var r = await fetch('/tasker/pick?mode=file&ext=xml&start=' + encodeURIComponent(_lastXmlPath));
-            picked = await r.json();
-        } catch (e) { setInputBadge('file dialog failed: ' + e.message, true, false); return; }
-        if (!picked.ok)   { setInputBadge('file dialog: ' + (picked.error || 'did not open'), true, false); return; }
-        if (!picked.path) { setInputBadge('paste XML', false, false); return; }   // отмена — не ошибка
-        try {
-            var res = await fetch('/dbg/file?path=' + encodeURIComponent(picked.path));
-            if (!res.ok) { setInputBadge('cannot read file: ' + (await res.text()).slice(0, 120), true, false); return; }
-            var buf = await res.arrayBuffer();
-            _lastXmlPath = picked.path;
-            try { localStorage.setItem('xml-conv-path', _lastXmlPath); } catch (e) { /* ignore */ }
-            acceptXmlText(decodeXmlBuffer(buf), picked.path.split(/[\/]/).pop());
-        } catch (e) { setInputBadge('cannot read file: ' + e.message, true, false); }
-    }
-
-    // Перетаскивание файла на левую панель.
-    (function initDrop() {
-        var panel = document.getElementById('leftPanel');
-        if (!panel) return;
-        ['dragenter', 'dragover'].forEach(function (ev) {
-            panel.addEventListener(ev, function (e) { e.preventDefault(); panel.classList.add('drop-ok'); });
-        });
-        ['dragleave', 'drop'].forEach(function (ev) {
-            panel.addEventListener(ev, function (e) { e.preventDefault(); panel.classList.remove('drop-ok'); });
-        });
-        panel.addEventListener('drop', function (e) {
-            var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-            if (!f) return;
-            var fr = new FileReader();
-            fr.onload  = function () { acceptXmlText(decodeXmlBuffer(fr.result), f.name); };
-            fr.onerror = function () { setInputBadge('cannot read ' + f.name, true, false); };
-            fr.readAsArrayBuffer(f);
-        });
-    })();
-
-    function clearInput() {
-        document.getElementById('xmlInput').value = '';
-        convert();
-    }
-
-    function loadExample() {
-        document.getElementById('xmlInput').value = `<InputSettings>
-  <InputSetting>
-    <Name>Global</Name>
-    <Value></Value>
-    <OutputVariable>{-Variable.null-}</OutputVariable>
-    <Type>Tab</Type>
-    <Help>Main settings tab</Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Run settings</Name>
-    <Value></Value>
-    <OutputVariable></OutputVariable>
-    <Type>Comment</Type>
-    <Help></Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Force range</Name>
-    <Value></Value>
-    <OutputVariable>{-Variable.acc0Forced-}</OutputVariable>
-    <Type>Number</Type>
-    <Help>Forced run of a specific account without checks</Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Range</Name>
-    <Value>1-50</Value>
-    <OutputVariable>{-Variable.cfgAccRange-}</OutputVariable>
-    <Type>Text</Type>
-    <Help>Account range. Formats: "5", "2-5", "2,4,5"</Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>WorkMode{Cooldown|NewRandom|UpdateToken}</Name>
-    <Value>Cooldown</Value>
-    <OutputVariable>{-Variable.wkMode-}</OutputVariable>
-    <Type>DropDown</Type>
-    <Help>Select work mode for accounts</Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Tasks ToDo{daily|weekly|monthly}</Name>
-    <Value>daily</Value>
-    <OutputVariable>{-Variable.cfgToDo-}</OutputVariable>
-    <Type>DropDownMultiSelect</Type>
-    <Help>Select tasks to perform</Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Debug log</Name>
-    <Value>False</Value>
-    <OutputVariable>{-Variable.debug-}</OutputVariable>
-    <Type>Boolean</Type>
-    <Help>Enable debug logging</Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Database settings</Name>
-    <Value></Value>
-    <OutputVariable></OutputVariable>
-    <Type>Comment</Type>
-    <Help></Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Database source{SQLite|PostgreSQL}</Name>
-    <Value>PostgreSQL</Value>
-    <OutputVariable>{-Variable.DBmode-}</OutputVariable>
-    <Type>DropDown</Type>
-    <Help>Select database backend</Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Project</Name>
-    <Value></Value>
-    <OutputVariable></OutputVariable>
-    <Type>Tab</Type>
-    <Help></Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Guild</Name>
-    <Value></Value>
-    <OutputVariable>{-Variable.guildName-}</OutputVariable>
-    <Type>Text</Type>
-    <Help>Guild name for the project</Help>
-  </InputSetting>
-  <InputSetting>
-    <Name>Referral code</Name>
-    <Value>913zlp48</Value>
-    <OutputVariable>{-Variable.cfgRefCode-}</OutputVariable>
-    <Type>Text</Type>
-    <Help>Referral code for random budget ref</Help>
-  </InputSetting>
-</InputSettings>`;
-        convert();
-    }
-
-    // ── Resizer ──
-    (function() {
-        var lp = document.getElementById('leftPanel');
-        var rs = document.getElementById('mainResizer');
-        var drag = false, sx, sw;
-        rs.addEventListener('mousedown', function(e) {
-            drag = true; sx = e.clientX; sw = lp.offsetWidth;
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
-        });
-        document.addEventListener('mousemove', function(e) {
-            if (!drag) return;
-            lp.style.flex = 'none';
-            lp.style.width = Math.max(200, Math.min(sw + e.clientX - sx, window.innerWidth - 300)) + 'px';
-        });
-        document.addEventListener('mouseup', function() {
-            drag = false;
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
+        document.addEventListener('mouseup', function () {
+            if (!dragging) return;
+            dragging = false;
+            localStorage.setItem('xmlview-split', left.getBoundingClientRect().width);
         });
     })();
 </script>
+
 </body>
 </html>
