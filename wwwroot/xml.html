@@ -29,6 +29,7 @@
             <span class="panel-title">XML Input</span>
             <span class="panel-badge" id="inputBadge">paste XML</span>
             <div style="margin-left:auto;display:flex;gap:6px">
+                <button class="btn sm" onclick="openFromDisk()">Open XML…</button>
                 <button class="btn sm" onclick="clearInput()">Clear</button>
             </div>
         </div>
@@ -185,8 +186,10 @@
             renderOutputs([], {}); return;
         }
 
+        // Целый проект приходит с объявлением <?xml ...?> и своим
+        // <InputSettings> внутри — заворачивать его ещё раз нельзя.
         var xml = raw;
-        if (!xml.startsWith('<InputSettings>')) xml = '<InputSettings>' + xml + '</InputSettings>';
+        if (xml.indexOf('<InputSettings') === -1) xml = '<InputSettings>' + xml + '</InputSettings>';
 
         var schema = [], values = {}, nodeCount = 0, usedFallback = false;
 
@@ -199,13 +202,22 @@
             var settings = doc.querySelectorAll('InputSetting');
             if (!settings.length) { useRegex = true; throw new Error('no items'); }
             nodeCount = settings.length;
+            // ZennoPoster пишет поля двумя способами: атрибутами
+            // (<InputSetting Name=".." Type=".." />) в выгрузке проекта и
+            // дочерними элементами (<Name>..</Name>) в ручных выборках.
+            // Сначала атрибут, потом элемент — так берутся обе формы.
+            function pick(el, tag) {
+                var a = el.getAttribute(tag);
+                if (a !== null && a !== '') return a;
+                var child = el.querySelector(tag) || (tag === 'Name' ? el.querySelector('n') : null);
+                return child ? child.textContent : '';
+            }
             settings.forEach(function(el) {
-                var nameEl  = el.querySelector('Name') || el.querySelector('n');
-                var nameRaw = nameEl ? nameEl.textContent : '';
-                var value   = (el.querySelector('Value')          || {textContent:''}).textContent;
-                var outVar  = (el.querySelector('OutputVariable') || {textContent:''}).textContent;
-                var typeRaw = (el.querySelector('Type')           || {textContent:''}).textContent.trim();
-                var help    = (el.querySelector('Help')           || {textContent:''}).textContent.trim();
+                var nameRaw = pick(el, 'Name');
+                var value   = pick(el, 'Value') || pick(el, 'DefaultValue');
+                var outVar  = pick(el, 'OutputVariable');
+                var typeRaw = pick(el, 'Type').trim();
+                var help    = pick(el, 'Help').trim();
                 processField(nameRaw, value, outVar, typeRaw, help, schema, values);
             });
         } catch(e) {
@@ -327,6 +339,68 @@
             setTimeout(function(){ btn.textContent = 'Copy'; }, 1500);
         });
     }
+
+    // ── Открытие файла ──────────────────────────────────────────────────────
+    // Шаблоны ZennoPoster сохраняются в UTF-16, поэтому кодировку определяем по
+    // BOM. Положиться на UTF-8 по умолчанию нельзя: весь текст приедет мусором.
+    // Тот же приём, что в zpxml-doc.js.
+    function decodeXmlBuffer(buffer) {
+        var b = new Uint8Array(buffer), skip = 0, enc = 'utf-8';
+        if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE)      { enc = 'utf-16le'; skip = 2; }
+        else if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) { enc = 'utf-16be'; skip = 2; }
+        else if (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) { skip = 3; }
+        try { return new TextDecoder(enc).decode(b.subarray(skip)); }
+        catch (e) { return new TextDecoder('utf-8').decode(b.subarray(skip)); }
+    }
+
+    function acceptXmlText(text, fileName) {
+        document.getElementById('xmlInput').value = text;
+        setInputBadge(fileName || 'loaded', false, true);
+        convert();
+    }
+
+    var _lastXmlPath = '';
+    try { _lastXmlPath = localStorage.getItem('xml-conv-path') || ''; } catch (e) { /* ignore */ }
+
+    // Системный диалог — тот же, что у zpxml: помнит каталог и отдаёт полный путь.
+    async function openFromDisk() {
+        setInputBadge('choosing a file...', false, false);
+        var picked;
+        try {
+            var r = await fetch('/tasker/pick?mode=file&ext=xml&start=' + encodeURIComponent(_lastXmlPath));
+            picked = await r.json();
+        } catch (e) { setInputBadge('file dialog failed: ' + e.message, true, false); return; }
+        if (!picked.ok)   { setInputBadge('file dialog: ' + (picked.error || 'did not open'), true, false); return; }
+        if (!picked.path) { setInputBadge('paste XML', false, false); return; }   // отмена — не ошибка
+        try {
+            var res = await fetch('/dbg/file?path=' + encodeURIComponent(picked.path));
+            if (!res.ok) { setInputBadge('cannot read file: ' + (await res.text()).slice(0, 120), true, false); return; }
+            var buf = await res.arrayBuffer();
+            _lastXmlPath = picked.path;
+            try { localStorage.setItem('xml-conv-path', _lastXmlPath); } catch (e) { /* ignore */ }
+            acceptXmlText(decodeXmlBuffer(buf), picked.path.split(/[\/]/).pop());
+        } catch (e) { setInputBadge('cannot read file: ' + e.message, true, false); }
+    }
+
+    // Перетаскивание файла на левую панель.
+    (function initDrop() {
+        var panel = document.getElementById('leftPanel');
+        if (!panel) return;
+        ['dragenter', 'dragover'].forEach(function (ev) {
+            panel.addEventListener(ev, function (e) { e.preventDefault(); panel.classList.add('drop-ok'); });
+        });
+        ['dragleave', 'drop'].forEach(function (ev) {
+            panel.addEventListener(ev, function (e) { e.preventDefault(); panel.classList.remove('drop-ok'); });
+        });
+        panel.addEventListener('drop', function (e) {
+            var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (!f) return;
+            var fr = new FileReader();
+            fr.onload  = function () { acceptXmlText(decodeXmlBuffer(fr.result), f.name); };
+            fr.onerror = function () { setInputBadge('cannot read ' + f.name, true, false); };
+            fr.readAsArrayBuffer(f);
+        });
+    })();
 
     function clearInput() {
         document.getElementById('xmlInput').value = '';

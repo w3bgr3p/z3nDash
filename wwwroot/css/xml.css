@@ -150,3 +150,6 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-sm); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+/* Подсветка панели, когда на неё тащат файл. */
+.panel.drop-ok { outline: 2px dashed var(--accent); outline-offset: -4px; }
