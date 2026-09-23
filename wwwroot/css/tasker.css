@@ -34,6 +34,8 @@ body {
 .schedule-row.group-child { padding-left: var(--sp-24); border-left: 2px solid var(--border); }
 .schedule-row:hover    { background: var(--bg2); }
 .schedule-row.active   { background: var(--bg3); }
+/* Выделена вместе с основной: правки формы уйдут и в неё. */
+.schedule-row.multi    { background: var(--bg2); box-shadow: inset 2px 0 0 var(--accent); }
 .schedule-row.row-disabled { opacity: 0.45; }
 .ungrouped-separator   { border-top: 2px solid var(--border); }
 
@@ -67,6 +69,7 @@ body {
 .detail-header  { padding: var(--sp-8) var(--sp-14) 0; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--bg1); }
 .detail-title   { font-size: var(--fs-14); font-weight: var(--fw-bold); color: var(--text); margin-bottom: var(--sp-2); }
 .detail-sub     { font-size: var(--fs-10); color: var(--text2); margin-bottom: var(--sp-6); font-family: var(--mono); }
+.detail-bulk    { font-size: var(--fs-10); color: var(--accent); margin-bottom: var(--sp-6); }
 .detail-actions { display: flex; gap: var(--sp-4); margin-bottom: var(--sp-8); flex-wrap: wrap; }
 .action-group   { display: flex; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg2); }
 
@@ -223,7 +226,7 @@ select.form-input { cursor: pointer; }
 #dialogOverlay.open { display: flex; }
 #dialogBox { background: var(--bg1); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-16) var(--sp-20); min-width: 260px; max-width: 380px; display: flex; flex-direction: column; gap: var(--sp-10); }
 #dialogTitle { font-weight: var(--fw-bold); font-size: var(--fs-13); }
-#dialogMsg   { color: var(--text2); font-size: var(--fs-11); line-height: var(--lh-loose); }
+#dialogMsg   { color: var(--text2); font-size: var(--fs-11); line-height: var(--lh-loose); white-space: pre-line; }
 #dialogInput { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--sp-4) var(--sp-8); color: var(--text); font-size: var(--fs-11); display: none; width: 100%; }
 #dialogButtons { display: flex; gap: var(--sp-8); justify-content: flex-end; }
 

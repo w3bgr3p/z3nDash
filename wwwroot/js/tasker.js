@@ -11,7 +11,10 @@ var _PS = {
 var MAX_BURST = 10000;
 
 var schedules  = [];
-var selectedId = null;
+var selectedId = null;          // задача, которую показывает форма
+var selectedIds = new Set();    // всё выделенное в списке, включая selectedId
+var _selAnchor = null;          // откуда считать диапазон по Shift+клику
+var _formBaseline = {};         // поля формы в том виде, как их отрисовали, — от них считается «изменено»
 var activeTab  = 'execution';
 var outputPoll = null;
 var formDirty  = false;
@@ -138,10 +141,10 @@ function onListKeyDown(e) {
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     if (document.querySelector('#dialogOverlay.open, .pm-overlay.open, .cm-modal-overlay.open')) return;
     if (!selectedId || selectedId === '__new__') return;
-    var s = schedules.find(function(x) { return x.id === selectedId; });
-    if (!s) return;
+    var ids = _selectedList().map(function(s) { return s.id; });
+    if (!ids.length) return;
     e.preventDefault();
-    deleteSchedule(s.id, s.name || '');
+    deleteSchedules(ids);
 }
 
 // ── Load list ─────────────────────────────────────────────────────────────────
@@ -150,6 +153,9 @@ async function loadList() {
     var res = await fetch('/tasker/list');
     if (!res.ok) throw new Error('/tasker/list HTTP ' + res.status);
     schedules = await res.json();
+    selectedIds.forEach(function(id) {
+        if (!schedules.some(function(s) { return s.id === id; })) selectedIds.delete(id);
+    });
     updateHeaderStats();
     renderList();
     if (selectedId && !formDirty) {
@@ -294,9 +300,11 @@ function renderList() {
 
         html += '<div class="schedule-row'
             + (showGrp ? ' group-child' : '')
-            + (s.id === selectedId ? ' active' : '')
+            + (s.id === selectedId ? ' active' : (selectedIds.has(s.id) ? ' multi' : ''))
             + (disabled ? ' row-disabled' : '')
-            + '" onclick="selectRow(\'' + s.id + '\')">'
+            + '" data-id="' + s.id + '"'
+            + ' onmousedown="if(event.shiftKey||event.ctrlKey||event.metaKey)event.preventDefault()"'
+            + ' onclick="onRowClick(event,\'' + s.id + '\')">'
             + (scheduled
                 ? '<span class="row-dot ' + (disabled ? 'disabled' : 'enabled')
                   + '" title="' + (disabled ? 'Enable' : 'Disable')
@@ -318,8 +326,71 @@ function renderList() {
 
 function filterList() { renderList(); }
 
+// Обычный клик — одна задача. Ctrl — добавить/убрать, Shift — диапазон от якоря.
+// Форма при этом остаётся на прежней задаче: набранное в ней не теряется.
+function onRowClick(e, id) {
+    var multi = e.ctrlKey || e.metaKey;
+    if ((!multi && !e.shiftKey) || !selectedId || selectedId === '__new__') {
+        _selAnchor = id;
+        selectRow(id);
+        return;
+    }
+    if (e.shiftKey) {
+        var order = Array.prototype.map.call(
+            document.querySelectorAll('#listScroll .schedule-row[data-id]'),
+            function(el) { return el.dataset.id; });
+        var a = order.indexOf(_selAnchor || selectedId), b = order.indexOf(id);
+        if (a < 0 || b < 0) { a = b = order.indexOf(id); }
+        if (!multi) selectedIds = new Set([selectedId]);
+        order.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(function(x) { selectedIds.add(x); });
+    } else {
+        _selAnchor = id;
+        if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+        if (!selectedIds.size) { deselect(); return; }
+        if (id === selectedId) {
+            // Форму показывала снятая задача — переключаемся на оставшуюся.
+            var rest = Array.from(selectedIds);
+            selectRow(rest[rest.length - 1], true);
+            return;
+        }
+    }
+    renderList();
+    renderBulkState();
+}
+
+// Выделенные задачи: основная первой, дальше в порядке списка.
+function _selectedList() {
+    var primary = schedules.find(function(s) { return s.id === selectedId; });
+    var rest = schedules.filter(function(s) { return s.id !== selectedId && selectedIds.has(s.id); });
+    return (primary ? [primary] : []).concat(rest);
+}
+
+function _bulkCount() {
+    return selectedId && selectedId !== '__new__' ? _selectedList().length : 0;
+}
+
+/// Плашка «выделено N» и подписи кнопок Save — чтобы было видно, куда уйдёт правка.
+function renderBulkState() {
+    var n  = _bulkCount();
+    var el = document.getElementById('detailBulk');
+    if (el) {
+        el.style.display = n > 1 ? '' : 'none';
+        el.textContent = n > 1
+            ? n + ' tasks selected. Fields you change in Settings or Schedule are saved to all of them (the name is not). '
+              + 'Ctrl+click adds or removes a task, Shift+click selects a range.'
+            : '';
+    }
+    document.querySelectorAll('.bulk-save').forEach(function(b) { b.textContent = _saveLabel(); });
+}
+
+function _saveLabel() {
+    var n = _bulkCount();
+    return n > 1 ? 'Save to ' + n + ' tasks' : 'Save';
+}
+
 function deselect() {
     if (!selectedId) return;
+    selectedIds = new Set();
     selectedId = null;
     taskDraft = null;
     formDirty  = false;
@@ -431,9 +502,11 @@ function renderGlobalStats() {
 
 // ── Select / detail ───────────────────────────────────────────────────────────
 
-function selectRow(id) {
+function selectRow(id, keepSelection) {
     if (selectedId === id) captureTaskDraft();
-    else { taskDraft = null; formDirty = false; }
+    else { taskDraft = null; formDirty = false; _formBaseline = {}; }
+    if (!keepSelection) selectedIds = new Set([id]);
+    selectedIds.add(id);
     selectedId = id;
     stopProcStatsPoll();
     _PS.save({ selectedId: id });
@@ -731,6 +804,20 @@ function renderDetail(s) {
     else if (activeTab === 'schedule') renderSchedule(s);
     else if (activeTab === 'traffic')  renderTrafficTab(s);
     else                               renderExecution(s);
+    _captureBaseline();
+    renderBulkState();
+}
+
+// Запоминаем поля ровно такими, какими их собрала форма сразу после отрисовки:
+// сравнивать с записью из БД нельзя — JSON браузера и расписания форма
+// сериализует по-своему, и неизменённое поле выглядело бы изменённым.
+function _captureBaseline() {
+    if (!selectedId || selectedId === '__new__') return;
+    var prev   = schedules.find(function(x) { return x.id === selectedId; }) || {};
+    var fields = collectScheduleFields(prev);
+    Object.keys(fields).forEach(function(k) {
+        if (!formDirty || !(k in _formBaseline)) _formBaseline[k] = fields[k];
+    });
 }
 
 function renderTrafficTab(s) {
@@ -918,6 +1005,7 @@ function infoRow(key, val) {
 // ── Settings tab ──────────────────────────────────────────────────────────────
 
 function newSchedule() {
+    selectedIds = new Set();
     selectedId = '__new__';
     formDirty  = true;
     renderList();
@@ -1008,7 +1096,7 @@ function renderSettings(s) {
         +   '<input class="form-input" id="f_timeout_seconds" type="number" min="0" max="604800" style="width:90px" value="' + (s.timeout_seconds || '0') + '">'
         +   '<span style="color:var(--text2);font-size:10px;">seconds before a run is aborted; 0 — no limit</span>'
         + '</div>'
-        + '<div class="form-actions"><button class="btn primary" onclick="saveSchedule(\'' + escHtml(id) + '\')">Save</button></div>'
+        + '<div class="form-actions"><button class="btn primary bulk-save" onclick="saveSchedule(\'' + escHtml(id) + '\')">' + _saveLabel() + '</button></div>'
         + '</div>';
 
     if (s.executor === 'xml') browserSyncRows();
@@ -1352,7 +1440,7 @@ function scheduleActionsHtml(s, withToggle) {
             : '')
         + '<div class="form-actions">'
         + (withToggle ? '<button class="btn" onclick="previewSchedule()">Preview</button>' : '')
-        + '<button class="btn primary" onclick="saveSchedule(\'' + escHtml(s.id || '') + '\')">Save</button>'
+        + '<button class="btn primary bulk-save" onclick="saveSchedule(\'' + escHtml(s.id || '') + '\')">' + _saveLabel() + '</button>'
         + '</div>'
         + '</div>';
 }
@@ -1895,10 +1983,60 @@ async function saveSchedule(existingId) {
         payload.sched_started_at = new Date().toISOString();
     }
 
-    var res  = await fetch('/tasker/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-    var data = await res.json();
-    if (data.ok) { selectedId = data.id; taskDraft = null; formDirty = false; await loadList(); selectRow(data.id); }
-    else Dialog.error(data.error || 'Save failed');
+    // Остальным выделенным — только то, что поменяли в форме, и заранее:
+    // после сохранения основной задачи базовая линия уже не та.
+    var others = existingId ? _selectedList().slice(1) : [];
+    var changed = others.length ? _changedFields(payload) : {};
+
+    var data = await _postSave(payload);
+    if (!data.ok) { Dialog.error(data.error || 'Save failed'); return; }
+
+    var failed = [];
+    if (Object.keys(changed).length) {
+        for (var i = 0; i < others.length; i++) {
+            var r = await _postSave(_bulkPayload(others[i], changed));
+            if (!r.ok) failed.push((others[i].name || others[i].id) + ': ' + (r.error || 'Save failed'));
+        }
+    }
+    selectedId = data.id; taskDraft = null; formDirty = false; _formBaseline = {};
+    await loadList();
+    selectRow(data.id, true);
+    if (failed.length) Dialog.error('Not saved:\n' + failed.join('\n'));
+}
+
+async function _postSave(payload) {
+    try {
+        var res = await fetch('/tasker/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        var text = await res.text();
+        try { return JSON.parse(text); }
+        catch (e) { return { ok: false, error: 'HTTP ' + res.status + ': ' + text.slice(0, 300) }; }
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+}
+
+// Поля, которые в форме изменили. Имя не размножаем: одинаковые имена у разных задач никому не нужны.
+function _changedFields(payload) {
+    var out = {};
+    Object.keys(_formBaseline).forEach(function(k) {
+        if (k === 'name' || payload[k] === undefined) return;
+        if (String(payload[k]) !== String(_formBaseline[k])) out[k] = payload[k];
+    });
+    // Расписание — единое целое: сменили режим — переносим его вместе с настройками.
+    if ('schedule_mode' in out) { out.cron = payload.cron; out.schedule_json = payload.schedule_json; }
+    return out;
+}
+
+function _bulkPayload(target, changed) {
+    var p = Object.assign({ id: target.id }, changed);
+    var mode = p.schedule_mode !== undefined ? p.schedule_mode : (target.schedule_mode || 'off');
+    var json = p.schedule_json !== undefined ? p.schedule_json : (target.schedule_json || '');
+    // Тот же сброс счётчика, что у основной задачи, но по её собственному прошлому.
+    if (mode !== 'off' && (target.schedule_mode !== mode || (target.schedule_json || '') !== json)) {
+        p.sched_runs = '0';
+        p.sched_started_at = new Date().toISOString();
+    }
+    return p;
 }
 
 function _nextDuplicateName(name, existingNames) {
@@ -1937,6 +2075,27 @@ async function duplicateSchedule(id) {
 async function deleteSchedule(id, name) {
     if (!(await Dialog.confirm('Eliminate "' + (name||id) + '"?', '✕ Eliminate', true))) return;
     await fetch('/tasker/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+    await _afterDelete();
+}
+
+async function deleteSchedules(ids) {
+    if (ids.length === 1) {
+        var one = schedules.find(function(x) { return x.id === ids[0]; }) || {};
+        return deleteSchedule(ids[0], one.name || '');
+    }
+    var names = ids.map(function(id) {
+        var s = schedules.find(function(x) { return x.id === id; }) || {};
+        return '  ' + (s.name || id);
+    });
+    if (!(await Dialog.confirm('Eliminate ' + ids.length + ' tasks?\n' + names.join('\n'), '✕ Eliminate', true))) return;
+    for (var i = 0; i < ids.length; i++) {
+        await fetch('/tasker/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:ids[i]}) });
+    }
+    await _afterDelete();
+}
+
+async function _afterDelete() {
+    selectedIds = new Set();
     selectedId = null;
     closeSse();
     document.getElementById('detailHeader').style.display  = 'none';
