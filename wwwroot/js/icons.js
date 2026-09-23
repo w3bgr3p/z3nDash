@@ -126,6 +126,20 @@ window.ICONS = {
                   <circle cx="200" cy="184" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                   <circle cx="56" cy="192" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                 </svg>`   ,
+    zpXml:    `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <rect x="32" y="100" width="64" height="56" rx="8" opacity=".2"/>
+                  <rect x="32" y="100" width="64" height="56" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <rect x="160" y="40" width="64" height="56" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <rect x="160" y="160" width="64" height="56" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M96 128h32M128 68v120M128 68h32M128 188h32"/>
+                </svg>`,
+    xml:      `<svg viewBox="0 0 256 256">
+                  <path fill="none" d="M0 0h256v256H0z"/>
+                  <path d="M152 32v56h56z" opacity=".2"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M200 224H56a8 8 0 0 1-8-8V40a8 8 0 0 1 8-8h96l56 56v128a8 8 0 0 1-8 8ZM152 32v56h56"/>
+                  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="m104 132-24 24 24 24m48-48 24 24-24 24"/>
+                </svg>`,
     sql: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
               <path fill="none" d="M0 0h256v256H0z"/>
               <ellipse cx="128" cy="80" opacity=".2" rx="88" ry="48"/>
