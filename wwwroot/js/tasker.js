@@ -127,7 +127,22 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('detailBody').addEventListener('click', function(e) {
         if (e.target.closest('.wd-btn')) markTaskDirty();
     });
+    document.addEventListener('keydown', onListKeyDown);
 });
+
+// Delete removes the selected task, but only when the key is not meant for
+// something else: a field being typed into, or a dialog/modal on top.
+function onListKeyDown(e) {
+    if (e.key !== 'Delete' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+    var t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (document.querySelector('#dialogOverlay.open, .pm-overlay.open, .cm-modal-overlay.open')) return;
+    if (!selectedId || selectedId === '__new__') return;
+    var s = schedules.find(function(x) { return x.id === selectedId; });
+    if (!s) return;
+    e.preventDefault();
+    deleteSchedule(s.id, s.name || '');
+}
 
 // ── Load list ─────────────────────────────────────────────────────────────────
 
