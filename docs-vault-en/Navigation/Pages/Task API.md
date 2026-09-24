@@ -80,6 +80,34 @@ const response = await fetch(process.env.Z3NDASH_API_URL + '/api/v1/self/defer',
 if (!response.ok) throw new Error(await response.text());
 ```
 
+## Controlling other tasks by ID
+
+A watcher script can pause and defer other tasks. It uses the same run token as
+`/self`; the target task's ID goes in the path.
+
+```python
+from z3ndash import task, list_tasks
+
+for state in list_tasks(name="direction_1"):    # exact name match
+    task(state["task_id"]).defer(seconds=1800, reason="watcher: no new records")
+
+task("a1b2c3").pause()
+task("a1b2c3").resume()
+```
+
+| Method | Path | Body |
+|---|---|---|
+| GET | `/api/v1/tasks` | — (optional `?name=` — exact name) |
+| GET | `/api/v1/tasks/{id}` | — |
+| POST | `/api/v1/tasks/{id}/defer` | same as `/self/defer` |
+| POST | `/api/v1/tasks/{id}/pause` | `{}` |
+| POST | `/api/v1/tasks/{id}/resume` | `{}` |
+
+The response is the same state as for `/self` (a list of states for `GET /api/v1/tasks`),
+with `run_id` set to `null`. Error codes are the same; 404 means no task has that ID.
+Deferral rules are shared: competing deferrals keep the latest time, and `resume`
+clears both the pause and the deferral.
+
 ## How the schedule behaves
 
 - A deferral applies to the whole task. Instances already admitted keep running; new

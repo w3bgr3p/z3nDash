@@ -55,6 +55,16 @@ public sealed partial class SchedulerService
             return ControlState(ReadControlRecord(_dbService.GetDb(), id), runId);
     }
 
+    public List<TaskControlState> ListControlStates()
+    {
+        var cols = new List<string> { "id", "name", "enabled", "schedule_mode", "schedule_paused", "deferred_until", "defer_reason" };
+        lock (_controlGate)
+            return _dbService.GetDb().GetLines(string.Join(",", cols), Table, thrw: true, where: "\"id\" != ''")
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Select(line => ControlState(ParseRow(line, cols), null))
+                .ToList();
+    }
+
     private static TaskControlState ControlState(Dictionary<string, string> record, string? runId)
         => new(record["id"], runId, record.GetValueOrDefault("name", ""),
             record.GetValueOrDefault("enabled") == "true", record.GetValueOrDefault("schedule_paused") == "true",

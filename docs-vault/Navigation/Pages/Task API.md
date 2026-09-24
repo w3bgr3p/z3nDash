@@ -79,6 +79,34 @@ const response = await fetch(process.env.Z3NDASH_API_URL + '/api/v1/self/defer',
 if (!response.ok) throw new Error(await response.text());
 ```
 
+## Управление другими задачами по ID
+
+Скрипт-наблюдатель может ставить на паузу и откладывать чужие задачи. Нужен
+тот же токен своего запуска, что и для `/self`; ID целевой задачи указывается в пути.
+
+```python
+from z3ndash import task, list_tasks
+
+for state in list_tasks(name="direction_1"):    # точное совпадение имени
+    task(state["task_id"]).defer(seconds=1800, reason="watcher: нет новых записей")
+
+task("a1b2c3").pause()
+task("a1b2c3").resume()
+```
+
+| Метод | Путь | Тело |
+|---|---|---|
+| GET | `/api/v1/tasks` | — (необязательно `?name=` — точное имя) |
+| GET | `/api/v1/tasks/{id}` | — |
+| POST | `/api/v1/tasks/{id}/defer` | как у `/self/defer` |
+| POST | `/api/v1/tasks/{id}/pause` | `{}` |
+| POST | `/api/v1/tasks/{id}/resume` | `{}` |
+
+Ответ — то же состояние, что у `/self` (список состояний для `GET /api/v1/tasks`),
+`run_id` в нём `null`. Коды ошибок те же; 404 — задачи с таким ID нет.
+Правила отсрочки общие: конкурирующие отсрочки берут самое позднее время,
+`resume` снимает и паузу, и отсрочку.
+
 ## Поведение расписания
 
 - Отсрочка относится ко всей задаче. Уже допущенные к выполнению экземпляры

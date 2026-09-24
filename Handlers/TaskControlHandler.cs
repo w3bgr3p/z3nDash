@@ -46,6 +46,29 @@ public sealed class TaskControlHandler(SchedulerService scheduler) : IScriptHand
         return (until, reason);
     }
 
+    internal static async Task<TaskRunContext?> Authorize(SchedulerService scheduler, HttpListenerContext context)
+    {
+        var auth = context.Request.Headers["Authorization"] ?? "";
+        if (auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            && scheduler.TryGetRun(auth[7..], out var run) && run != null)
+            return run;
+        context.Response.StatusCode = 401;
+        await HttpHelpers.WriteJson(context.Response, new { error = "Missing or expired run token" });
+        return null;
+    }
+
+    internal static async Task WriteError(HttpListenerResponse response, Exception ex)
+    {
+        response.StatusCode = ex switch
+        {
+            JsonException or ArgumentException => 400,
+            KeyNotFoundException => 404,
+            InvalidOperationException => 503,
+            _ => 500
+        };
+        await HttpHelpers.WriteJson(response, new { error = ex.Message });
+    }
+
     public async Task<bool> HandleRequest(HttpListenerContext context)
     {
         var request = context.Request;
@@ -53,14 +76,7 @@ public sealed class TaskControlHandler(SchedulerService scheduler) : IScriptHand
         response.Headers["Cache-Control"] = "no-store";
         try
         {
-            var auth = request.Headers["Authorization"] ?? "";
-            if (!auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                || !scheduler.TryGetRun(auth[7..], out var run) || run == null)
-            {
-                response.StatusCode = 401;
-                await HttpHelpers.WriteJson(response, new { error = "Missing or expired run token" });
-                return true;
-            }
+            if (await Authorize(scheduler, context) is not { } run) return true;
             var action = request.Url!.AbsolutePath.TrimEnd('/');
             TaskControlState state;
             if (action == PathPrefix && request.HttpMethod == "GET")
@@ -84,14 +100,7 @@ public sealed class TaskControlHandler(SchedulerService scheduler) : IScriptHand
         }
         catch (Exception ex)
         {
-            response.StatusCode = ex switch
-            {
-                JsonException or ArgumentException => 400,
-                KeyNotFoundException => 404,
-                InvalidOperationException => 503,
-                _ => 500
-            };
-            await HttpHelpers.WriteJson(response, new { error = ex.Message });
+            await WriteError(response, ex);
         }
         return true;
     }
