@@ -502,7 +502,7 @@ function renderGlobalStats() {
 
 // ── Select / detail ───────────────────────────────────────────────────────────
 
-function selectRow(id, keepSelection) {
+function selectRow(id, keepSelection, initialTab) {
     if (selectedId === id) captureTaskDraft();
     else { taskDraft = null; formDirty = false; _formBaseline = {}; }
     if (!keepSelection) selectedIds = new Set([id]);
@@ -514,8 +514,8 @@ function selectRow(id, keepSelection) {
     if (!s) return;
     renderList();
     showDetailHeader(s);
-    activeTab = 'execution';
-    setActiveTab('execution');
+    activeTab = initialTab || 'execution';
+    setActiveTab(activeTab);
     renderDetail(taskDraft || s);
     showBottomPanels(s);
     _updateAiContext(s);
@@ -2069,7 +2069,7 @@ async function duplicateSchedule(id) {
                 body: JSON.stringify({ id:data.id, schema:pData.schema, values:pData.values }) });
     } catch(e) {}
     await loadList();
-    selectRow(data.id);
+    selectRow(data.id, false, 'settings');
 }
 
 async function deleteSchedule(id, name) {
@@ -2600,6 +2600,7 @@ window.addEventListener('resize', function() {
 function pickPath(mode) {
     var field = document.getElementById('f_script_path');
     var exec  = (document.getElementById('f_executor') || {}).value || '';
+    var taskId = selectedId;
 
     var extByExec = {
         'xml': 'xml', 'csx': 'csx',
@@ -2615,7 +2616,10 @@ function pickPath(mode) {
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (!d.ok)   { alert('Could not open the dialog: ' + (d.error || '')); return; }
-            if (d.path && field.isConnected) { field.value = d.path; markTaskDirty(); }
+            if (d.path && selectedId === taskId) {
+                var currentField = document.getElementById('f_script_path');
+                if (currentField) { currentField.value = d.path; markTaskDirty(); }
+            }
         })
         .catch(function(e) { alert('Could not open the dialog: ' + e); });
 }
