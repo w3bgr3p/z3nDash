@@ -10,6 +10,8 @@ Dock подключается страницами через `wwwroot/js/nav.js
 | `zp7` | [[ZP7]] | `Alt+2` |
 | `zb` | [[ZB]] | `Alt+3` |
 | `har` | [[HAR]] | — |
+| `zpXml` | [[zpXml]] | — |
+| `xml` | [[XML]] | `Alt+9` |
 | `json` | [[JSON]] | `Alt+6` |
 | `text` | [[Text Tools]] | `Alt+7` |
 | `treasury` | [[Treasury]] | — |
@@ -36,7 +38,7 @@ Dock подключается страницами через `wwwroot/js/nav.js
 | Хоткей | Что делает |
 |---|---|
 | `Alt+X` | генератор OTP |
-| `Alt+T` | переключает тему |
+| `Alt+T` | переключает темы Dark, Light, Hyper и Graphite |
 | `Alt+P` | переносит док к следующему краю |
 
 ## Дополнительно

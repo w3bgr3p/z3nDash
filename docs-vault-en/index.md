@@ -23,6 +23,8 @@ The windowed build targets Windows. The `net10.0` target builds without WinForms
 | [[Logs]] | Shared ZP7 log history, a window on [[ZP7]] | `Alt+4` |
 | [[Traffic]] | HTTP traffic and replay, a window on [[ZP7]] | `Alt+5` |
 | [[HAR]] | HAR archive viewer and replay | — |
+| [[zpXml]] | Graph editing and step-by-step debugging for ZennoPoster XML templates | — |
+| [[XML]] | XML tree viewing, formatting and search | `Alt+9` |
 | [[JSON]] | JSON viewing and analysis | `Alt+6` |
 | [[Text Tools]] | Text transforms | `Alt+7` |
 | [[Treasury]] | Web3 asset overview | — |

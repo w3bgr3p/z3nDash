@@ -2,6 +2,10 @@
 
 Страница `/config.html` управляет локальной конфигурацией z3nDash.
 
+Разделы Overview, Database, Logs & Server, Browsers API, OmniRoute, Services,
+Security и Maintenance переключаются в боковой панели. Последний открытый раздел
+восстанавливается при следующем посещении страницы.
+
 ## Server Status
 
 Показывает:

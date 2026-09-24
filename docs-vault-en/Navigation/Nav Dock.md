@@ -10,6 +10,8 @@ The dock is pulled in by every page through `wwwroot/js/nav.js`. Its items and h
 | `zp7` | [[ZP7]] | `Alt+2` |
 | `zb` | [[ZB]] | `Alt+3` |
 | `har` | [[HAR]] | — |
+| `zpXml` | [[zpXml]] | — |
+| `xml` | [[XML]] | `Alt+9` |
 | `json` | [[JSON]] | `Alt+6` |
 | `text` | [[Text Tools]] | `Alt+7` |
 | `treasury` | [[Treasury]] | — |
@@ -36,7 +38,7 @@ These are bound in `nav.js` rather than in the item list, and they open nothing:
 | Hotkey | What it does |
 |---|---|
 | `Alt+X` | the OTP generator |
-| `Alt+T` | cycles the theme |
+| `Alt+T` | cycles through Dark, Light, Hyper and Graphite |
 | `Alt+P` | moves the dock to the next edge |
 
 ## Also in the dock

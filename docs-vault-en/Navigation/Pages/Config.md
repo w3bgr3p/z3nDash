@@ -2,6 +2,10 @@
 
 The `/config.html` page manages the local z3nDash configuration.
 
+The side rail switches between Overview, Database, Logs & Server, Browsers API,
+OmniRoute, Services, Security and Maintenance. The last open section is restored
+on the next visit.
+
 ## Server Status
 
 Shows:

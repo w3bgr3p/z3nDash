@@ -14,6 +14,8 @@ dashboard and local API are served by the built-in HTTP server.
 - ZP7 worker overview and control for ZennoPoster jobs on the local network.
 - ZennoBrowser profile and process integration.
 - Application logs, HTTP request inspection, and request replay.
+- Interactive ZennoPoster XML graph editing and debugging, plus a general XML
+  tree viewer.
 - JSON, text, clipboard-template, code-graph, and SQLite file-viewer tools.
 - System snapshots and a configurable process-memory watchdog.
 - Web3 treasury views and supporting blockchain utilities.
@@ -116,6 +118,8 @@ The default dashboard address is `http://localhost:33333`.
 | allLogs | Combined ZP7 log history from every node (modal on ZP7) |
 | Traffic | Inspect and replay HTTP traffic from the nodes and z3nDash (modal on ZP7) |
 | HAR | Inspect HAR archives and replay requests from them |
+| zpXml | View, edit, and debug ZennoPoster XML templates as an executable graph |
+| XML | Open, format, search, and inspect XML as a collapsible tree |
 | JSON / Text | Transform and analyze structured or plain text |
 | Clips | Store and copy reusable templates |
 | Treasury | Inspect Web3 assets |

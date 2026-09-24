@@ -28,6 +28,11 @@ Supported executors:
 | `csx` | a C# script; the task list carries a compile-check button for it |
 | `xml` | a ZennoPoster template: the built-in runtime plays the XML graph, and the browser is chosen on the task card |
 
+Use `Ctrl+click` to select several tasks and `Shift+click` to select a range.
+Changed fields from the **Settings** and **Schedule** tabs are saved to every
+selected task, while names remain individual. The `Delete` key removes the
+selected task or the whole selection after confirmation.
+
 ## Schedule
 
 The UI can build:
