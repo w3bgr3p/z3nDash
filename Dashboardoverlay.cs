@@ -60,6 +60,7 @@ public class DashboardOverlay : Form
     // ── Hotkey-константы ───────────────────────────────────────────────────────
 
     private const int    WM_HOTKEY    = 0x0312;
+    private const int    WM_GETMINMAXINFO = 0x0024;
     private const uint   MOD_CONTROL  = 0x0002;
     private const uint   MOD_ALT      = 0x0001;
     private const uint   MOD_NOREPEAT = 0x4000;
@@ -235,7 +236,13 @@ public class DashboardOverlay : Form
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
-    protected override void WndProc(ref Message m) => base.WndProc(ref m);
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == WM_GETMINMAXINFO && m.LParam != IntPtr.Zero)
+            WindowMaximizeGeometry.ApplyWorkingArea(m.HWnd, m.LParam);
+
+        base.WndProc(ref m);
+    }
 
     // ── WebView2 ──────────────────────────────────────────────────────────────
 
