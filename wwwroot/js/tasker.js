@@ -554,11 +554,7 @@ function renderDetailActions(s) {
         + '<button class="btn sm" onclick="duplicateSchedule(\'' + id + '\')" style="border-color:var(--yellow);color:var(--yellow);">📋📋</button>'
         + '</div>'
         + '<div class="action-group">'
-        + '<button class="btn green sm" onclick="openValuesModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">⚙ </button>'
-        + '<button class="btn accent sm" onclick="openSchemaModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🔧 </button>'
-        + '<button class="btn sm" onclick="openImportPayload(\'' + id + '\')" style="border-color:var(--accent);color:var(--accent);">📥 </button>'
-        + '<button class="btn sm" onclick="exportPayload(\'' + id + '\')" style="border-color:var(--accent);color:var(--accent);">📤 </button>'
-        + '<button class="btn sm" title="Clear payload" onclick="clearPayload(\'' + id + '\',\'' + escHtml(s.name || '') + '\')" style="border-color:var(--red);color:var(--red);">🗑 </button>'
+        + '<button class="btn green sm" title="Payload: values, schema, import, export" onclick="openPayloadModal(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">⚙ Payload</button>'
         + '</div>'
         + '<div class="action-group">'
         
@@ -2108,29 +2104,6 @@ async function _afterDelete() {
     await loadList();
 }
 
-async function exportPayload(id) {
-    try {
-        var res  = await fetch('/tasker/payload?id=' + encodeURIComponent(id));
-        var data = await res.json();
-        await navigator.clipboard.writeText(JSON.stringify({ schema:data.schema, values:data.values }, null, 2));
-        Dialog.alert('Payload JSON copied to clipboard.', 'Exported');
-    } catch(e) { Dialog.error(e.message); }
-}
-
-async function clearPayload(id, name) {
-    // payload_values ровно пустая — единственное состояние, при котором планировщик
-    // не перезапишет args базой-64. "{}" его не останавливает — скрипту
-    // всё равно приедет позиционный аргумент e30=.
-    if (!(await Dialog.confirm('Delete payload schema and values of "' + (name||id) + '"? Script will stop receiving the base64 argument.', '🗑 Clear payload', true))) return;
-    try {
-        var res  = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id, schema:'', values:''}) });
-        var data = await res.json();
-        if (!data.ok) { Dialog.error(data.error || 'Clear failed'); return; }
-        await loadList();
-        if (selectedId === id) selectRow(id);
-    } catch(e) { Dialog.error(e.message); }
-}
-
 async function openScriptFile(filePath) {
     try {
         var res  = await fetch('/tasker/open-file?path=' + encodeURIComponent(filePath));
@@ -2395,46 +2368,118 @@ async function _loadPayload(id) {
     } catch(e) { pmSchema = []; pmValues = {}; }
 }
 
-async function openSchemaModal(id, name) {
+var pmTab = 'values';
+var pmPreviewTimer = null;
+
+async function openPayloadModal(id, name) {
     pmScheduleId = id;
     await _loadPayload(id);
-    document.getElementById('schemaTitle').textContent = 'Schema: ' + (name || id);
-    document.getElementById('schemaOverlay').classList.add('open');
-    renderConstructor();
+    document.getElementById('payloadTitle').textContent = 'Payload: ' + (name || id);
+    document.getElementById('payloadImport').style.display = 'none';
+    document.getElementById('payloadOverlay').classList.add('open');
+    vmActiveTab = 0;
+    _showPayloadTab('values');
 }
-function closeSchemaModal() { document.getElementById('schemaOverlay').classList.remove('open'); }
+function closePayloadModal() { document.getElementById('payloadOverlay').classList.remove('open'); }
 
-async function openValuesModal(id, name) {
-    pmScheduleId = id;
-    await _loadPayload(id);
-    document.getElementById('valuesTitle').textContent = 'Values: ' + (name || id);
-    document.getElementById('valuesOverlay').classList.add('open');
-    renderValues();
+function _collectValues() {
+    document.querySelectorAll('#valuesBody [data-vkey]').forEach(function(el) { pmValues[el.dataset.vkey] = el.type==='checkbox'?(el.checked?'true':'false'):el.value; });
 }
-function closeValuesModal() { document.getElementById('valuesOverlay').classList.remove('open'); }
 
-var _importPayloadId = null;
-function openImportPayload(id) {
-    _importPayloadId = id;
-    document.getElementById('importPayloadInput').value = '';
-    document.getElementById('importPayloadOverlay').classList.add('open');
-    setTimeout(function() { document.getElementById('importPayloadInput').focus(); }, 50);
+function pmSwitch(tab) {
+    if (pmTab === 'values') _collectValues();
+    _showPayloadTab(tab);
 }
-function closeImportPayload() { document.getElementById('importPayloadOverlay').classList.remove('open'); _importPayloadId = null; }
 
-async function confirmImportPayload() {
+function _showPayloadTab(tab) {
+    pmTab = tab;
+    document.getElementById('valuesBody').style.display = tab === 'values' ? '' : 'none';
+    document.getElementById('schemaBody').style.display = tab === 'schema' ? '' : 'none';
+    document.getElementById('payloadTabValues').classList.toggle('active', tab === 'values');
+    document.getElementById('payloadTabSchema').classList.toggle('active', tab === 'schema');
+    if (tab === 'values') renderValues(); else renderConstructor();
+    refreshPayloadPreview();
+}
+
+// Превью считает сервер (/tasker/args-preview): правила сборки флагов живут в одном месте.
+function refreshPayloadPreview() {
+    if (pmPreviewTimer) clearTimeout(pmPreviewTimer);
+    pmPreviewTimer = setTimeout(_loadPayloadPreview, 300);
+}
+
+async function _loadPayloadPreview() {
+    pmPreviewTimer = null;
+    var el = document.getElementById('payloadPreview');
+    if (!el || !pmScheduleId) return;
+    try {
+        var res  = await fetch('/tasker/args-preview', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({id:pmScheduleId, schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues)}) });
+        var data = await res.json();
+        if (!data.ok) { el.textContent = '[' + (data.step || 'error') + '] ' + (data.error || ''); return; }
+        var text = data.command || data.note || '';
+        (data.skipped || []).forEach(function(f) { text += '\n' + f + ' skipped: set in Args'; });
+        el.textContent = text;
+    } catch(e) { el.textContent = e.message; }
+}
+
+async function savePayload() {
+    if (!pmScheduleId) return;
+    if (pmTab === 'values') _collectValues();
+    for (var i = 0; i < pmSchema.length; i++) {
+        var f = pmSchema[i];
+        if (f.type !== 'section' && f.type !== 'html' && f.type !== 'tab' && !(f.key || '').trim()) { Dialog.error('Field #'+(i+1)+' must have a key.'); return; }
+    }
+    try {
+        var res  = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:pmScheduleId, schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues)}) });
+        var data = await res.json();
+        if (data.ok) closePayloadModal(); else Dialog.error(data.error || 'Save failed');
+    } catch(e) { Dialog.error(e.message); }
+}
+
+function togglePayloadImport() {
+    var box  = document.getElementById('payloadImport');
+    var open = box.style.display === 'none';
+    box.style.display = open ? '' : 'none';
+    if (!open) return;
+    var input = document.getElementById('importPayloadInput');
+    input.value = '';
+    setTimeout(function() { input.focus(); }, 50);
+}
+
+// Импорт только заполняет окно; в БД попадает по Save, как любая правка.
+function applyPayloadImport() {
     var raw = document.getElementById('importPayloadInput').value.trim();
     if (!raw) return;
-    var parsed;
-    try { parsed = JSON.parse(raw); } catch(e) { alert('Invalid JSON: ' + e.message); return; }
-    if (typeof parsed.schema !== 'string' || typeof parsed.values !== 'string') { alert('Missing schema or values fields'); return; }
     try {
-        var res = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:_importPayloadId, schema:parsed.schema, values:parsed.values}) });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        closeImportPayload();
-        var s = schedules.find(function(x) { return x.id === _importPayloadId || x.id === selectedId; });
-        if (s) openSchemaModal(s.id, s.name || s.id);
-    } catch(e) { alert('Import failed: ' + e.message); }
+        var parsed = JSON.parse(raw);
+        if (typeof parsed.schema !== 'string' || typeof parsed.values !== 'string') { Dialog.error('Missing schema or values fields'); return; }
+        pmSchema = parsed.schema ? JSON.parse(parsed.schema) : [];
+        pmValues = parsed.values ? JSON.parse(parsed.values) : {};
+    } catch(e) { Dialog.error('Invalid JSON: ' + e.message); return; }
+    document.getElementById('payloadImport').style.display = 'none';
+    _showPayloadTab(pmTab);
+}
+
+async function exportPayload() {
+    if (pmTab === 'values') _collectValues();
+    try {
+        await navigator.clipboard.writeText(JSON.stringify({ schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues) }, null, 2));
+        Dialog.alert('Payload JSON copied to clipboard.', 'Exported');
+    } catch(e) { Dialog.error(e.message); }
+}
+
+async function clearPayload() {
+    var id = pmScheduleId;
+    if (!id) return;
+    if (!(await Dialog.confirm('Delete payload schema and values? The script will stop receiving payload flags.', '🗑 Clear payload', true))) return;
+    try {
+        var res  = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id, schema:'', values:''}) });
+        var data = await res.json();
+        if (!data.ok) { Dialog.error(data.error || 'Clear failed'); return; }
+        closePayloadModal();
+        await loadList();
+        if (selectedId === id) selectRow(id);
+    } catch(e) { Dialog.error(e.message); }
 }
 
 function renderConstructor() {
@@ -2476,9 +2521,10 @@ function pmSchemaUpdate(idx, prop, val) {
     if (!pmSchema[idx]) return;
     pmSchema[idx][prop] = val;
     if (prop === 'type' && (val === 'section' || val === 'html' || val === 'tab')) pmSchema[idx].key = '';
+    refreshPayloadPreview();
 }
-function pmSchemaAdd(type)   { pmSchema.push({key:'',label:'',type:type||'text',options:''}); renderConstructor(); }
-function pmSchemaRemove(idx) { pmSchema.splice(idx, 1); renderConstructor(); }
+function pmSchemaAdd(type)   { pmSchema.push({key:'',label:'',type:type||'text',options:''}); renderConstructor(); refreshPayloadPreview(); }
+function pmSchemaRemove(idx) { pmSchema.splice(idx, 1); renderConstructor(); refreshPayloadPreview(); }
 
 var _dragSrcIdx = null;
 function _bindSchemaDrag(container) {
@@ -2531,7 +2577,7 @@ function renderFieldHtml(f) {
 var vmActiveTab = 0;
 function renderValues() {
     var body = document.getElementById('valuesBody');
-    if (!pmSchema.length) { body.innerHTML = '<div style="color:var(--text2);font-size:11px;padding:12px 0">No fields. Open Schema to add fields.</div>'; return; }
+    if (!pmSchema.length) { body.innerHTML = '<div style="color:var(--text2);font-size:11px;padding:12px 0">No fields. Add them on the Schema tab.</div>'; return; }
     var groups = [], current = {label:null, fields:[]};
     pmSchema.forEach(function(f) {
         if (f.type === 'tab') { groups.push(current); current = {label:f.label||('Tab '+(groups.length+1)), fields:[]}; }
@@ -2553,30 +2599,7 @@ function vmSwitchTab(idx) {
     document.querySelectorAll('#valuesBody [data-vkey]').forEach(function(el) { pmValues[el.dataset.vkey] = el.type==='checkbox'?(el.checked?'true':'false'):el.value; });
     vmActiveTab = idx; renderValues();
 }
-function pmValuesSet(key, val) { pmValues[key] = val; }
-
-async function saveSchema() {
-    if (!pmScheduleId) return;
-    for (var i = 0; i < pmSchema.length; i++) {
-        var f = pmSchema[i];
-        if (f.type !== 'section' && f.type !== 'html' && f.type !== 'tab' && !f.key.trim()) { Dialog.error('Field #'+(i+1)+' must have a key.'); return; }
-    }
-    try {
-        var res  = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:pmScheduleId, schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues)}) });
-        var data = await res.json();
-        if (data.ok) closeSchemaModal(); else Dialog.error(data.error||'Save failed');
-    } catch(e) { Dialog.error(e.message); }
-}
-
-async function saveValues() {
-    if (!pmScheduleId) return;
-    document.querySelectorAll('#valuesBody [data-vkey]').forEach(function(el) { pmValues[el.dataset.vkey] = el.type==='checkbox'?(el.checked?'true':'false'):el.value; });
-    try {
-        var res  = await fetch('/tasker/payload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:pmScheduleId, schema:JSON.stringify(pmSchema), values:JSON.stringify(pmValues)}) });
-        var data = await res.json();
-        if (data.ok) closeValuesModal(); else Dialog.error(data.error||'Save failed');
-    } catch(e) { Dialog.error(e.message); }
-}
+function pmValuesSet(key, val) { pmValues[key] = val; refreshPayloadPreview(); }
 
 // ── Polling ───────────────────────────────────────────────────────────────────
 

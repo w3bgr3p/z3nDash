@@ -239,6 +239,17 @@ select.form-input { cursor: pointer; }
 .pm-close:hover { color: var(--text); }
 .pm-body   { flex: 1; overflow-y: auto; padding: var(--sp-12) var(--sp-14); min-height: 0; }
 .pm-footer { padding: var(--sp-8) var(--sp-14); border-top: 1px solid var(--border); display: flex; gap: var(--sp-6); justify-content: flex-end; flex-shrink: 0; }
+.pm-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 var(--sp-14); flex-shrink: 0; }
+.pm-tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--text2); padding: 6px 14px; font-size: 11px; cursor: pointer; }
+.pm-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.pm-import { padding: var(--sp-8) var(--sp-14); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--sp-6); flex-shrink: 0; }
+.pm-import textarea { width: 100%; height: 120px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 11px; font-family: monospace; padding: 8px; resize: vertical; outline: none; box-sizing: border-box; }
+.pm-import .btn { align-self: flex-end; }
+.pm-hint { font-size: 10px; color: var(--text2); }
+.pm-preview { padding: var(--sp-6) var(--sp-14); border-top: 1px solid var(--border); display: flex; gap: var(--sp-8); align-items: baseline; font-size: 10px; flex-shrink: 0; }
+.pm-preview-label { color: var(--text2); white-space: nowrap; }
+.pm-preview code { font-family: monospace; color: var(--text); word-break: break-all; white-space: pre-wrap; }
+.pm-footer-gap { flex: 1; }
 
 .schema-field-row { display: grid; grid-template-columns: 16px 1fr 110px 1fr 28px; gap: var(--sp-6); align-items: center; padding: var(--sp-4) 0; border-bottom: 1px solid var(--bg2); }
 .schema-field-row:last-child { border-bottom: none; }

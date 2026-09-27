@@ -97,41 +97,29 @@
     </div>
 </div>
 
-<!-- Schema modal -->
-<div id="schemaOverlay" class="pm-overlay" onclick="if(event.target===this)closeSchemaModal()">
+<!-- Payload modal -->
+<div id="payloadOverlay" class="pm-overlay" onclick="if(event.target===this)closePayloadModal()">
     <div class="pm-modal">
-        <div class="pm-header"><h3 id="schemaTitle">Schema</h3><button class="pm-close" onclick="closeSchemaModal()">✕</button></div>
-        <div class="pm-body" id="schemaBody"></div>
-        <div class="pm-footer">
-            <button class="btn" onclick="closeSchemaModal()">Cancel</button>
-            <button class="btn primary" onclick="saveSchema()">Save Schema</button>
+        <div class="pm-header"><h3 id="payloadTitle">Payload</h3><button class="pm-close" onclick="closePayloadModal()">✕</button></div>
+        <div class="pm-tabs">
+            <button class="pm-tab active" id="payloadTabValues" onclick="pmSwitch('values')">Values</button>
+            <button class="pm-tab" id="payloadTabSchema" onclick="pmSwitch('schema')">Schema</button>
         </div>
-    </div>
-</div>
-
-<!-- Values modal -->
-<div id="valuesOverlay" class="pm-overlay" onclick="if(event.target===this)closeValuesModal()">
-    <div class="pm-modal">
-        <div class="pm-header"><h3 id="valuesTitle">Values</h3><button class="pm-close" onclick="closeValuesModal()">✕</button></div>
         <div class="pm-body" id="valuesBody"></div>
-        <div class="pm-footer">
-            <button class="btn" onclick="closeValuesModal()">Cancel</button>
-            <button class="btn primary" onclick="saveValues()">Save Values</button>
+        <div class="pm-body" id="schemaBody" style="display:none"></div>
+        <div class="pm-import" id="payloadImport" style="display:none">
+            <div class="pm-hint">Paste <code>{"schema":"...","values":"..."}</code></div>
+            <textarea id="importPayloadInput" placeholder='{"schema":"[...]","values":"{...}"}'></textarea>
+            <button class="btn sm primary" onclick="applyPayloadImport()">Apply</button>
         </div>
-    </div>
-</div>
-
-<!-- Import payload modal -->
-<div id="importPayloadOverlay" class="pm-overlay" onclick="if(event.target===this)closeImportPayload()">
-    <div class="pm-modal" style="width:520px;">
-        <div class="pm-header"><h3>Import Payload</h3><button class="pm-close" onclick="closeImportPayload()">✕</button></div>
-        <div class="pm-body" style="padding:14px;">
-            <div style="font-size:10px;color:var(--text2);margin-bottom:8px;">Paste <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;">{"schema":"...","values":"..."}</code></div>
-            <textarea id="importPayloadInput" style="width:100%;height:160px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;font-family:monospace;padding:8px;resize:vertical;outline:none;box-sizing:border-box;" placeholder='{"schema":"[...]","values":"{...}"}'></textarea>
-        </div>
+        <div class="pm-preview"><span class="pm-preview-label">Command</span><code id="payloadPreview"></code></div>
         <div class="pm-footer">
-            <button class="btn" onclick="closeImportPayload()">Cancel</button>
-            <button class="btn primary" onclick="confirmImportPayload()">Apply</button>
+            <button class="btn sm" onclick="togglePayloadImport()">📥 Import</button>
+            <button class="btn sm" onclick="exportPayload()">📤 Export</button>
+            <button class="btn sm danger" onclick="clearPayload()">🗑 Clear</button>
+            <span class="pm-footer-gap"></span>
+            <button class="btn" onclick="closePayloadModal()">Cancel</button>
+            <button class="btn primary" onclick="savePayload()">Save</button>
         </div>
     </div>
 </div>
