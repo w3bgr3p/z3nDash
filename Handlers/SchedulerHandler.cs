@@ -15,6 +15,8 @@ namespace z3nDash;
 ///   POST /tasker/stop     — Kill процесса по id
 ///   GET  /tasker/output   — last_output из БД по ?id=
 ///   GET  /tasker/pick     — системный диалог выбора файла или каталога
+///   GET  /tasker/script-params — параметры python-скрипта по ?id= или ?path=, без запуска
+///   POST /tasker/args-preview  — команда запуска по несохранённому payload из модалки
 /// </summary>
 public sealed class SchedulerHandler : IScriptHandler
 {
@@ -108,6 +110,8 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/tasker/config-file" && method == "GET") { await GetConfigFile(context, db); return true; }
             if (path == "/tasker/config-file" && method == "POST") { await SaveConfigFile(context); return true; }
             if (path == "/tasker/ensure-venv" && method == "POST") { await EnsureVenv(context, db); return true; }
+            if (path == "/tasker/script-params" && method == "GET") { await GetScriptParams(context, db); return true; }
+            if (path == "/tasker/args-preview"  && method == "POST") { await ArgsPreview(context, db); return true; }
             if (path == "/tasker/schedule-preview" && method == "POST") { await SchedulePreview(context); return true; }
             if (path == "/tasker/install/stream" && method == "GET") { await InstallStream(context, db); return true; }
             if (path == "/tasker/open-terminal" && method == "GET") { await OpenTerminal(context, db); return true; }
@@ -727,6 +731,90 @@ public sealed class SchedulerHandler : IScriptHandler
         var created = File.Exists(interpreter);
 
         await HttpHelpers.WriteJson(ctx.Response, new { ok = created, interpreter, log = lines });
+    }
+
+    // ── Параметры скрипта ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Параметры командной строки python-скрипта по ?id= задачи или по ?path=
+    /// (для ещё не сохранённой задачи, тогда venv берётся из ?venv=true).
+    /// Скрипт только разбирается, не запускается.
+    /// </summary>
+    private async Task GetScriptParams(HttpListenerContext ctx, Db db)
+    {
+        var id         = ctx.Request.QueryString["id"] ?? "";
+        var scriptPath = ctx.Request.QueryString["path"] ?? "";
+        var executor   = "python";
+        var useVenv    = ctx.Request.QueryString["venv"] == "true";
+
+        if (!string.IsNullOrEmpty(id))
+        {
+            var row = db.Get("executor,script_path,use_venv", Table, where: $"\"id\" = '{id.Replace("'", "''")}'");
+            if (string.IsNullOrEmpty(row))
+            {
+                await HttpHelpers.WriteJson(ctx.Response, new { ok = false, step = "task", error = $"schedule not found: {id}" });
+                return;
+            }
+            var parts  = row.Split('¦');
+            executor   = parts.Length > 0 ? parts[0] : "";
+            scriptPath = parts.Length > 1 ? parts[1] : "";
+            useVenv    = parts.Length > 2 && parts[2] == "true";
+        }
+
+        if (string.IsNullOrWhiteSpace(scriptPath)) { ctx.Response.StatusCode = 400; return; }
+
+        if (executor != "python")
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, step = "executor", error = $"executor is {executor}, not python" });
+            return;
+        }
+
+        var result = await ScriptParams.InspectAsync(scriptPath, useVenv);
+        await HttpHelpers.WriteJson(ctx.Response, result);
+    }
+
+    /// <summary>
+    /// Команда, которой Tasker запустит задачу с этим payload: для строки превью
+    /// в модалке. Schema и values — несохранённое состояние окна; экзекутор,
+    /// путь и Args берутся из задачи. Пароли замаскированы.
+    /// </summary>
+    private async Task ArgsPreview(HttpListenerContext ctx, Db db)
+    {
+        var json = await ReadJson(ctx.Request);
+        string Prop(string key) => json?.TryGetProperty(key, out var v) == true && v.ValueKind == JsonValueKind.String
+            ? v.GetString() ?? "" : "";
+
+        var id = Prop("id");
+        if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
+
+        var row = db.Get("executor,script_path,args,use_venv", Table, where: $"\"id\" = '{id.Replace("'", "''")}'");
+        if (string.IsNullOrEmpty(row))
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, step = "task", error = $"schedule not found: {id}" });
+            return;
+        }
+        var parts      = row.Split('¦');
+        var executor   = parts.Length > 0 ? parts[0] : "";
+        var scriptPath = parts.Length > 1 ? parts[1] : "";
+        var args       = parts.Length > 2 ? parts[2] : "";
+        var useVenv    = parts.Length > 3 && parts[3] == "true";
+
+        if (executor == "xml")
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, command = "", note = "xml: payload goes to project variables" });
+            return;
+        }
+
+        try
+        {
+            var result = PayloadArgs.Build(executor, args, Prop("schema"), Prop("values"));
+            var (fileName, arguments) = SchedulerService.BuildCommand(executor, scriptPath, result.Masked, useVenv);
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = true, command = $"{fileName} {arguments}", skipped = result.Skipped });
+        }
+        catch (Exception ex) when (ex is JsonException or ArgumentException)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, step = "payload", error = $"{ex.GetType().Name}: {ex.Message}" });
+        }
     }
 
     // ── Установка зависимостей ─────────────────────────────────────────────────
