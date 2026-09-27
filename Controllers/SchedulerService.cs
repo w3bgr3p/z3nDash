@@ -517,40 +517,13 @@ public sealed partial class SchedulerService : IDisposable
         var instanceKey = $"{id}:{runId}";
         var scheduleTag = BuildScheduleTag(name);
 
+        // Шаблону xml payload уходит в переменные проекта, и только ему
+        // подмешивается строка аккаунта по condition. Скрипты получают payload
+        // флагами (PayloadArgs), аккаунт и БД — их собственная забота.
         var payloadValues = record.GetValueOrDefault("payload_values", "");
-        if (!string.IsNullOrWhiteSpace(payloadValues))
-        {
-            var projectName = Path.GetFileName(scriptPath).Split('.')[0];
-            var table       = $"__{projectName}";
-            var nowIso      = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-
-            var payload = JsonSerializer.Deserialize<Dictionary<string, object>>(payloadValues)
-                          ?? new Dictionary<string, object>();
-
-            var condition = payload.TryGetValue("condition", out var cond) ? cond?.ToString() ?? "" : "";
-            condition     = condition.Replace("NOW", $"'{nowIso}'");
-
-            if (!string.IsNullOrWhiteSpace(condition))
-            {
-                var cols    = db.GetTableColumns(table);
-                var colsSql = string.Join(", ", cols.Select(c => $"\"{c}\""));
-                var rawRow  = db.Query($"SELECT {colsSql} FROM \"{table}\" WHERE {condition} LIMIT 1");
-
-                if (!string.IsNullOrWhiteSpace(rawRow))
-                {
-                    var values = rawRow.Split('¦');
-                    for (int i = 0; i < cols.Count && i < values.Length; i++)
-                        payload[cols[i]] = values[i];
-                    _log?.Info($"[{name}] account selected from {table}");
-                }
-                else
-                {
-                    _log?.Warn($"[{name}] no account found in {table} by condition: {condition}");
-                }
-            }
-
-            args = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
-        }
+        var xmlPayload = executor == "xml" && !string.IsNullOrWhiteSpace(payloadValues)
+            ? XmlPayload(db, name, scriptPath, payloadValues)
+            : null;
         
         // run в событии — чтобы UI мог развести по цветам логи параллельных нитей.
         Action<string> broadcast = line =>
@@ -616,23 +589,20 @@ public sealed partial class SchedulerService : IDisposable
                 // Прокси задаётся при запуске браузера и на живом инстансе не
                 // меняется, поэтому берём его до старта — из поля задачи, а иначе
                 // из переменной самого шаблона.
-                var payload = string.IsNullOrWhiteSpace(args)
-                    ? record
-                    : JsonSerializer.Deserialize<Dictionary<string, string>>(
-                        Encoding.UTF8.GetString(Convert.FromBase64String(args))) ?? record;
+                var payload = xmlPayload ?? record;
 
                 // Значения payload — это InputSettings задачи, и в ZennoPoster они
                 // ложатся в переменные проекта до старта. Без этого шаблон работал
                 // на своих значениях по умолчанию: в настройках стояла страна GH,
                 // а прокси собирался с той, что зашита в сам шаблон.
                 //
-                // Кладём только то, что пришло из args: при пустом args payload
-                // подменяется строкой задачи из БД, и её колонки (name, executor,
+                // Кладём только значения payload: без них payload подменяется
+                // строкой задачи из БД, и её колонки (name, executor,
                 // script_path) переменными проекта быть не должны.
                 //
                 // SeedVariables в XmlPlayer заполняет лишь пустые переменные,
                 // поэтому заданное здесь шаблон не перетрёт.
-                if (!string.IsNullOrWhiteSpace(args))
+                if (xmlPayload != null)
                 {
                     var applied = 0;
                     foreach (var (key, value) in payload)
@@ -837,7 +807,23 @@ public sealed partial class SchedulerService : IDisposable
         var useVenv = record.GetValueOrDefault("use_venv", "false") == "true";
         // venv создаётся лениво: чекбокс можно поставить до того, как каталог появится.
         if (useVenv && executor == "python") PythonEnv.Ensure(scriptPath, line => _log?.Info($"[{name}] {line}"));
-        var (fileName, arguments) = BuildCommand(executor, scriptPath, args, useVenv);
+        PayloadArgs.Result launchArgs;
+        try
+        {
+            launchArgs = PayloadArgs.Build(executor, args,
+                record.GetValueOrDefault("payload_schema", ""), payloadValues);
+        }
+        catch (Exception ex) when (ex is JsonException or ArgumentException)
+        {
+            var err = $"[ERR] step=payload | {ex.GetType().Name}: {ex.Message}";
+            _log?.Error($"[{name}] {err}");
+            SseHub.BroadcastOutput(JsonSerializer.Serialize(new { line = err, run = runId, level = "ERROR" }), id);
+            UpdateStatus(db, id, "error", firedAt, "-1", err, runId);
+            FinishQueueEntry(db, queueUuid, "error", runId);
+            return;
+        }
+        var (fileName, arguments) = BuildCommand(executor, scriptPath, launchArgs.Args, useVenv);
+        var maskedArguments       = BuildCommand(executor, scriptPath, launchArgs.Masked, useVenv).arguments;
 
         _log?.Info($"[{name}] launch → {fileName} {Path.GetFileName(scriptPath)} run={runId}");
         UpdateStatus(db, id, "running", firedAt, "", "", runId);
@@ -863,6 +849,9 @@ public sealed partial class SchedulerService : IDisposable
 
         var process = new System.Diagnostics.Process { StartInfo = psi, EnableRaisingEvents = true };
         var rp2     = new RunningProcess(process, firedAt, null, broadcast);
+        foreach (var flag in launchArgs.Skipped)
+            rp2.AddLine($"[payload] {flag} skipped: set in Args");
+        rp2.AddLine($"[launch] {fileName} {maskedArguments}");
 
         Console.ForegroundColor = ConsoleColor.Magenta;
         Console.WriteLine($"[LIVE] process task starting id={id} name={name} run={runId} key={instanceKey} exe={fileName}");
@@ -1061,7 +1050,37 @@ public sealed partial class SchedulerService : IDisposable
     private static string ResolvePython(string scriptPath, bool useVenv)
         => PythonEnv.Resolve(scriptPath, useVenv);
 
-    private static (string fileName, string arguments) BuildCommand(string executor, string scriptPath, string args, bool useVenv = false)
+    /// <summary>
+    /// Payload для шаблона xml: значения задачи плюс, при заданном condition,
+    /// колонки первой подходящей строки из __&lt;имя шаблона&gt;.
+    /// </summary>
+    private Dictionary<string, string> XmlPayload(Db db, string name, string scriptPath, string payloadValues)
+    {
+        var payload   = PayloadArgs.Values(payloadValues);
+        var nowIso    = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        var condition = payload.GetValueOrDefault("condition", "").Replace("NOW", $"'{nowIso}'");
+        if (string.IsNullOrWhiteSpace(condition)) return payload;
+
+        var table   = $"__{Path.GetFileName(scriptPath).Split('.')[0]}";
+        var cols    = db.GetTableColumns(table);
+        var colsSql = string.Join(", ", cols.Select(c => $"\"{c}\""));
+        var rawRow  = db.Query($"SELECT {colsSql} FROM \"{table}\" WHERE {condition} LIMIT 1");
+
+        if (!string.IsNullOrWhiteSpace(rawRow))
+        {
+            var values = rawRow.Split('¦');
+            for (int i = 0; i < cols.Count && i < values.Length; i++)
+                payload[cols[i]] = values[i];
+            _log?.Info($"[{name}] account selected from {table}");
+        }
+        else
+        {
+            _log?.Warn($"[{name}] no account found in {table} by condition: {condition}");
+        }
+        return payload;
+    }
+
+    internal static (string fileName, string arguments) BuildCommand(string executor, string scriptPath, string args, bool useVenv = false)
     {
         static string TsNodeArgs(string path, string extraArgs)
         {
