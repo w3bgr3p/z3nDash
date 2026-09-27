@@ -2482,6 +2482,66 @@ async function clearPayload() {
     } catch(e) { Dialog.error(e.message); }
 }
 
+// Поля схемы из параметров скрипта (/tasker/script-params). Флагом payload
+// становится только длинный именованный параметр, чьё имя переживает обратный
+// путь camelCase → kebab-case в PayloadArgs. Остальное перечисляется в skipped
+// и остаётся в Args. Имеющиеся поля и значения не трогаются.
+function schemaFromScriptParams(schema, values, params) {
+    var out  = schema.slice();
+    var vals = Object.assign({}, values);
+    var have = {};
+    out.forEach(function(f) { if (f.key) have[f.key] = true; });
+    var added = [], skipped = [];
+
+    (params || []).forEach(function(p) {
+        var names = p.names || [];
+        if (!names.length) { skipped.push((p.exprs && p.exprs.names ? String(p.exprs.names) : '?') + ': name is computed at run time'); return; }
+        var label = names.join(', ');
+        if (p.positional) { skipped.push(label + ': positional, stays in Args'); return; }
+        if (p.subcommand) { skipped.push(label + ': belongs to subcommand ' + p.subcommand); return; }
+        var flag = names.filter(function(n) { return n.indexOf('--') === 0; })[0];
+        if (!flag) { skipped.push(label + ': short flag only'); return; }
+        if (flag === '--help') return;
+        if (p.action === 'store_false') { skipped.push(flag + ': store_false has no payload form'); return; }
+
+        var key = flag.slice(2).replace(/-([a-z])/g, function(_, c) { return c.toUpperCase(); });
+        if (key.replace(/(?!^)(?=[A-Z])/g, '-').toLowerCase() !== flag.slice(2)) { skipped.push(flag + ': name does not map back to the same flag'); return; }
+        if (have[key]) { skipped.push(flag + ': already in schema'); return; }
+
+        var type = (p.action === 'store_true' || p.is_flag === true) ? 'boolean'
+                 : Array.isArray(p.choices) ? 'select' : 'text';
+        out.push({ key: key, label: p.help || key, type: type, options: type === 'select' ? p.choices.join(',') : '' });
+        have[key] = true;
+        added.push(flag);
+
+        if (vals[key] === undefined && p.default !== undefined && p.default !== null)
+            vals[key] = Array.isArray(p.default) ? p.default.join(',') : String(p.default);
+    });
+    return { schema: out, values: vals, added: added, skipped: skipped };
+}
+
+// Заполняет только окно; в БД схема попадает по Save.
+async function importSchemaFromScript() {
+    if (!pmScheduleId) return;
+    var data;
+    try {
+        var res = await fetch('/tasker/script-params?id=' + encodeURIComponent(pmScheduleId));
+        data = await res.json();
+    } catch(e) { Dialog.error(e.message); return; }
+    if (!data.ok) { Dialog.error('[' + (data.step || 'error') + '] ' + (data.error || '')); return; }
+
+    var r = schemaFromScriptParams(pmSchema, pmValues, data.params);
+    pmSchema = r.schema;
+    pmValues = r.values;
+    renderConstructor();
+    refreshPayloadPreview();
+
+    var lines = ['Added: ' + (r.added.length ? r.added.join(' ') : 'nothing')];
+    if (r.skipped.length) lines.push('Skipped:\n' + r.skipped.join('\n'));
+    if (data.uses_sys_argv) lines.push('The script also reads sys.argv directly: check those arguments by hand.');
+    Dialog.alert(lines.join('\n\n'), 'Schema from script');
+}
+
 function renderConstructor() {
     var body = document.getElementById('schemaBody');
     function thirdColProp(f) { return (f.type === 'select' || f.type === 'multiselect') ? 'options' : 'label'; }
@@ -2513,6 +2573,7 @@ function renderConstructor() {
         + '<button class="btn sm" onclick="pmSchemaAdd(\'text\')">+ Field</button>'
         + '<button class="btn sm accent" onclick="pmSchemaAdd(\'section\')">+ Section</button>'
         + '<button class="btn sm" onclick="pmSchemaAdd(\'html\')">+ HTML</button>'
+        + '<button class="btn sm" title="Add fields from the script\'s argparse / click parameters" onclick="importSchemaFromScript()">↻ From script</button>'
         + (pmSchema.length === 0 ? '<span style="color:var(--text2);font-size:10px;margin-left:6px">No fields</span>' : '')
         + '</div>';
     _bindSchemaDrag(body);

@@ -107,3 +107,72 @@ test('Import fills the form and does not save by itself', async () => {
     assert.equal(context.pmValues.proxy, 'p');
     assert.ok(!requests.some((r) => r.url === '/tasker/payload' && r.opts && r.opts.method === 'POST'));
 });
+
+test('script parameters become schema fields that round-trip to the same flags', () => {
+    const { context } = loadTasker();
+    const params = [
+        { names: ['--proxy-url'], help: 'Proxy', default: null },
+        { names: ['--dry'], action: 'store_true', default: false },
+        { names: ['--mode'], choices: ['fast', 'slow'], default: 'fast' },
+        { names: ['--acc_id'], default: 7 },
+        { names: ['target'], positional: true },
+        { names: ['-n'] },
+        { names: [], exprs: { names: ['name'] } },
+        { names: ['--x'], subcommand: 'run' },
+        { names: ['--no-cache'], action: 'store_false' },
+        { names: ['--dryRun'] },
+        { names: ['--url'] },
+        { names: ['-h', '--help'] },
+    ];
+
+    const r = context.schemaFromScriptParams([{ key: 'url', type: 'text' }], { url: 'keep' }, params);
+
+    assert.deepEqual([...r.added], ['--proxy-url', '--dry', '--mode', '--acc_id']);
+    assert.deepEqual([...r.schema.map((f) => f.key)], ['url', 'proxyUrl', 'dry', 'mode', 'acc_id']);
+    assert.deepEqual([...r.schema.map((f) => f.type)], ['text', 'text', 'boolean', 'select', 'text']);
+    assert.equal(r.schema[3].options, 'fast,slow');
+    assert.equal(r.schema[1].label, 'Proxy');
+    assert.equal(r.values.url, 'keep');
+    assert.equal(r.values.dry, 'false');
+    assert.equal(r.values.mode, 'fast');
+    assert.equal(r.values.acc_id, '7');
+    assert.equal(r.values.proxyUrl, undefined);
+    assert.equal(r.skipped.length, 7);
+});
+
+test('From script fills the schema from script-params without saving', async () => {
+    const { context, requests } = loadTasker();
+    const alerts = [];
+    context.Dialog = { alert(msg) { alerts.push(msg); }, error(msg) { alerts.push('ERR ' + msg); } };
+    context.fetch = async (url, opts) => {
+        requests.push({ url, opts });
+        const body = url.startsWith('/tasker/script-params?')
+            ? { ok: true, params: [{ names: ['--url'] }, { names: ['--headless'], action: 'store_true' }], uses_sys_argv: false }
+            : { ok: true, command: '' };
+        return { ok: true, json: async () => body };
+    };
+    context.pmScheduleId = 't1';
+    context.pmSchema = [];
+    context.pmValues = {};
+
+    await context.importSchemaFromScript();
+
+    assert.ok(requests.some((r) => r.url === '/tasker/script-params?id=t1'));
+    assert.deepEqual([...context.pmSchema.map((f) => f.key)], ['url', 'headless']);
+    assert.ok(!requests.some((r) => r.url === '/tasker/payload' && r.opts && r.opts.method === 'POST'));
+    assert.match(alerts[0], /Added: --url --headless/);
+});
+
+test('From script shows the server error verbatim', async () => {
+    const { context } = loadTasker();
+    const alerts = [];
+    context.Dialog = { alert(msg) { alerts.push(msg); }, error(msg) { alerts.push('ERR ' + msg); } };
+    context.fetch = async () => ({ ok: true, json: async () => ({ ok: false, step: 'executor', error: 'executor is node, not python' }) });
+    context.pmScheduleId = 't1';
+    context.pmSchema = [];
+
+    await context.importSchemaFromScript();
+
+    assert.deepEqual(alerts, ['ERR [executor] executor is node, not python']);
+    assert.equal(context.pmSchema.length, 0);
+});
