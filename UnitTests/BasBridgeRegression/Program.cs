@@ -16,6 +16,7 @@ async Task Section(string name, Func<Task> body)
 
 await Section("session", () => SessionTests.Run(Expect));
 await Section("http-browser", () => HttpBrowserTests.Run(Expect));
+await Section("query", () => QueryTests.Run(Expect));
 
 Out.P(failures == 0 ? "ALL OK" : $"FAILURES: {failures}");
 return failures == 0 ? 0 : 1;
