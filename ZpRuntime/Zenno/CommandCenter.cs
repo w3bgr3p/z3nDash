@@ -66,11 +66,25 @@ namespace ZennoLab.CommandCenter
         /// </summary>
         public static void AttachBrowser(IBrowserInstance browser) => HTTP.Browser = browser;
 
+        /// <summary>
+        /// Браузер для запросов текущего потока выполнения. Главнее глобального:
+        /// у каждой сессии моста BAS свой браузер, и параллельные прогоны не
+        /// должны перетирать друг другу сессию для HTTP.Request.
+        /// </summary>
+        public static void AttachBrowserForCurrentFlow(IBrowserInstance? browser) => HTTP.FlowBrowser.Value = browser;
+
         public static class HTTP
         {
             private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Net.Http.HttpClient> _clients = new();
 
-            internal static IBrowserInstance Browser { get; set; }
+            internal static readonly System.Threading.AsyncLocal<IBrowserInstance?> FlowBrowser = new();
+            private static IBrowserInstance _global;
+
+            internal static IBrowserInstance Browser
+            {
+                get => FlowBrowser.Value ?? _global;
+                set => _global = value;
+            }
 
             public static string Request(
                 InterfacesLibrary.Enums.Http.HttpMethod method,

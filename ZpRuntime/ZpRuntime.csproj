@@ -71,4 +71,8 @@
         <PackageReference Include="System.Management"        Version="10.0.0-rc.2.25502.107" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="BasBridgeRegression" />
+    </ItemGroup>
+
 </Project>
