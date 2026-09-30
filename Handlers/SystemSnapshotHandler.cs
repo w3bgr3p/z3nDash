@@ -5,10 +5,15 @@
 //   POST   /system-snapshot/ai-audit       { model, raw } → { analysis, model, ts }
 //   GET    /system-snapshot/ai-cache       → { entry } | { entry: null }
 //   DELETE /system-snapshot/ai-cache       → { ok }
+//   GET    /system-snapshot/process?pid=N  → { pid, name, path, started, memMb, cmdLine, sysInformer } | { error }
+//   POST   /system-snapshot/kill           { pid, name } → { ok } | { error }
+//   POST   /system-snapshot/reveal         { pid, name } → { ok } | { error }   (Explorer, exe selected)
+//   POST   /system-snapshot/sysinformer    { pid, name } → { ok } | { error }   (System Informer, process selected)
 
 using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 
@@ -39,6 +44,10 @@ internal sealed class SystemSnapshotHandler
         if (method == "POST"   && path == "/system-snapshot/ai-audit")  { await AiAudit(ctx);       return; }
         if (method == "GET"    && path == "/system-snapshot/ai-cache")  { await AiCacheGet(ctx);    return; }
         if (method == "DELETE" && path == "/system-snapshot/ai-cache")  { await AiCacheDelete(ctx); return; }
+        if (method == "GET"    && path == "/system-snapshot/process")   { await ProcessInfo(ctx);   return; }
+        if (method == "POST"   && path == "/system-snapshot/kill")      { await ProcessKill(ctx);   return; }
+        if (method == "POST"   && path == "/system-snapshot/reveal")    { await ProcessReveal(ctx); return; }
+        if (method == "POST"   && path == "/system-snapshot/sysinformer") { await OpenSystemInformer(ctx); return; }
 
         ctx.Response.StatusCode = 404;
         await HttpHelpers.WriteJson(ctx.Response, new { error = "Not found" });
@@ -70,20 +79,25 @@ internal sealed class SystemSnapshotHandler
 
         void Line(string s)    => sb.AppendLine(s);
         void Section(string t) { Line(""); Line(hr); Line($"## {t}"); Line(hr); }
+        // Table row: every column but the last is padded to its width and columns are joined
+        // with two spaces, so a value longer than its width never merges with the next one.
+        // system.html splits rows on 2+ spaces and relies on this.
+        void Row(params (object? V, int W)[] cols) =>
+            Line(string.Join("  ", cols.Select((c, i) =>
+                i == cols.Length - 1 ? $"{c.V}" : $"{c.V}".PadRight(c.W))).TrimEnd());
 
         var allProcs = Process.GetProcesses();
 
         var pidName = new Dictionary<int, string>(allProcs.Length);
         foreach (var p in allProcs)
             pidName[p.Id] = p.ProcessName;
+        string ProcName(int pid) => pidName.TryGetValue(pid, out var pn) ? pn : "?";
+        static string Ep(string addr, int port) => addr.Contains(':') ? $"[{addr}]:{port}" : $"{addr}:{port}";
 
         var tcpRows   = PlatformSnapshot.GetTcpRowsWithPid();
+        var udpRows   = PlatformSnapshot.GetUdpRowsWithPid();
         var connByPid = new Dictionary<int, int>();
         foreach (var r in tcpRows) { connByPid.TryGetValue(r.Pid, out var c); connByPid[r.Pid] = c + 1; }
-
-        System.Net.IPEndPoint[] udpListeners;
-        try   { udpListeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveUdpListeners(); }
-        catch { udpListeners = Array.Empty<System.Net.IPEndPoint>(); }
 
         var uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
         Line("SYSTEM SNAPSHOT FOR LLM ANALYSIS");
@@ -104,7 +118,7 @@ internal sealed class SystemSnapshotHandler
         Line($"Load         : {cpuLoad}");
 
         Section("PROCESS AGGREGATION BY NAME (ALL INSTANCES SUMMED)");
-        Line($"{"NAME",-35} {"TOTAL_MEM_MB",-12} {"INSTANCES",-10} {"TCP_CONNS",-12} AVG_MEM_MB");
+        Row(("NAME", 35), ("TOTAL_MEM_MB", 12), ("INSTANCES", 10), ("TCP_CONNS", 12), ("AVG_MEM_MB", 0));
         Line(new string('-', 80));
 
         foreach (var g in allProcs.GroupBy(p => p.ProcessName)
@@ -117,12 +131,11 @@ internal sealed class SystemSnapshotHandler
             })
             .OrderByDescending(x => x.TotalMB))
         {
-            var name = g.Name.Length > 35 ? g.Name[..35] : g.Name;
-            Line($"{name,-35} {g.TotalMB,-12} {g.Count,-10} {g.Tcp,-12} {g.AvgMB}");
+            Row((g.Name, 35), (g.TotalMB, 12), (g.Count, 10), (g.Tcp, 12), (g.AvgMB, 0));
         }
 
         Section("ALL PROCESSES (PID | NAME | MEM_MB | CPU_SEC | THREADS | START_TIME)");
-        Line($"{"PID",-8} {"NAME",-35} {"MEM_MB",-10} {"CPU_SEC",-12} {"THREADS",-8} STARTED");
+        Row(("PID", 8), ("NAME", 35), ("MEM_MB", 10), ("CPU_SEC", 12), ("THREADS", 8), ("STARTED", 0));
         Line(new string('-', 90));
 
         foreach (var p in allProcs.OrderBy(p => p.ProcessName))
@@ -132,44 +145,39 @@ internal sealed class SystemSnapshotHandler
             try { cpu     = Math.Round(p.TotalProcessorTime.TotalSeconds, 1); }      catch { }
             try { thr     = p.Threads.Count; }                                        catch { }
             try { started = p.StartTime.ToString("HH:mm:ss"); }                       catch { }
-            var name = p.ProcessName.Length > 35 ? p.ProcessName[..35] : p.ProcessName;
-            Line($"{p.Id,-8} {name,-35} {mem2,-10} {cpu,-12} {thr,-8} {started}");
+            Row((p.Id, 8), (p.ProcessName, 35), (mem2, 10), (cpu, 12), (thr, 8), (started, 0));
         }
 
         Section("ACTIVE NETWORK CONNECTIONS (TCP + UDP)");
-        Line($"{"PID",-10} {"PROTO",-7} {"LOCAL",-26} {"REMOTE",-26} {"STATE",-14} PROCESS");
+        Row(("PID", 8), ("PROTO", 5), ("LOCAL", 26), ("REMOTE", 26), ("STATE", 12), ("PROCESS", 0));
         Line(new string('-', 100));
 
-        foreach (var r in tcpRows.OrderBy(r => r.LocalPort))
+        foreach (var r in tcpRows.Concat(udpRows).OrderBy(r => r.LocalPort))
         {
-            var proc   = pidName.TryGetValue(r.Pid, out var pn) ? pn : "?";
-            var local  = $"{r.LocalAddr}:{r.LocalPort}";
-            var remote = r.RemotePort > 0 ? $"{r.RemoteAddr}:{r.RemotePort}" : "-";
-            Line($"{r.Pid,-10} {"TCP",-7} {local,-26} {remote,-26} {r.State,-14} {proc}");
+            var remote = r.RemotePort > 0 ? Ep(r.RemoteAddr, r.RemotePort) : "-";
+            Row((r.Pid, 8), (r.Proto, 5), (Ep(r.LocalAddr, r.LocalPort), 26), (remote, 26), (r.State, 12), (ProcName(r.Pid), 0));
         }
-        foreach (var ep in udpListeners.OrderBy(e => e.Port))
-            Line($"{"?",-10} {"UDP",-7} {ep.Address}:{ep.Port,-20} {"-",-26} {"LISTEN",-14} ?");
 
-        Section("LISTENING PORTS SUMMARY (TCP)");
-        Line($"{"PID",-8} {"PORT",-8} {"BIND_ADDR",-20} PROCESS");
-        Line(new string('-', 55));
-        foreach (var r in tcpRows.Where(r => r.State == "Listen").OrderBy(r => r.LocalPort))
-            Line($"{r.Pid,-8} {r.LocalPort,-8} {r.LocalAddr,-20} {(pidName.TryGetValue(r.Pid, out var pn) ? pn : "?")}");
+        Section("LISTENING PORTS SUMMARY (TCP + UDP)");
+        Row(("PID", 8), ("PROTO", 5), ("PORT", 6), ("BIND_ADDR", 20), ("PROCESS", 0));
+        Line(new string('-', 60));
+        foreach (var r in tcpRows.Where(r => r.State == "Listen").Concat(udpRows).OrderBy(r => r.LocalPort))
+            Row((r.Pid, 8), (r.Proto, 5), (r.LocalPort, 6), (r.LocalAddr, 20), (ProcName(r.Pid), 0));
 
         Section("ESTABLISHED TCP CONNECTIONS");
-        Line($"{"PID",-10} {"LOCAL",-26} {"REMOTE",-26} PROCESS");
+        Row(("PID", 8), ("LOCAL", 26), ("REMOTE", 26), ("PROCESS", 0));
         Line(new string('-', 80));
         foreach (var r in tcpRows.Where(r => r.State == "Established").OrderBy(r => r.Pid))
-            Line($"{r.Pid,-10} {r.LocalAddr}:{r.LocalPort,-20} {r.RemoteAddr}:{r.RemotePort,-20} {(pidName.TryGetValue(r.Pid, out var pn) ? pn : "?")}");
+            Row((r.Pid, 8), (Ep(r.LocalAddr, r.LocalPort), 26), (Ep(r.RemoteAddr, r.RemotePort), 26), (ProcName(r.Pid), 0));
 
         Section("RUNNING SERVICES");
-        Line($"{"NAME",-50} {"STATUS",-12} DISPLAY");
+        Row(("NAME", 50), ("STATUS", 12), ("DISPLAY", 0));
         Line(new string('-', 100));
         foreach (var svc in PlatformSnapshot.GetRunningServices())
-            Line($"{svc.Name,-50} {"Running",-12} {svc.Display}");
+            Row((svc.Name, 50), ("Running", 12), (svc.Display, 0));
 
         Section("DISK USAGE");
-        Line($"{"DRIVE",-6} {"TOTAL_GB",-12} {"USED_GB",-12} {"FREE_GB",-12} PCT_USED");
+        Row(("DRIVE", 6), ("TOTAL_GB", 12), ("USED_GB", 12), ("FREE_GB", 12), ("PCT_USED", 0));
         Line(new string('-', 55));
         foreach (var drive in DriveInfo.GetDrives())
         {
@@ -180,7 +188,7 @@ internal sealed class SystemSnapshotHandler
                 var total = Math.Round(drive.TotalSize      / 1073741824.0, 1);
                 var free  = Math.Round(drive.TotalFreeSpace / 1073741824.0, 1);
                 var used  = Math.Round(total - free, 1);
-                Line($"{drive.Name.TrimEnd('\\', '/'),-6} {total,-12} {used,-12} {free,-12} {(total > 0 ? Math.Round(used / total * 100, 1) : 0)}%");
+                Row((drive.Name.TrimEnd('\\', '/'), 6), (total, 12), (used, 12), (free, 12), ($"{(total > 0 ? Math.Round(used / total * 100, 1) : 0)}%", 0));
             }
             catch { }
         }
@@ -193,7 +201,7 @@ internal sealed class SystemSnapshotHandler
         Line($"OS 64-bit   : {Environment.Is64BitOperatingSystem}");
 
         Section("PATH ENTRIES");
-        Line($"{"IDX",-5} PATH");
+        Row(("IDX", 5), ("PATH", 0));
         Line(new string('-', 80));
         // Windows использует ';', Linux использует ':'
         var pathSep = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
@@ -201,8 +209,7 @@ internal sealed class SystemSnapshotHandler
         var pathEntries = (Environment.GetEnvironmentVariable("PATH") ?? "")
             .Split(pathSep, StringSplitOptions.RemoveEmptyEntries);
         for (int i = 0; i < pathEntries.Length; i++)
-            Line($"{i + 1,-5} {pathEntries[i]}");
-        Line($"\nTotal entries: {pathEntries.Length}");
+            Row((i + 1, 5), (pathEntries[i], 0));
 
         Line(""); Line(hr); Line("END OF SNAPSHOT"); Line(hr);
 
@@ -274,6 +281,231 @@ internal sealed class SystemSnapshotHandler
         await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
     }
 
+    // ── Process actions ───────────────────────────────────────────────────────
+
+    private async Task ProcessInfo(HttpListenerContext ctx)
+    {
+        if (!int.TryParse(ctx.Request.QueryString["pid"], out var pid))
+        { ctx.Response.StatusCode = 400; await HttpHelpers.WriteJson(ctx.Response, new { error = "pid required" }); return; }
+
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            string? exe = null, started = null; double? memMb = null;
+            try { exe     = p.MainModule?.FileName; }                          catch { }
+            try { started = p.StartTime.ToString("yyyy-MM-dd HH:mm:ss"); }     catch { }
+            try { memMb   = Math.Round(p.WorkingSet64 / 1048576.0, 1); }       catch { }
+            var cmdLine = GetCommandLine(pid);
+            await HttpHelpers.WriteJson(ctx.Response, new { pid, name = p.ProcessName, path = exe, started, memMb, cmdLine,
+                                                            sysInformer = FindSystemInformer() != null });
+        }
+        catch (Exception ex)
+        {
+            await HttpHelpers.WriteJson(ctx.Response, new { error = $"step=process-info | {ex.GetType().Name}: {ex.Message}" });
+        }
+    }
+
+    // null when WMI returns nothing (access denied for elevated/protected processes, or the process is gone).
+    private static string? GetCommandLine(int pid)
+    {
+#if WINDOWS
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher(
+                $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {pid}");
+            foreach (System.Management.ManagementObject item in searcher.Get())
+                using (item) return item["CommandLine"]?.ToString();
+        }
+        catch { }
+        return null;
+#else
+        try { return File.ReadAllText($"/proc/{pid}/cmdline").Replace('\0', ' ').Trim(); }
+        catch { return null; }
+#endif
+    }
+
+    // The snapshot is a few seconds old and PIDs get reused, so the caller passes the name it saw
+    // and the action is refused when the live process under that PID has a different name.
+    private static async Task<(Process? proc, string? error)> ResolveProcess(HttpListenerContext ctx, string step)
+    {
+        int pid; string name;
+        try
+        {
+            using var reader = new StreamReader(ctx.Request.InputStream);
+            var json = JsonSerializer.Deserialize<JsonElement>(await reader.ReadToEndAsync());
+            pid  = json.GetProperty("pid").GetInt32();
+            name = json.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
+        }
+        catch (Exception ex) { return (null, $"step={step} | invalid body: {ex.GetType().Name}: {ex.Message}"); }
+
+        if (pid <= 4 || pid == Environment.ProcessId)
+            return (null, $"step={step} | refused: pid {pid} is a system process or z3nDash itself");
+
+        Process p;
+        try { p = Process.GetProcessById(pid); }
+        catch (Exception ex) { return (null, $"step={step} | {ex.GetType().Name}: {ex.Message}"); }
+
+        if (name != "" && !string.Equals(p.ProcessName, name, StringComparison.OrdinalIgnoreCase))
+        {
+            var live = p.ProcessName; p.Dispose();
+            return (null, $"step={step} | refused: pid {pid} is now '{live}', not '{name}'");
+        }
+        return (p, null);
+    }
+
+    private async Task ProcessKill(HttpListenerContext ctx)
+    {
+        var (p, err) = await ResolveProcess(ctx, "kill");
+        if (p == null) { await HttpHelpers.WriteJson(ctx.Response, new { error = err }); return; }
+        using (p)
+        {
+            try
+            {
+                p.Kill();
+                var exited = p.WaitForExit(5000);
+                await HttpHelpers.WriteJson(ctx.Response, exited
+                    ? new { ok = true, error = (string?)null }
+                    : new { ok = false, error = (string?)$"step=kill | process {p.Id} still running after 5s" });
+            }
+            catch (Exception ex)
+            {
+                await HttpHelpers.WriteJson(ctx.Response, new { error = $"step=kill | {ex.GetType().Name}: {ex.Message}" });
+            }
+        }
+    }
+
+    private async Task ProcessReveal(HttpListenerContext ctx)
+    {
+        var (p, err) = await ResolveProcess(ctx, "reveal");
+        if (p == null) { await HttpHelpers.WriteJson(ctx.Response, new { error = err }); return; }
+        using (p)
+        {
+            try
+            {
+                var exe = p.MainModule?.FileName;
+                if (string.IsNullOrEmpty(exe))
+                { await HttpHelpers.WriteJson(ctx.Response, new { error = $"step=reveal | no executable path for pid {p.Id}" }); return; }
+#if WINDOWS
+                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{exe}\"") { UseShellExecute = true })?.Dispose();
+                await HttpHelpers.WriteJson(ctx.Response, new { ok = true, path = exe });
+#else
+                await HttpHelpers.WriteJson(ctx.Response, new { error = $"step=reveal | not supported on this OS, path: {exe}" });
+#endif
+            }
+            catch (Exception ex)
+            {
+                await HttpHelpers.WriteJson(ctx.Response, new { error = $"step=reveal | {ex.GetType().Name}: {ex.Message}" });
+            }
+        }
+    }
+
+    // Opens the System Informer properties window of the process, in two steps (source:
+    // winsiderss/systeminformer, SystemInformer/main.c + mainwnd.c; checked live on this machine):
+    //   1. `SystemInformer.exe -selectpid N` — when an instance is running, the new process sends it
+    //      WM_PH_ACTIVATE (selects the row, synchronously) and exits; otherwise it becomes the instance.
+    //   2. WM_COMMAND ID_PROCESS_PROPERTIES (10006) to the main window — properties of the selected row.
+    // Success = a System Informer window titled "<name>.exe (<pid>)" shows up. An elevated System
+    // Informer only lets WM_PH_ACTIVATE through UIPI, so step 2 fails there and the row stays selected.
+    private const int SiPropertiesCmd = 10006;
+
+    private async Task OpenSystemInformer(HttpListenerContext ctx)
+    {
+        var (p, err) = await ResolveProcess(ctx, "sysinformer");
+        if (p == null) { await HttpHelpers.WriteJson(ctx.Response, new { error = err }); return; }
+        using (p)
+        {
+            var exe = FindSystemInformer();
+            if (exe == null)
+            { await HttpHelpers.WriteJson(ctx.Response, new { error = "step=sysinformer | SystemInformer.exe not found (App Paths registry key)" }); return; }
+#if WINDOWS
+            var pid = p.Id;
+            var stage = "sysinformer-selectpid";
+            try
+            {
+                var wasRunning = Process.GetProcessesByName("SystemInformer").Length > 0;
+                using (var helper = Process.Start(new ProcessStartInfo(exe, $"-selectpid {pid}") { UseShellExecute = true }))
+                {
+                    if (wasRunning && helper != null && !await Task.Run(() => helper.WaitForExit(6000)))
+                    { await HttpHelpers.WriteJson(ctx.Response, new { error = $"step={stage} | SystemInformer.exe -selectpid did not exit within 6s" }); return; }
+                }
+
+                stage = "sysinformer-mainwindow";
+                IntPtr main = IntPtr.Zero;
+                for (int i = 0; i < 40 && main == IntPtr.Zero; i++)   // a fresh start needs time to build the window
+                {
+                    main = SiWindows().FirstOrDefault(w => w.Cls == "MainWindowClassName").Hwnd;
+                    if (main == IntPtr.Zero) await Task.Delay(250);
+                }
+                if (main == IntPtr.Zero)
+                { await HttpHelpers.WriteJson(ctx.Response, new { error = $"step={stage} | no visible MainWindowClassName window of SystemInformer.exe within 10s" }); return; }
+                if (!wasRunning) await Task.Delay(1500);             // fresh start: the process list fills in after the window
+
+                stage = "sysinformer-properties";
+                if (!NativeMethods.PostMessage(main, 0x0111 /* WM_COMMAND */, (IntPtr)SiPropertiesCmd, IntPtr.Zero))
+                {
+                    var code = Marshal.GetLastWin32Error();
+                    await HttpHelpers.WriteJson(ctx.Response, new { ok = true, properties = false,
+                        error = $"step={stage} | PostMessage WM_COMMAND failed, Win32 error {code}; process is selected in the list" });
+                    return;
+                }
+
+                var suffix = $"({pid})";
+                for (int i = 0; i < 12; i++)
+                {
+                    if (SiWindows().Any(w => w.Title.EndsWith(suffix)))
+                    { await HttpHelpers.WriteJson(ctx.Response, new { ok = true, properties = true }); return; }
+                    await Task.Delay(250);
+                }
+                await HttpHelpers.WriteJson(ctx.Response, new { ok = true, properties = false,
+                    error = $"step={stage} | no window titled '*{suffix}' within 3s after WM_COMMAND {SiPropertiesCmd}" });
+            }
+            catch (Exception ex)
+            {
+                await HttpHelpers.WriteJson(ctx.Response, new { error = $"step={stage} | {ex.GetType().Name}: {ex.Message}" });
+            }
+#else
+            await HttpHelpers.WriteJson(ctx.Response, new { error = "step=sysinformer | not supported on this OS" });
+#endif
+        }
+    }
+
+#if WINDOWS
+    private static List<(IntPtr Hwnd, string Cls, string Title)> SiWindows()
+    {
+        var pids = new HashSet<int>();
+        foreach (var sp in Process.GetProcessesByName("SystemInformer")) { pids.Add(sp.Id); sp.Dispose(); }
+        var list = new List<(IntPtr, string, string)>();
+        NativeMethods.EnumWindows((h, _) =>
+        {
+            NativeMethods.GetWindowThreadProcessId(h, out var wpid);
+            if (!pids.Contains((int)wpid) || !NativeMethods.IsWindowVisible(h)) return true;
+            var cls = new StringBuilder(256); NativeMethods.GetClassName(h, cls, cls.Capacity);
+            var ttl = new StringBuilder(512); NativeMethods.GetWindowText(h, ttl, ttl.Capacity);
+            list.Add((h, cls.ToString(), ttl.ToString()));
+            return true;
+        }, IntPtr.Zero);
+        return list;
+    }
+#endif
+
+    // The installer registers App Paths\SystemInformer.exe; a portable copy is not found.
+    private static string? FindSystemInformer()
+    {
+#if WINDOWS
+        const string key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\SystemInformer.exe";
+        foreach (var root in new[] { Microsoft.Win32.Registry.LocalMachine, Microsoft.Win32.Registry.CurrentUser })
+        {
+            try
+            {
+                using var k = root.OpenSubKey(key);
+                if (k?.GetValue(null) is string path && File.Exists(path.Trim('"'))) return path.Trim('"');
+            }
+            catch { }
+        }
+#endif
+        return null;
+    }
+
     // ── Prompt ────────────────────────────────────────────────────────────────
 
     private static string BuildAuditPrompt(string raw)
@@ -326,7 +558,7 @@ internal sealed class SystemSnapshotHandler
 
 internal static class PlatformSnapshot
 {
-    internal record TcpRow(int Pid, string LocalAddr, int LocalPort, string RemoteAddr, int RemotePort, string State);
+    internal record TcpRow(string Proto, int Pid, string LocalAddr, int LocalPort, string RemoteAddr, int RemotePort, string State);
     internal record MemInfo(double TotalGb, double UsedGb, double FreeGb, double UsedPct);
     internal record ServiceInfo(string Name, string Display);
 
@@ -341,40 +573,91 @@ internal static class PlatformSnapshot
 #endif
     }
 
+    internal static List<TcpRow> GetUdpRowsWithPid()
+    {
 #if WINDOWS
+        return GetUdpRowsWindows();
+#else
+        try
+        {
+            return IPGlobalProperties.GetIPGlobalProperties().GetActiveUdpListeners()
+                .Select(ep => new TcpRow("UDP", 0, ep.Address.ToString(), ep.Port, "", 0, "Listen")).ToList();
+        }
+        catch { return new List<TcpRow>(); }
+#endif
+    }
+
+#if WINDOWS
+    private const int AfInet  = 2;
+    private const int AfInet6 = 23;
+    private const int TcpTableOwnerPidAll = 5;   // TCP_TABLE_OWNER_PID_ALL: listeners + connections
+    private const int UdpTableOwnerPid    = 1;   // UDP_TABLE_OWNER_PID
+
     private static List<TcpRow> GetTcpRowsWindows()
     {
         var rows = new List<TcpRow>();
-        try
-        {
-            int size = 0;
-            NativeMethods.GetExtendedTcpTable(IntPtr.Zero, ref size, false, 2, 4, 0);
-            var buf = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
-            try
-            {
-                if (NativeMethods.GetExtendedTcpTable(buf, ref size, false, 2, 4, 0) != 0) return rows;
-                int count       = System.Runtime.InteropServices.Marshal.ReadInt32(buf);
-                const int rowSz = 24;
-                for (int i = 0; i < count; i++)
-                {
-                    var ptr   = IntPtr.Add(buf, 4 + i * rowSz);
-                    var state = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 0);
-                    var lAddr = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 4);
-                    var lPort = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 8);
-                    var rAddr = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 12);
-                    var rPort = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 16);
-                    var pid   = System.Runtime.InteropServices.Marshal.ReadInt32(ptr, 20);
-                    rows.Add(new TcpRow(pid, Ip(lAddr), Ntohs(lPort), Ip(rAddr), Ntohs(rPort), TcpStateWin(state)));
-                }
-            }
-            finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(buf); }
-        }
-        catch { }
+        // MIB_TCPROW_OWNER_PID: state, localAddr, localPort, remoteAddr, remotePort, pid (24 bytes)
+        ReadTable(NativeMethods.GetExtendedTcpTable, AfInet, TcpTableOwnerPidAll, 24, p => rows.Add(new TcpRow("TCP",
+            Marshal.ReadInt32(p, 20), Ip4(p, 4), Port(p, 8), Ip4(p, 12), Port(p, 16), TcpStateWin(Marshal.ReadInt32(p, 0)))));
+        // MIB_TCP6ROW_OWNER_PID: localAddr[16], localScope, localPort, remoteAddr[16], remoteScope, remotePort, state, pid (56 bytes)
+        ReadTable(NativeMethods.GetExtendedTcpTable, AfInet6, TcpTableOwnerPidAll, 56, p => rows.Add(new TcpRow("TCP6",
+            Marshal.ReadInt32(p, 52), Ip6(p, 0, 16), Port(p, 20), Ip6(p, 24, 40), Port(p, 44), TcpStateWin(Marshal.ReadInt32(p, 48)))));
         return rows;
     }
 
-    private static string Ip(int raw)    { var b = BitConverter.GetBytes(raw); return $"{b[0]}.{b[1]}.{b[2]}.{b[3]}"; }
-    private static int    Ntohs(int raw) { var b = BitConverter.GetBytes(raw); return (b[2] << 8) | b[3]; }
+    private static List<TcpRow> GetUdpRowsWindows()
+    {
+        var rows = new List<TcpRow>();
+        // MIB_UDPROW_OWNER_PID: localAddr, localPort, pid (12 bytes)
+        ReadTable(NativeMethods.GetExtendedUdpTable, AfInet, UdpTableOwnerPid, 12, p => rows.Add(new TcpRow("UDP",
+            Marshal.ReadInt32(p, 8), Ip4(p, 0), Port(p, 4), "", 0, "Listen")));
+        // MIB_UDP6ROW_OWNER_PID: localAddr[16], localScope, localPort, pid (28 bytes)
+        ReadTable(NativeMethods.GetExtendedUdpTable, AfInet6, UdpTableOwnerPid, 28, p => rows.Add(new TcpRow("UDP6",
+            Marshal.ReadInt32(p, 24), Ip6(p, 0, 16), Port(p, 20), "", 0, "Listen")));
+        return rows;
+    }
+
+    private delegate int TableFn(IntPtr table, ref int size, bool sort, int af, int tableClass, int reserved);
+
+    // Table layout: DWORD dwNumEntries, then rows of rowSz bytes. The table can grow between the
+    // size query and the read (ERROR_INSUFFICIENT_BUFFER = 122) — retry with the new size.
+    private static void ReadTable(TableFn fn, int af, int tableClass, int rowSz, Action<IntPtr> onRow)
+    {
+        try
+        {
+            int size = 0;
+            fn(IntPtr.Zero, ref size, false, af, tableClass, 0);
+            for (int attempt = 0; attempt < 3 && size > 0; attempt++)
+            {
+                var buf = Marshal.AllocHGlobal(size);
+                try
+                {
+                    var rc = fn(buf, ref size, false, af, tableClass, 0);
+                    if (rc == 122) continue;
+                    if (rc != 0) return;
+                    int count = Marshal.ReadInt32(buf);
+                    for (int i = 0; i < count; i++)
+                        onRow(IntPtr.Add(buf, 4 + i * rowSz));
+                    return;
+                }
+                finally { Marshal.FreeHGlobal(buf); }
+            }
+        }
+        catch { }
+    }
+
+    private static string Ip4(IntPtr p, int off) =>
+        $"{Marshal.ReadByte(p, off)}.{Marshal.ReadByte(p, off + 1)}.{Marshal.ReadByte(p, off + 2)}.{Marshal.ReadByte(p, off + 3)}";
+
+    private static string Ip6(IntPtr p, int off, int scopeOff)
+    {
+        var b = new byte[16];
+        Marshal.Copy(IntPtr.Add(p, off), b, 0, 16);
+        return new IPAddress(b, (uint)Marshal.ReadInt32(p, scopeOff)).ToString();
+    }
+
+    // Port is in network byte order in the low 16 bits of the DWORD (first two bytes in memory).
+    private static int Port(IntPtr p, int off) => (Marshal.ReadByte(p, off) << 8) | Marshal.ReadByte(p, off + 1);
 
     private static string TcpStateWin(int s) => s switch
     {
@@ -410,7 +693,7 @@ internal static class PlatformSnapshot
                     var (rAddr, rPort) = ParseHexEndpoint(remoteHex);
                     var state          = TcpStateLinux(Convert.ToInt32(stateHex, 16));
 
-                    rows.Add(new TcpRow(0, lAddr, lPort, rAddr, rPort, state));
+                    rows.Add(new TcpRow(file.EndsWith("6") ? "TCP6" : "TCP", 0, lAddr, lPort, rAddr, rPort, state));
                 }
             }
             catch { }
@@ -618,5 +901,25 @@ internal static class NativeMethods
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    public static extern int GetClassName(IntPtr hWnd, StringBuilder name, int maxCount);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 }
 #endif

@@ -138,6 +138,44 @@ test('script parameters become schema fields that round-trip to the same flags',
     assert.equal(r.values.acc_id, '7');
     assert.equal(r.values.proxyUrl, undefined);
     assert.equal(r.skipped.length, 7);
+    // Без значения по умолчанию: пусто значит «не задано», флаг не передаётся.
+    assert.equal(r.schema[1].skipEmpty, true);
+    assert.ok(!r.schema[2].skipEmpty, 'boolean needs no skipEmpty');
+    assert.ok(!r.schema[3].skipEmpty, 'field with a default keeps passing it');
+});
+
+test('an append parameter with an empty list default is skipped when empty', () => {
+    const { context } = loadTasker();
+
+    const r = context.schemaFromScriptParams([], {}, [
+        { names: ['--url'], action: 'append', default: [] },
+        { names: ['--tag'], action: 'append', default: ['a', 'b'] },
+    ]);
+
+    assert.equal(r.schema[0].skipEmpty, true);
+    assert.equal(r.values.url, '');
+    assert.ok(!r.schema[1].skipEmpty);
+    assert.equal(r.values.tag, 'a,b');
+});
+
+test('schema rows offer Skip empty for value fields only', () => {
+    const { context, elements } = loadTasker();
+    context.pmSchema = [
+        { key: 'out', type: 'text', skipEmpty: true },
+        { key: 'dry', type: 'boolean' },
+        { key: '', type: 'section', label: 'S' },
+        { key: 'mode', type: 'select', options: 'a,b' },
+    ];
+
+    context.renderConstructor();
+
+    const rows = elements.schemaBody.innerHTML.split('class="schema-field-row"').slice(1);
+    assert.equal(rows.length, 4);
+    assert.match(rows[0], /type="checkbox"[^>]*checked[^>]*pmSchemaUpdate\(0,'skipEmpty',this\.checked\)/);
+    assert.doesNotMatch(rows[1], /skipEmpty/);
+    assert.doesNotMatch(rows[2], /skipEmpty/);
+    assert.match(rows[3], /pmSchemaUpdate\(3,'skipEmpty',this\.checked\)/);
+    assert.doesNotMatch(rows[3], /checked onchange/);
 });
 
 test('From script fills the schema from script-params without saving', async () => {

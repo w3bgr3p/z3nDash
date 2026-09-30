@@ -401,3 +401,16 @@
             .cfg-rail-item .label { overflow: visible; }
             .cfg-rail-sep { display: none; }
         }
+
+        /* Environment */
+        .env-stamp { font-size:10px; color:var(--text-dim); margin-bottom:8px; }
+        .env-group { font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin:14px 0 6px; }
+        .env-row { display:grid; grid-template-columns:minmax(140px, 200px) minmax(90px, 140px) 1fr; gap:10px; align-items:start;
+                   padding:6px 0; border-top:1px solid var(--border); font-size:11px; }
+        .env-name { color:var(--text-hi); }
+        .env-row > * { min-width:0; }
+        .env-row .pill { display:inline-block; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+        .env-install { margin-top:6px; padding:2px 9px; font-size:10px; }
+        .env-path, .env-detail { font-family:"JetBrains Mono",monospace; font-size:10px; color:var(--text-dim); white-space:pre-wrap; word-break:break-all; }
+        .env-path { color:var(--text); }
+        @media (max-width: 700px) { .env-row { grid-template-columns:1fr; gap:4px; } }

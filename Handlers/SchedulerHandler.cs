@@ -157,21 +157,43 @@ public sealed class SchedulerHandler : IScriptHandler
                 record[col] = val.GetString() ?? "";
         }
 
-        // upsert: проверить существование записи
+        // upsert: проверить существование записи.
+        // Запись с thrw: Query по умолчанию глотает ошибку базы, и Save отвечал ok,
+        // хотя строка не легла (так было при отсутствующей таблице).
         var existing = db.Get("id", Table, where: $"\"id\" = '{id}'");
-        if (!string.IsNullOrWhiteSpace(existing))
+        var stage = "update";
+        try
         {
-            var setParts = record.Where(kv => kv.Key != "id")
-                                 .Select(kv => $"\"{kv.Key}\" = '{kv.Value.Replace("'", "''")}'");
-            db.Query($"UPDATE \"{Table}\" SET {string.Join(", ", setParts)} WHERE \"id\" = '{id}'");
+            if (!string.IsNullOrWhiteSpace(existing))
+            {
+                var setParts = record.Where(kv => kv.Key != "id")
+                                     .Select(kv => $"\"{kv.Key}\" = '{kv.Value.Replace("'", "''")}'");
+                db.Query($"UPDATE \"{Table}\" SET {string.Join(", ", setParts)} WHERE \"id\" = '{id}'", thrw: true);
+            }
+            else
+            {
+                stage = "insert";
+                record["status"]      = "idle";
+                record["last_run"]    = "";
+                record["last_exit"]   = "";
+                record["last_output"] = "";
+                db.InsertDic(record, Table, thrw: true);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            record["status"]      = "idle";
-            record["last_run"]    = "";
-            record["last_exit"]   = "";
-            record["last_output"] = "";
-            db.InsertDic(record, Table);
+            var e = ex is AggregateException ae ? ae.GetBaseException() : ex;
+            ctx.Response.StatusCode = 500;
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = $"step={stage} | {e.GetType().Name}: {e.Message}" });
+            return;
+        }
+
+        // Успех — это строка, прочитанная обратно, а не отсутствие исключения.
+        if (string.IsNullOrWhiteSpace(db.Get("id", Table, where: $"\"id\" = '{id}'")))
+        {
+            ctx.Response.StatusCode = 500;
+            await HttpHelpers.WriteJson(ctx.Response, new { ok = false, error = $"step=verify | row id={id} not found in \"{Table}\" after {stage}" });
+            return;
         }
 
         // «Начать сразу» должно значить сразу, а не «на ближайшем минутном тике».

@@ -43,6 +43,7 @@
             <div class="stat-item"><span class="stat-label">All Ports</span><span class="stat-value" id="sPorts"><span class="pill warn">—</span></span></div>
             <div class="stat-item"><span class="stat-label">DB Mode</span><span class="stat-value mono" id="sDbMode">—</span></div>
             <div class="stat-item"><span class="stat-label">DB Host</span><span class="stat-value mono" id="sDbHost">—</span></div>
+            <div class="stat-item"><span class="stat-label">DB Status</span><span class="stat-value" id="sDbStatus"><span class="pill warn">—</span></span></div>
             <div class="stat-item"><span class="stat-label">Logs Folder</span><span class="stat-value mono" id="sLogsFolder" style="font-size:10px">—</span></div>
             <div class="stat-item"><span class="stat-label">Reports Folder</span><span class="stat-value mono" id="sReportsFolder" style="font-size:10px">—</span></div>
             <div class="stat-item"><span class="stat-label">Temp Folder</span><span class="stat-value mono" id="sTempFolder" style="font-size:10px">—</span></div>
@@ -323,6 +324,20 @@
             <p style="font-size:10px; color:var(--text-dim); text-align:right; margin-top:4px;">
                 The PIN is never returned when the config loads. The path is stored in appsettings.
             </p>
+            </section>
+        </section>
+
+        <section class="cfg-sec" data-sec="env" hidden>
+            <section class="card config-card">
+            <div class="card-hdr">
+                <h2>Environment</h2>
+                <button class="btn" id="envCheckBtn" onclick="loadEnvironment()" style="margin-left:auto; padding:3px 10px; font-size:10px;">&#8635; Check</button>
+            </div>
+            <p style="font-size:10px; color:var(--text-dim); margin:0 0 10px;">
+                Tools this machine has for running tasks. Each row shows what the command, registry or connection actually returned.
+            </p>
+            <div class="env-stamp" id="envStamp"></div>
+            <div id="envList"></div>
             </section>
         </section>
 

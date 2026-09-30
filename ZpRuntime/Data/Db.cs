@@ -271,7 +271,7 @@ namespace z3nDash
             if (_dbMode == dbMode.Postgre)
                 query += " ON CONFLICT DO NOTHING";
     
-            Query(query, log, thrw);
+            Query(query, thrw);
         }
         public void SetDone(string taskColumn = "daily", int cooldownMin = 0, string tableName = null, bool log = false, bool thrw = false, string key = "id", object id = null, string where = "")
         {

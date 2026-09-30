@@ -82,6 +82,7 @@ function closeSse() {
 
 function closeSseOutput() {
     if (_sseOutput) { _sseOutput.close(); _sseOutput = null; }
+    _dropOutputQueue();
     stopLiveWatch();
 }
 
@@ -152,6 +153,7 @@ function onListKeyDown(e) {
 async function loadList() {
     var res = await fetch('/tasker/list');
     if (!res.ok) throw new Error('/tasker/list HTTP ' + res.status);
+    var before = selectedId ? JSON.stringify(schedules.find(function(s) { return s.id === selectedId; }) || null) : '';
     schedules = await res.json();
     selectedIds.forEach(function(id) {
         if (!schedules.some(function(s) { return s.id === id; })) selectedIds.delete(id);
@@ -160,7 +162,9 @@ async function loadList() {
     renderList();
     if (selectedId && !formDirty) {
         var still = schedules.find(function(s) { return s.id === selectedId; });
-        if (still) {
+        // Опрос раз в 10 секунд. Если строка задачи не изменилась, форму не
+        // перерисовываем: иначе каждый тик пересобирал её и слал scan-folder.
+        if (still && JSON.stringify(still) !== before) {
             renderDetailActions(still);
             if (activeTab !== 'output') renderDetail(still);
         }
@@ -247,8 +251,11 @@ function renderList() {
         var showA = ga && groupCounts[ga] > 1, showB = gb && groupCounts[gb] > 1;
         if (showA && !showB) return -1;
         if (!showA && showB) return 1;
-        if (showA && showB) return ga < gb ? -1 : ga > gb ? 1 : 0;
-        return 0;
+        if (showA && showB && ga !== gb) return ga < gb ? -1 : 1;
+        var disabledA = (a.schedule_mode || 'off') !== 'off' && a.enabled === 'false';
+        var disabledB = (b.schedule_mode || 'off') !== 'off' && b.enabled === 'false';
+        if (disabledA !== disabledB) return disabledA ? 1 : -1;
+        return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
     });
 
     if (!_groupsInitialized) {
@@ -791,7 +798,11 @@ function showBottomPanels(s) {
     curProject = '';
     curTaskId  = s.schedule_tag || s.name || s.id;
     curRunId   = s.last_run_id  || '';
-    loadOutput(s.id);
+    // Окно чистится сразу: иначе строки новой задачи дописывались к старой,
+    // пока история ещё в пути.
+    var box = _getOutputBox();
+    if (box) box.innerHTML = '<div class="out-line empty">(no output yet)</div>';
+    loadOutput(s.id, true);
     startSseOutput(s.id);
 }
 
@@ -913,7 +924,7 @@ function renderExecution(s) {
         + infoRow('Max runtime', (parseInt(s.timeout_seconds || '0', 10) || 0) > 0 ? s.timeout_seconds + 's' : 'no limit')
         + '</div>'
         + (isRunning && isMulti
-            ? '<div class="detail-section" id="instancesCard"><div class="info-card-title">Active instances</div><div id="instancesList">—</div></div>'
+            ? '<div class="detail-section" id="instancesCard"><div class="info-card-title">Active instances<span class="inst-count" id="instancesCount"></span></div><div class="inst-list" id="instancesList">—</div></div>'
             : '')
         // Очередь скрыта, пока в ней пусто, и раскрывается опросом. Прежнее условие
         // (isRunning && isMulti) прятало её у однопоточной задачи — а залп «N раз»
@@ -946,12 +957,13 @@ function renderExecution(s) {
                 .then(function(list) {
                     var el = document.getElementById('instancesList');
                     if (!el) return;
+                    var count = document.getElementById('instancesCount');
+                    if (count) count.textContent = list && list.length ? String(list.length) : '';
                     el.innerHTML = (!list || !list.length) ? '(none)' : list.map(function(inst) {
-                        return '<div style="display:flex;align-items:center;gap:6px;margin:2px 0">'
-                            + '<span class="accent" style="font-family:monospace;font-size:10px">' + escHtml(inst.runId) + '</span>'
-                            + '<span style="color:var(--text2)">' + inst.uptimeSec + 's</span>'
-                            + '<span style="color:var(--text2)">' + inst.memoryMB + 'MB</span>'
-                            + '<button class="btn stop sm" onclick="killOneInstance(\'' + escHtml(id) + '\',\'' + escHtml(inst.runId) + '\')">✕</button>'
+                        return '<div class="inst-row">'
+                            + '<span class="inst-id">' + escHtml(inst.runId) + '</span>'
+                            + '<span class="inst-meta">' + inst.uptimeSec + 's · ' + inst.memoryMB + 'MB</span>'
+                            + '<button class="btn stop sm" title="Kill this instance" onclick="killOneInstance(\'' + escHtml(id) + '\',\'' + escHtml(inst.runId) + '\')">✕</button>'
                             + '</div>';
                     }).join('');
                 }).catch(function() {});
@@ -1428,11 +1440,15 @@ function scheduleActionsHtml(s, withToggle) {
     var enabled = s.enabled !== 'false';
     return '<div class="form-grid">'
         + (withToggle
-            ? '<div class="form-label">Enabled</div>'
-              + '<select class="form-input" id="f_enabled">'
-              + '<option value="true" '  + (enabled  ? 'selected' : '') + '>Yes</option>'
-              + '<option value="false" ' + (!enabled ? 'selected' : '') + '>No</option>'
-              + '</select>'
+            ? '<div class="form-label">Is Active</div>'
+              + '<div class="toggle2 schedule-status-toggle">'
+              + '<label class="switch" title="Inactive / Active">'
+              + '<input type="checkbox" id="f_enabled"' + (enabled ? ' checked' : '') + '>'
+              + '<span class="slider"></span>'
+              + '</label>'
+              + '<span class="t2-label inactive">Inactive</span>'
+              + '<span class="t2-label active">Active</span>'
+              + '</div>'
             : '')
         + '<div class="form-actions">'
         + (withToggle ? '<button class="btn" onclick="previewSchedule()">Preview</button>' : '')
@@ -1448,8 +1464,6 @@ function previewBoxHtml() {
 function zpFormHtml(s) {
     var z = _zp;
     return '<div class="form-grid">'
-        // 1. Как выполнять
-        + '<div class="form-section">How to run</div>'
         + '<div class="form-label">Frequency</div>'
         + '<select class="form-input" id="z_how" onchange="zpSyncRows()">'
         + [['once','Once'],['daily','Every day'],['weekly','Every week'],['monthly','Every month']]
@@ -1464,8 +1478,6 @@ function zpFormHtml(s) {
         + '<div class="form-label" id="z_monthdays_label">Days of month</div>'
         + '<input class="form-input" id="z_monthdays" value="' + escHtml(z.monthdays) + '" placeholder="1-5, 10, 20">'
 
-        // 2. Начать
-        + '<div class="form-section">Start</div>'
         + '<div class="form-label">Begins</div>'
         + '<select class="form-input" id="z_start_mode" onchange="zpSyncRows()">'
         + '<option value="now"' + (z.start.mode === 'now' ? ' selected' : '') + '>Right away</option>'
@@ -1474,15 +1486,9 @@ function zpFormHtml(s) {
         + '<div class="form-label" id="z_start_at_label">Date and time</div>'
         + '<input class="form-input" id="z_start_at" type="datetime-local" value="' + escHtml(z.start.at || '') + '">'
 
-        // 3. Сколько делать
-        + '<div class="form-section">How much to do</div>'
         + '<div class="form-label">Attempts per run</div>'
         + rangeInputsHtml('z_attempts', z.attempts.min, z.attempts.max)
-        + '<div class="form-label">Reset successes</div>'
-        + '<div><input type="checkbox" id="z_reset_success"' + (z.attempts.resetSuccess ? ' checked' : '') + '></div>'
 
-        // 4. Когда повторять
-        + '<div class="form-section" id="z_windows_section">When to repeat</div>'
         + '<div class="form-label" id="z_windows_label">Time windows</div>'
         + '<div id="z_windows_wrap">'
         +   '<div id="z_windows"></div>'
@@ -1490,9 +1496,7 @@ function zpFormHtml(s) {
         +   '<div style="color:var(--text2);font-size:10px;margin-top:3px;">empty — around the clock</div>'
         + '</div>'
 
-        // 5. Как повторять
-        + '<div class="form-section" id="z_repeat_section">How to repeat</div>'
-        + '<div class="form-label" id="z_repeat_label">Mode</div>'
+        + '<div class="form-label" id="z_repeat_label">Repeat mode</div>'
         + '<select class="form-input" id="z_repeat_mode" onchange="zpSyncRows()">'
         + [['back_to_back','Back to back'],['pause','Back to back with a pause'],['regular','At a fixed rate'],['spread','Spread over the window']]
             .map(function(o) { return '<option value="' + o[0] + '"' + (z.repeat.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
@@ -1500,9 +1504,7 @@ function zpFormHtml(s) {
         + '<div class="form-label" id="z_repeat_min_label">Minutes</div>'
         + rangeInputsHtml('z_repeat', z.repeat.min, z.repeat.max)
 
-        // 6. Завершить
-        + '<div class="form-section" id="z_end_section">Finish</div>'
-        + '<div class="form-label" id="z_end_label">Condition</div>'
+        + '<div class="form-label" id="z_end_label">Finish</div>'
         + '<select class="form-input" id="z_end_mode" onchange="zpSyncRows()">'
         + [['never','Never'],['date','On a date'],['count','After N repeats']]
             .map(function(o) { return '<option value="' + o[0] + '"' + (z.end.mode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
@@ -1585,7 +1587,6 @@ function collectZp() {
         attempts:  {
             min: _num('z_attempts_min', 1),
             max: _num('z_attempts_max', 1),
-            resetSuccess: !!(document.getElementById('z_reset_success') || {}).checked,
         },
         windows:   _zp.windows.filter(function(w) { return w.from && w.to; }),
         repeat:    { mode: _val('z_repeat_mode', 'pause'), min: _num('z_repeat_min', 10), max: _num('z_repeat_max', 10) },
@@ -1689,6 +1690,15 @@ function checkLive() {
         .catch(function() {});
 }
 
+// Строки вывода приходят десятками в секунду, а запрос нужен один:
+// все строки за секунду сводятся в один checkLive в её конце.
+var _liveSoon = null;
+
+function _checkLiveSoon() {
+    if (_liveSoon) return;
+    _liveSoon = setTimeout(function() { _liveSoon = null; checkLive(); }, 1000);
+}
+
 // ── Нити и фильтры вывода ─────────────────────────────────────────────────────
 // Пять параллельных нитей пишут в одно окно, поэтому у каждой свой цвет,
 // бейдж с началом runId и чип в шапке для изоляции.
@@ -1768,16 +1778,29 @@ function _appendLine(box, d) {
     box.insertAdjacentHTML('beforeend', LogLine.build(d));
     var el = box.lastElementChild;
     if (_runFilter && el && el.getAttribute('data-run') !== _runFilter) el.classList.add('ll-muted');
+    _trimOutput(box);
     return el;
 }
 
-function loadOutput(id) {
+// Окно держит только хвост: на долгом прогоне десятки тысяч строк в DOM
+// тормозят каждую вставку.
+var OUTPUT_LINE_LIMIT = 3000;
+
+function _trimOutput(box) {
+    var extra = box.children.length - OUTPUT_LINE_LIMIT;
+    while (extra-- > 0) box.removeChild(box.firstElementChild);
+}
+
+// streamFirst: история не затирает строки, которые поток успел прислать раньше
+// неё. Без этого пустая история, пришедшая позже, стирала весь буфер прогона.
+function loadOutput(id, streamFirst) {
     // load last saved output from DB into bottom box
     fetch('/tasker/output?id=' + encodeURIComponent(id))
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var box = _getOutputBox();
-            if (!box) return;
+            if (!box || selectedId !== id) return;
+            if (streamFirst && box.querySelector('.out-line:not(.empty)')) return;
             // История из БД приходит без разбивки по нитям: только текст строк.
             _resetRuns();
             var text = data.output || '';
@@ -1785,6 +1808,7 @@ function loadOutput(id) {
                 box.innerHTML = '<div class="out-line empty">(no output yet)</div>';
             } else {
                 box.innerHTML = renderOutputLines(text);
+                _trimOutput(box);
                 box.scrollTop = box.scrollHeight;
             }
         }).catch(function() {});
@@ -1794,46 +1818,75 @@ function reloadOutput() {
     if (selectedId && selectedId !== '__new__') loadOutput(selectedId);
 }
 
+// Строки из канала вывода копятся и разбираются пачкой раз в 50 мс. По одной выходило
+// дорого: каждая читала scrollHeight и заставляла пересчитать раскладку окна,
+// а при открытии задачи сервер присылает весь накопленный буфер разом —
+// 207 строк на готовом окне в ~1200 строк занимали главный поток на 3,9 с.
+var _outQueue = [];
+var _outFrame = 0;
+
+function _dropOutputQueue() {
+    _outQueue = [];
+    if (_outFrame) { clearTimeout(_outFrame); _outFrame = 0; }
+}
+
+function _flushOutput() {
+    _outFrame = 0;
+    var batch = _outQueue;
+    _outQueue = [];
+    var box = _getOutputBox();
+    if (!box || !batch.length) return;
+
+    var empty = box.querySelector('.out-line.empty');
+    if (empty) empty.remove();
+    var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+
+    batch.forEach(function(d) {
+        try { _putOutputLine(box, d); } catch (err) {}
+    });
+    if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+// Прогресс-строка одной нити перерисовывается на месте, а не копится.
+function _progressPrefix(s) { return s.replace(/[\d%\[\]]+.*$/, '').trim(); }
+
+function _putOutputLine(box, d) {
+    if (d.clear) { box.innerHTML = ''; _resetRuns(); }
+    var plain    = LogLine.plain(d.line || '');
+    var last     = box.lastElementChild;
+    var lastSpan = last ? last.querySelector('.out-line-text') : null;
+    var lastText = lastSpan ? lastSpan.textContent : '';
+    var sameProgress = last && last.classList.contains('out-line') && !last.classList.contains('empty')
+        && (last.getAttribute('data-run') || '') === (d.run || '')
+        && _progressPrefix(plain).length > 3
+        && _progressPrefix(plain) === _progressPrefix(lastText);
+
+    if (last && (d.replace_last || sameProgress)) {
+        _noteRun(d.run);
+        last.outerHTML = LogLine.build(d);
+    } else {
+        _appendLine(box, d);
+    }
+}
+
 function startSseOutput(id) {
     if (_sseOutput) { _sseOutput.close(); _sseOutput = null; }
+    _dropOutputQueue();
     _resetRuns();
     startLiveWatch(id);
 
     _sseOutput = new EventSource('/tasker/output/stream?id=' + encodeURIComponent(id));
 
     _sseOutput.addEventListener('output', function(e) {
-        try {
-            var d   = JSON.parse(e.data);
-            var box = _getOutputBox();
-            if (!box) return;
-            if (d.done)  { _setLive(false); return; }
-            if (d.clear) { box.innerHTML = ''; _resetRuns(); }
-            var empty = box.querySelector('.out-line.empty');
-            if (empty) empty.remove();
-
-            var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-            var plain    = LogLine.plain(d.line || '');
-            var last     = box.lastElementChild;
-
-            // Прогресс-строка одной нити перерисовывается на месте, а не копится.
-            function progressPrefix(s) { return s.replace(/[\d%\[\]]+.*$/, '').trim(); }
-            var lastSpan = last ? last.querySelector('.out-line-text') : null;
-            var lastText = lastSpan ? lastSpan.textContent : '';
-            var sameProgress = last && last.classList.contains('out-line') && !last.classList.contains('empty')
-                && (last.getAttribute('data-run') || '') === (d.run || '')
-                && progressPrefix(plain).length > 3
-                && progressPrefix(plain) === progressPrefix(lastText);
-
-            if (d.replace_last || sameProgress) {
-                _noteRun(d.run);
-                last.outerHTML = LogLine.build(d);
-            } else {
-                _appendLine(box, d);
-            }
-            if (atBottom) box.scrollTop = box.scrollHeight;
-            // Живая строка — повод не ждать очередного тика опроса.
-            if (!d.replay) checkLive();
-        } catch(err) {}
+        var d;
+        try { d = JSON.parse(e.data); } catch (err) { return; }
+        if (d.done) { _setLive(false); return; }
+        _outQueue.push(d);
+        // В фоновой вкладке таймер срабатывает редко: держим не больше, чем окно покажет.
+        if (_outQueue.length > OUTPUT_LINE_LIMIT) _outQueue.splice(0, _outQueue.length - OUTPUT_LINE_LIMIT);
+        if (!_outFrame) _outFrame = setTimeout(_flushOutput, 50);
+        // Живая строка — повод не ждать очередного тика опроса.
+        if (!d.replay) _checkLiveSoon();
     });
 
     _sseOutput.addEventListener('done', function() {
@@ -1958,7 +2011,8 @@ function collectScheduleFields(prev) {
         payload.schedule_mode = mode;
         if (document.getElementById('f_cron')) payload.cron = _val('f_cron', '');
         if (document.getElementById('z_how')) payload.schedule_json = JSON.stringify(collectZp());
-        payload.enabled       = mode === 'off' ? 'false' : _val('f_enabled', 'true');
+        var enabledEl = document.getElementById('f_enabled');
+        payload.enabled = mode === 'off' || (enabledEl && !enabledEl.checked) ? 'false' : 'true';
     }
     return payload;
 }
@@ -2510,7 +2564,13 @@ function schemaFromScriptParams(schema, values, params) {
 
         var type = (p.action === 'store_true' || p.is_flag === true) ? 'boolean'
                  : Array.isArray(p.choices) ? 'select' : 'text';
-        out.push({ key: key, label: p.help || key, type: type, options: type === 'select' ? p.choices.join(',') : '' });
+        var field = { key: key, label: p.help || key, type: type, options: type === 'select' ? p.choices.join(',') : '' };
+        // Нет значения по умолчанию (None) или пустой список у append: пусто значит
+        // «не передавать» — иначе --key "" добавит скрипту пустую строку.
+        var noDefault = p.default === undefined || p.default === null
+            || (Array.isArray(p.default) && p.default.length === 0);
+        if (type !== 'boolean' && noDefault) field.skipEmpty = true;
+        out.push(field);
         have[key] = true;
         added.push(flag);
 
@@ -2557,6 +2617,13 @@ function renderConstructor() {
         var disabled = (f.type==='section'||f.type==='html'||f.type==='tab') ? ' disabled style="opacity:0.35"' : '';
         return '<input class="schema-input" placeholder="key" value="' + escHtml(f.key) + '"' + disabled + ' oninput="pmSchemaUpdate(' + i + ',\'key\',this.value)">';
     }
+    // Пустое значение по умолчанию уходит скрипту как --key "". Галка — для полей,
+    // где пусто значит «не задано»: тогда флаг не передаётся вовсе.
+    function skipEmptyCell(f, i) {
+        if (f.type === 'boolean' || f.type === 'section' || f.type === 'html' || f.type === 'tab') return '<span></span>';
+        return '<label class="schema-skip" title="Do not pass the flag when the value is empty">'
+            + '<input type="checkbox"' + (f.skipEmpty ? ' checked' : '') + ' onchange="pmSchemaUpdate(' + i + ',\'skipEmpty\',this.checked)">skip</label>';
+    }
     var rows = pmSchema.map(function(f, i) {
         var typeOpts = FIELD_TYPES.map(function(t) { return '<option value="' + t + '"' + (f.type===t?' selected':'') + '>' + t + '</option>'; }).join('');
         return '<div class="schema-field-row" draggable="true" data-idx="' + i + '">'
@@ -2564,10 +2631,11 @@ function renderConstructor() {
             + keyInput(f, i)
             + '<select class="schema-input" onchange="pmSchemaUpdate(' + i + ',\'type\',this.value);renderConstructor()">' + typeOpts + '</select>'
             + '<input class="schema-input" placeholder="' + thirdColPlaceholder(f) + '" value="' + escHtml(thirdColVal(f)) + '" oninput="pmSchemaUpdate(' + i + ',\'' + thirdColProp(f) + '\',this.value)">'
+            + skipEmptyCell(f, i)
             + '<button class="schema-del" onclick="pmSchemaRemove(' + i + ')">✕</button>'
             + '</div>';
     }).join('');
-    body.innerHTML = (pmSchema.length ? '<div class="schema-col-header"><span></span><span>Key</span><span>Type</span><span>Label / Options</span><span></span></div>' : '')
+    body.innerHTML = (pmSchema.length ? '<div class="schema-col-header"><span></span><span>Key</span><span>Type</span><span>Label / Options</span><span>Empty</span><span></span></div>' : '')
         + rows
         + '<div style="margin-top:10px;display:flex;gap:6px">'
         + '<button class="btn sm" onclick="pmSchemaAdd(\'text\')">+ Field</button>'

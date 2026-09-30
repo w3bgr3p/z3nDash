@@ -156,6 +156,12 @@ public class EmbeddedServer
         _scriptHandlers.Add(handler);
     }
 
+    /// <summary>Повторить Init обработчиков: он создаёт их таблицы, а база сменилась на лету.</summary>
+    public void ReinitHandlers()
+    {
+        foreach (var handler in _scriptHandlers) handler.Init();
+    }
+
     public void Start()
     {
         _isRunning = true;

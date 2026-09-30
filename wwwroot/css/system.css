@@ -97,6 +97,25 @@ body {
 .data-table td.warn   { color: var(--yellow); }
 .data-table td.red    { color: var(--red); }
 .data-table td.green  { color: var(--green); }
+.data-table tr.pickable { cursor: pointer; }
+.data-table tr.selected td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* ── Process panel ── */
+.proc-empty { font-size: var(--fs-9); color: var(--text2); }
+.proc-box { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(--fs-10); }
+.proc-kv { display: flex; gap: var(--sp-8); }
+.proc-kv span:first-child { width: 60px; flex-shrink: 0; color: var(--text2); }
+.proc-path, .proc-ports { font-size: var(--fs-9); color: var(--text2); word-break: break-all; }
+.proc-cmd {
+    font-size: var(--fs-9); color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: var(--sp-4); white-space: pre-wrap; word-break: break-all; cursor: copy;
+    max-height: 160px; overflow-y: auto;
+}
+.proc-cmd:empty { display: none; }
+.proc-box .ai-btn-row { margin-top: var(--sp-4); }
+.proc-status { font-size: var(--fs-9); color: var(--text2); word-break: break-word; }
+.proc-status.error { color: var(--red); }
 
 /* ── Search in section ── */
 .section-search {

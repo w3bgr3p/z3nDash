@@ -59,6 +59,27 @@
         <!-- Sidebar -->
         <div class="sidebar" id="sidebarPanel">
 
+            <!-- Selected process -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">Process</div>
+                <div id="procEmpty" class="proc-empty">Click a row with a PID</div>
+                <div id="procBox" class="proc-box" style="display:none">
+                    <div class="proc-kv"><span>PID</span><span id="procPid"></span></div>
+                    <div class="proc-kv"><span>Name</span><span id="procName"></span></div>
+                    <div class="proc-kv"><span>Memory</span><span id="procMem"></span></div>
+                    <div class="proc-kv"><span>Started</span><span id="procStarted"></span></div>
+                    <div class="proc-path" id="procPath"></div>
+                    <div class="proc-cmd" id="procCmd" title="Click to copy" onclick="procCopyCmd()"></div>
+                    <div class="proc-ports" id="procPorts"></div>
+                    <div class="ai-btn-row">
+                        <button class="btn danger" id="procKillBtn" onclick="procKill()">Kill</button>
+                        <button class="btn" id="procSiBtn" onclick="procSystemInformer()" title="Opens this process's properties in System Informer" style="display:none">System Informer</button>
+                        <button class="btn" id="procRevealBtn" onclick="procReveal()">Show in Explorer</button>
+                    </div>
+                    <div class="proc-status" id="procStatus"></div>
+                </div>
+            </div>
+
             <!-- AI Audit -->
             <div class="sidebar-section">
                 <div class="sidebar-title">AI Audit</div>
@@ -153,10 +174,10 @@
         const content = lines.filter(l => !l.match(/^[=\-]{4,}$/));
 
         // Detect KV-style (single-colon lines, no table)
-        const kvLines = content.filter(l => /^\w[\w ]+\s+:\s+/.test(l));
-        if (kvLines.length >= 3 && kvLines.length === content.filter(l=>l.trim()).length) {
+        const kvLines = content.filter(l => /^\w[\w .\-]*?\s+:\s+/.test(l));
+        if (kvLines.length >= 2 && kvLines.length === content.filter(l=>l.trim()).length) {
             const pairs = kvLines.map(l => {
-                const m = l.match(/^(.+?)\s{2,}:\s{1,}(.*)$/);
+                const m = l.match(/^(.+?)\s+:\s+(.*)$/);
                 return m ? { k: m[1].trim(), v: m[2].trim() } : null;
             }).filter(Boolean);
             return { title, type: 'kv', pairs };
@@ -190,11 +211,13 @@
         return cols;
     }
 
+    // The server separates columns with 2+ spaces (a value may be wider than its header,
+    // so header positions are not reliable). The last column takes the rest of the line.
     function splitRow(line, cols) {
-        return cols.map((col, i) => {
-            const end = i + 1 < cols.length ? cols[i + 1].start : undefined;
-            return (line.slice(col.start, end) || '').trim();
-        });
+        const parts = line.trim().split(/ {2,}/);
+        const head  = parts.slice(0, cols.length - 1);
+        const tail  = parts.slice(cols.length - 1).join('  ');
+        return cols.map((_, i) => i < cols.length - 1 ? (head[i] || '') : tail);
     }
 
     // ── Render nav ────────────────────────────────────────────────────────────
@@ -211,7 +234,7 @@
 
         currentSections.forEach((s, i) => {
             const el = document.createElement('div');
-            el.className   = 'nav-item' + (i === 0 ? ' active' : '');
+            el.className   = 'nav-item' + (i === activeIdx() ? ' active' : '');
             el.textContent = s.title;
             el.dataset.idx = i;
             el.onclick     = () => activateSection(i);
@@ -219,7 +242,15 @@
         });
     }
 
+    // Refresh keeps the section that was open (matched by title; falls back to the first).
+    let activeTitle = '';
+    function activeIdx() {
+        const i = currentSections.findIndex(s => s.title === activeTitle);
+        return i >= 0 ? i : 0;
+    }
+
     function activateSection(idx) {
+        activeTitle = currentSections[idx]?.title || '';
         document.querySelectorAll('.nav-item').forEach((el, i) => {
             el.classList.toggle('active', i === idx);
         });
@@ -236,7 +267,7 @@
 
         currentSections.forEach((s, i) => {
             const panel = document.createElement('div');
-            panel.className = 'section-panel' + (i === 0 ? ' active' : '');
+            panel.className = 'section-panel' + (i === activeIdx() ? ' active' : '');
             panel.id        = 'panel_' + i;
 
             if (s.type === 'kv') {
@@ -279,7 +310,15 @@
             return `<th class="${cls}" onclick="sortSection(${idx}, ${ci})">${esc(h)}</th>`;
         }).join('');
 
+        const pidCol  = s.headers.indexOf('PID');
+        const nameCol = s.headers.includes('PROCESS') ? s.headers.indexOf('PROCESS') : s.headers.indexOf('NAME');
+
         const tds = sorted.map(row => {
+            const pid = pidCol >= 0 ? parseInt(row[pidCol], 10) : NaN;
+            const pickable = pid > 0;
+            const rowAttr = pickable
+                ? ` class="pickable${pid === selectedProc?.pid ? ' selected' : ''}" onclick="selectProcess(${pid}, '${esc(jsStr(row[nameCol] || ''))}')"`
+                : '';
             const cells = row.map((cell, ci) => {
                 const num = parseFloat(cell);
                 const isNum = !isNaN(num) && cell.trim() !== '';
@@ -302,7 +341,7 @@
 
                 return `<td class="${cls.trim()}">${bar}${esc(cell)}</td>`;
             }).join('');
-            return `<tr>${cells}</tr>`;
+            return `<tr${rowAttr}>${cells}</tr>`;
         }).join('');
 
         return `
@@ -367,7 +406,7 @@
         const ram = raw.match(/Used\s*:\s*([\d.]+\s*GB\s*\([\d.]+%\))/);
         document.getElementById('sRam').textContent = ram ? ram[1].trim() : '—';
 
-        const cpu = raw.match(/Load\s*:\s*(\d+%)/);
+        const cpu = raw.match(/Load\s*:\s*([\d.]+%)/);
         document.getElementById('sCpu').textContent = cpu ? cpu[1].trim() : '—';
 
         // Count processes from ALL PROCESSES section
@@ -454,6 +493,109 @@
         meta.classList.add('show');
         document.getElementById('aiBtnClear').style.display = 'inline-block';
     }
+
+    // ── Selected process ──────────────────────────────────────────────────────
+    let selectedProc = null;   // { pid, name }
+
+    function rerenderTables() {
+        currentSections.forEach((s, i) => {
+            if (s.type !== 'table') return;
+            const panel = document.getElementById('panel_' + i);
+            if (!panel) return;
+            const filter = panel.querySelector('.section-search input')?.value || '';
+            panel.innerHTML = renderTableHtml(s, i, filter);
+        });
+    }
+
+    async function selectProcess(pid, name) {
+        selectedProc = { pid, name };
+        rerenderTables();
+        document.getElementById('procEmpty').style.display = 'none';
+        document.getElementById('procBox').style.display   = '';
+        document.getElementById('procPid').textContent     = pid;
+        document.getElementById('procName').textContent    = name || '?';
+        document.getElementById('procMem').textContent     = '…';
+        document.getElementById('procStarted').textContent = '…';
+        document.getElementById('procPath').textContent    = '';
+        document.getElementById('procCmd').textContent     = '';
+        procSetStatus('');
+
+        // Ports from the snapshot, so the "who holds this port" question is answered in place
+        const listen = currentSections.find(s => s.title.startsWith('LISTENING'));
+        const ports  = listen?.rows ? listen.rows.filter(r => parseInt(r[0], 10) === pid).map(r => `${r[1]} ${r[3]}:${r[2]}`) : [];
+        document.getElementById('procPorts').textContent = ports.length ? 'Listening: ' + [...new Set(ports)].join(', ') : '';
+
+        try {
+            const r = await fetch(`${API}/system-snapshot/process?pid=${pid}`);
+            const d = await r.json();
+            if (selectedProc?.pid !== pid) return;
+            if (d.error) { procSetStatus(d.error, true); return; }
+            if (name && d.name && d.name.toLowerCase() !== name.toLowerCase())
+                procSetStatus(`PID ${pid} is now '${d.name}', snapshot had '${name}' — refresh`, true);
+            document.getElementById('procMem').textContent     = d.memMb != null ? d.memMb + ' MB' : 'n/a';
+            document.getElementById('procStarted').textContent = d.started || 'n/a';
+            document.getElementById('procPath').textContent    = d.path || '(path not available — access denied or system process)';
+            document.getElementById('procCmd').textContent     = d.cmdLine || '(command line not available)';
+            document.getElementById('procSiBtn').style.display = d.sysInformer ? '' : 'none';
+        } catch (e) { procSetStatus(e.message, true); }
+    }
+
+    async function procCopyCmd() {
+        const text = document.getElementById('procCmd').textContent;
+        if (!text || text.startsWith('(')) return;
+        try { await navigator.clipboard.writeText(text); procSetStatus('Command line copied'); }
+        catch (e) { procSetStatus(e.message, true); }
+    }
+
+    function procSetStatus(msg, isError) {
+        const el = document.getElementById('procStatus');
+        el.textContent = msg;
+        el.classList.toggle('error', !!isError);
+    }
+
+    async function procPost(path) {
+        const r = await fetch(`${API}/system-snapshot/${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(selectedProc || {})
+        });
+        return r.json();
+    }
+
+    async function procKill() {
+        if (!selectedProc) return;
+        const { pid, name } = selectedProc;
+        if (!confirm(`Kill ${name || '?'} (PID ${pid})?`)) return;
+        const btn = document.getElementById('procKillBtn');
+        btn.disabled = true;
+        procSetStatus('Killing…');
+        try {
+            const d = await procPost('kill');
+            if (d.error) { procSetStatus(d.error, true); return; }
+            procSetStatus(`Killed ${name} (PID ${pid})`);
+            selectedProc = null;
+            await captureNow();
+        } catch (e) { procSetStatus(e.message, true); }
+        finally { btn.disabled = false; }
+    }
+
+    async function procReveal() {
+        if (!selectedProc) return;
+        try {
+            const d = await procPost('reveal');
+            procSetStatus(d.error || '', !!d.error);
+        } catch (e) { procSetStatus(e.message, true); }
+    }
+
+    async function procSystemInformer() {
+        if (!selectedProc) return;
+        try {
+            const d = await procPost('sysinformer');
+            procSetStatus(d.error || '', !!d.error);
+        } catch (e) { procSetStatus(e.message, true); }
+    }
+
+    function jsStr(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
     // ── Sidebar resizer ───────────────────────────────────────────────────────
     function initResizer() {

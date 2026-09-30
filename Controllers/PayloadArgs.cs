@@ -32,7 +32,7 @@ public static class PayloadArgs
         var skipped = new List<string>();
         var emitted = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var (key, type) in Fields(schemaJson))
+        foreach (var (key, type, skipEmpty) in Fields(schemaJson))
         {
             var flag = "--" + Kebab(key);
             if (!emitted.Add(flag)) continue;
@@ -48,7 +48,10 @@ public static class PayloadArgs
             }
 
             // Пустое значение передаётся явно: скрипт ждёт пустую строку, а не
-            // отсутствие аргумента — на этом уже падали.
+            // отсутствие аргумента — на этом уже падали. Галка skipEmpty на поле —
+            // для обратного случая: пусто значит «не задано», скрипт возьмёт своё
+            // значение по умолчанию.
+            if (value.Length == 0 && skipEmpty) continue;
             flags.Add(flag);
             flags.Add(Quote(value));
             masked.Add(flag);
@@ -90,9 +93,9 @@ public static class PayloadArgs
         return result;
     }
 
-    private static List<(string key, string type)> Fields(string schemaJson)
+    private static List<(string key, string type, bool skipEmpty)> Fields(string schemaJson)
     {
-        var fields = new List<(string key, string type)>();
+        var fields = new List<(string key, string type, bool skipEmpty)>();
         if (string.IsNullOrWhiteSpace(schemaJson)) return fields;
 
         using var doc = JsonDocument.Parse(schemaJson);
@@ -105,7 +108,10 @@ public static class PayloadArgs
             var key  = field.TryGetProperty("key",  out var k) && k.ValueKind == JsonValueKind.String ? k.GetString()!.Trim() : "";
             var type = field.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString()! : "text";
             if (key.Length == 0 || Markup.Contains(type)) continue;
-            fields.Add((key, type));
+            var skipEmpty = field.TryGetProperty("skipEmpty", out var s)
+                && (s.ValueKind == JsonValueKind.True
+                    || s.ValueKind == JsonValueKind.String && string.Equals(s.GetString(), "true", StringComparison.OrdinalIgnoreCase));
+            fields.Add((key, type, skipEmpty));
         }
         return fields;
     }

@@ -3,8 +3,9 @@ using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.Odbc;
+using Microsoft.Data.Sqlite;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -25,7 +26,19 @@ namespace z3n7
         public Sql(string dbPath, string dbPass)
         {
             Debug.WriteLine(dbPath);
-            _connection = new OdbcConnection($"Driver={{SQLite3 ODBC Driver}};Database={dbPath}");
+            // Раньше SQLite шёл через системный "SQLite3 ODBC Driver", которого нет на чистой
+            // машине. Microsoft.Data.Sqlite несёт движок с собой. Файл он создаёт сам,
+            // а каталог — нет, поэтому каталог создаём здесь.
+            var dir = Path.GetDirectoryName(Path.GetFullPath(dbPath));
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            // Pooling=false: как и прежний ODBC, соединение закрывает файл на Dispose,
+            // иначе пул держит его открытым и файл нельзя ни удалить, ни заменить.
+            _connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = dbPath,
+                Mode       = SqliteOpenMode.ReadWriteCreate,
+                Pooling    = false,
+            }.ToString());
             _connection.Open();
         }
 
@@ -54,7 +67,7 @@ namespace z3n7
         {
             get
             {
-                if (_connection is OdbcConnection)
+                if (_connection is SqliteConnection)
                     return DatabaseType.SQLite;
                 if (_connection is NpgsqlConnection)
                     return DatabaseType.PostgreSQL;
@@ -98,9 +111,9 @@ namespace z3n7
 
         public IDbDataParameter CreateParameter(string name, object value)
         {
-            if (_connection is OdbcConnection)
+            if (_connection is SqliteConnection)
             {
-                return new OdbcParameter(name, value ?? DBNull.Value);
+                return new SqliteParameter(name, value ?? DBNull.Value);
             }
             else if (_connection is NpgsqlConnection)
             {
@@ -127,9 +140,9 @@ namespace z3n7
             EnsureConnection();
             var result = new List<string>();
 
-            if (_connection is OdbcConnection odbcConn)
+            if (_connection is SqliteConnection sqliteConn)
             {
-                using (var cmd = new OdbcCommand(sql, odbcConn))
+                using (var cmd = new SqliteCommand(sql, sqliteConn))
                 using (var reader = await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
@@ -173,9 +186,9 @@ namespace z3n7
 
             try
             {
-                if (_connection is OdbcConnection odbcConn)
+                if (_connection is SqliteConnection sqliteConn)
                 {
-                    using (var cmd = new OdbcCommand(sql, odbcConn))
+                    using (var cmd = new SqliteCommand(sql, sqliteConn))
                     {
                         if (parameters != null)
                         {
@@ -686,9 +699,9 @@ namespace z3n7
             try
             {
                 EnsureConnection();
-                if (_connection is OdbcConnection odbcConn)
+                if (_connection is SqliteConnection sqliteConn)
                 {
-                    using (var cmd = new OdbcCommand(query, odbcConn))
+                    using (var cmd = new SqliteCommand(query, sqliteConn))
                     {
                         foreach (var param in parameters)
                             cmd.Parameters.Add(param);
@@ -726,9 +739,9 @@ namespace z3n7
             EnsureConnection();
             int current = 0;
     
-            if (_connection is OdbcConnection odbcConn)
+            if (_connection is SqliteConnection sqliteConn)
             {
-                using (var cmd = new OdbcCommand(query, odbcConn))
+                using (var cmd = new SqliteCommand(query, sqliteConn))
                 {
                     var result = await cmd.ExecuteScalarAsync();
                     current = Convert.ToInt32(result);

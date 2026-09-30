@@ -70,6 +70,23 @@ Expect("empty multiselect -> --key \"\"", r.Args, "--tags \"\"");
 r = PayloadArgs.Build("python", "", Schema(("tags", "multiselect")), Values(new { tags = "a,b" }));
 Expect("multiselect -> one value", r.Args, "--tags a,b");
 
+// ── skipEmpty ────────────────────────────────────────────────────────────────
+const string SkipEmptySchema = "[{\"key\":\"out\",\"type\":\"text\",\"skipEmpty\":true},{\"key\":\"n\",\"type\":\"text\"}]";
+r = PayloadArgs.Build("python", "", SkipEmptySchema, Values(new { @out = "", n = "" }));
+Expect("skipEmpty: empty value not passed", r.Args, "--n \"\"");
+
+r = PayloadArgs.Build("python", "", SkipEmptySchema, "{}");
+Expect("skipEmpty: missing value not passed", r.Args, "--n \"\"");
+
+r = PayloadArgs.Build("python", "", SkipEmptySchema, Values(new { @out = "a.har", n = "1" }));
+Expect("skipEmpty: filled value passed", r.Args, "--out a.har --n 1");
+
+r = PayloadArgs.Build("python", "", "[{\"key\":\"out\",\"type\":\"text\",\"skipEmpty\":\"true\"}]", Values(new { @out = "" }));
+Expect("skipEmpty: string \"true\" accepted", r.Args, "");
+
+r = PayloadArgs.Build("python", "", "[{\"key\":\"out\",\"type\":\"text\",\"skipEmpty\":false}]", Values(new { @out = "" }));
+Expect("skipEmpty false: empty still passed", r.Args, "--out \"\"");
+
 // ── что во флаги не идёт ─────────────────────────────────────────────────────
 r = PayloadArgs.Build("python", "", Schema(("url", "text")), Values(new { url = "x", acc0Forced = "1" }));
 Expect("keys outside schema dropped", r.Args, "--url x");

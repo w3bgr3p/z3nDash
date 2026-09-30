@@ -24,9 +24,9 @@ internal sealed class ConfigHandler
     }
 
     public bool Matches(string path, string method) =>
-        (method == "GET"  && path is "/config" or "/config/status" or "/config/storage" or "/config/ui" or "/config/ai-models") ||
+        (method == "GET"  && path is "/config" or "/config/status" or "/config/storage" or "/config/ui" or "/config/ai-models" or "/config/environment") ||
         (method == "POST" && path is "/config" or "/config/jvars" or "/config/ai-validate" or "/clear-all-logs" or "/config/ui"
-                                  or "/config/client-bundle" or "/config/update-templates");
+                                  or "/config/client-bundle" or "/config/update-templates" or "/config/environment/install");
 
     public async Task Handle(HttpListenerContext ctx)
     {
@@ -40,6 +40,8 @@ internal sealed class ConfigHandler
         if (method == "GET"  && path == "/config/status")        { await GetStatus(ctx.Response);    return; }
         if (method == "GET"  && path == "/config/storage")       { await GetStorage(ctx.Response);   return; }
         if (method == "GET"  && path == "/config/ai-models")     { await GetAiModels(ctx.Response);  return; }
+        if (method == "GET"  && path == "/config/environment")   { await GetEnvironment(ctx.Response); return; }
+        if (method == "POST" && path == "/config/environment/install") { using var r = new StreamReader(ctx.Request.InputStream); await InstallEnvironment(ctx.Response, await r.ReadToEndAsync()); return; }
         if (method == "POST" && path == "/clear-all-logs")       { await ClearAllLogs(ctx.Response); return; }
 
         if (method == "POST" && path == "/config/client-bundle")    { using var r = new StreamReader(ctx.Request.InputStream); await ClientBundle(ctx.Response, await r.ReadToEndAsync()); return; }
@@ -47,6 +49,39 @@ internal sealed class ConfigHandler
 
         if (method == "GET"  && path == "/config/ui") { await GetUiState(ctx.Response);  return; }
         if (method == "POST" && path == "/config/ui") { using var r = new StreamReader(ctx.Request.InputStream); await SaveUiState(ctx.Response, await r.ReadToEndAsync()); return; }
+    }
+
+    // Перечень инструментов машины; см. EnvironmentCheck.
+    private async Task GetEnvironment(HttpListenerResponse response)
+    {
+        var items = await EnvironmentCheck.RunAsync(_dbService);
+        await HttpHelpers.WriteJson(response, new { checkedAt = DateTime.UtcNow.ToString("o"), items });
+    }
+
+    // Body: {"key":"node"}. Команду берём только из EnvironmentInstall по ключу.
+    private static async Task InstallEnvironment(HttpListenerResponse response, string body)
+    {
+        var stage = "parse";
+        try
+        {
+            var key = JsonSerializer.Deserialize<JsonElement>(body).GetProperty("key").GetString() ?? "";
+            stage = "recipe";
+            var recipe = EnvironmentInstall.Get(key);
+            if (recipe == null)
+            {
+                response.StatusCode = 400;
+                await HttpHelpers.WriteJson(response, new { ok = false, error = $"step={stage} | unknown install key: {key}" });
+                return;
+            }
+            stage = "start";
+            var started = EnvironmentInstall.Start(recipe);
+            await HttpHelpers.WriteJson(response, new { ok = true, key, kind = recipe.Kind, title = recipe.Title, command = started });
+        }
+        catch (Exception ex)
+        {
+            response.StatusCode = stage == "parse" ? 400 : 500;
+            await HttpHelpers.WriteJson(response, new { ok = false, error = $"step={stage} | {ex.GetType().Name}: {ex.Message}" });
+        }
     }
 
     private async Task GetAiModels(HttpListenerResponse response)
@@ -91,6 +126,7 @@ internal sealed class ConfigHandler
     private async Task SaveConfig(HttpListenerResponse response, string body)
     {
         string cfgPath = Path.Combine(AppContext.BaseDirectory, "appsettings.secrets.json");
+        var stage = "parse";
         try
         {
             var incoming = JsonSerializer.Deserialize<JsonElement>(body);
@@ -117,12 +153,34 @@ internal sealed class ConfigHandler
                 foreach (var prop in incoming.EnumerateObject())
                     existing[keyMap.TryGetValue(prop.Name, out var mapped) ? mapped : prop.Name] = prop.Value;
 
+            // Подключение проверяем до записи файла: конфиг с недостижимой базой
+            // раньше сохранялся, и следующий запуск падал, не дойдя до страницы Config.
+            stage = "db-connect";
+            var newDb = ReadDbConfig(existing);
+            if (Config.HasDb(newDb))
+            {
+                try { DbConnectionService.Open(newDb); }
+                catch (Exception ex)
+                {
+                    response.StatusCode = 400;
+                    await HttpHelpers.WriteJson(response, new
+                    {
+                        ok = false,
+                        error = $"step={stage} | {ex.GetType().Name}: {ex.Message} | config not saved",
+                    });
+                    return;
+                }
+            }
+
+            stage = "write";
             var opts    = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(existing, opts);
 
             if (File.Exists(cfgPath)) File.Copy(cfgPath, cfgPath + ".bak", overwrite: true);
             await File.WriteAllTextAsync(cfgPath, json, Encoding.UTF8);
 
+            // Connect заодно создаёт таблицы в новой базе (подписчики Connected).
+            stage = "reload";
             Config.Init();
             if (Config.IsConfigured)
                 _dbService.Connect(Config.DbConfig);
@@ -134,8 +192,16 @@ internal sealed class ConfigHandler
         catch (Exception ex)
         {
             response.StatusCode = 400;
-            await HttpHelpers.WriteJson(response, new { ok = false, error = ex.Message });
+            await HttpHelpers.WriteJson(response, new { ok = false, error = $"step={stage} | {ex.GetType().Name}: {ex.Message}" });
         }
+    }
+
+    private static DbConfig ReadDbConfig(Dictionary<string, JsonElement> cfg)
+    {
+        var section = cfg.FirstOrDefault(kv => kv.Key.Equals("DbConfig", StringComparison.OrdinalIgnoreCase));
+        if (section.Key == null || section.Value.ValueKind != JsonValueKind.Object) return new DbConfig();
+        return section.Value.Deserialize<DbConfig>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+               ?? new DbConfig();
     }
 
     // ── POST /config/ai-validate ───────────────────────────────────────────────
@@ -314,6 +380,7 @@ internal sealed class ConfigHandler
             isConfigured   = Config.IsConfigured,
             isUnlocked     = InternalTasks.IsUnlocked,
             isDbConnected  = _dbService.IsConnected,
+            dbError        = _dbService.LastError,
             dashboardPort  = _port,
             listeningPorts = ports,
             logsFolder     = _logPath,

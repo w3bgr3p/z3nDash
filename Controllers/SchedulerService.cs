@@ -54,12 +54,22 @@ public sealed partial class SchedulerService : IDisposable
             _timer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(1));
             return;
         }
-        db.PrepareTable(DbSchema.Schedules.Columns, Table);
-        db.PrepareTable(DbSchema.ScheduleQueue.Columns, QueueTable);
+        PrepareTables(db);
         RepairShiftedScheduleColumns(db);
         RestoreQueue(db);
         RestoreRunningProcesses(db);
         _timer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(1));
+    }
+
+    /// <summary>
+    /// Только таблицы. На смене базы со страницы Config зовётся это, а не Init:
+    /// восстановление очереди и running-задач на живом приложении запустило бы
+    /// уже идущие задачи второй раз.
+    /// </summary>
+    public static void PrepareTables(Db db)
+    {
+        db.PrepareTable(DbSchema.Schedules.Columns, Table);
+        db.PrepareTable(DbSchema.ScheduleQueue.Columns, QueueTable);
     }
 
     private void RepairShiftedScheduleColumns(Db db)
@@ -1034,7 +1044,7 @@ public sealed partial class SchedulerService : IDisposable
         db.Upd($"sched_runs = '{runs}'", Table, where: $"\"id\" = '{id}'");
     }
 
-    private static string ResolveGitBash()
+    internal static string ResolveGitBash()
     {
         string[] candidates =
         [

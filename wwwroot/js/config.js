@@ -52,6 +52,17 @@
                 : `${d.pgHost ?? ''}:${d.pgPort ?? ''}`;
             setText('sDbHost', host);
 
+            // Текст ошибки — дословно с сервера: по нему видно, что поправить в строке подключения.
+            const dbStatus = document.getElementById('sDbStatus');
+            if (dbStatus) {
+                const pill = document.createElement('span');
+                if (d.isDbConnected)      { pill.className = 'pill ok';   pill.textContent = 'connected'; }
+                else if (!d.isConfigured) { pill.className = 'pill warn'; pill.textContent = 'not configured'; }
+                else                      { pill.className = 'pill err';  pill.textContent = 'not connected'; pill.title = d.dbError || ''; }
+                dbStatus.replaceChildren(pill);
+                if (d.isConfigured && !d.isDbConnected && d.dbError) toast('DB: ' + d.dbError, 'err');
+            }
+
             setText('sLogsFolder', d.logsFolder || '—');
             setText('sReportsFolder', d.reportsFolder || '—');
             setText('sTempFolder', d.tempFolder || '—');
@@ -286,7 +297,9 @@
                 await loadStatus();
             } else {
                 const t = await r.text();
-                toast('Save failed: ' + t, 'err');
+                let msg = t;
+                try { msg = JSON.parse(t).error || t; } catch (e) {}
+                toast('Save failed: ' + msg, 'err');
             }
         } catch(e) {
             toast('Error: ' + e.message, 'err');
@@ -607,6 +620,113 @@
         if (_servicesTimer !== null) { clearInterval(_servicesTimer); _servicesTimer = null; }
     }
 
+    // ── Environment ───────────────────────────────────────────────────
+    // Проверка идёт секунды (запускает python, node, dotnet...), поэтому сама
+    // срабатывает только при первом входе в раздел, дальше — по кнопке.
+    let _envLoaded = false;
+
+    function enterEnvironment() {
+        if (!_envLoaded) loadEnvironment();
+    }
+
+    async function loadEnvironment() {
+        const btn   = document.getElementById('envCheckBtn');
+        const list  = document.getElementById('envList');
+        const stamp = document.getElementById('envStamp');
+        btn.disabled = true;
+        stamp.textContent = 'checking…';
+        try {
+            const r = await fetch('/config/environment');
+            const text = await r.text();
+            let d;
+            try { d = JSON.parse(text); } catch (e) { throw new Error('HTTP ' + r.status + ': ' + text.slice(0, 300)); }
+            if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+            renderEnvironment(list, d.items || []);
+            stamp.textContent = 'checked ' + new Date(d.checkedAt).toLocaleString();
+            _envLoaded = true;
+        } catch (e) {
+            stamp.textContent = 'check failed: ' + e.message;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // Установка идёт в отдельном окне консоли: там видны ход, запрос UAC и итог.
+    // Дашборд её не ждёт — по окончании жмут Check, PATH перечитывается сам.
+    async function installEnvironment(key, btn) {
+        btn.disabled = true;
+        try {
+            const r = await fetch('/config/environment/install', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key })
+            });
+            const text = await r.text();
+            let d;
+            try { d = JSON.parse(text); } catch (e) { d = { ok: false, error: 'HTTP ' + r.status + ': ' + text.slice(0, 300) }; }
+            if (!d.ok) { toast('Install failed: ' + (d.error || 'unknown'), 'err'); return; }
+            toast(d.kind === 'url'
+                ? 'Opened: ' + d.command
+                : d.title + ': installer started in a console window. Press Check when it finishes.', 'ok');
+        } catch (e) {
+            toast('Install failed: ' + e.message, 'err');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function renderEnvironment(list, items) {
+        const pillClass = { found: 'ok', missing: 'err', info: 'warn' };
+        list.textContent = '';
+        let group = null;
+        items.forEach(it => {
+            if (it.group !== group) {
+                group = it.group;
+                const h = document.createElement('div');
+                h.className = 'env-group';
+                h.textContent = group;
+                list.appendChild(h);
+            }
+            const row = document.createElement('div');
+            row.className = 'env-row';
+
+            const name = document.createElement('div');
+            name.className = 'env-name';
+            name.textContent = it.name;
+
+            const state = document.createElement('div');
+            const pill = document.createElement('span');
+            pill.className = 'pill ' + (pillClass[it.state] || 'warn');
+            pill.textContent = it.version || it.state;
+            state.appendChild(pill);
+            if (it.state === 'missing' && it.install) {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'btn env-install';
+                b.textContent = it.install === 'sqlite-odbc' || it.install === 'winget' ? 'Open page' : 'Install';
+                b.addEventListener('click', () => installEnvironment(it.install, b));
+                state.appendChild(document.createElement('br'));
+                state.appendChild(b);
+            }
+
+            const info = document.createElement('div');
+            if (it.path) {
+                const p = document.createElement('div');
+                p.className = 'env-path';
+                p.textContent = it.path;
+                info.appendChild(p);
+            }
+            if (it.detail) {
+                const dt = document.createElement('div');
+                dt.className = 'env-detail';
+                dt.textContent = it.detail;
+                info.appendChild(dt);
+            }
+            row.append(name, state, info);
+            list.appendChild(row);
+        });
+    }
+
     const SECTIONS = [
         { id: 'overview', icon: '🟢', title: 'Overview',            enter: enterOverview, leave: leaveOverview },
         { id: 'db',       icon: '🗄', title: 'Database' },
@@ -616,6 +736,7 @@
         { id: 'services', icon: '🛡', title: 'Services',            enter: enterServices, leave: leaveServices },
         { id: 'security', icon: '🔐', title: 'Security · jVars' },
         { id: 'maint',    icon: '🧰', title: 'Maintenance' },
+        { id: 'env',      icon: '🧪', title: 'Environment',         enter: enterEnvironment },
     ];
 
     const SEPARATORS_AFTER = ['overview', 'ai', 'services'];

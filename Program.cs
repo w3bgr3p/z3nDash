@@ -58,9 +58,12 @@ try
     var dbConnectionService = new DbConnectionService();
     var _log = new Logger(logLevel: LogLevel.Error);
 
+    // Недоступная база не должна ронять запуск: иначе до страницы Config,
+    // где её и чинят, уже не добраться. Текст ошибки отдаёт /config/status.
     if (Config.IsConfigured)
     {
-        dbConnectionService.Connect(Config.DbConfig, _log);
+        try { dbConnectionService.Connect(Config.DbConfig, _log); }
+        catch (Exception ex) { Console.WriteLine($"[db] {ex.GetType().Name}: {ex.Message}"); }
     }
 
     var dashboardService = new EmbeddedServer(logsConfig, dbConnectionService);
@@ -90,8 +93,15 @@ try
     dashboardService.Start();
     schedulerService.Init();
 
+    // Базу меняют и на лету со страницы Config: в новой базе нужны те же таблицы.
+    dbConnectionService.Connected += db =>
+    {
+        SchedulerService.PrepareTables(db);
+        dashboardService.ReinitHandlers();
+    };
+
     int port = dashboardService.Port;
-    string startUrl = Config.IsConfigured
+    string startUrl = dbConnectionService.IsConnected
         ? $"http://localhost:{port}/?page=tasker"
         : $"http://localhost:{port}/?page=config";
 
@@ -100,11 +110,6 @@ try
 #else
     OpenBrowser(startUrl);
 #endif
-
-    if (Config.IsConfigured)
-    {
-        var db = dbConnectionService.GetDb();
-    }
 
     var exitTcs = new TaskCompletionSource();
 

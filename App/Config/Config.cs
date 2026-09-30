@@ -48,10 +48,13 @@ public class Config
 
         Crx = config.GetSection("Crx").Get<Dictionary<string, CrxItem>>() ?? new();
 
-        IsConfigured = DbConfig.Mode == dbMode.SQLite
-            ? !string.IsNullOrWhiteSpace(DbConfig.SqlitePath)
-            : !string.IsNullOrWhiteSpace(DbConfig.PostgresConnectionString);
+        IsConfigured = HasDb(DbConfig);
     }
+
+    /// <summary>Задано ли, куда подключаться: путь для SQLite или строка для Postgres.</summary>
+    public static bool HasDb(DbConfig db) => db.Mode == dbMode.SQLite
+        ? !string.IsNullOrWhiteSpace(db.SqlitePath)
+        : !string.IsNullOrWhiteSpace(db.PostgresConnectionString);
 }
 
 
