@@ -920,13 +920,36 @@ public sealed partial class SchedulerService : IDisposable
         }
     }
 
-    private static async Task ReadStreamAsync(Stream stream, RunningProcess rp, string prefix)
+    /// <summary>
+    /// Вывод процесса читается на собственном потоке, а не в пуле. Канал
+    /// stdout/stderr процесса открыт без overlapped I/O, и ReadAsync на нём
+    /// держит поток пула всё время, пока скрипт молчит. При 90 запущенных
+    /// скриптах так было занято 184 потока пула (стеки dotnet-stack,
+    /// 2026-10-01), и HTTP, БД и планировщик ждали поток по 9–35 с.
+    /// </summary>
+    private static Task ReadStreamAsync(Stream stream, RunningProcess rp, string prefix)
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try { ReadStream(stream, rp, prefix); done.SetResult(); }
+            catch (Exception ex) { done.SetException(ex); }
+        })
+        {
+            IsBackground = true,
+            Name = "proc-output",
+        };
+        thread.Start();
+        return done.Task;
+    }
+
+    private static void ReadStream(Stream stream, RunningProcess rp, string prefix)
     {
         var buffer = new byte[1024];
         var sb     = new StringBuilder();
         int bytesRead;
 
-        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
         {
             sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
 
