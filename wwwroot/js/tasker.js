@@ -924,6 +924,8 @@ function stopProcStatsPoll() {
     if (_queuePoll)     { clearInterval(_queuePoll);     _queuePoll     = null; }
 }
 
+var _instCache = {};
+
 function renderExecution(s) {
     stopProcStatsPoll();
     var status    = getTaskStatus(s);
@@ -973,7 +975,7 @@ function renderExecution(s) {
         + infoRow('Max runtime', (parseInt(s.timeout_seconds || '0', 10) || 0) > 0 ? s.timeout_seconds + 's' : 'no limit')
         + '</div>'
         + (isRunning && isMulti
-            ? '<div class="detail-section" id="instancesCard"><div class="info-card-title">Active instances<span class="inst-count" id="instancesCount"></span></div><div class="inst-list" id="instancesList">—</div></div>'
+            ? '<div class="detail-section" id="instancesCard"><div class="info-card-title">Active instances<span class="inst-count" id="instancesCount">' + ((_instCache[s.id] || {}).count || '') + '</span></div><div class="inst-list" id="instancesList">' + ((_instCache[s.id] || {}).html || '—') + '</div></div>'
             : '')
         // Очередь скрыта, пока в ней пусто, и раскрывается опросом. Прежнее условие
         // (isRunning && isMulti) прятало её у однопоточной задачи — а залп «N раз»
@@ -1007,14 +1009,19 @@ function renderExecution(s) {
                     var el = document.getElementById('instancesList');
                     if (!el) return;
                     var count = document.getElementById('instancesCount');
-                    if (count) count.textContent = list && list.length ? String(list.length) : '';
-                    el.innerHTML = (!list || !list.length) ? '(none)' : list.map(function(inst) {
+                    var cnt = list && list.length ? String(list.length) : '';
+                    if (count) count.textContent = cnt;
+                    var html = (!list || !list.length) ? '(none)' : list.map(function(inst) {
                         return '<div class="inst-row">'
                             + '<span class="inst-id">' + escHtml(inst.runId) + '</span>'
                             + '<span class="inst-meta">' + inst.uptimeSec + 's · ' + inst.memoryMB + 'MB</span>'
                             + '<button class="btn stop sm" title="Kill this instance" onclick="killOneInstance(\'' + escHtml(id) + '\',\'' + escHtml(inst.runId) + '\')">✕</button>'
                             + '</div>';
                     }).join('');
+                    // Карточка пересоздаётся при каждой перерисовке задачи и до
+                    // ответа опроса показывала бы «—»: берём прошлый список.
+                    _instCache[id] = { html: html, count: cnt };
+                    if (el.innerHTML !== html) el.innerHTML = html;
                 }).catch(function() {});
         }
 
