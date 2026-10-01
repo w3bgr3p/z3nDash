@@ -12,19 +12,23 @@ namespace z3nDash;
 /// </summary>
 public sealed partial class SchedulerService
 {
-    public sealed record TaskResources(int Instances, int Processes, long MemoryMB);
+    /// <summary>CpuPct — доля всей машины (как в диспетчере задач); -1, пока нет второго снимка.</summary>
+    public sealed record TaskResources(int Instances, int Processes, long MemoryMB, double CpuPct);
 
     public sealed record ResourceSnapshot(
         Dictionary<string, TaskResources> Tasks,
         int  Instances,
         int  Processes,
         long MemoryMB,
+        double CpuPct,
         int  InProcessRuns,
         long MasterMB);
 
     private readonly object _resLock = new();
     private ResourceSnapshot? _resCache;
     private DateTime _resCachedAt;
+    private Dictionary<int, ulong>? _prevCpu;
+    private DateTime _prevCpuAt;
 
     /// <summary>
     /// Снимок берётся не чаще раза в 3 секунды: WMI-запрос по всем процессам
@@ -56,8 +60,21 @@ public sealed partial class SchedulerService
             .ToList();
 
         var table = SnapshotProcessTable();
+        var now   = DateTime.UtcNow;
 
-        var tasks = new Dictionary<string, (int inst, int procs, long bytes)>();
+        // Дельта процессорного времени между двумя снимками. Процесс, которого
+        // не было в прошлом снимке, начался внутри окна — его время целиком.
+        var prev    = _prevCpu;
+        var elapsed = (now - _prevCpuAt).TotalSeconds;
+        bool cpuOk  = prev != null && elapsed > 0.5 && table.Cpu.Count > 0;
+        double Cpu(int pid)
+        {
+            if (!cpuOk || !table.Cpu.TryGetValue(pid, out var cur)) return 0;
+            prev!.TryGetValue(pid, out var old);
+            return cur >= old ? (cur - old) / 1e7 : 0;   // 100-нс тики → секунды
+        }
+
+        var tasks = new Dictionary<string, (int inst, int procs, long bytes, double cpuSec)>();
         var counted  = new HashSet<int>();   // процесс не должен попасть в сумму дважды
         int inProc   = 0;
 
@@ -76,13 +93,21 @@ public sealed partial class SchedulerService
                 if (!table.Memory.TryGetValue(p, out var bytes)) continue;
                 acc.procs++;
                 acc.bytes += bytes;
+                acc.cpuSec += Cpu(p);
             }
             tasks[taskId] = acc;
         }
 
+        double Pct(double cpuSec) => cpuOk
+            ? Math.Round(cpuSec / elapsed / Environment.ProcessorCount * 100, 1)
+            : -1;
+
         var perTask = tasks.ToDictionary(
             kv => kv.Key,
-            kv => new TaskResources(kv.Value.inst, kv.Value.procs, kv.Value.bytes / 1024 / 1024));
+            kv => new TaskResources(kv.Value.inst, kv.Value.procs, kv.Value.bytes / 1024 / 1024, Pct(kv.Value.cpuSec)));
+
+        _prevCpu   = table.Cpu;
+        _prevCpuAt = now;
 
         long master = 0;
         try
@@ -97,24 +122,27 @@ public sealed partial class SchedulerService
             live.Count,
             tasks.Values.Sum(t => t.procs),
             tasks.Values.Sum(t => t.bytes) / 1024 / 1024,
+            Pct(tasks.Values.Sum(t => t.cpuSec)),
             inProc,
             master);
     }
 
     private sealed record ProcessTable(
         Dictionary<int, List<int>> Children,
-        Dictionary<int, long>      Memory);
+        Dictionary<int, long>      Memory,
+        Dictionary<int, ulong>     Cpu);
 
     private static ProcessTable SnapshotProcessTable()
     {
         var children = new Dictionary<int, List<int>>();
         var memory   = new Dictionary<int, long>();
+        var cpu      = new Dictionary<int, ulong>();
 
 #if WINDOWS
         try
         {
             using var searcher = new ManagementObjectSearcher(
-                "SELECT ProcessId, ParentProcessId, WorkingSetSize FROM Win32_Process");
+                "SELECT ProcessId, ParentProcessId, WorkingSetSize, UserModeTime, KernelModeTime FROM Win32_Process");
             foreach (ManagementObject item in searcher.Get())
             {
                 using (item)
@@ -122,12 +150,14 @@ public sealed partial class SchedulerService
                     var id     = Convert.ToInt32((uint)item["ProcessId"]);
                     var parent = Convert.ToInt32((uint)item["ParentProcessId"]);
                     memory[id] = item["WorkingSetSize"] is ulong ws ? (long)ws : 0;
+                    cpu[id]    = (item["UserModeTime"] is ulong um ? um : 0)
+                               + (item["KernelModeTime"] is ulong km ? km : 0);
                     if (!children.TryGetValue(parent, out var list))
                         children[parent] = list = new List<int>();
                     list.Add(id);
                 }
             }
-            return new ProcessTable(children, memory);
+            return new ProcessTable(children, memory, cpu);
         }
         catch { }
 #endif
@@ -144,7 +174,7 @@ public sealed partial class SchedulerService
             }
         }
         catch { }
-        return new ProcessTable(children, memory);
+        return new ProcessTable(children, memory, cpu);
     }
 
     private static IEnumerable<int> WalkTree(int root, ProcessTable table)

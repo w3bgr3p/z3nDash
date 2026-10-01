@@ -197,6 +197,7 @@ function updateHeaderStats() {
             ? '<div class="stat-item" title="Memory of all running task processes (with child processes), without z3nDash itself ('
                 + fmtMB(res.MasterMB) + ')' + (res.InProcessRuns ? '; ' + res.InProcessRuns + ' in-process run(s) not counted' : '') + '">'
                 + 'RAM: <span class="stat-val">' + fmtMB(res.MemoryMB) + '</span>'
+                + (res.CpuPct >= 0 ? ' CPU: <span class="stat-val">' + res.CpuPct.toFixed(1) + '%</span>' : '')
                 + ' <span style="opacity:.6">' + res.Instances + ' inst · ' + res.Processes + ' proc</span></div>'
             : '');
 }
@@ -204,6 +205,8 @@ function updateHeaderStats() {
 // ── Resource usage ────────────────────────────────────────────────────────────
 
 var _resources = null;
+
+function fmtCpu(p) { return p >= 0 ? p.toFixed(1) + '% CPU' : ''; }
 
 function fmtMB(mb) {
     mb = Number(mb) || 0;
@@ -215,7 +218,8 @@ function taskMemText(id) {
     var t = _resources && _resources.Tasks && _resources.Tasks[id];
     if (!t) return '';
     if (!t.Processes) return t.Instances + ' inst (in-process)';
-    return fmtMB(t.MemoryMB) + ' · ' + t.Instances + ' inst · ' + t.Processes + ' proc';
+    return fmtMB(t.MemoryMB) + (t.CpuPct >= 0 ? ' · ' + fmtCpu(t.CpuPct) : '')
+        + ' · ' + t.Instances + ' inst · ' + t.Processes + ' proc';
 }
 
 function loadResources() {
@@ -226,7 +230,7 @@ function loadResources() {
             updateHeaderStats();
             document.querySelectorAll('[data-mem]').forEach(function(el) {
                 var t = _resources.Tasks && _resources.Tasks[el.dataset.mem];
-                el.textContent = t && t.Processes ? ' · ' + fmtMB(t.MemoryMB) : '';
+                el.textContent = t && t.Processes ? ' · ' + fmtMB(t.MemoryMB) + (t.CpuPct >= 0 ? ' · ' + t.CpuPct.toFixed(1) + '%' : '') : '';
             });
             var tot = document.getElementById('procTotalMem');
             if (tot) tot.textContent = taskMemText(selectedId) || '—';
@@ -360,7 +364,7 @@ function renderList() {
             + '<div class="row-name">' + escHtml(showGrp ? shortName : (s.name || '(unnamed)')) + '</div>'
             + '<div class="row-sub">' + escHtml(trigger) + (lastRun ? ' · ' + lastRun : '')
             + '<span class="row-mem" data-mem="' + s.id + '">'
-            + (function() { var t = _resources && _resources.Tasks && _resources.Tasks[s.id]; return t && t.Processes ? ' · ' + fmtMB(t.MemoryMB) : ''; })()
+            + (function() { var t = _resources && _resources.Tasks && _resources.Tasks[s.id]; return t && t.Processes ? ' · ' + fmtMB(t.MemoryMB) + (t.CpuPct >= 0 ? ' · ' + t.CpuPct.toFixed(1) + '%' : '') : ''; })()
             + '</span></div>'
             + '</div>'
             + '<div class="row-right">'
@@ -949,7 +953,7 @@ function renderExecution(s) {
             + infoRow('Memory', '<span id="procMem"    class="accent">—</span>')
             : '')
         + (isRunning
-            ? infoRow('Memory total', '<span id="procTotalMem" class="accent" title="All instances with their child processes">' + (taskMemText(s.id) || '—') + '</span>')
+            ? infoRow('Resources', '<span id="procTotalMem" class="accent" title="All instances with their child processes">' + (taskMemText(s.id) || '—') + '</span>')
             : '')
         + '</div>'
         + '<div class="detail-section">'
