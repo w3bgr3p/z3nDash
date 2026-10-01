@@ -10,7 +10,7 @@ namespace z3nDash;
 /// </summary>
 internal static class EnvironmentInstall
 {
-    /// <summary>console — команда в окне cmd; url — открыть страницу, где скачивать.</summary>
+    /// <summary>console — команда в окне cmd; powershell — скрипт (Command — его текст) в окне; url — открыть страницу.</summary>
     public sealed record Recipe(string Title, string Kind, string Command);
 
     // Идентификаторы пакетов проверены 2026-09-28 через «winget show --id <id> --exact».
@@ -20,8 +20,8 @@ internal static class EnvironmentInstall
 
     public static Recipe? Get(string key) => key switch
     {
-        // App Installer из Microsoft Store: в нём и живёт winget.
-        "winget"        => new("winget (App Installer)", "url", "ms-windows-store://pdp/?productid=9NBLGGH4NNS1"),
+        // Магазин не нужен: на машинах без него (и на серверных/виртуальных) ссылка ms-windows-store:// не открывается.
+        "winget"        => new("winget (App Installer)", "powershell", WingetScript),
 
         // --override заменяет тихие ключи winget целиком, поэтому /quiet здесь свой.
         // PrependPath=1 ставит python в PATH раньше заглушки Microsoft Store.
@@ -44,6 +44,34 @@ internal static class EnvironmentInstall
         _               => null,
     };
 
+    /// <summary>
+    /// Официальный способ без магазина: msixbundle App Installer и его зависимости из релиза winget-cli.
+    /// Ссылки /releases/latest/download/... и состав архива (папки x64, arm64, x86) проверены 2026-09-30.
+    /// Установка для текущего пользователя, права администратора не нужны.
+    /// </summary>
+    private const string WingetScript = """
+        $ErrorActionPreference = 'Stop'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $ProgressPreference = 'SilentlyContinue'
+        $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+        $dir  = Join-Path $env:TEMP 'z3nDash-winget'
+        $base = 'https://github.com/microsoft/winget-cli/releases/latest/download'
+        New-Item -ItemType Directory -Force $dir | Out-Null
+        try {
+            Write-Host 'Downloading App Installer (about 215 MB)...'
+            Invoke-WebRequest "$base/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -OutFile "$dir\winget.msixbundle"
+            Write-Host 'Downloading dependencies (about 95 MB)...'
+            Invoke-WebRequest "$base/DesktopAppInstaller_Dependencies.zip" -OutFile "$dir\deps.zip"
+            Expand-Archive "$dir\deps.zip" -DestinationPath "$dir\deps" -Force
+            $deps = @(Get-ChildItem "$dir\deps\$arch" -Filter *.appx | ForEach-Object FullName)
+            Write-Host 'Installing...'
+            Add-AppxPackage -Path "$dir\winget.msixbundle" -DependencyPath $deps
+            Write-Host 'Done. Press Check in z3nDash.'
+        } catch {
+            Write-Host ("FAILED: " + $_.Exception.GetType().Name + ": " + $_.Exception.Message) -ForegroundColor Red
+        }
+        """;
+
     /// <summary>Браузер той ревизии, которую ждёт драйвер, лежащий рядом с exe.</summary>
     private static Recipe PlaywrightRecipe()
     {
@@ -64,6 +92,18 @@ internal static class EnvironmentInstall
         {
             Process.Start(new ProcessStartInfo(recipe.Command) { UseShellExecute = true });
             return recipe.Command;
+        }
+
+        if (recipe.Kind == "powershell")
+        {
+            var script = Path.Combine(Path.GetTempPath(), "z3nDash-install.ps1");
+            File.WriteAllText(script, recipe.Command);
+            Process.Start(new ProcessStartInfo("cmd.exe",
+                $"/s /k \"title z3nDash install: {recipe.Title} & powershell -NoProfile -ExecutionPolicy Bypass -File \"{script}\"\"")
+            {
+                UseShellExecute = true,
+            });
+            return script;
         }
 
         // /s снимает только первую и последнюю кавычку — внутренние кавычки команды целы.

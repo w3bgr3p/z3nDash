@@ -703,7 +703,7 @@
                 const b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'btn env-install';
-                b.textContent = it.install === 'sqlite-odbc' || it.install === 'winget' ? 'Open page' : 'Install';
+                b.textContent = it.install === 'sqlite-odbc' ? 'Open page' : 'Install';
                 b.addEventListener('click', () => installEnvironment(it.install, b));
                 state.appendChild(document.createElement('br'));
                 state.appendChild(b);
