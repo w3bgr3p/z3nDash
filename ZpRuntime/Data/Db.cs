@@ -76,8 +76,30 @@ namespace z3nDash
         public void SetDebug(bool debug) => _debug = debug;
         
         #region Core Query
-        public string Query(string query,  bool thrw = false, bool unSafe = false)
+
+        /// <summary>
+        /// Наблюдатель для диагностического режима: текст запроса, сколько он занял
+        /// вместе с повторами, сколько было попыток. Пока null — замера нет.
+        /// </summary>
+        public static Action<string, TimeSpan, int>? QueryObserver;
+
+        public string Query(string query, bool thrw = false, bool unSafe = false)
         {
+            var observer = QueryObserver;
+            if (observer == null) return QueryCore(query, thrw, out _);
+
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
+            var attempts = 0;
+            try { return QueryCore(query, thrw, out attempts); }
+            finally
+            {
+                try { observer(query, System.Diagnostics.Stopwatch.GetElapsedTime(started), attempts); } catch { }
+            }
+        }
+
+        private string QueryCore(string query, bool thrw, out int attempts)
+        {
+            attempts = 0;
             string result = string.Empty;
             int maxRetries = 10;
             int delay = 100;
@@ -90,9 +112,10 @@ namespace z3nDash
                 if (_debug) query.Debug();
                 for (int i = 0; i < maxRetries; i++)
                 {
+                    attempts = i + 1;
                     try
                     {
-                        result = Task.Run(async () => 
+                        result = Task.Run(async () =>
                             Regex.IsMatch(query.TrimStart(), @"^\s*SELECT\b", RegexOptions.IgnoreCase)
                                 ? await db.DbReadAsync(query, ColumnSeparator.ToString(), RawSeparator.ToString())
                                 : (await db.DbWriteAsync(query)).ToString()

@@ -51,14 +51,14 @@ public sealed partial class SchedulerService
 
     public TaskControlState GetControlState(string id, string? runId = null)
     {
-        lock (_controlGate)
+        using (DiagTrace.Gate(_controlGate, "controlGate"))
             return ControlState(ReadControlRecord(_dbService.GetDb(), id), runId);
     }
 
     public List<TaskControlState> ListControlStates()
     {
         var cols = new List<string> { "id", "name", "enabled", "schedule_mode", "schedule_paused", "deferred_until", "defer_reason" };
-        lock (_controlGate)
+        using (DiagTrace.Gate(_controlGate, "controlGate"))
             return _dbService.GetDb().GetLines(string.Join(",", cols), Table, thrw: true, where: "\"id\" != ''")
                 .Where(line => !string.IsNullOrWhiteSpace(line))
                 .Select(line => ControlState(ParseRow(line, cols), null))
@@ -75,7 +75,7 @@ public sealed partial class SchedulerService
     {
         if (until <= DateTimeOffset.UtcNow) throw new ArgumentException("until must be in the future");
         if (reason.Length > 2000) throw new ArgumentException("reason must be at most 2000 characters");
-        lock (_controlGate)
+        using (DiagTrace.Gate(_controlGate, "controlGate"))
         {
             var db = _dbService.GetDb();
             var record = ReadControlRecord(db, id);
@@ -91,7 +91,7 @@ public sealed partial class SchedulerService
 
     public TaskControlState PauseTask(string id, bool paused, string? runId = null)
     {
-        lock (_controlGate)
+        using (DiagTrace.Gate(_controlGate, "controlGate"))
         {
             var db = _dbService.GetDb();
             ReadControlRecord(db, id);

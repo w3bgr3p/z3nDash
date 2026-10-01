@@ -211,7 +211,7 @@ public sealed class SchedulerHandler : IScriptHandler
         var id = json.Value.TryGetProperty("id", out var eid) ? eid.GetString() ?? "" : "";
         if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
 
-        _scheduler.Kill(id);
+        using (DiagTrace.Span("kill")) _scheduler.Kill(id);
         db.Del(Table, where: $"\"id\" = '{id}'");
         await HttpHelpers.WriteJson(ctx.Response, new { ok = true });
     }

@@ -45,6 +45,7 @@ public sealed partial class SchedulerService : IDisposable
         _dbService = dbService;
         _log       = log;
         _timer = new System.Threading.Timer(Tick, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        DiagTrace.RunningInstances = () => _running.Count(kv => !kv.Value.HasExited);
     }
 
     public void Init()
@@ -169,7 +170,7 @@ public sealed partial class SchedulerService : IDisposable
     /// </summary>
     private void FireSchedule(Db db, Dictionary<string, string> record, string id, DateTime now)
     {
-        lock (_controlGate)
+        using (DiagTrace.Gate(_controlGate, "controlGate"))
         {
             if (!AutomaticLaunchAllowed(db, id)) return;
             FireScheduleCore(db, record, id, now);
@@ -311,7 +312,7 @@ public sealed partial class SchedulerService : IDisposable
     /// </summary>
     private void DrainQueueFor(Db db, string scheduleId)
     {
-        lock (_controlGate)
+        using (DiagTrace.Gate(_controlGate, "controlGate"))
         {
             bool allowScheduled;
             try
@@ -428,7 +429,7 @@ public sealed partial class SchedulerService : IDisposable
                 // ёмкость свободной и подняли лишние нити сверх Threads.
                 if (delay > TimeSpan.Zero) await Task.Delay(delay);
 
-                lock (_controlGate)
+                using (DiagTrace.Gate(_controlGate, "controlGate"))
                 {
                     if (automatic && !AutomaticLaunchAllowed(db, id))
                     {

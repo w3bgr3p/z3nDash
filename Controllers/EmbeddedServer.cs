@@ -43,6 +43,7 @@ public class EmbeddedServer
     private readonly DocsGraphHandler _docsGraphHandler;
     private readonly TerminalHandler _terminalHandler;
     private readonly SqliteViewerHandler _sqliteViewerHandler;
+    private readonly DiagHandler _diagHandler;
 
     
     private const int DefaultPort = 33333;
@@ -133,6 +134,7 @@ public class EmbeddedServer
         _docsGraphHandler = new DocsGraphHandler();
         _terminalHandler = new TerminalHandler(_wwwrootPath);
         _sqliteViewerHandler = new SqliteViewerHandler();
+        _diagHandler = new DiagHandler(dbService);
 
         // Порт replay жёстко привязан к порту панели: фронт (окно traffic и har.html)
         // вычисляет его как port + 1 и спросить настройку не может.
@@ -187,7 +189,10 @@ public class EmbeddedServer
             try
             {
                 var context = await _listener.GetContextAsync();
-                _ = Task.Run(() => ProcessRequest(context));
+                // Момент приёма — для диагностики: от него до начала ProcessRequest
+                // запрос ждёт поток в пуле.
+                var accepted = DiagTrace.Enabled ? DiagTrace.Now() : 0;
+                _ = Task.Run(() => ProcessRequest(context, accepted));
             }
             catch { if (!_isRunning) break; }
         }
@@ -224,7 +229,7 @@ public class EmbeddedServer
         finally { try { context.Response.Close(); } catch { } }
     }
 
-    private async Task ProcessRequest(HttpListenerContext context)
+    private async Task ProcessRequest(HttpListenerContext context, double accepted = 0)
     {
         
         var request  = context.Request;
@@ -243,11 +248,14 @@ public class EmbeddedServer
         
         if (_debug ) request.RawUrl.Debug();
 
+        var diag = accepted > 0 ? DiagTrace.BeginRequest(request, accepted) : null;
     
         try
         {
             string path   = request.Url?.AbsolutePath.ToLower() ?? "";
             string method = request.HttpMethod;
+
+            if (DiagHandler.Matches(path)) { await _diagHandler.Handle(context, path, method); return; }
 // Script handlers (/zp, /py, /node, ...)
             foreach (var handler in _scriptHandlers)
             {
@@ -367,7 +375,13 @@ public class EmbeddedServer
             var err = Encoding.UTF8.GetBytes(ex.Message);
             response.OutputStream.Write(err, 0, err.Length);
         }
-        finally { response.Close(); }
+        finally
+        {
+            var status = 0;
+            try { status = response.StatusCode; } catch { }
+            try { response.Close(); } catch { }
+            DiagTrace.EndRequest(diag, status);
+        }
     }
 
     // ── Static file serving ────────────────────────────────────────────────────
