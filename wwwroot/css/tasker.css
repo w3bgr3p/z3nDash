@@ -125,6 +125,10 @@ select.form-input { cursor: pointer; }
 /* Живые инстансы: на всю ширину, в несколько колонок и с прокруткой —
    на двадцати нитях столбик уходил за экран, а правая половина пустовала. */
 #instancesCard { grid-column: 1 / -1; }
+/* Карточка инстансов забирает всё место до панели логов, а не держит фиксированную высоту. */
+.detail-grid:has(#instancesCard) { height: 100%; grid-template-rows: auto minmax(120px, 1fr); }
+#instancesCard { display: flex; flex-direction: column; min-height: 0; }
+#instancesCard .inst-list { flex: 1; min-height: 0; max-height: none; align-content: start; }
 .inst-count    { color: var(--text2); margin-left: var(--sp-4); }
 .inst-list     { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: var(--sp-2) var(--sp-20); max-height: 180px; overflow-y: auto; }
 .inst-row      { display: flex; align-items: center; gap: var(--sp-6); font-size: var(--fs-10); }
