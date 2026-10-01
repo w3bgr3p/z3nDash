@@ -91,6 +91,7 @@ public sealed class SchedulerHandler : IScriptHandler
             if (path == "/tasker/payload" && method == "POST")        { await SavePayload(context, db);             return true; }
             if (path == "/tasker/process-stats" && method == "GET") { await ProcessStats(context); return true; }
             if (path == "/tasker/instances"     && method == "GET")  { await Instances(context); return true; }
+            if (path == "/tasker/resources"     && method == "GET")  { await Resources(context); return true; }
             if (path == "/tasker/kill-instance" && method == "POST") { await KillInstance(context); return true; }
             if (path == "/tasker/queue"         && method == "GET")  { await QueueItems(context, db); return true; }
             if (path == "/tasker/clear-queue"   && method == "POST") { await ClearQueue(context, db); return true; }
@@ -367,6 +368,9 @@ public sealed class SchedulerHandler : IScriptHandler
         if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
         await HttpHelpers.WriteJson(ctx.Response, _scheduler.GetInstances(id));
     }
+
+    private async Task Resources(HttpListenerContext ctx)
+        => await HttpHelpers.WriteJson(ctx.Response, _scheduler.GetResources());
 
     private async Task KillInstance(HttpListenerContext ctx)
     {

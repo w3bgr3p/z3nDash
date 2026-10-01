@@ -187,11 +187,50 @@ function updateHeaderStats() {
     var enabled = schedules.filter(function(s) {
         return (s.schedule_mode || 'off') !== 'off' && s.enabled !== 'false';
     }).length;
+    var res = _resources;
     document.getElementById('headerStats').innerHTML =
         '<div class="stat-item">Tasks: <span class="stat-val">' + total + '</span></div>' +
         '<div class="stat-item">Running: <span class="stat-val stat-running">' + running + '</span></div>' +
         '<div class="stat-item">Scheduled: <span class="stat-val">' + enabled + '</span></div>' +
-        (errors ? '<div class="stat-item">Errors: <span class="stat-val stat-error">' + errors + '</span></div>' : '');
+        (errors ? '<div class="stat-item">Errors: <span class="stat-val stat-error">' + errors + '</span></div>' : '') +
+        (res && res.Instances > 0
+            ? '<div class="stat-item" title="Memory of all running task processes (with child processes), without z3nDash itself ('
+                + fmtMB(res.MasterMB) + ')' + (res.InProcessRuns ? '; ' + res.InProcessRuns + ' in-process run(s) not counted' : '') + '">'
+                + 'RAM: <span class="stat-val">' + fmtMB(res.MemoryMB) + '</span>'
+                + ' <span style="opacity:.6">' + res.Instances + ' inst · ' + res.Processes + ' proc</span></div>'
+            : '');
+}
+
+// ── Resource usage ────────────────────────────────────────────────────────────
+
+var _resources = null;
+
+function fmtMB(mb) {
+    mb = Number(mb) || 0;
+    return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : mb + ' MB';
+}
+
+/// Память задачи — по дереву процессов всех её инстансов, не по одному python.
+function taskMemText(id) {
+    var t = _resources && _resources.Tasks && _resources.Tasks[id];
+    if (!t) return '';
+    if (!t.Processes) return t.Instances + ' inst (in-process)';
+    return fmtMB(t.MemoryMB) + ' · ' + t.Instances + ' inst · ' + t.Processes + ' proc';
+}
+
+function loadResources() {
+    fetch('/tasker/resources')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            _resources = d;
+            updateHeaderStats();
+            document.querySelectorAll('[data-mem]').forEach(function(el) {
+                var t = _resources.Tasks && _resources.Tasks[el.dataset.mem];
+                el.textContent = t && t.Processes ? ' · ' + fmtMB(t.MemoryMB) : '';
+            });
+            var tot = document.getElementById('procTotalMem');
+            if (tot) tot.textContent = taskMemText(selectedId) || '—';
+        }).catch(function() {});
 }
 
 // ── List rendering ────────────────────────────────────────────────────────────
@@ -319,7 +358,10 @@ function renderList() {
                 : '<span class="row-dot ondemand" title="No schedule"></span>')
             + '<div class="row-info">'
             + '<div class="row-name">' + escHtml(showGrp ? shortName : (s.name || '(unnamed)')) + '</div>'
-            + '<div class="row-sub">' + escHtml(trigger) + (lastRun ? ' · ' + lastRun : '') + '</div>'
+            + '<div class="row-sub">' + escHtml(trigger) + (lastRun ? ' · ' + lastRun : '')
+            + '<span class="row-mem" data-mem="' + s.id + '">'
+            + (function() { var t = _resources && _resources.Tasks && _resources.Tasks[s.id]; return t && t.Processes ? ' · ' + fmtMB(t.MemoryMB) : ''; })()
+            + '</span></div>'
             + '</div>'
             + '<div class="row-right">'
             + '<span class="task-status ' + status + '">' + status + '</span>'
@@ -905,6 +947,9 @@ function renderExecution(s) {
             ? infoRow('PID',    '<span id="procPid"    class="accent">—</span>')
             + infoRow('Uptime', '<span id="procUptime" class="accent">—</span>')
             + infoRow('Memory', '<span id="procMem"    class="accent">—</span>')
+            : '')
+        + (isRunning
+            ? infoRow('Memory total', '<span id="procTotalMem" class="accent" title="All instances with their child processes">' + (taskMemText(s.id) || '—') + '</span>')
             : '')
         + '</div>'
         + '<div class="detail-section">'
@@ -2733,6 +2778,8 @@ function pmValuesSet(key, val) { pmValues[key] = val; refreshPayloadPreview(); }
 // ── Polling ───────────────────────────────────────────────────────────────────
 
 setInterval(loadList, 10000);
+loadResources();
+setInterval(loadResources, 5000);
 
 window.addEventListener('resize', function() {
     var topPanel = document.getElementById('detailPanel');
