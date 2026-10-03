@@ -14,7 +14,6 @@ The dock is pulled in by every page through `wwwroot/js/nav.js`. Its items and h
 | `xml` | [[XML]] | `Alt+9` |
 | `json` | [[JSON]] | `Alt+6` |
 | `text` | [[Text Tools]] | `Alt+7` |
-| `treasury` | [[Treasury]] | — |
 | `config` | [[Config]] | `Alt+0` |
 | `clips` | [[Clips]] | `Alt+C` |
 | `system` | [[System Snapshot]] | — |

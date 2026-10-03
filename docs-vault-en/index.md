@@ -27,7 +27,6 @@ The windowed build targets Windows. The `net10.0` target builds without WinForms
 | [[XML]] | XML tree viewing, formatting and search | `Alt+9` |
 | [[JSON]] | JSON viewing and analysis | `Alt+6` |
 | [[Text Tools]] | Text transforms | `Alt+7` |
-| [[Treasury]] | Web3 asset overview | — |
 | [[Config]] | Database, server, OmniRoute and watchdog | `Alt+0` |
 | [[Clips]] | Reusable clipboard templates | `Alt+C` |
 | [[System Snapshot]] | Windows state snapshots | — |

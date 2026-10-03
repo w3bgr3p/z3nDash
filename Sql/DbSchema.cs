@@ -119,18 +119,6 @@
             }
         };
 
-        public static readonly TableSchema TreasuryAiCache = new()
-        {
-            Name = "treasury_ai_cache",
-            Columns = new()
-            {
-                { "id",     "INTEGER PRIMARY KEY" },
-                { "model",  "TEXT" },
-                { "ts",     "TEXT" },
-                { "report", "TEXT" },
-            }
-        };
-
         public static readonly TableSchema Instance = new()
         {
             Name = "instance",

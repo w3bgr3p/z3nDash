@@ -27,7 +27,6 @@ z3nDash — дашборд для расписаний, ZennoPoster-узлов, 
 | [[XML]] | Просмотр, форматирование и поиск по XML-дереву | `Alt+9` |
 | [[JSON]] | Просмотр и анализ JSON | `Alt+6` |
 | [[Text Tools]] | Текстовые преобразования | `Alt+7` |
-| [[Treasury]] | Сводка Web3-активов | — |
 | [[Config]] | База, сервер, OmniRoute и watchdog | `Alt+0` |
 | [[Clips]] | Шаблоны для копирования | `Alt+C` |
 | [[System Snapshot]] | Снимки состояния Windows | — |

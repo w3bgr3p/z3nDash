@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Cronos;
-using NBitcoin.Protocol;
 using z3nDash;
 using ZennoLab.InterfacesLibrary.ProjectModel;
 

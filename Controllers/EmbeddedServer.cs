@@ -36,7 +36,6 @@ public class EmbeddedServer
     private readonly ZbHandler _zbHandler;
     private readonly AiClient _aiClient;
     private readonly AiAgentHandler _aiAgentHandler;
-    private readonly TreasuryHandler _treasuryHandler;
     private readonly SystemSnapshotHandler _snapshotHandler;
     private readonly JsonAnalyzerHandler _jsonAnalyzerHandler;
     private readonly GraphHandler _graphHandler;
@@ -127,7 +126,6 @@ public class EmbeddedServer
         _aiClient            = new AiClient();
         _configHandler       = new ConfigHandler(logPath, _listener, _port, dbService, _aiClient);
         _aiAgentHandler      = new AiAgentHandler(dbService, _aiClient);
-        _treasuryHandler     = new TreasuryHandler(dbService, _aiClient);
         _snapshotHandler     = new SystemSnapshotHandler(dbService, _aiClient);
         _jsonAnalyzerHandler = new JsonAnalyzerHandler(dbService, _aiClient);
         _graphHandler = new GraphHandler();
@@ -336,12 +334,6 @@ public class EmbeddedServer
                 await _aiAgentHandler.Handle(context);
                 return;
             }
-            if (path.StartsWith("/treasury"))
-            {
-                await _treasuryHandler.Handle(context);
-                return;
-            }
-
             if (_snapshotHandler.Matches(path))
             {
                 await _snapshotHandler.Handle(context); 

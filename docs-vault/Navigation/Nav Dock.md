@@ -14,7 +14,6 @@ Dock подключается страницами через `wwwroot/js/nav.js
 | `xml` | [[XML]] | `Alt+9` |
 | `json` | [[JSON]] | `Alt+6` |
 | `text` | [[Text Tools]] | `Alt+7` |
-| `treasury` | [[Treasury]] | — |
 | `config` | [[Config]] | `Alt+0` |
 | `clips` | [[Clips]] | `Alt+C` |
 | `system` | [[System Snapshot]] | — |

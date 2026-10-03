@@ -2,7 +2,7 @@
 
 z3nDash is a local Windows control center for automation workflows. It combines
 task scheduling, ZennoPoster and ZennoBrowser operations, logs, HTTP inspection,
-system snapshots, Web3 tools, and day-to-day utilities in one embedded dashboard.
+system snapshots, and day-to-day utilities in one embedded dashboard.
 
 The desktop application is built with .NET 10, WinForms, and WebView2. Its
 dashboard and local API are served by the built-in HTTP server.
@@ -18,7 +18,6 @@ dashboard and local API are served by the built-in HTTP server.
   tree viewer.
 - JSON, text, clipboard-template, code-graph, and SQLite file-viewer tools.
 - System snapshots and a configurable process-memory watchdog.
-- Web3 treasury views and supporting blockchain utilities.
 - Built-in documentation available from the dashboard.
 - OmniRoute integration for AI-assisted features.
 
@@ -122,7 +121,6 @@ The default dashboard address is `http://localhost:33333`.
 | XML | Open, format, search, and inspect XML as a collapsible tree |
 | JSON / Text | Transform and analyze structured or plain text |
 | Clips | Store and copy reusable templates |
-| Treasury | Inspect Web3 assets |
 | System | Capture and compare system state |
 | dllGraph | Choose a DLL file and explore its C# relationships |
 | Config | Configure PostgreSQL, services, storage, and watchdog |
@@ -153,7 +151,6 @@ Sql/          PostgreSQL access and schema helpers
 Csx/          C# script execution
 ZpRuntime/    in-process ZennoPoster-compatible runtime and its browser layer
 Api/          external service integrations
-Web3/         blockchain and wallet utilities
 wwwroot/      dashboard HTML, CSS, and JavaScript
 docs-vault/   bundled product documentation
 templates/    dashboard and report templates
