@@ -443,7 +443,7 @@ internal sealed class ConfigHandler
 
     private static async Task GetUiState(HttpListenerResponse response)
     {
-        if (!File.Exists(UiStatePath)) { await HttpHelpers.WriteJson(response, new { theme = "dark" }); return; }
+        if (!File.Exists(UiStatePath)) { await HttpHelpers.WriteJson(response, new { theme = "graphite" }); return; }
         var raw = await File.ReadAllTextAsync(UiStatePath, Encoding.UTF8);
         await HttpHelpers.WriteRawJson(response, raw);
     }

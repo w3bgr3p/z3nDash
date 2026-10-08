@@ -1734,7 +1734,7 @@
         const fdate = (label, key, val) => `
             <div class="field-group">
                 <span class="field-label">${label}<span class="field-key">${key}</span></span>
-                <input class="field-input" type="datetime-local" id="sched_${key}" value="${escHtml(zpDateToInput(val))}" style="color-scheme:dark;">
+                <input class="field-input" type="datetime-local" id="sched_${key}" value="${escHtml(zpDateToInput(val))}">
             </div>`;
         const fsel = (label, key, val, opts, onchange='') => `
             <div class="field-group">

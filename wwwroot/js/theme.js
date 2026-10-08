@@ -13,21 +13,28 @@
    ═══════════════════════════════════════════════════════ */
 
 const THEMES = [
-    { id: 'dark',      label: '⬛  Dark' },
-    { id: 'light',     label: '⬜  Light' },
-    { id: 'hyper',     label: '🟩  Hyper' },
-    { id: 'graphite',  label: '⬛  Graphite' },
+    { id: 'graphite',       label: '⬛  Graphite' },
+    { id: 'graphite-light', label: '⬜  Aluminium' },
+    { id: 'hyper',          label: '🟩  Hyper' },
+    { id: 'hyper-light',    label: '🟩  Paper' },
 ];
 
 const THEME_IDS = THEMES.map(t => t.id);
 const THEME_KEY = 'zp-theme';
+const THEME_DEFAULT = 'graphite';
+
+// Темы dark и light удалены. Сохранённое значение переводим в пару
+// того же тона, а не молча сбрасываем.
+const THEME_RENAMED = { dark: 'graphite', light: 'graphite-light' };
 
 function getTheme() {
-    return localStorage.getItem(THEME_KEY) || 'dark';
+    const saved = localStorage.getItem(THEME_KEY);
+    return THEME_RENAMED[saved] || saved || THEME_DEFAULT;
 }
 
 function setTheme(name) {
-    if (!THEME_IDS.includes(name)) name = 'dark';
+    name = THEME_RENAMED[name] || name;
+    if (!THEME_IDS.includes(name)) name = THEME_DEFAULT;
     localStorage.setItem(THEME_KEY, name);
     document.documentElement.setAttribute('data-theme', name);
 
