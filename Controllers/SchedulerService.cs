@@ -1365,13 +1365,18 @@ public sealed partial class SchedulerService : IDisposable
     ///
     /// Возвращает, сколько элементов поставлено в очередь.
     /// </summary>
-    public int EnqueueManual(string id, Dictionary<string, string> record, Db db, int count)
+    public int EnqueueManual(string id, Dictionary<string, string> record, Db db, int count, string? argsOverride = null)
     {
         if (count < 1) return 0;
         count = Math.Min(count, MaxManualBurst);
 
+        // args залпа заменяют args задачи только в элементах очереди; запись задачи не трогаем.
+        var queued = argsOverride == null
+            ? record
+            : new Dictionary<string, string>(record) { ["args"] = argsOverride };
+
         for (var i = 0; i < count; i++)
-            EnqueueItem(db, id, record, priority: 0, origin: OriginManual);
+            EnqueueItem(db, id, queued, priority: 0, origin: OriginManual);
 
         if (count > 1)
             _log?.Info($"[{record.GetValueOrDefault("name", id)}] залп: {count} прогонов в очередь, нитей {ReadThreads(record)}");

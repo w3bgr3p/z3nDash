@@ -18,6 +18,7 @@
         <div class="header-stats">
             <div class="stat-item"><span class="stat-label">Host:</span><span class="stat-val" id="sHost">—</span></div>
             <div class="stat-item"><span class="stat-label">RAM Used:</span><span class="stat-val" id="sRam">—</span></div>
+            <div class="stat-item"><span class="stat-label">Commit:</span><span class="stat-val" id="sCommit">—</span></div>
             <div class="stat-item"><span class="stat-label">CPU:</span><span class="stat-val" id="sCpu">—</span></div>
             <div class="stat-item"><span class="stat-label">Processes:</span><span class="stat-val" id="sProcs">—</span></div>
             <div class="stat-item"><span class="stat-label">TCP Conns:</span><span class="stat-val" id="sTcp">—</span></div>
@@ -51,6 +52,16 @@
             <div class="empty-state" id="emptyState">
                 <div class="empty-state-title">Loading system data…</div>
                 <div class="empty-state-sub">Collecting current system data</div>
+            </div>
+            <div class="section-panel" id="envPanel">
+                <div class="env-head">
+                    <h2>Environment</h2>
+                    <button class="btn" id="envCheckBtn" onclick="loadEnvironment()">&#8635; Check</button>
+                </div>
+                <div class="env-note">Tools this machine has for running tasks. Each row shows what the command, registry or connection actually returned.</div>
+                <div class="env-stamp" id="envStamp"></div>
+                <div class="env-status" id="envStatus"></div>
+                <div id="envList"></div>
             </div>
         </div>
 
@@ -104,6 +115,8 @@
     </div>
 </div>
 
+<script src="/js/system-memory.js"></script>
+<script src="/js/system-env.js"></script>
 <script>
     const API = window.location.origin;
 
@@ -116,6 +129,8 @@
 
     // ── Init ──────────────────────────────────────────────────────────────────
     loadModels();
+    appendEnvNav(document.getElementById('sectionNav'));
+    if (PageState.load().env) activateEnv();
     captureNow();
     initResizer();
 
@@ -235,12 +250,13 @@
 
         currentSections.forEach((s, i) => {
             const el = document.createElement('div');
-            el.className   = 'nav-item' + (i === activeIdx() ? ' active' : '');
-            el.textContent = s.title;
+            el.className   = 'nav-item' + (!envActive && i === activeIdx() ? ' active' : '');
+            el.textContent = s.title === 'MEMORY ALLOCATION' ? 'Memory allocation' : s.title;
             el.dataset.idx = i;
             el.onclick     = () => activateSection(i);
             nav.appendChild(el);
         });
+        appendEnvNav(nav);
     }
 
     // Refresh keeps the section that was open (matched by title; falls back to the first).
@@ -252,11 +268,12 @@
 
     function activateSection(idx) {
         activeTitle = currentSections[idx]?.title || '';
-        document.querySelectorAll('.nav-item').forEach((el, i) => {
-            el.classList.toggle('active', i === idx);
+        deactivateEnv();
+        document.querySelectorAll('.nav-item[data-idx]').forEach(el => {
+            el.classList.toggle('active', Number(el.dataset.idx) === idx);
         });
-        document.querySelectorAll('.section-panel').forEach((el, i) => {
-            el.classList.toggle('active', i === idx);
+        document.querySelectorAll('.section-panel').forEach(el => {
+            el.classList.toggle('active', el.id === 'panel_' + idx);
         });
     }
 
@@ -264,11 +281,11 @@
     function renderAllSections() {
         const area = document.getElementById('contentArea');
         // Remove old panels (keep emptyState)
-        area.querySelectorAll('.section-panel').forEach(el => el.remove());
+        area.querySelectorAll('.section-panel:not(#envPanel)').forEach(el => el.remove());
 
         currentSections.forEach((s, i) => {
             const panel = document.createElement('div');
-            panel.className = 'section-panel' + (i === activeIdx() ? ' active' : '');
+            panel.className = 'section-panel' + (!envActive && i === activeIdx() ? ' active' : '');
             panel.id        = 'panel_' + i;
 
             if (s.type === 'kv') {
@@ -346,6 +363,7 @@
         }).join('');
 
         return `
+        ${s.title === 'MEMORY ALLOCATION' ? renderMemoryAllocation() : ''}
         <div class="section-search">
             <input type="text" placeholder="Filter rows…" value="${esc(filter)}"
                    oninput="filterSection(${idx}, this.value)">
@@ -406,6 +424,7 @@
 
         const ram = raw.match(/Used\s*:\s*([\d.]+\s*GB\s*\([\d.]+%\))/);
         document.getElementById('sRam').textContent = ram ? ram[1].trim() : '—';
+        populateCommitStat();
 
         const cpu = raw.match(/Load\s*:\s*([\d.]+%)/);
         document.getElementById('sCpu').textContent = cpu ? cpu[1].trim() : '—';

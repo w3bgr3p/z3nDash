@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z3nDash | Browser</title>
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/diag.js"></script>
+    <script src="/js/theme.js"></script>
+    <script src="/js/nav.js"></script>
+    <link rel="stylesheet" href="/css/browser.css">
+</head>
+<body>
+
+<div class="page-header">
+    <h1>Browser</h1>
+    <div class="provider-switch" id="providerSwitch">
+        <button class="provider-btn" data-provider="zb">ZennoBrowser</button>
+        <button class="provider-btn" data-provider="shardx">ShardX</button>
+    </div>
+    <span class="subtitle" id="providerSubtitle"></span>
+</div>
+
+<div class="status-bar">
+    <div class="dot" id="statusDot"></div>
+    <span class="dim">Host:</span>
+    <span id="hostLabel" class="hi">—</span>
+    <span class="sep">|</span>
+    <span class="dim">Key:</span>
+    <span id="keyStatus" class="dim">—</span>
+    <span class="sep" id="versionSep" hidden>|</span>
+    <span id="versionLabel" class="dim" hidden></span>
+    <span class="sep">|</span>
+    <a href="/?page=config" class="cfg-link">⚙ Config</a>
+    <button class="btn sm" id="btnConnect" style="margin-left:auto">↻ Connect</button>
+</div>
+
+<div class="stats-row">
+    <div class="stat-card running"><div class="stat-label">Running</div><div class="stat-value" id="statRunning">—</div><div class="stat-sub">browser instances</div></div>
+    <div class="stat-card"><div class="stat-label">Profiles</div><div class="stat-value" id="statProfiles">—</div><div class="stat-sub">total</div></div>
+    <div class="stat-card"><div class="stat-label">Proxies</div><div class="stat-value" id="statProxies">—</div><div class="stat-sub">configured</div></div>
+    <div class="stat-card warn"><div class="stat-label" id="statExtraLabel">Threads</div><div class="stat-value" id="statExtra">—</div><div class="stat-sub" id="statExtraSub">active</div></div>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" data-tab="profiles">Profiles</button>
+    <button class="tab-btn" data-tab="proxies">Proxies</button>
+    <button class="tab-btn" data-tab="threads" id="tabBtnThreads">Threads</button>
+</div>
+
+<!-- Profiles -->
+<div class="tab-panel active" id="tab-profiles">
+    <div class="section-header">
+        <span class="section-title">Profiles</span>
+        <span class="section-count" id="profilesCount">0</span>
+        <div class="section-actions">
+            <button class="btn sm green" id="btnNewProfile">＋ New profile</button>
+            <button class="btn sm red" id="btnStopAll">⛔ Stop All</button>
+            <button class="btn sm" id="btnRefreshProfiles">↻ Refresh</button>
+        </div>
+    </div>
+    <div class="filter-row">
+        <input type="text" id="profileSearch" placeholder="Search by name or tag...">
+        <select id="profileFolderFilter"><option value="">All folders</option></select>
+        <label class="check-label">
+            <input type="checkbox" id="profileRunningOnly">
+            Running
+        </label>
+    </div>
+    <div class="tbl-wrap">
+        <table>
+            <thead><tr>
+                <th class="sortable" data-sort="name">Name</th>
+                <th class="sortable" data-sort="folder">Folder</th>
+                <th class="sortable" data-sort="proxy">Proxy</th>
+                <th class="col-tags">Tags</th>
+                <th class="sortable" data-sort="status">Status</th>
+                <th class="sortable" data-sort="lastStart">Last Start</th>
+                <th></th>
+            </tr></thead>
+            <tbody id="profilesTbody"><tr><td colspan="7" class="empty">Not connected</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Proxies -->
+<div class="tab-panel" id="tab-proxies">
+    <div class="section-header">
+        <span class="section-title">Proxies</span>
+        <span class="section-count" id="proxiesCount">0</span>
+        <div class="section-actions"><button class="btn sm" id="btnRefreshProxies">↻ Refresh</button></div>
+    </div>
+    <div class="tbl-wrap">
+        <table>
+            <thead><tr id="proxiesHead"></tr></thead>
+            <tbody id="proxiesTbody"><tr><td colspan="4" class="empty">Not connected</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Threads (ZennoBrowser only) -->
+<div class="tab-panel" id="tab-threads">
+    <div class="section-header">
+        <span class="section-title">Threads</span>
+        <span class="section-count" id="threadsCount">0</span>
+        <div class="section-actions">
+            <button class="btn sm" id="btnRefreshThreads">↻ Refresh</button>
+            <button class="btn sm red" id="btnFreeAllThreads">✕ Free All</button>
+        </div>
+    </div>
+    <div class="tbl-wrap">
+        <table>
+            <thead><tr><th>Token</th><th>Type</th><th>Created</th><th></th></tr></thead>
+            <tbody id="threadsTbody"><tr><td colspan="4" class="empty">Not connected</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Proxy picker -->
+<div class="modal-overlay" id="proxyModal">
+    <div class="modal-box">
+        <div class="modal-title">Set proxy</div>
+        <div class="modal-sub" id="proxyModalProfile"></div>
+        <label class="modal-label" for="proxySelect">Proxy</label>
+        <select id="proxySelect"></select>
+        <div id="proxyNewWrap" hidden>
+            <label class="modal-label" for="proxyNewInput">New proxy</label>
+            <input id="proxyNewInput" type="text" autocomplete="off" spellcheck="false">
+            <div class="modal-hint" id="proxyNewHint"></div>
+        </div>
+        <div class="modal-error" id="proxyModalError" hidden></div>
+        <div class="modal-buttons">
+            <button class="btn" id="proxyCancel">Cancel</button>
+            <button class="btn green" id="proxyApply">Apply</button>
+        </div>
+    </div>
+</div>
+
+<!-- New profile -->
+<div class="modal-overlay" id="newProfileModal">
+    <div class="modal-box">
+        <div class="modal-title">New profile</div>
+        <label class="modal-label" for="npName">Name</label>
+        <input id="npName" type="text" autocomplete="off" spellcheck="false">
+        <label class="modal-label" for="npPlatform">Platform</label>
+        <select id="npPlatform"></select>
+        <label class="modal-label" for="npFolder">Folder</label>
+        <select id="npFolder"></select>
+        <div id="npFolderNewWrap" hidden>
+            <input id="npFolderNew" type="text" autocomplete="off" spellcheck="false" placeholder="Folder name">
+        </div>
+        <label class="modal-label" for="npProxy">Proxy</label>
+        <select id="npProxy"></select>
+        <div id="npProxyNewWrap" hidden>
+            <input id="npProxyNew" type="text" autocomplete="off" spellcheck="false">
+            <div class="modal-hint" id="npProxyHint"></div>
+        </div>
+        <div id="npTagsWrap">
+            <label class="modal-label" for="npTags">Tags</label>
+            <input id="npTags" type="text" autocomplete="off" spellcheck="false" placeholder="space separated">
+        </div>
+        <div class="modal-error" id="npError" hidden></div>
+        <div class="modal-buttons">
+            <button class="btn" id="npCancel">Cancel</button>
+            <button class="btn green" id="npCreate">Create</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/js/browser.js"></script>
+</body>
+</html>

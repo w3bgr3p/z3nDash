@@ -72,6 +72,8 @@ public class ClipboardConfig
     // Хоткеи регистрируются, только пока окно этого процесса активно.
     // Пустая строка = гейт выключен, хоткеи держатся постоянно.
     public string ProcessName { get; set; } = "ProjectMaker";
+    // После записи результата в буфер эмулировать Ctrl+V в активное окно.
+    public bool   AutoPaste   { get; set; } = true;
 }
 
 public class CrxItem

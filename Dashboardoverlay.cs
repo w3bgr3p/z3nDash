@@ -310,7 +310,7 @@ public class DashboardOverlay : Form
             Location  = new Point(0, 0),
             Size      = new Size(Width, DH),
             Anchor    = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            BackColor = Color.FromArgb(20, 20, 30),
+            BackColor = Color.FromArgb(0, 0, 0),
             Cursor    = Cursors.SizeAll
         };
 

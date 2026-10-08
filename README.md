@@ -1,7 +1,7 @@
 # z3nDash
 
 z3nDash is a local Windows control center for automation workflows. It combines
-task scheduling, ZennoPoster and ZennoBrowser operations, logs, HTTP inspection,
+task scheduling, ZennoPoster, ZennoBrowser and ShardX operations, logs, HTTP inspection,
 system snapshots, and day-to-day utilities in one embedded dashboard.
 
 The desktop application is built with .NET 10, WinForms, and WebView2. Its
@@ -12,7 +12,7 @@ dashboard and local API are served by the built-in HTTP server.
 - Task scheduler with manual runs, recurring schedules, process control, live
   output, payloads, and several script/executable runners.
 - ZP7 worker overview and control for ZennoPoster jobs on the local network.
-- ZennoBrowser profile and process integration.
+- ZennoBrowser and ShardX profile management: start, stop, proxy, create.
 - Application logs, HTTP request inspection, and request replay.
 - Interactive ZennoPoster XML graph editing and debugging, plus a general XML
   tree viewer.
@@ -29,7 +29,7 @@ dashboard and local API are served by the built-in HTTP server.
 - .NET 10 SDK when building from source. The repository pins SDK `10.0.103`
   and allows later .NET 10 feature-band versions.
 
-ZennoPoster, ZennoBrowser, and OmniRoute are required only for the dashboard
+ZennoPoster, ZennoBrowser, ShardX, and OmniRoute are required only for the dashboard
 features that integrate with those services.
 
 PostgreSQL stores z3nDash application data. The SQLite page in the dashboard is
@@ -80,7 +80,7 @@ In **Config**:
 1. Select `PostgreSQL`.
 2. Enter the complete PostgreSQL connection string.
 3. Set the dashboard port and storage folders if the defaults are unsuitable.
-4. Add ZennoBrowser and OmniRoute endpoints when those integrations are used.
+4. Add ZennoBrowser, ShardX and OmniRoute endpoints when those integrations are used.
 5. Save the configuration.
 
 Example connection string:
@@ -113,7 +113,7 @@ The default dashboard address is `http://localhost:33333`.
 |---|---|
 | Tasker | Configure, run, stop, and monitor scheduled tasks |
 | ZP7 | Manage ZennoPoster workers and jobs |
-| ZB | Work with ZennoBrowser profiles and processes |
+| Browser | Manage ZennoBrowser or ShardX profiles: start, stop, proxy, create |
 | allLogs | Combined ZP7 log history from every node (modal on ZP7) |
 | Traffic | Inspect and replay HTTP traffic from the nodes and z3nDash (modal on ZP7) |
 | HAR | Inspect HAR archives and replay requests from them |
@@ -121,12 +121,14 @@ The default dashboard address is `http://localhost:33333`.
 | XML | Open, format, search, and inspect XML as a collapsible tree |
 | JSON / Text | Transform and analyze structured or plain text |
 | Clips | Store and copy reusable templates |
-| System | Capture and compare system state |
+| System | Capture system state and check the tools installed for running tasks |
 | dllGraph | Choose a DLL file and explore its C# relationships |
-| Config | Configure PostgreSQL, services, storage, and watchdog |
+| Config | Configure PostgreSQL, services, storage, watchdog, and the interface |
 | docsVault | Browse the bundled documentation or choose a Markdown folder |
 
 The navigation dock also shows the current keyboard shortcuts for these pages.
+Which pages it shows, its screen edge, and the theme are chosen in
+Config → Interface.
 
 ## Network safety
 

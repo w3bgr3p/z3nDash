@@ -2,13 +2,16 @@
 
 The dock is pulled in by every page through `wwwroot/js/nav.js`. Its items and hotkeys live in `wwwroot/js/navpath.js`.
 
+Which of the items to show is chosen in [[Config]] → Interface → Dock pages.
+The theme and the screen edge are set there too; the dock has no theme button. `config` cannot be hidden.
+
 ## Items
 
 | ID | Page | Hotkey |
 |---|---|---|
 | `tasker` | [[Tasker]] | `Alt+1` |
 | `zp7` | [[ZP7]] | `Alt+2` |
-| `zb` | [[ZB]] | `Alt+3` |
+| `browser` | [[Browser]] | `Alt+3` |
 | `har` | [[HAR]] | — |
 | `zpXml` | [[zpXml]] | — |
 | `xml` | [[XML]] | `Alt+9` |

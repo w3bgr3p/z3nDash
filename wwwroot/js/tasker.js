@@ -154,6 +154,8 @@ async function loadList() {
     var res = await fetch('/tasker/list');
     if (!res.ok) throw new Error('/tasker/list HTTP ' + res.status);
     var before = selectedId ? JSON.stringify(schedules.find(function(s) { return s.id === selectedId; }) || null) : '';
+    // Кнопки шапки зависят от всех выделенных, а не только от основной задачи.
+    var beforeSel = selectedId ? JSON.stringify(_selectedList()) : '';
     schedules = await res.json();
     selectedIds.forEach(function(id) {
         if (!schedules.some(function(s) { return s.id === id; })) selectedIds.delete(id);
@@ -167,6 +169,8 @@ async function loadList() {
         if (still && JSON.stringify(still) !== before) {
             renderDetailActions(still);
             if (activeTab !== 'output') renderDetail(still);
+        } else if (still && JSON.stringify(_selectedList()) !== beforeSel) {
+            renderDetailActions(still);
         }
     } else if (!selectedId) {
         var saved = _PS.load().selectedId;
@@ -409,6 +413,9 @@ function onRowClick(e, id) {
     }
     renderList();
     renderBulkState();
+    // Кнопки шапки действуют на всё выделенное — пересчитать подписи и обработчики.
+    var primary = schedules.find(function(s) { return s.id === selectedId; });
+    if (primary) renderDetailActions(primary);
 }
 
 // Выделенные задачи: основная первой, дальше в порядке списка.
@@ -429,7 +436,8 @@ function renderBulkState() {
     if (el) {
         el.style.display = n > 1 ? '' : 'none';
         el.textContent = n > 1
-            ? n + ' tasks selected. Fields you change in Settings or Schedule are saved to all of them (the name is not). '
+            ? n + ' tasks selected. Fields you change in Settings or Schedule are saved to all of them (the name is not); '
+              + 'Run, pause, Restart, Interrupt and Eliminate also apply to all of them. '
               + 'Ctrl+click adds or removes a task, Shift+click selects a range.'
             : '';
     }
@@ -589,21 +597,34 @@ function showDetailHeader(s) {
 
 function renderDetailActions(s) {
     var id         = s.id || '';
-    var pauseLabel = s.enabled === 'false' ? '▶' : '⏸';
+    // При нескольких выделенных Run, пауза, Resume, Restart, Interrupt и удаление
+    // действуют на все; кнопки считают своё состояние по всей выделенной группе.
+    var n          = _bulkCount();
+    var many       = n > 1;
+    var sel        = many ? _selectedList() : [s];
     // Pause relates to the schedule: an on-demand task has nothing to pause.
-    var scheduled  = (s.schedule_mode || 'off') !== 'off';
-    var runLabel   = _isJs(s.executor) ? '▶ npm run' : '▶ Run';
+    var schedSel   = sel.filter(function(x) { return (x.schedule_mode || 'off') !== 'off'; });
+    var scheduled  = schedSel.length > 0;
+    var anyOn      = schedSel.some(function(x) { return x.enabled !== 'false'; });
+    var pauseLabel = anyOn ? '⏸' : '▶';
+    var held       = sel.some(scheduleHeld);
+    var runLabel   = _isJs(s.executor) && !many ? '▶ npm run' : '▶ Run';
+    var suffix     = many ? ' (' + n + ')' : '';
+    var onTitle    = many ? ' — ' + n + ' selected tasks' : '';
+    var prevCount  = document.getElementById('runCount');
+    var countVal   = prevCount && prevCount.value ? prevCount.value : '1';
 
     document.getElementById('detailActions').innerHTML =
         '<div class="action-group">'
-        + '<input type="number" class="form-input" id="runCount" value="1" min="1" max="' + MAX_BURST + '"'
+        + '<input type="number" class="form-input" id="runCount" value="' + escHtml(countVal) + '" min="1" max="' + MAX_BURST + '"'
         +   ' title="How many runs to queue. They start as threads free up." style="width:54px;text-align:center;padding:2px 4px">'
-        + '<button class="btn primary sm" onclick="runNow(\'' + id + '\')">' + runLabel + '</button>'
-        + (scheduled ? '<button class="btn sm" onclick="toggleEnabled(\'' + id + '\',\'' + (s.enabled || 'true') + '\')">' + pauseLabel + '</button>' : '')
-        + (scheduleHeld(s) ? '<button class="btn sm" title="Clear script pause and deferral" onclick="resumeSchedule(\'' + id + '\')">Resume schedule</button>' : '')
-        + '<button class="btn sm" title="Restart" onclick="restartNow(\'' + id + '\')" style="border-color:var(--yellow);color:var(--yellow);">↺</button>'
-        + '<button class="btn stop sm" title="Interrupt" onclick="stopNow(\'' + id + '\')">■</button>'
-        + '<button class="btn danger sm" onclick="deleteSchedule(\'' + id + '\',\'' + escHtml(s.name || '') + '\')">🗑</button>'
+        + '<button class="btn primary sm" title="Run' + onTitle + '" onclick="' + (many ? 'runSelected()' : 'runNow(\'' + id + '\')') + '">' + runLabel + suffix + '</button>'
+        + (scheduled ? '<button class="btn sm" title="' + (anyOn ? 'Pause schedule' : 'Enable schedule') + (many ? ' — ' + schedSel.length + ' scheduled of ' + n + ' selected' : '') + '"'
+            + ' onclick="' + (many ? 'toggleEnabledSelected()' : 'toggleEnabled(\'' + id + '\',\'' + (s.enabled || 'true') + '\')') + '">' + pauseLabel + '</button>' : '')
+        + (held ? '<button class="btn sm" title="Clear script pause and deferral' + onTitle + '" onclick="' + (many ? 'resumeSelected()' : 'resumeSchedule(\'' + id + '\')') + '">Resume schedule</button>' : '')
+        + '<button class="btn sm" title="Restart' + onTitle + '" onclick="' + (many ? 'restartSelected()' : 'restartNow(\'' + id + '\')') + '" style="border-color:var(--yellow);color:var(--yellow);">↺</button>'
+        + '<button class="btn stop sm" title="Interrupt' + onTitle + '" onclick="' + (many ? 'stopSelected()' : 'stopNow(\'' + id + '\')') + '">■' + suffix + '</button>'
+        + '<button class="btn danger sm" title="Eliminate' + onTitle + '" onclick="' + (many ? 'deleteSelected()' : 'deleteSchedule(\'' + id + '\',\'' + escHtml(s.name || '') + '\')') + '">🗑' + suffix + '</button>'
         + '<button class="btn sm" onclick="duplicateSchedule(\'' + id + '\')" style="border-color:var(--yellow);color:var(--yellow);">📋📋</button>'
         + '</div>'
         + '<div class="action-group">'
@@ -622,19 +643,22 @@ function renderDetailActions(s) {
         + '</div>';
 
     // async: добавить кнопки config/install если нужно
-    var prev = document.getElementById('extActionGroup');
-    if (prev) prev.remove();
-    if (_needsConfig(s.executor)) extendDetailActions(s);
+    var seq = ++_extActionsSeq;
+    if (_needsConfig(s.executor)) extendDetailActions(s, seq);
 }
+
+// Each render bumps the counter; a slower earlier extendDetailActions sees it is stale and drops its group.
+var _extActionsSeq = 0;
 
 // ── Config / Install buttons (async, добавляются после scan-folder) ───────────
 
-async function extendDetailActions(s) {
+async function extendDetailActions(s, seq) {
     var res, info;
     try {
         res  = await fetch('/tasker/scan-folder?id=' + encodeURIComponent(s.id));
         info = await res.json();
     } catch(e) { return; }
+    if (seq !== _extActionsSeq) return;
 
     var group = document.createElement('div');
     group.className = 'action-group';
@@ -718,6 +742,8 @@ async function extendDetailActions(s) {
         group.appendChild(instBtn);
     }
 
+    // The npm-scripts fetch above is a second await; re-check before touching the DOM.
+    if (seq !== _extActionsSeq) return;
     var actionsEl = document.getElementById('detailActions');
     if (actionsEl) actionsEl.appendChild(group);
 }
@@ -2359,6 +2385,101 @@ async function killOneInstance(id, runId) {
 
 async function clearQueue(id) {
     await fetch('/tasker/clear-queue', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id}) });
+}
+
+// ── Действия над несколькими выделенными задачами ────────────────────────────
+// Каждая задача — отдельный запрос; отказ одной не останавливает остальные,
+// отказы собираются и показываются одним окном в конце.
+
+async function _postTask(url, body) {
+    try {
+        var res  = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        var text = await res.text();
+        var data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch (e) {}
+        if (res.ok && data.ok !== false) return null;
+        return data.error || ('HTTP ' + res.status + (text ? ': ' + text.trim().slice(0, 200) : ''));
+    } catch (e) {
+        return e.message;
+    }
+}
+
+async function _forSelected(list, url, bodyFn) {
+    var failed = [];
+    for (var i = 0; i < list.length; i++) {
+        var err = await _postTask(url, bodyFn(list[i]));
+        if (err) failed.push((list[i].name || list[i].id) + ': ' + err);
+    }
+    return failed;
+}
+
+function _reportFailed(what, failed) {
+    if (failed.length) Dialog.error(what + ':\n' + failed.join('\n'));
+}
+
+function _namesList(list) {
+    return list.map(function(s) { return '  ' + (s.name || s.id); }).join('\n');
+}
+
+async function runSelected() {
+    var list  = _selectedList();
+    var count = _runCount();
+    var failed = await _forSelected(list, '/tasker/run', function(s) { return { id: s.id, count: count }; });
+    await loadList();
+    if (selectedId) startSseOutput(selectedId);
+    _reportFailed('Not started', failed);
+}
+
+// Если хоть одно расписание в группе включено — ставим на паузу все, иначе включаем все.
+async function toggleEnabledSelected() {
+    var list = _selectedList().filter(function(s) { return (s.schedule_mode || 'off') !== 'off'; });
+    if (!list.length) return;
+    var target = list.some(function(s) { return s.enabled !== 'false'; }) ? 'false' : 'true';
+    var failed = await _forSelected(list.filter(function(s) { return (s.enabled === 'false' ? 'false' : 'true') !== target; }),
+        '/tasker/save', function(s) { return { id: s.id, enabled: target }; });
+    await loadList();
+    _reportFailed(target === 'false' ? 'Not paused' : 'Not enabled', failed);
+}
+
+async function resumeSelected() {
+    var list = _selectedList().filter(scheduleHeld);
+    var failed = await _forSelected(list, '/tasker/resume', function(s) { return { id: s.id }; });
+    await loadList();
+    _reportFailed('Not resumed', failed);
+}
+
+async function stopSelected() {
+    var list = _selectedList();
+    if (!(await Dialog.confirm('Interrupt ' + list.length + ' tasks?\n' + _namesList(list), '■ Interrupt', true))) return;
+    var failed = await _forSelected(list, '/tasker/stop', function(s) { return { id: s.id }; });
+    // Как и у одной задачи: без сброса очереди следующий прогон поднимется сам.
+    var queued = [];
+    for (var i = 0; i < list.length; i++) {
+        var pending = await _pendingCount(list[i].id);
+        if (pending) queued.push({ s: list[i], pending: pending });
+    }
+    if (queued.length) {
+        var lines = queued.map(function(q) { return '  ' + (q.s.name || q.s.id) + ': ' + q.pending; }).join('\n');
+        if (await Dialog.confirm('Queued runs will start as threads free up:\n' + lines + '\nDrop them too?', '■ Interrupt', true))
+            failed = failed.concat(await _forSelected(queued.map(function(q) { return q.s; }), '/tasker/clear-queue', function(s) { return { id: s.id }; }));
+    }
+    await loadList();
+    _reportFailed('Not interrupted', failed);
+}
+
+async function restartSelected() {
+    var list  = _selectedList();
+    var count = _runCount();
+    var failed = await _forSelected(list, '/tasker/stop', function(s) { return { id: s.id }; });
+    await new Promise(function(r) { setTimeout(r, 800); });
+    failed = failed.concat(await _forSelected(list, '/tasker/run', function(s) { return { id: s.id, count: count }; }));
+    await loadList();
+    if (selectedId) startSseOutput(selectedId);
+    _reportFailed('Not restarted', failed);
+}
+
+function deleteSelected() {
+    return deleteSchedules(_selectedList().map(function(s) { return s.id; }));
 }
 
 var OVERLAP_LABELS = { skip: 'Skip', parallel: 'Queue', kill_restart: 'Kill & restart' };

@@ -73,7 +73,12 @@ function initTheme() {
             if (data.theme)        setTheme(data.theme);
             if (data.dockPosition) {
                 localStorage.setItem('zp-dock-pos', data.dockPosition);
-                setDockPosition(data.dockPosition);
+                if (typeof window.setDockPosition === 'function') window.setDockPosition(data.dockPosition);
+            }
+            if (Array.isArray(data.dockHidden)) {
+                // Док мог ещё не собраться — тогда он прочтёт это из localStorage.
+                localStorage.setItem('zp-dock-hidden', JSON.stringify(data.dockHidden));
+                if (typeof window.applyDockHidden === 'function') window.applyDockHidden(data.dockHidden);
             }
         })
         .catch(() => {});

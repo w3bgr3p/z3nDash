@@ -46,6 +46,7 @@ public sealed class ClipboardConverterService : IDisposable
         supported   = false,
         enabled     = false,
         processName = _cfg.ProcessName ?? "",
+        autoPaste   = _cfg.AutoPaste,
         foreground  = "",
         active      = false,
         hotkeys     = Array.Empty<object>(),
@@ -73,6 +74,47 @@ public sealed class ClipboardConverterService : IDisposable
     private static extern bool UnhookWinEvent(IntPtr hWinEventHook);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint   dwFlags;
+        public uint   time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int    dx;
+        public int    dy;
+        public uint   mouseData;
+        public uint   dwFlags;
+        public uint   time;
+        public IntPtr dwExtraInfo;
+    }
+
+    // Union INPUT: MOUSEINPUT — самый большой член, он задаёт размер структуры.
+    // Без него sizeof(INPUT) меньше ожидаемого и SendInput отклоняет вызов с кодом 87.
+    [StructLayout(LayoutKind.Explicit)]
+    private struct INPUT
+    {
+        [FieldOffset(0)] public uint       type;
+        [FieldOffset(8)] public MOUSEINPUT mi;
+        [FieldOffset(8)] public KEYBDINPUT ki;
+    }
+
+    private const uint INPUT_KEYBOARD  = 1;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const ushort VK_CONTROL = 0x11;
+    private const ushort VK_MENU    = 0x12;   // Alt
+    private const ushort VK_V       = 0x56;
 
     private delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd,
         int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
@@ -297,8 +339,46 @@ public sealed class ClipboardConverterService : IDisposable
         try { Clipboard.SetText(result); }
         catch (Exception ex) { Record("write_clipboard", ex); return; }
 
-        lock (_lock) { _converted++; _lastResult = $"{action} · {DateTime.Now:HH:mm:ss}"; }
+        bool autoPaste;
+        lock (_lock) { _converted++; _lastResult = $"{action} · {DateTime.Now:HH:mm:ss}"; autoPaste = _cfg.AutoPaste; }
+
+        if (autoPaste) SendPaste();
     }
+
+    // Эмуляция Ctrl+V. Хоткей сработал при зажатом Alt, а Ctrl+Alt+V — другое
+    // сочетание, поэтому Alt на время вставки снимается и возвращается, если
+    // пользователь всё ещё держит его физически (иначе следующий Alt+G не сработает).
+    // Ctrl нажимается ДО отпускания Alt: Alt, отпущенный без другой клавиши между,
+    // активирует меню окна.
+    private void SendPaste()
+    {
+        try
+        {
+            Thread.Sleep(30);   // дать буферу обмена примениться до того, как приложение его прочтёт
+
+            bool altHeld = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+
+            var seq = new List<INPUT> { Key(VK_CONTROL, false) };
+            if (altHeld) seq.Add(Key(VK_MENU, true));
+            seq.Add(Key(VK_V, false));
+            seq.Add(Key(VK_V, true));
+            seq.Add(Key(VK_CONTROL, true));
+            if (altHeld) seq.Add(Key(VK_MENU, false));
+
+            var arr  = seq.ToArray();
+            uint sent = SendInput((uint)arr.Length, arr, Marshal.SizeOf<INPUT>());
+            if (sent != arr.Length)
+                throw new InvalidOperationException(
+                    $"SendInput accepted {sent} of {arr.Length} events, Win32 error {Marshal.GetLastWin32Error()}");
+        }
+        catch (Exception ex) { Record("send_paste", ex); }
+    }
+
+    private static INPUT Key(ushort vk, bool up) => new()
+    {
+        type = INPUT_KEYBOARD,
+        ki   = new KEYBDINPUT { wVk = vk, dwFlags = up ? KEYEVENTF_KEYUP : 0 },
+    };
 
     // Шаг + дословный текст исключения. Без трактовки причины.
     private void Record(string step, Exception ex)
@@ -330,6 +410,7 @@ public sealed class ClipboardConverterService : IDisposable
                 supported   = true,
                 enabled     = _cfg.Enabled,
                 processName = _cfg.ProcessName ?? "",
+                autoPaste   = _cfg.AutoPaste,
                 foreground,
                 active      = _registered,
                 hotkeys,

@@ -13,7 +13,7 @@ window.ICONS = {
                   <circle cx="164" cy="156" r="60" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                   <circle cx="92" cy="156" r="60" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
                 </svg>`,
-    zb:         `<svg viewBox="0 0 256 256">
+    browser:    `<svg viewBox="0 0 256 256">
                   <path fill="none" d="M0 0h256v256H0z"/>
                   <circle cx="128" cy="128" r="96" opacity=".2"/>
                   <circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>

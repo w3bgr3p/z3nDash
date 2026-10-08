@@ -16,10 +16,37 @@ body {
     flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-8);
 }
 .main-header h1 { font-size: var(--fs-13); font-weight: var(--fw-bold); color: var(--accent); }
-.header-stats { display: flex; gap: var(--sp-14); font-size: var(--fs-10); color: var(--text2); margin-left: var(--sp-8); }
+.header-stats { display: flex; flex-wrap: wrap; gap: var(--sp-14); font-size: var(--fs-10); color: var(--text2); margin-left: var(--sp-8); }
 .stat-item { display: flex; gap: var(--sp-4); align-items: center; white-space: nowrap; }
 .stat-label { color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; }
 .stat-val   { color: var(--accent); font-weight: var(--fw-semi); }
+
+/* Physical RAM and system commit have separate denominators. */
+.memory-overview { margin-bottom: var(--sp-12); }
+.memory-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--sp-12); margin: var(--sp-12) 0; }
+.memory-card { --memory-used: var(--accent); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--sp-12); background: var(--bg1); }
+.memory-card.warning { --memory-used: var(--yellow); }
+.memory-card.critical { --memory-used: var(--red); }
+.memory-card h2, .memory-table-title { font-size: var(--fs-11); margin-bottom: var(--sp-8); }
+.memory-chart-row { display: flex; align-items: center; gap: var(--sp-14); flex-wrap: wrap; }
+.memory-pie { width: 116px; height: 116px; flex-shrink: 0; border-radius: 50%; background: conic-gradient(var(--memory-used) 0 var(--used), var(--bg3, var(--border)) var(--used) 100%); display: grid; place-items: center; }
+.memory-pie span { display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%; background: var(--bg1); font-size: var(--fs-13); font-weight: var(--fw-bold); }
+.memory-legend { flex: 1; min-width: 150px; }
+.memory-legend div { display: flex; align-items: center; gap: var(--sp-4); margin: var(--sp-6) 0; color: var(--text2); }
+.memory-legend strong { margin-left: auto; color: var(--text); white-space: nowrap; }
+.memory-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.memory-dot.allocated { background: var(--memory-used); }
+.memory-dot.available { background: var(--bg3, var(--border)); border: 1px solid var(--text2); }
+.memory-total { padding-top: var(--sp-6); border-top: 1px solid var(--border); }
+.memory-status { padding: var(--sp-8); border: 1px solid var(--border); border-left: 3px solid var(--green); }
+.memory-status.warning { border-left-color: var(--yellow); color: var(--yellow); }
+.memory-status.critical { border-left-color: var(--red); color: var(--red); }
+.memory-status.unavailable { border-left-color: var(--text2); }
+.memory-explanation { color: var(--text2); line-height: 1.6; max-width: 960px; margin: var(--sp-8) 0; }
+.memory-details { margin: var(--sp-12) 0; color: var(--text2); line-height: 1.6; }
+.memory-details strong { color: var(--text); }
+.memory-commit.critical { color: var(--red); }
+.memory-commit.warning { color: var(--yellow); }
 .header-right { margin-left: auto; display: flex; gap: var(--sp-6); align-items: center; }
 
 /* ── Toolbar ── */
@@ -207,3 +234,28 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-sm); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+/* ── Environment (fixed section, not part of the snapshot) ── */
+.nav-sep { height: 1px; background: var(--border); margin: var(--sp-6) var(--sp-12); }
+.env-head { display: flex; align-items: center; gap: var(--sp-8); margin-bottom: var(--sp-6); }
+.env-head h2 { font-size: var(--fs-11); color: var(--text-hi); }
+.env-head .btn { margin-left: auto; }
+.env-note { font-size: var(--fs-10); color: var(--text2); margin-bottom: var(--sp-8); }
+.env-stamp { font-size: var(--fs-10); color: var(--text2); margin-bottom: var(--sp-8); }
+.env-status { font-size: var(--fs-10); margin-bottom: var(--sp-8); }
+.env-status.ok  { color: var(--green); }
+.env-status.err { color: var(--red); }
+.env-group { font-size: var(--fs-10); color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin: 14px 0 6px; }
+.env-row { display: grid; grid-template-columns: minmax(140px, 200px) minmax(90px, 140px) 1fr; gap: 10px; align-items: start;
+           padding: 6px 0; border-top: 1px solid var(--border); font-size: 11px; }
+.env-name { color: var(--text-hi); }
+.env-row > * { min-width: 0; }
+.env-row .pill { display: inline-block; max-width: 100%; white-space: normal; overflow-wrap: anywhere;
+                 padding: 1px 6px; border-radius: var(--radius-lg); font-size: var(--fs-10); font-weight: var(--fw-bold); }
+.pill.ok   { background: var(--green-tint);  color: var(--green);  border: 1px solid var(--green-tint-border); }
+.pill.warn { background: var(--yellow-tint); color: var(--yellow); border: 1px solid var(--yellow-tint-border); }
+.pill.err  { background: var(--red-tint);    color: var(--red);    border: 1px solid var(--red-tint-border); }
+.env-install { margin-top: 6px; padding: 2px 9px; font-size: 10px; }
+.env-path, .env-detail { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--text2); white-space: pre-wrap; word-break: break-all; }
+.env-path { color: var(--text); }
+@media (max-width: 700px) { .env-row { grid-template-columns: 1fr; gap: 4px; } }

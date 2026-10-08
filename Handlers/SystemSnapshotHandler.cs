@@ -108,28 +108,51 @@ internal sealed class SystemSnapshotHandler
 
         Section("SYSTEM MEMORY SUMMARY");
         var mem = PlatformSnapshot.GetMemoryInfo();
-        Line($"Total    : {mem.TotalGb} GB");
-        Line($"Used     : {mem.UsedGb} GB  ({mem.UsedPct}%)");
-        Line($"Free     : {mem.FreeGb} GB");
+        Line(FormattableString.Invariant($"Total    : {mem.TotalGb} GB"));
+        Line(FormattableString.Invariant($"Used     : {mem.UsedGb} GB  ({mem.UsedPct}%)"));
+        Line(FormattableString.Invariant($"Free     : {mem.FreeGb} GB"));
+        if (mem.Commit is { } commit)
+        {
+            Line($"Commit used bytes : {commit.UsedBytes}");
+            Line($"Commit limit bytes : {commit.LimitBytes}");
+            Line($"Commit peak bytes : {commit.PeakBytes}");
+            Line($"Paged pool bytes : {commit.PagedPoolBytes}");
+            Line($"Nonpaged pool bytes : {commit.NonpagedPoolBytes}");
+        }
 
         Section("CPU SUMMARY");
         Line($"Logical CPUs : {Environment.ProcessorCount}");
         var cpuLoad = PlatformSnapshot.GetCpuLoad();
         Line($"Load         : {cpuLoad}");
 
+        var processGroups = allProcs.GroupBy(p => p.ProcessName)
+            .Select(g => {
+                long mem2 = 0, privateBytes = 0;
+                int unreadable = 0;
+                foreach (var p in g)
+                {
+                    try { mem2 += p.WorkingSet64; } catch { }
+                    try { privateBytes += p.PrivateMemorySize64; } catch { unreadable++; }
+                }
+                var totalMB = Math.Round(mem2 / 1048576.0, 1);
+                var tcp     = g.Sum(p => connByPid.TryGetValue(p.Id, out var c) ? c : 0);
+                return (Name: g.Key, TotalMB: totalMB, PrivateMB: Math.Round(privateBytes / 1048576.0, 1),
+                    Count: g.Count(), Tcp: tcp, AvgMB: Math.Round(totalMB / g.Count(), 1), Unreadable: unreadable);
+            })
+            .ToArray();
+
+        Section("MEMORY ALLOCATION");
+        Row(("NAME", 35), ("PRIVATE_MB", 12), ("RAM_MB", 12), ("INSTANCES", 10), ("UNREADABLE", 0));
+        Line(new string('-', 90));
+        foreach (var g in processGroups.OrderByDescending(x => x.PrivateMB))
+            Row((g.Name, 35), (g.PrivateMB.ToString("F1", System.Globalization.CultureInfo.InvariantCulture), 12),
+                (g.TotalMB.ToString("F1", System.Globalization.CultureInfo.InvariantCulture), 12),
+                (g.Count, 10), (g.Unreadable, 0));
+
         Section("PROCESS AGGREGATION BY NAME (ALL INSTANCES SUMMED)");
         Row(("NAME", 35), ("TOTAL_MEM_MB", 12), ("INSTANCES", 10), ("TCP_CONNS", 12), ("AVG_MEM_MB", 0));
         Line(new string('-', 80));
-
-        foreach (var g in allProcs.GroupBy(p => p.ProcessName)
-            .Select(g => {
-                long mem2 = 0;
-                foreach (var p in g) try { mem2 += p.WorkingSet64; } catch { }
-                var totalMB = Math.Round(mem2 / 1048576.0, 1);
-                var tcp     = g.Sum(p => connByPid.TryGetValue(p.Id, out var c) ? c : 0);
-                return (Name: g.Key, TotalMB: totalMB, Count: g.Count(), Tcp: tcp, AvgMB: Math.Round(totalMB / g.Count(), 1));
-            })
-            .OrderByDescending(x => x.TotalMB))
+        foreach (var g in processGroups.OrderByDescending(x => x.TotalMB))
         {
             Row((g.Name, 35), (g.TotalMB, 12), (g.Count, 10), (g.Tcp, 12), (g.AvgMB, 0));
         }
@@ -238,7 +261,9 @@ internal sealed class SystemSnapshotHandler
 
         var systemPrompt =
             "You are a system auditor. Analyze the provided system snapshot and identify: " +
-            "1) Memory pressure — which processes or process groups consume the most RAM (total, not just per-instance). " +
+            "1) Memory pressure — distinguish physical RAM from system commit used/limit/headroom. " +
+            "Commit exhaustion can cause allocation failures even with available RAM. Compare process groups by private allocation and RAM; " +
+            "private process totals do not account for all system commit, and UNREADABLE marks incomplete measurements. " +
             "2) Network anomalies — unusually high connection counts per process, suspicious listening ports, unexpected established connections. " +
             "3) Disk pressure — drives above 80% utilization. " +
             "4) CPU load assessment relative to process count. " +
@@ -513,7 +538,7 @@ internal sealed class SystemSnapshotHandler
         var sb = new StringBuilder();
         sb.AppendLine($"System audit snapshot. Host: {ExtractField(raw, "Hostname")}, Captured: {ExtractField(raw, "Captured")}, Uptime: {ExtractField(raw, "Uptime")}");
         sb.AppendLine();
-        foreach (var s in new[] { "SYSTEM MEMORY SUMMARY", "CPU SUMMARY", "PROCESS AGGREGATION BY NAME",
+        foreach (var s in new[] { "SYSTEM MEMORY SUMMARY", "MEMORY ALLOCATION", "CPU SUMMARY", "PROCESS AGGREGATION BY NAME",
                                    "LISTENING PORTS SUMMARY", "ESTABLISHED TCP CONNECTIONS", "DISK USAGE", "ENVIRONMENT MARKERS" })
             AppendSection(sb, raw, s);
         return sb.ToString();
@@ -559,7 +584,9 @@ internal sealed class SystemSnapshotHandler
 internal static class PlatformSnapshot
 {
     internal record TcpRow(string Proto, int Pid, string LocalAddr, int LocalPort, string RemoteAddr, int RemotePort, string State);
-    internal record MemInfo(double TotalGb, double UsedGb, double FreeGb, double UsedPct);
+    internal record CommitInfo(ulong UsedBytes, ulong LimitBytes, ulong PeakBytes,
+        ulong PagedPoolBytes, ulong NonpagedPoolBytes);
+    internal record MemInfo(double TotalGb, double UsedGb, double FreeGb, double UsedPct, CommitInfo? Commit = null);
     internal record ServiceInfo(string Name, string Display);
 
     // ── TCP rows ──────────────────────────────────────────────────────────────
@@ -742,6 +769,20 @@ internal static class PlatformSnapshot
     internal static MemInfo GetMemoryInfo()
     {
 #if WINDOWS
+        var perf = new NativeMethods.PERFORMANCE_INFORMATION();
+        perf.cb = (uint)Marshal.SizeOf<NativeMethods.PERFORMANCE_INFORMATION>();
+        if (NativeMethods.GetPerformanceInfo(ref perf, perf.cb))
+        {
+            var pageSize = perf.PageSize.ToUInt64();
+            ulong Bytes(UIntPtr pages) => pages.ToUInt64() * pageSize;
+            var totalGb = Bytes(perf.PhysicalTotal) / 1073741824.0;
+            var freeGb = Bytes(perf.PhysicalAvailable) / 1073741824.0;
+            var usedGb = totalGb - freeGb;
+            return new MemInfo(Math.Round(totalGb, 2), Math.Round(usedGb, 2), Math.Round(freeGb, 2),
+                totalGb > 0 ? Math.Round(usedGb / totalGb * 100, 1) : 0,
+                new CommitInfo(Bytes(perf.CommitTotal), Bytes(perf.CommitLimit), Bytes(perf.CommitPeak),
+                    Bytes(perf.KernelPaged), Bytes(perf.KernelNonpaged)));
+        }
         var s = new NativeMethods.MEMORYSTATUSEX { dwLength = 64 };
         if (!NativeMethods.GlobalMemoryStatusEx(ref s)) return new MemInfo(0, 0, 0, 0);
         var total = Math.Round(s.ullTotalPhys / 1073741824.0, 2);
@@ -877,6 +918,20 @@ internal static class PlatformSnapshot
 #if WINDOWS
 internal static class NativeMethods
 {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PERFORMANCE_INFORMATION
+    {
+        public uint cb;
+        public UIntPtr CommitTotal, CommitLimit, CommitPeak;
+        public UIntPtr PhysicalTotal, PhysicalAvailable, SystemCache;
+        public UIntPtr KernelTotal, KernelPaged, KernelNonpaged, PageSize;
+        public uint HandleCount, ProcessCount, ThreadCount;
+    }
+
+    [DllImport("psapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetPerformanceInfo(ref PERFORMANCE_INFORMATION info, uint size);
+
     [System.Runtime.InteropServices.DllImport("iphlpapi.dll", SetLastError = true)]
     public static extern int GetExtendedTcpTable(IntPtr pTcpTable, ref int dwSize, bool sort,
         int ipVersion, int tableClass, int reserved);

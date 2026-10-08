@@ -19,7 +19,7 @@ z3nDash — дашборд для расписаний, ZennoPoster-узлов, 
 |---|---|---|
 | [[Tasker]] | Расписания и ручной запуск задач | `Alt+1` |
 | [[ZP7]] | Состояние и управление задачами через ZP node | `Alt+2` |
-| [[ZB]] | Данные ZennoBoxer API и процессы | `Alt+3` |
+| [[Browser]] | Профили ZennoBrowser и ShardX: запуск, прокси, создание | `Alt+3` |
 | [[Logs]] | Общая история логов ZP7, окно на [[ZP7]] | `Alt+4` |
 | [[Traffic]] | HTTP-трафик и replay, окно на [[ZP7]] | `Alt+5` |
 | [[HAR]] | Просмотр HAR-архивов и replay | — |
@@ -27,9 +27,9 @@ z3nDash — дашборд для расписаний, ZennoPoster-узлов, 
 | [[XML]] | Просмотр, форматирование и поиск по XML-дереву | `Alt+9` |
 | [[JSON]] | Просмотр и анализ JSON | `Alt+6` |
 | [[Text Tools]] | Текстовые преобразования | `Alt+7` |
-| [[Config]] | База, сервер, OmniRoute и watchdog | `Alt+0` |
+| [[Config]] | База, сервер, OmniRoute, watchdog и интерфейс | `Alt+0` |
 | [[Clips]] | Шаблоны для копирования | `Alt+C` |
-| [[System Snapshot]] | Снимки состояния Windows | — |
+| [[System Snapshot]] | Снимки состояния Windows и инструменты машины | — |
 | [[dllGraph]] | Граф C#-кода | `Alt+G` |
 | [[docsVault]] | Этот vault | `Alt+H` |
 | [[SQLite]] | Просмотр выбранной SQLite-базы | — |

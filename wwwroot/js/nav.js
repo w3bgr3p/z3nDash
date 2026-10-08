@@ -32,6 +32,7 @@ window.PageState = {
         if (p.includes('har'))         return 'har';
         if (p.includes('zpxml') || q.toLowerCase().includes('page=zpxml')) return 'zpXml';
         if (q.includes('page=xml'))    return 'xml';
+        if (q.includes('page=browser')) return 'browser';
         if (q.includes('page=config')) return 'config';
         if (p.includes('json'))        return 'json';
         return 'home';
@@ -66,6 +67,33 @@ window.PageState = {
             body: JSON.stringify({ theme: getTheme(), dockPosition: next })
         }).catch(() => {});
     }
+
+    // Страницы, скрытые в Config → Interface. Config скрыть нельзя: иначе в настройки
+    // из дока не попасть.
+    const DOCK_HIDDEN_KEY = 'zp-dock-hidden';
+    const DOCK_LOCKED     = ['config'];
+
+    function getDockHidden() {
+        try {
+            const v = JSON.parse(localStorage.getItem(DOCK_HIDDEN_KEY));
+            return Array.isArray(v) ? v.filter(id => !DOCK_LOCKED.includes(id)) : [];
+        } catch { return []; }
+    }
+
+    function applyDockHidden(hidden) {
+        if (!Array.isArray(hidden)) hidden = [];
+        hidden = hidden.filter(id => !DOCK_LOCKED.includes(id));
+        localStorage.setItem(DOCK_HIDDEN_KEY, JSON.stringify(hidden));
+        document.querySelectorAll('#zp-dock .zp-di[data-id]').forEach(el => {
+            el.style.display = hidden.includes(el.dataset.id) ? 'none' : '';
+        });
+    }
+
+    window.setDockPosition = (pos) => setDockPosition(pos);
+    window.getDockPosition = getDockPosition;
+    window.getDockHidden   = getDockHidden;
+    window.applyDockHidden = applyDockHidden;
+    window.DOCK_LOCKED     = DOCK_LOCKED;
 
     function setDockPosition(pos) {
         if (!DOCK_POSITIONS.includes(pos)) pos = 'bottom';
@@ -287,6 +315,7 @@ window.PageState = {
 
             const el = document.createElement(item.href ? 'a' : 'div');
             el.className = 'zp-di' + (item.id === current ? ' active' : '');
+            el.dataset.id = item.id;
             if (item.href) el.href = item.href;
             if (item.onclick) el.addEventListener('click', e => { e.preventDefault(); item.onclick(); });
 
@@ -303,22 +332,8 @@ window.PageState = {
             dock.appendChild(el);
         });
 
-        const sep = document.createElement('div');
-        sep.className = 'zp-dock-sep';
-        dock.appendChild(sep);
-
-        const th = document.createElement('div');
-        th.className = 'zp-di';
-        th.innerHTML = `
-            <div class="zp-di-icon">${ICONS.theme}</div>
-            <div class="zp-di-label">Theme</div>
-            <div class="zp-di-tip">Theme <span style="color:var(--muted)">Alt+T</span></div>
-            <div class="zp-di-dot"></div>
-        `;
-        th.onclick = () => typeof cycleTheme === 'function' && cycleTheme();
+        // Тема выбирается в Config → Interface; в доке её нет, хоткей остался.
         HOTKEYS['alt+KeyT'] = () => typeof cycleTheme === 'function' && cycleTheme();
-
-        dock.appendChild(th);
 
         wrap.appendChild(dock);
         document.body.appendChild(zone);
@@ -332,6 +347,7 @@ window.PageState = {
         }
         
         setDockPosition(getDockPosition());
+        applyDockHidden(getDockHidden());
         HOTKEYS['alt+KeyP'] = () => cycleDockPosition();
 
 

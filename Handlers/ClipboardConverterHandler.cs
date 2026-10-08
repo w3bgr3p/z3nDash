@@ -83,6 +83,8 @@ public sealed class ClipboardConverterHandler : IScriptHandler
             var enabled     = doc.TryGetProperty("enabled", out var e) && e.ValueKind == JsonValueKind.True;
             var processName = doc.TryGetProperty("processName", out var pn) ? pn.GetString() ?? "" : "";
 
+            var autoPaste   = !doc.TryGetProperty("autoPaste", out var ap) || ap.ValueKind != JsonValueKind.False;
+
             processName = processName.Trim();   // пусто = гейт выключен, это валидное значение
 
             // ── merge в существующий конфиг (паттерн ConfigHandler) ─────────
@@ -101,6 +103,7 @@ public sealed class ClipboardConverterHandler : IScriptHandler
                 {
                     Enabled     = enabled,
                     ProcessName = processName,
+                    AutoPaste   = autoPaste,
                 }));
 
             if (File.Exists(cfgPath)) File.Copy(cfgPath, cfgPath + ".bak", overwrite: true);

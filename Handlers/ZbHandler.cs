@@ -17,13 +17,22 @@ internal sealed class ZbHandler
 
     private static string ZbKey => Config.BrowsersApi.ZennoBrowser.Token;
 
+    // ShardX Launcher: локальный API, Bearer-токен из настроек лаунчера
+    private static string ShardXBase =>
+        !string.IsNullOrWhiteSpace(Config.BrowsersApi.ShardX.Host)
+            ? Config.BrowsersApi.ShardX.Host.TrimEnd('/')
+            : "http://127.0.0.1:40325";
+
+    private static string ShardXToken => Config.BrowsersApi.ShardX.Token;
+
     public ZbHandler()
     {
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        // Старт профиля ShardX сначала проверяет прокси, поэтому запас как в BrowserProvider
+        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
     }
 
     public bool Matches(string path) =>
-        path.StartsWith("/zb/");
+        path.StartsWith("/zb/") || path.StartsWith("/shardx/");
 
     public async Task Handle(HttpListenerContext ctx)
     {
@@ -47,7 +56,19 @@ internal sealed class ZbHandler
         // /zb/api/* → проксируем в ZB API
         if (path.StartsWith("/zb/api/"))
         {
-            await Proxy(ctx, path);
+            await Proxy(ctx, ZbBase + path["/zb/api".Length..], "ZB",
+                req => req.Headers.TryAddWithoutValidation("Api-Token", ZbKey));
+            return;
+        }
+
+        // /shardx/api/* → проксируем в ShardX Launcher API
+        if (path.StartsWith("/shardx/api/"))
+        {
+            await Proxy(ctx, ShardXBase + path["/shardx/api".Length..], "ShardX", req =>
+            {
+                if (!string.IsNullOrWhiteSpace(ShardXToken))
+                    req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + ShardXToken.Trim());
+            });
             return;
         }
 
@@ -57,12 +78,11 @@ internal sealed class ZbHandler
 
     // ── Proxy ─────────────────────────────────────────────────────────────────
 
-    private async Task Proxy(HttpListenerContext ctx, string path)
+    // /zb/api/v1/profiles → http://zbhost/v1/profiles, /shardx/api/profiles → http://shardx/profiles
+    private async Task Proxy(HttpListenerContext ctx, string targetPath, string name, Action<HttpRequestMessage> auth)
     {
-        // /zb/api/v1/profiles → http://zbhost/v1/profiles
-        var zbPath = path["/zb/api".Length..]; // оставляем /v1/...
         var query  = ctx.Request.Url?.Query ?? "";
-        var target = ZbBase + zbPath + query;
+        var target = targetPath + query;
 
         var req = new HttpRequestMessage
         {
@@ -70,7 +90,7 @@ internal sealed class ZbHandler
             RequestUri = new Uri(target),
         };
 
-        req.Headers.TryAddWithoutValidation("Api-Token", ZbKey);
+        auth(req);
 
         // Пробрасываем тело для POST/PUT/DELETE с телом
         if (ctx.Request.HasEntityBody)
@@ -96,7 +116,7 @@ internal sealed class ZbHandler
         catch (Exception ex)
         {
             ctx.Response.StatusCode = 502;
-            await HttpHelpers.WriteJson(ctx.Response, new { error = "ZB unreachable: " + ex.Message });
+            await HttpHelpers.WriteJson(ctx.Response, new { error = name + " unreachable: " + ex.Message });
         }
     }
 

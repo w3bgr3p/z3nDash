@@ -224,6 +224,21 @@ public sealed class SchedulerHandler : IScriptHandler
         var id = json.Value.TryGetProperty("id", out var eid) ? eid.GetString() ?? "" : "";
         if (string.IsNullOrEmpty(id)) { ctx.Response.StatusCode = 400; return; }
 
+        // Необязательные args на этот залп: уходят в очередь вместо args задачи,
+        // сохранённая задача не меняется. Проверка стоит до поиска задачи, чтобы
+        // вызывающий мог узнать, понимает ли этот z3nDash поле, не запуская ничего.
+        string? args = null;
+        if (json.Value.TryGetProperty("args", out var eargs) && eargs.ValueKind != JsonValueKind.Null)
+        {
+            args = eargs.ValueKind == JsonValueKind.String ? eargs.GetString()?.Trim() : null;
+            if (string.IsNullOrEmpty(args))
+            {
+                ctx.Response.StatusCode = 400;
+                await HttpHelpers.WriteJson(ctx.Response, new { error = "args must be a non-empty string" });
+                return;
+            }
+        }
+
         if (!TryReadCount(json.Value, out var count))
         {
             ctx.Response.StatusCode = 400;
@@ -239,8 +254,8 @@ public sealed class SchedulerHandler : IScriptHandler
         var rows = db.GetLines(string.Join(",", cols), Table, where: $"\"id\" = '{id}'");
         if (rows.Count == 0) { ctx.Response.StatusCode = 404; return; }
 
-        var queued = _scheduler.EnqueueManual(id, ParseRow(rows[0], cols), db, count);
-        await HttpHelpers.WriteJson(ctx.Response, new { ok = true, id, queued });
+        var queued = _scheduler.EnqueueManual(id, ParseRow(rows[0], cols), db, count, args);
+        await HttpHelpers.WriteJson(ctx.Response, new { ok = true, id, queued, args });
     }
 
     /// <summary>

@@ -134,6 +134,14 @@ The run, stop and delete commands take the JSON `{"id":"task ID"}`.
 `save` accepts an `id` and the task fields to change, for example `enabled`,
 `schedule_mode`, `cron`, `schedule_json`. Without an `id` it creates a new task.
 
+`/tasker/run` also takes `count` (how many runs to queue) and an optional string `args`:
+it goes into the queue items of that burst instead of the task's `args`, and the task
+itself is not changed. This lets an orchestrating script launch a burst with a different
+country without touching the schedule or settings. Payload flags are still appended,
+except those already present in `args`. A non-string or empty `args` gets 400
+`args must be a non-empty string` (checked before `count` and before the task lookup).
+The response includes the burst's `args`.
+
 There are also operator commands: `POST /tasker/pause` and `/tasker/resume` with the
 body `{"id":"..."}`, and `POST /tasker/defer?id=...` with the same body as
 `/self/defer`. They use the existing access to the dashboard API.

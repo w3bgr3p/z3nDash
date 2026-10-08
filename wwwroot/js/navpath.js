@@ -2,7 +2,7 @@ window.NAV_CONFIG = {
     hotkeys: {
         'alt+Digit1': '/?page=tasker',
         'alt+Digit2': '/?page=zp7',
-        'alt+Digit3': '/?page=zb',
+        'alt+Digit3': '/?page=browser',
         'alt+Digit4': '/?page=zp7#allLogs',
         'alt+Digit5': '/?page=zp7#traffic',
         'alt+Digit6': '/json',
@@ -17,7 +17,7 @@ window.NAV_CONFIG = {
 
         { id: 'tasker', label: 'Tasker',  href: '/tasker.html', hotkey: '1' },
         { id: 'zp7',       label: 'ZP7',         href: '/?page=zp7',     hotkey: '2' },
-        { id: 'zb',        label: 'ZB',         href: '/?page=zb',       hotkey: '3' },
+        { id: 'browser',   label: 'Browser',    href: '/?page=browser',  hotkey: '3' },
         { id: 'har',       label: 'HAR',        href: '/har.html',       hotkey: '' },
         { id: 'zpXml',  label: 'zpXml',   href: '/?page=zpxml.html',       hotkey: '' },
         { id: 'xml',       label: 'XML',        href: '/?page=xml',      hotkey: '9' },

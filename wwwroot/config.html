@@ -284,6 +284,13 @@
                     <label>Process Name · empty = everywhere</label>
                     <input id="ccProcessName" type="text" placeholder="ProjectMaker">
                 </div>
+                <div class="field">
+                    <label>Auto-paste (sends Ctrl+V)</label>
+                    <select id="ccAutoPaste">
+                        <option value="true">On</option>
+                        <option value="false">Off</option>
+                    </select>
+                </div>
             </div>
             <div class="btn-row">
                 <button class="btn primary" onclick="saveClipConv()">💾 Save Clipboard Converter</button>
@@ -328,17 +335,29 @@
             </section>
         </section>
 
-        <section class="cfg-sec" data-sec="env" hidden>
+        <section class="cfg-sec" data-sec="ui" hidden>
             <section class="card config-card">
-            <div class="card-hdr">
-                <h2>Environment</h2>
-                <button class="btn" id="envCheckBtn" onclick="loadEnvironment()" style="margin-left:auto; padding:3px 10px; font-size:10px;">&#8635; Check</button>
+            <div class="card-hdr"><h2>Interface</h2></div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Theme · Alt+T cycles</label>
+                    <div id="uiThemeBox"></div>
+                </div>
+                <div class="field">
+                    <label>Dock position · Alt+P cycles</label>
+                    <select id="uiDockPos" onchange="saveDockPosition(this.value)">
+                        <option value="bottom">Bottom</option>
+                        <option value="top">Top</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                    </select>
+                </div>
             </div>
+            <div class="card-hdr" style="margin-top:16px"><h2>Dock pages</h2></div>
             <p style="font-size:10px; color:var(--text-dim); margin:0 0 10px;">
-                Tools this machine has for running tasks. Each row shows what the command, registry or connection actually returned.
+                The dock shows the checked pages. Changes apply at once and are saved for every page. Config always stays in the dock.
             </p>
-            <div class="env-stamp" id="envStamp"></div>
-            <div id="envList"></div>
+            <div class="ui-dock-list" id="uiDockList"></div>
             </section>
         </section>
 

@@ -448,18 +448,35 @@ internal sealed class ConfigHandler
         await HttpHelpers.WriteRawJson(response, raw);
     }
 
+    private static readonly SemaphoreSlim _uiLock = new(1, 1);
+
+    // Тело сливается с сохранённым по ключам верхнего уровня: тема, позиция и
+    // состав дока пишутся из разных мест, и каждый шлёт только своё поле.
     private static async Task SaveUiState(HttpListenerResponse response, string body)
     {
+        await _uiLock.WaitAsync();
         try
         {
-            JsonSerializer.Deserialize<JsonElement>(body);
-            await File.WriteAllTextAsync(UiStatePath, body, Encoding.UTF8);
+            var patch = JObject.Parse(body);
+            var state = new JObject();
+            if (File.Exists(UiStatePath))
+            {
+                // Битый файл не должен навсегда запрещать сохранение — начинаем с пустого.
+                try { state = JObject.Parse(await File.ReadAllTextAsync(UiStatePath, Encoding.UTF8)); }
+                catch (Newtonsoft.Json.JsonException) { }
+            }
+            state.Merge(patch, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace });
+            await File.WriteAllTextAsync(UiStatePath, state.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8);
             await HttpHelpers.WriteJson(response, new { ok = true });
         }
         catch (Exception ex)
         {
             response.StatusCode = 400;
-            await HttpHelpers.WriteJson(response, new { ok = false, error = ex.Message });
+            await HttpHelpers.WriteJson(response, new { ok = false, error = $"{ex.GetType().Name}: {ex.Message}" });
+        }
+        finally
+        {
+            _uiLock.Release();
         }
     }
 }

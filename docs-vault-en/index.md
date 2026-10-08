@@ -19,7 +19,7 @@ The windowed build targets Windows. The `net10.0` target builds without WinForms
 |---|---|---|
 | [[Tasker]] | Schedules and manual task runs | `Alt+1` |
 | [[ZP7]] | Task state and control through ZP nodes | `Alt+2` |
-| [[ZB]] | ZennoBoxer API data and processes | `Alt+3` |
+| [[Browser]] | ZennoBrowser and ShardX profiles: start, proxy, create | `Alt+3` |
 | [[Logs]] | Shared ZP7 log history, a window on [[ZP7]] | `Alt+4` |
 | [[Traffic]] | HTTP traffic and replay, a window on [[ZP7]] | `Alt+5` |
 | [[HAR]] | HAR archive viewer and replay | — |
@@ -27,9 +27,9 @@ The windowed build targets Windows. The `net10.0` target builds without WinForms
 | [[XML]] | XML tree viewing, formatting and search | `Alt+9` |
 | [[JSON]] | JSON viewing and analysis | `Alt+6` |
 | [[Text Tools]] | Text transforms | `Alt+7` |
-| [[Config]] | Database, server, OmniRoute and watchdog | `Alt+0` |
+| [[Config]] | Database, server, OmniRoute, watchdog and interface | `Alt+0` |
 | [[Clips]] | Reusable clipboard templates | `Alt+C` |
-| [[System Snapshot]] | Windows state snapshots | — |
+| [[System Snapshot]] | Windows state snapshots and machine tools | — |
 | [[dllGraph]] | C# code graph | `Alt+G` |
 | [[docsVault]] | This vault | `Alt+H` |
 | [[SQLite]] | Viewer for a chosen SQLite file | — |
