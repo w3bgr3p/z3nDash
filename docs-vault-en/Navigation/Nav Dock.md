@@ -40,7 +40,7 @@ These are bound in `nav.js` rather than in the item list, and they open nothing:
 | Hotkey | What it does |
 |---|---|
 | `Alt+X` | the OTP generator |
-| `Alt+T` | cycles through Dark, Light, Hyper and Graphite |
+| `Alt+T` | cycles through Graphite, Aluminium, Hyper and Paper |
 | `Alt+P` | moves the dock to the next edge |
 
 ## Also in the dock

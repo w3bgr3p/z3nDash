@@ -33,6 +33,13 @@ Changed fields from the **Settings** and **Schedule** tabs are saved to every
 selected task, while names remain individual. The `Delete` key removes the
 selected task or the whole selection after confirmation.
 
+## Resources
+
+RAM and CPU appear per task and in the header total. On Windows, each instance
+includes its child processes, including browsers. CPU is shown as a share of the
+whole machine after the second sample. z3nDash's own memory is separate;
+in-process XML runs are marked instead of receiving an individual memory figure.
+
 ## Schedule
 
 The UI can build:
@@ -77,7 +84,7 @@ Once the limit passes, the run is aborted, a line about the limit goes into the 
 How the abort happens depends on the executor:
 
 - an external process (`python`, `node`, `cmd`, `npm`, …) is killed together with its process tree — a real stop;
-- `internal`, `csx-internal` and `xml` get their `CancellationToken` cancelled. Cancellation is cooperative: `xml` checks the token between branches, and code that never looks at the token will not stop.
+- `xml` gets its `CancellationToken` cancelled. Cancellation is cooperative: it checks the token between branches, and code that never looks at the token will not stop.
 
 ## Control
 
@@ -92,6 +99,16 @@ Available actions:
 - open a terminal;
 - check and install Python and Node dependencies.
 
+Run, schedule pause/enable, Resume schedule, Restart, Interrupt and Eliminate
+apply to all selected tasks. Run queues the chosen count for each task; the
+header shows the selection count. Bulk controls continue after individual
+failures and collect errors into one message. Interrupt can also clear pending
+runs.
+
+`POST /tasker/run` accepts optional non-empty `args` for that manual batch. They
+replace saved arguments in the queued runs without changing the task; payload
+flags are still added. See [[Task API]].
+
 ## Output
 
 Output of the active run is streamed over SSE. Parallel instances each get their own `runId`.
@@ -105,6 +122,16 @@ details are in [[Traffic]]. The file rotates itself.
 ## Payload
 
 A payload consists of a schema and values. It can be edited, imported, exported and passed to the executor on start.
+
+Fields support type, title, argument flag, position, default value and enum;
+drag them to change their order. A command preview shows how values become
+arguments. Python `argparse` and `click` parameters can populate the schema by
+parsing the script without running it.
+
+**Skip empty** omits an empty value so the script uses its default. Otherwise
+the empty value is passed explicitly. Password fields are masked in the preview
+and the run log's `[launch]` line. Invalid argument conversion stops the run at
+`step=payload`.
 
 ## API
 

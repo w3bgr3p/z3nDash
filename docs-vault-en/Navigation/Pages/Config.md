@@ -56,7 +56,7 @@ The jVars section stores encrypted local variables and the path to the jVars fil
 
 ## Interface
 
-- the theme (`Alt+T` still cycles through the themes);
+- the theme: Graphite, Aluminium, Hyper or Paper (`Alt+T` cycles through them);
 - the screen edge for the [[Nav Dock]] (`Alt+P` moves it to the next edge);
 - **Dock pages** — which pages the dock shows. Config cannot be removed from the
   dock, otherwise the dock would offer no way back to the settings.

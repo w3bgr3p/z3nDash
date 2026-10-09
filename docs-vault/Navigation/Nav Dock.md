@@ -40,7 +40,7 @@ Dock подключается страницами через `wwwroot/js/nav.js
 | Хоткей | Что делает |
 |---|---|
 | `Alt+X` | генератор OTP |
-| `Alt+T` | переключает темы Dark, Light, Hyper и Graphite |
+| `Alt+T` | переключает темы Graphite, Aluminium, Hyper и Paper |
 | `Alt+P` | переносит док к следующему краю |
 
 ## Дополнительно
